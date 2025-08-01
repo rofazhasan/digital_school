@@ -21,7 +21,7 @@
 
 **Developer:** Md. Rofaz Hasan Rafiu  
 **Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io)  
+**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
 **GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
 **LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
 **Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
@@ -569,7 +569,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 **Made with ❤️ by Md. Rofaz Hasan Rafiu**
 
-[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://rofazhasan.github.io)
+[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://rofazhasan.github.io/rofaz-portfolio/)
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rofazhasan)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/md-rofaz-hasan-rafiu)
 [![Facebook](https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white)](https://facebook.com/rofazhasanrafiu)
