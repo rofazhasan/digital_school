@@ -21,7 +21,7 @@
 
 **Developer:** Md. Rofaz Hasan Rafiu  
 **Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io)  
+**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
 **GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
 **LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
 **Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
@@ -30,6 +30,28 @@
 **Version:** 0.1.0  
 **License:** ISC License  
 **Status:** Active Development  
+
+### 🎓 Educational Background
+- **Undergraduate:** Computer Science and Engineering at Rajshahi University of Engineering and Technology (RUET) - 2022-Present
+- **Higher Secondary:** St. Joseph Higher Secondary School (2021-2022) - Grade A+
+- **High School:** Kalihati R.S. Govt Pilot High School (2015-2020) - Grade A+
+
+### 💼 Professional Profile
+I'm a passionate student pursuing Computer Science and Engineering at RUET. With a keen interest in software engineering, IT, AI, and a penchant for content creation through YouTube and blogging, I am dedicated to innovation and problem-solving. My sincerity, modesty, and proficiency in both Bangla and English empower me to connect with diverse audiences, making me a versatile learner and contributor in the ever-evolving world of technology.
+
+### 🛠️ Technical Skills
+- **Programming Languages:** C (90%), C++ (60%), Python (50%), JavaScript (90%)
+- **Web Development:** HTML, CSS, JavaScript, React
+- **Database Management:** MySQL (70%), MongoDB
+- **Version Control:** Git, GitHub
+- **Software Tools:** Visual Studio Code, Sublime Text, Photoshop
+- **Problem Solving:** Analytical thinking and creative problem-solving abilities
+- **Team Collaboration:** Effective communication and teamwork skills
+
+### 🎯 Services Offered
+- **Web Design:** Crafting responsive and captivating websites tailored to your brand
+- **Advertising:** Strategic advertising solutions for digital and print media
+- **Apps Design:** Transforming ideas into intuitive and visually appealing mobile applications  
 
 ---
 
@@ -542,10 +564,21 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 **Developer:** Md. Rofaz Hasan Rafiu  
 **Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io)  
+**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
 **GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
 **LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
 **Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
+**Address:** Tangail, Dhaka, Bangladesh
+
+### 💼 Professional Services
+Feel free to reach out to me with any inquiries, project proposals, or just to say hello. I'm here to assist you with any questions you may have. Let's start a conversation and explore how we can collaborate to bring your ideas to life.
+
+**Services Available:**
+- 🎨 **Web Design & Development**
+- 📱 **Mobile App Development**
+- 📢 **Digital Advertising & Marketing**
+- 🤖 **AI & Machine Learning Solutions**
+- 📊 **Data Analysis & Visualization**
 
 ### Getting Help
 
@@ -553,6 +586,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 - 🐛 **Bug Reports:** Create an issue on GitHub
 - 💡 **Feature Requests:** Submit via GitHub issues
 - 💬 **Discussions:** Join our GitHub discussions
+- 📧 **Direct Contact:** mdrofazhasanrafiu@gmail.com
 
 ---
 
@@ -569,7 +603,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 **Made with ❤️ by Md. Rofaz Hasan Rafiu**
 
-[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://rofazhasan.github.io)
+[![Portfolio](https://img.shields.io/badge/Portfolio-000000?style=for-the-badge&logo=About.me&logoColor=white)](https://rofazhasan.github.io/rofaz-portfolio/)
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/rofazhasan)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/md-rofaz-hasan-rafiu)
 [![Facebook](https://img.shields.io/badge/Facebook-1877F2?style=for-the-badge&logo=facebook&logoColor=white)](https://facebook.com/rofazhasanrafiu)
