@@ -7,7 +7,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('🔍 CSV Download API called:', { 
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries())
+    });
+    
     const token = await getTokenFromRequest(request);
+    
+    console.log('🔍 CSV Token result:', { 
+      hasToken: !!token,
+      userRole: token?.user?.role,
+      userId: token?.user?.id
+    });
     
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });

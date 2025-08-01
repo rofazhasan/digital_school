@@ -195,12 +195,20 @@ export default function ExamResultsPage() {
         ? `/api/exams/results/${examId}/download`
         : `/api/exams/results/${examId}/download-simple`;
       
+      console.log('🔍 Download request:', { endpoint, format, examId });
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         credentials: 'include', // Include cookies for session authentication
+      });
+      
+      console.log('🔍 Download response:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        ok: response.ok 
       });
 
       if (response.ok) {
