@@ -17,21 +17,12 @@
 
 ---
 
-## 👨‍💻 Developer Information
-
-**Developer:** Md. Rofaz Hasan Rafiu  
-**Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
-**GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
-**LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
-**Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
 
 **Project:** Digital School Management System  
 **Version:** 0.1.0  
 **License:** ISC License  
 **Status:** Active Development  
 
----
 
 ## 🚀 Features
 
@@ -542,10 +533,21 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 **Developer:** Md. Rofaz Hasan Rafiu  
 **Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io)  
+**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
 **GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
 **LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
 **Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
+**Address:** Tangail, Dhaka, Bangladesh
+
+### 💼 Professional Services
+Feel free to reach out to me with any inquiries, project proposals, or just to say hello. I'm here to assist you with any questions you may have. Let's start a conversation and explore how we can collaborate to bring your ideas to life.
+
+**Services Available:**
+- 🎨 **Web Design & Development**
+- 📱 **Mobile App Development**
+- 📢 **Digital Advertising & Marketing**
+- 🤖 **AI & Machine Learning Solutions**
+- 📊 **Data Analysis & Visualization**
 
 ### Getting Help
 
@@ -553,6 +555,7 @@ OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 - 🐛 **Bug Reports:** Create an issue on GitHub
 - 💡 **Feature Requests:** Submit via GitHub issues
 - 💬 **Discussions:** Join our GitHub discussions
+- 📧 **Direct Contact:** mdrofazhasanrafiu@gmail.com
 
 ---
 
