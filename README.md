@@ -17,14 +17,6 @@
 
 ---
 
-## 👨‍💻 Developer Information
-
-**Developer:** Md. Rofaz Hasan Rafiu  
-**Email:** mdrofazhasanrafiu@gmail.com  
-**Portfolio:** [rofazhasan.github.io](https://rofazhasan.github.io/rofaz-portfolio/)  
-**GitHub:** [@rofazhasan](https://github.com/rofazhasan)  
-**LinkedIn:** [Md. Rofaz Hasan Rafiu](https://linkedin.com/in/md-rofaz-hasan-rafiu)  
-**Facebook:** [Rofaz Hasan Rafiu](https://facebook.com/rofazhasanrafiu)  
 
 **Project:** Digital School Management System  
 **Version:** 0.1.0  
