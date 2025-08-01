@@ -1,0 +1,35 @@
+{
+  "timestamp": "2025-07-27T10:34:01.499Z",
+  "totalSubmissions": 1,
+  "submissions": [
+    {
+      "id": "cmdlhysql0015wvzqh0sfbpwc",
+      "studentId": "cmdlgmx8x0004wvzqff9max1m",
+      "examId": "cmdlgxsqr000jwvzq09y4la4m",
+      "examSetId": "cmdlhij2p000vwvzq66ppor5t",
+      "answers": {
+        "cmdlgtn3b000dwvzq1haqfzcw": "সরণ ও দূরত্ব উভয়ই স্কেলার রাশি।",
+        "cmdlgtowi000fwvzq68b3bhyh": "বেগ",
+        "cmdlgtv1u000hwvzqrpr4i5m0": "2 m/s²",
+        "cmdlh1lf2000twvzqa82m2igj_images": [
+          {
+            "file": {},
+            "preview": "blob:http://localhost:3000/5a7259d2-2929-4d04-8307-9e373f365db9",
+            "timestamp": "2025-07-27T09:52:52.712Z",
+            "questionId": "cmdlh1lf2000twvzqa82m2igj",
+            "questionText": "A car starts from rest and accelerates uniformly to reach a velocity of 30 m/s in 6 seconds."
+          }
+        ]
+      },
+      "submittedAt": "2025-07-27T09:53:00.319Z",
+      "startedAt": null,
+      "score": 5,
+      "evaluatorNotes": null,
+      "evaluatedAt": null,
+      "studentName": "John Doe",
+      "studentEmail": "john@email.com",
+      "examName": "Rahi",
+      "examDescription": ""
+    }
+  ]
+}

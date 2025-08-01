@@ -1,0 +1,26 @@
+{
+  "name": "Digital School Question Bank",
+  "short_name": "QuestionBank",
+  "description": "World-class AI-powered question bank for schools and coaching.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    },
+    {
+      "src": "/vercel.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/vercel.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+} 

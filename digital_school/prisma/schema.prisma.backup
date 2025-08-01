@@ -1,0 +1,836 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String                     @id @default(cuid())
+  email             String?                    @unique
+  phone             String?                    @unique
+  password          String
+  role              Role                       @default(STUDENT)
+  name              String
+  avatar            String?
+  isActive          Boolean                    @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+  deletedAt         DateTime?
+  instituteId       String?
+  activityAudits    ActivityAudit[]
+  aiActivities      AIActivity[]
+  attendanceRecords Attendance[]               @relation("AttendanceTeacher")
+  badges            Badge[]                    @relation("UserBadges")
+  billing           Billing[]
+  chatSessions      ChatSession[]
+  examAssignments   ExamEvaluationAssignment[] @relation("ExamAssignmentCreator")
+  examEvaluations   ExamEvaluationAssignment[] @relation("ExamEvaluator")
+  examSets          ExamSet[]
+  drawings          ExamSubmissionDrawing[]
+  assignedExams     Exam[]                     @relation("ExamAssigner")
+  createdExams      Exam[]                     @relation("ExamCreator")
+  exportJobs        ExportJob[]
+  managedInstitute  Institute?                 @relation("InstituteSuperUser")
+  logs              Log[]
+  notices           Notice[]
+  notifications     Notification[]
+  questionBanks     QuestionBank[]
+  questions         Question[]
+  editedQuestions   Question[]                 @relation("EditedQuestions")
+  resultReviews     ResultReview[]             @relation("ResultReviewer")
+  studentProfile    StudentProfile?
+  teacherProfile    TeacherProfile?
+  institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
+
+  @@index([role])
+  @@index([instituteId])
+  @@index([createdAt])
+  @@index([isActive])
+  @@map("users")
+}
+
+model Institute {
+  id           String    @id @default(cuid())
+  name         String
+  address      String?
+  phone        String?
+  email        String?
+  website      String?
+  logoUrl      String?
+  signatureUrl String?
+  colorTheme   Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  superUserId  String?   @unique
+  classes      Class[]
+  superUser    User?     @relation("InstituteSuperUser", fields: [superUserId], references: [id])
+  settings     Settings?
+  users        User[]    @relation("InstituteUsers")
+
+  @@map("institutes")
+}
+
+model StudentProfile {
+  id               String                  @id @default(cuid())
+  roll             String
+  registrationNo   String                  @unique
+  guardianName     String
+  guardianPhone    String
+  guardianEmail    String?
+  address          String?
+  dateOfBirth      DateTime?
+  bloodGroup       String?
+  emergencyContact String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  userId           String                  @unique
+  classId          String
+  admitCards       AdmitCard[]
+  badges           Badge[]                 @relation("StudentBadges")
+  examStudentMaps  ExamStudentMap[]
+  drawings         ExamSubmissionDrawing[]
+  omrSheets        OMRSheet[]
+  resultReviews    ResultReview[]
+  results          Result[]
+  class            Class                   @relation(fields: [classId], references: [id])
+  user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([classId])
+  @@index([userId])
+  @@index([roll])
+  @@index([registrationNo])
+  @@index([createdAt])
+  @@map("student_profiles")
+}
+
+model TeacherProfile {
+  id            String         @id @default(cuid())
+  employeeId    String         @unique
+  department    String?
+  qualification String?
+  joiningDate   DateTime?
+  subjects      String[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  userId        String         @unique
+  questionBanks QuestionBank[] @relation("TeacherQuestionBanks")
+  questions     Question[]     @relation("TeacherQuestions")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("teacher_profiles")
+}
+
+model Class {
+  id           String    @id @default(cuid())
+  name         String
+  section      String
+  shift        String?
+  subjectGroup String?
+  capacity     Int       @default(40)
+  academicYear String?
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  instituteId  String
+  exams        Exam[]
+  notices      Notice[]  @relation("NoticeToClasses")
+  students     StudentProfile[]
+  questions    Question[] @relation("ClassQuestions")
+  attendance   Attendance[]
+  institute    Institute @relation(fields: [instituteId], references: [id])
+
+  @@unique([name, section, instituteId])
+  @@index([instituteId])
+  @@index([isActive])
+  @@index([createdAt])
+  @@map("classes")
+}
+
+model Exam {
+  id                    String                     @id @default(cuid())
+  name                  String
+  description           String?
+  date                  DateTime
+  startTime             DateTime
+  endTime               DateTime
+  duration              Int                        @default(60)
+  type                  ExamType
+  totalMarks            Int                        @default(100)
+  passMarks             Int                        @default(40)
+  isActive              Boolean                    @default(true)
+  allowRetake           Boolean                    @default(false)
+  instructions          String?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  createdById           String
+  assignedById          String?
+  classId               String
+  assignedAt            DateTime?
+  endDate               DateTime?
+  isPublished           Boolean                    @default(false)
+  passingMarks          Int                        @default(40)
+  startDate             DateTime?
+  generatedSet          Json?
+  negativeMarks         Float                      @default(0.0)
+  cqRequiredQuestions   Int                        @default(0)
+  cqTotalQuestions      Int                        @default(0)
+  sqRequiredQuestions   Int                        @default(0)
+  sqTotalQuestions      Int                        @default(0)
+  admitCards            AdmitCard[]
+  evaluationAssignments ExamEvaluationAssignment[]
+  examSets              ExamSet[]
+  examStudentMaps       ExamStudentMap[]
+  drawings              ExamSubmissionDrawing[]
+  assignedBy            User?                      @relation("ExamAssigner", fields: [assignedById], references: [id])
+  class                 Class                      @relation(fields: [classId], references: [id])
+  createdBy             User                       @relation("ExamCreator", fields: [createdById], references: [id])
+  omrSheets             OMRSheet[]
+  resultReviews         ResultReview[]
+  results               Result[]
+
+  @@index([classId])
+  @@index([createdById])
+  @@index([type])
+  @@index([isActive])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@index([startDate])
+  @@index([endDate])
+  @@map("exams")
+}
+
+model Question {
+  id                     String                   @id @default(cuid())
+  type                   QuestionType
+  subject                String
+  chapter                String?
+  questionText           String
+  modelAnswer            String?
+  modelAnswer_bn         String?
+  modelAnswer_en         String?
+  tags                   String[]
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  createdById            String
+  clonedFromId           String?
+  subQuestions           Json?
+  isAiGenerated          Boolean                  @default(false)
+  teacherProfileId       String?
+  topic                  String?
+  classId                String
+  editedById             String?
+  isPrivate              Boolean                  @default(false)
+  lastEditedAt           DateTime?
+  marks                  Int
+  usageCount             Int                      @default(0)
+  options                Json?
+  difficulty             Difficulty
+  hasMath                Boolean                  @default(false)
+  images                 String[]
+  answerLatex            String?
+  difficultyDetail       String?
+  questionLatex          String?
+  referenceFiles         String[]
+  status                 QuestionStatus           @default(DRAFT)
+  title_bn               String?
+  title_en               String?
+  versions               QuestionVersion[]        @relation("QuestionVersions")
+  QuestionToQuestionBank QuestionToQuestionBank[]
+  class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])
+  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clones                 Question[]               @relation("ClonedQuestion")
+  createdBy              User                     @relation(fields: [createdById], references: [id])
+  editedBy               User?                    @relation("EditedQuestions", fields: [editedById], references: [id])
+  TeacherProfile         TeacherProfile?          @relation("TeacherQuestions", fields: [teacherProfileId], references: [id])
+  examSets               ExamSet[]                @relation("ExamSetToQuestion")
+
+  @@index([classId])
+  @@index([type])
+  @@index([subject])
+  @@index([difficulty])
+  @@index([createdById])
+  @@index([isPrivate])
+  @@index([createdAt])
+  @@index([usageCount])
+  @@map("questions")
+}
+
+model QuestionBank {
+  id                     String                   @id @default(cuid())
+  name                   String
+  description            String?
+  subject                String
+  chapter                String?
+  isActive               Boolean                  @default(true)
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+  createdById            String
+  teacherId              String?
+  QuestionToQuestionBank QuestionToQuestionBank[]
+  createdBy              User                     @relation(fields: [createdById], references: [id])
+  teacher                TeacherProfile?          @relation("TeacherQuestionBanks", fields: [teacherId], references: [id])
+  examSets               ExamSet[]                @relation("ExamSetToQuestionBank")
+
+  @@map("question_banks")
+}
+
+model ExamSet {
+  id              String           @id @default(cuid())
+  name            String
+  description     String?
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  createdById     String
+  examId          String
+  questionsJson   Json?
+  createdBy       User             @relation(fields: [createdById], references: [id])
+  exam            Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examStudentMaps ExamStudentMap[]
+  omrSheets       OMRSheet[]
+  questions       Question[]       @relation("ExamSetToQuestion")
+  questionBanks   QuestionBank[]   @relation("ExamSetToQuestionBank")
+
+  @@unique([name, examId])
+  @@map("exam_sets")
+}
+
+model ExamStudentMap {
+  id        String         @id @default(cuid())
+  isActive  Boolean        @default(true)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  studentId String
+  examId    String
+  examSetId String?
+  exam      Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examSet   ExamSet?       @relation(fields: [examSetId], references: [id])
+  student   StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, examId])
+  @@map("exam_student_maps")
+}
+
+model OMRSheet {
+  id            String          @id @default(cuid())
+  qrCode        String          @unique
+  scannedData   Json?
+  resultData    Json?
+  isProcessed   Boolean         @default(false)
+  scanSessionId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  studentId     String
+  examId        String
+  examSetId     String?
+  exam          Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examSet       ExamSet?        @relation(fields: [examSetId], references: [id])
+  scanSession   OMRScanSession? @relation(fields: [scanSessionId], references: [id])
+  student       StudentProfile  @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, examId, examSetId])
+  @@map("omr_sheets")
+}
+
+model AdmitCard {
+  id           String         @id @default(cuid())
+  qrCode       String         @unique
+  examCenter   String?
+  roomNumber   String?
+  seatNumber   String?
+  instructions String?
+  isPrinted    Boolean        @default(false)
+  printedAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  studentId    String
+  examId       String
+  exam         Exam           @relation(fields: [examId], references: [id])
+  student      StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, examId])
+  @@map("admit_cards")
+}
+
+model Attendance {
+  id        String   @id @default(cuid())
+  date      DateTime
+  present   String[]
+  absent    String[]
+  late      String[]
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teacherId String
+  classId   String
+  class     Class    @relation(fields: [classId], references: [id])
+  teacher   User     @relation("AttendanceTeacher", fields: [teacherId], references: [id])
+
+  @@unique([date, classId])
+  @@map("attendance")
+}
+
+model Result {
+  id               String         @id @default(cuid())
+  mcqMarks         Float          @default(0)
+  cqMarks          Float          @default(0)
+  total            Float          @default(0)
+  rank             Int?
+  grade            String?
+  percentage       Float?
+  comment          String?
+  isPublished      Boolean        @default(false)
+  publishedAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  examSubmissionId String?        @unique
+  sqMarks          Float          @default(0)
+  status           String?        @default("PUBLISHED")
+  suspensionReason String?
+  examId           String
+  studentId        String
+  exam             Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student          StudentProfile @relation(fields: [studentId], references: [id])
+
+  @@unique([studentId, examId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+  @@index([isPublished])
+  @@index([createdAt])
+  @@index([rank])
+  @@map("results")
+}
+
+model Badge {
+  id          String         @id @default(cuid())
+  title       String
+  type        BadgeType
+  description String?
+  condition   String?
+  issuedDate  DateTime       @default(now())
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  earnedById  String
+  studentId   String
+  earnedBy    User           @relation("UserBadges", fields: [earnedById], references: [id])
+  student     StudentProfile @relation("StudentBadges", fields: [studentId], references: [id])
+
+  @@map("badges")
+}
+
+model Notice {
+  id             String       @id @default(cuid())
+  title          String
+  description    String
+  targetClassIds String[]
+  targetType     NoticeTarget
+  isActive       Boolean      @default(true)
+  expiresAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  postedById     String
+  postedBy       User         @relation(fields: [postedById], references: [id])
+  targetClasses  Class[]      @relation("NoticeToClasses")
+
+  @@map("notices")
+}
+
+model AIActivity {
+  id           String   @id @default(cuid())
+  activityType String
+  usageCount   Int      @default(1)
+  tokenCost    Float?
+  responseTime Int?
+  success      Boolean  @default(true)
+  errorMessage String?
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@map("ai_activities")
+}
+
+model Log {
+  id        String     @id @default(cuid())
+  action    ActionType
+  context   Json?
+  ipAddress String?
+  userAgent String?
+  timestamp DateTime   @default(now())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+
+  @@map("logs")
+}
+
+model Settings {
+  id            String    @id @default(cuid())
+  instituteName String
+  logoUrl       String?
+  signatureUrl  String?
+  colorTheme    Json?
+  contactInfo   Json?
+  features      Json?
+  limits        Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  instituteId   String    @unique
+  institute     Institute @relation(fields: [instituteId], references: [id])
+
+  @@map("settings")
+}
+
+model OMRScanSession {
+  id             String     @id @default(cuid())
+  sessionName    String
+  examinerId     String
+  filesUploaded  String[]
+  failedFiles    String[]
+  totalFiles     Int        @default(0)
+  processedFiles Int        @default(0)
+  isCompleted    Boolean    @default(false)
+  completedAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  omrSheets      OMRSheet[]
+
+  @@map("omr_scan_sessions")
+}
+
+model StripePlan {
+  id          String    @id @default(cuid())
+  planId      String    @unique
+  name        String
+  description String?
+  price       Float
+  currency    String    @default("USD")
+  interval    String
+  limits      Json?
+  features    Json?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  billing     Billing[]
+
+  @@map("stripe_plans")
+}
+
+model Billing {
+  id                   String        @id @default(cuid())
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  status               BillingStatus @default(ACTIVE)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  nextPaymentDue       DateTime?
+  amount               Float?
+  currency             String        @default("USD")
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+  userId               String
+  planId               String
+  plan                 StripePlan    @relation(fields: [planId], references: [id])
+  user                 User          @relation(fields: [userId], references: [id])
+
+  @@map("billing")
+}
+
+model ExportJob {
+  id            String          @id @default(cuid())
+  type          ExportJobType
+  status        ExportJobStatus @default(PENDING)
+  downloadUrl   String?
+  fileSize      Int?
+  errorMessage  String?
+  metadata      Json?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  triggeredById String
+  triggeredBy   User            @relation(fields: [triggeredById], references: [id])
+
+  @@map("export_jobs")
+}
+
+model ChatSession {
+  id        String        @id @default(cuid())
+  title     String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  userId    String
+  messages  ChatMessage[]
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@map("chat_sessions")
+}
+
+model ChatMessage {
+  id         String      @id @default(cuid())
+  prompt     String
+  response   String
+  tokensUsed Int?
+  createdAt  DateTime    @default(now())
+  sessionId  String
+  session    ChatSession @relation(fields: [sessionId], references: [id])
+
+  @@map("chat_messages")
+}
+
+model ActivityAudit {
+  id        String   @id @default(cuid())
+  date      DateTime
+  module    String
+  action    String
+  count     Int      @default(0)
+  metadata  Json?
+  createdAt DateTime @default(now())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@unique([date, module, userId])
+  @@map("activity_audits")
+}
+
+model QuestionVersion {
+  id            String   @id @default(cuid())
+  questionId    String
+  versionNumber Int
+  data          Json
+  createdAt     DateTime @default(now())
+  question      Question @relation("QuestionVersions", fields: [questionId], references: [id])
+}
+
+model QuestionToQuestionBank {
+  A              String
+  B              String
+  questions      Question     @relation(fields: [A], references: [id], onDelete: Cascade)
+  question_banks QuestionBank @relation(fields: [B], references: [id], onDelete: Cascade)
+
+  @@id([A, B], map: "_QuestionToQuestionBank_AB_pkey")
+  @@index([B], map: "_QuestionToQuestionBank_B_index")
+  @@map("_QuestionToQuestionBank")
+}
+
+model ExamSubmission {
+  id               String         @id @default(cuid())
+  studentId        String
+  examId           String
+  answers          Json
+  submittedAt      DateTime       @default(now())
+  score            Float?
+  evaluatedAt      DateTime?
+  evaluatorNotes   String?
+  examSetId        String?
+  startedAt        DateTime?
+  status           String?        @default("SUBMITTED")
+  suspensionReason String?
+  result           Result?
+  resultReviews    ResultReview[]
+
+  @@unique([studentId, examId])
+  @@index([examId])
+  @@index([studentId])
+  @@index([status])
+  @@index([submittedAt])
+  @@index([evaluatedAt])
+  @@index([examSetId])
+  @@index([startedAt])
+  @@map("exam_submissions")
+}
+
+model ExamSubmissionDrawing {
+  id                String         @id @default(cuid())
+  studentId         String
+  questionId        String
+  examId            String
+  imageData         String
+  originalImagePath String
+  evaluatorId       String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  imageIndex        Int            @default(0)
+  evaluator         User           @relation(fields: [evaluatorId], references: [id])
+  exam              Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student           StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, questionId, imageIndex])
+  @@map("exam_submission_drawings")
+}
+
+model ExamEvaluationAssignment {
+  id           String           @id @default(cuid())
+  examId       String
+  evaluatorId  String
+  assignedById String
+  assignedAt   DateTime         @default(now())
+  status       EvaluationStatus @default(PENDING)
+  notes        String?
+  completedAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  assignedBy   User             @relation("ExamAssignmentCreator", fields: [assignedById], references: [id])
+  evaluator    User             @relation("ExamEvaluator", fields: [evaluatorId], references: [id])
+  exam         Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, evaluatorId])
+  @@map("exam_evaluation_assignments")
+}
+
+model ResultReview {
+  id               String         @id @default(cuid())
+  examId           String
+  studentId        String
+  studentComment   String
+  evaluatorComment String?
+  status           ReviewStatus   @default(PENDING)
+  requestedAt      DateTime       @default(now())
+  reviewedAt       DateTime?
+  reviewedById     String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  examSubmissionId String
+  exam             Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  reviewer         User?          @relation("ResultReviewer", fields: [reviewedById], references: [id])
+  student          StudentProfile @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  examSubmission   ExamSubmission @relation(fields: [examSubmissionId], references: [id], onDelete: Cascade)
+
+  @@unique([examId, studentId])
+  @@map("result_reviews")
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  userId      String
+  title       String
+  message     String
+  type        NotificationType @default(INFO)
+  isRead      Boolean          @default(false)
+  relatedId   String?
+  relatedType String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  SUPER_USER
+}
+
+enum QuestionType {
+  MCQ
+  CQ
+  SQ
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum ExamType {
+  ONLINE
+  OFFLINE
+  MIXED
+}
+
+enum BadgeType {
+  ACHIEVEMENT
+  PARTICIPATION
+  EXCELLENCE
+  MILESTONE
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+}
+
+enum NoticeTarget {
+  ALL
+  STUDENTS
+  TEACHERS
+  ADMINS
+  SPECIFIC_CLASS
+}
+
+enum ActionType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXAM_START
+  EXAM_SUBMIT
+  OMR_SCAN
+  CQ_EVALUATE
+  AI_GENERATE
+  EXPORT
+  PRINT
+}
+
+enum ExportJobType {
+  PDF
+  CSV
+  EXCEL
+}
+
+enum ExportJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum BillingStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  PENDING
+}
+
+enum EvaluationStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+}
+
+enum ReviewStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+  REVIEW_RESPONSE
+}
+
+enum QuestionStatus {
+  APPROVED
+  NEEDS_REVIEW
+  DRAFT
+}
