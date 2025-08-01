@@ -140,10 +140,31 @@ function generateCSVResults(data: CSVData): string {
     day: 'numeric'
   });
 
+  // Helper function to sanitize text for CSV
+  function sanitizeText(text: string): string {
+    if (!text) return '';
+    // Remove or replace Unicode characters that cause issues
+    return text.replace(/[^\x00-\x7F]/g, (char) => {
+      // Replace Bengali/Unicode characters with ASCII equivalents or remove them
+      const replacements: { [key: string]: string } = {
+        'আ': 'A', 'ব': 'B', 'গ': 'G', 'ঘ': 'Gh', 'ঙ': 'Ng',
+        'চ': 'Ch', 'ছ': 'Chh', 'জ': 'J', 'ঝ': 'Jh', 'ঞ': 'Ny',
+        'ট': 'T', 'ঠ': 'Th', 'ড': 'D', 'ঢ': 'Dh', 'ণ': 'N',
+        'ত': 'T', 'থ': 'Th', 'দ': 'D', 'ধ': 'Dh', 'ন': 'N',
+        'প': 'P', 'ফ': 'Ph', 'ব': 'B', 'ভ': 'Bh', 'ম': 'M',
+        'য': 'Y', 'র': 'R', 'ল': 'L', 'শ': 'Sh', 'ষ': 'Sh',
+        'স': 'S', 'হ': 'H', 'ড়': 'R', 'ঢ়': 'Rh', 'য়': 'Y',
+        'ৎ': 'K', 'ং': 'Ng', 'ঃ': 'H', 'ঁ': 'N',
+        // Add more replacements as needed
+      };
+      return replacements[char] || '?';
+    });
+  }
+
   // Create English CSV header
-  let csv = `"${institute?.name || 'Educational Institute'}"\n`;
-  csv += `"Class: ${exam.class.name} ${exam.class.section}"\n`;
-  csv += `"Exam: ${exam.name}"\n`;
+  let csv = `"${sanitizeText(institute?.name || 'Educational Institute')}"\n`;
+  csv += `"Class: ${sanitizeText(exam.class.name)} ${sanitizeText(exam.class.section)}"\n`;
+  csv += `"Exam: ${sanitizeText(exam.name)}"\n`;
   csv += `"Total Marks: ${exam.totalMarks} | Pass Marks: ${exam.passMarks}"\n\n`;
   
   // Add results table with English headers
@@ -151,13 +172,13 @@ function generateCSVResults(data: CSVData): string {
   
   results.forEach((result, index) => {
     const comment = result.total >= exam.passMarks ? 'Pass' : 'Fail';
-    csv += `"${index + 1}","${result.student.roll}","${result.student.user.name}","${result.total}","${result.rank || 'N/A'}","${comment}"\n`;
+    csv += `"${index + 1}","${sanitizeText(result.student.roll)}","${sanitizeText(result.student.user.name)}","${result.total}","${result.rank || 'N/A'}","${comment}"\n`;
   });
   
   // Add summary in English
   csv += `\n"Summary: Out of ${statistics.totalStudents} students, ${statistics.passCount} students passed the examination."\n`;
   csv += `"Generated on: ${currentDate}"\n`;
-  csv += `"Head Master: ${institute?.name || 'Educational Institute'}"\n`;
+  csv += `"Head Master: ${sanitizeText(institute?.name || 'Educational Institute')}"\n`;
   csv += `"QR Code for verification: ${exam.id}"\n`;
   
   return csv;
