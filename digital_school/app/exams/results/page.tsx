@@ -108,7 +108,9 @@ export default function ExamResultsPage() {
       setLoading(true);
       
       // Fetch current user
-      const userResponse = await fetch('/api/user');
+      const userResponse = await fetch('/api/user', {
+        credentials: 'include'
+      });
       if (!userResponse.ok) {
         if (userResponse.status === 401) {
         router.push('/login');
@@ -120,7 +122,9 @@ export default function ExamResultsPage() {
       setUser(userData);
 
       // Fetch results based on user role
-      const resultsResponse = await fetch('/api/exams/results/all');
+      const resultsResponse = await fetch('/api/exams/results/all', {
+        credentials: 'include'
+      });
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
         // Handle different possible data structures
@@ -196,6 +200,7 @@ export default function ExamResultsPage() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for session authentication
       });
 
       if (response.ok) {
