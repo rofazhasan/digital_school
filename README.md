@@ -31,29 +31,6 @@
 **License:** ISC License  
 **Status:** Active Development  
 
-### 🎓 Educational Background
-- **Undergraduate:** Computer Science and Engineering at Rajshahi University of Engineering and Technology (RUET) - 2022-Present
-- **Higher Secondary:** St. Joseph Higher Secondary School (2021-2022) - Grade A+
-- **High School:** Kalihati R.S. Govt Pilot High School (2015-2020) - Grade A+
-
-### 💼 Professional Profile
-I'm a passionate student pursuing Computer Science and Engineering at RUET. With a keen interest in software engineering, IT, AI, and a penchant for content creation through YouTube and blogging, I am dedicated to innovation and problem-solving. My sincerity, modesty, and proficiency in both Bangla and English empower me to connect with diverse audiences, making me a versatile learner and contributor in the ever-evolving world of technology.
-
-### 🛠️ Technical Skills
-- **Programming Languages:** C (90%), C++ (60%), Python (50%), JavaScript (90%)
-- **Web Development:** HTML, CSS, JavaScript, React
-- **Database Management:** MySQL (70%), MongoDB
-- **Version Control:** Git, GitHub
-- **Software Tools:** Visual Studio Code, Sublime Text, Photoshop
-- **Problem Solving:** Analytical thinking and creative problem-solving abilities
-- **Team Collaboration:** Effective communication and teamwork skills
-
-### 🎯 Services Offered
-- **Web Design:** Crafting responsive and captivating websites tailored to your brand
-- **Advertising:** Strategic advertising solutions for digital and print media
-- **Apps Design:** Transforming ideas into intuitive and visually appealing mobile applications  
-
----
 
 ## 🚀 Features
 
