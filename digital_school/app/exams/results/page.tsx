@@ -340,6 +340,33 @@ export default function ExamResultsPage() {
             </Badge>
           </div>
         )}
+        
+        {/* Debug button for testing authentication */}
+        {canViewAllResults && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={async () => {
+              try {
+                const response = await fetch('/api/test-auth', {
+                  credentials: 'include'
+                });
+                const data = await response.json();
+                console.log('🔍 Test Auth Response:', data);
+                if (response.ok) {
+                  toast.success('Authentication test successful');
+                } else {
+                  toast.error(`Auth test failed: ${data.error}`);
+                }
+              } catch (error) {
+                console.error('Auth test error:', error);
+                toast.error('Auth test failed');
+              }
+            }}
+          >
+            Test Auth
+          </Button>
+        )}
       </div>
 
       {/* Filters and Search - Only for non-students */}
