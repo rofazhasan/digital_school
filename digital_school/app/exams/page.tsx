@@ -41,6 +41,11 @@ type Exam = {
   createdAt?: string;
   type?: 'ONLINE' | 'OFFLINE' | 'MIXED';
   allowRetake?: boolean;
+  mcqNegativeMarking?: number;
+  cqTotalQuestions?: number;
+  cqRequiredQuestions?: number;
+  sqTotalQuestions?: number;
+  sqRequiredQuestions?: number;
 };
 
 type FilterState = {
@@ -675,6 +680,12 @@ export default function ExamsPage() {
                                 Retake Allowed
                               </Badge>
                             )}
+                            
+                            {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 && (
+                              <Badge variant="outline" className="text-red-600 border-red-600">
+                                -{exam.mcqNegativeMarking}% MCQ
+                              </Badge>
+                            )}
                           </div>
                         </CardHeader>
 
@@ -715,6 +726,27 @@ export default function ExamsPage() {
                                 {exam.createdBy || 'Unknown'}
                               </p>
                             </div>
+                            
+                            {(exam.cqTotalQuestions || exam.sqTotalQuestions) && (
+                              <div className="col-span-2">
+                                <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
+                                  <FileText className="w-3 h-3" />
+                                  Question Selection
+                                </div>
+                                <div className="flex gap-2 text-xs">
+                                  {exam.cqTotalQuestions && (
+                                    <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded">
+                                      CQ: {exam.cqRequiredQuestions || 5}/{exam.cqTotalQuestions}
+                                    </span>
+                                  )}
+                                  {exam.sqTotalQuestions && (
+                                    <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 px-2 py-1 rounded">
+                                      SQ: {exam.sqRequiredQuestions || 5}/{exam.sqTotalQuestions}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">

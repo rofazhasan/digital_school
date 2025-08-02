@@ -29,6 +29,30 @@ const schema = z.object({
   classId: z.string().min(1, "Class is required"),
   allowRetake: z.boolean().optional(),
   instructions: z.string().optional(),
+  // Negative marking for MCQs (percentage)
+  mcqNegativeMarking: z.coerce.number().min(0).max(100).optional(),
+  // Question selection settings
+  cqTotalQuestions: z.coerce.number().min(0).optional(),
+  cqRequiredQuestions: z.coerce.number().min(0).optional(),
+  sqTotalQuestions: z.coerce.number().min(0).optional(),
+  sqRequiredQuestions: z.coerce.number().min(0).optional(),
+}).refine((data) => {
+  // Validate that required questions don't exceed total questions
+  // Allow both to be 0 (no questions of this type)
+  if (data.cqRequiredQuestions !== undefined && data.cqTotalQuestions !== undefined) {
+    if (data.cqRequiredQuestions > data.cqTotalQuestions) {
+      return false;
+    }
+  }
+  if (data.sqRequiredQuestions !== undefined && data.sqTotalQuestions !== undefined) {
+    if (data.sqRequiredQuestions > data.sqTotalQuestions) {
+      return false;
+    }
+  }
+  return true;
+}, {
+  message: "Required questions cannot exceed total questions",
+  path: ["cqRequiredQuestions", "sqRequiredQuestions"]
 });
 
 type ExamForm = z.infer<typeof schema>;
@@ -57,6 +81,11 @@ export default function CreateExamPage() {
       classId: "",
       allowRetake: false,
       instructions: "",
+      mcqNegativeMarking: 0,
+      cqTotalQuestions: 8,
+      cqRequiredQuestions: 5,
+      sqTotalQuestions: 15,
+      sqRequiredQuestions: 5,
     },
   });
 
@@ -267,6 +296,79 @@ export default function CreateExamPage() {
                         <FormMessage />
                       </FormItem>
                     )} />
+                    
+                    {/* Negative Marking Section */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Negative Marking Settings</h3>
+                      <FormField name="mcqNegativeMarking" control={form.control} render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>MCQ Negative Marking (%)</FormLabel>
+                          <FormControl>
+                            <Input 
+                              type="number" 
+                              min={0} 
+                              max={100} 
+                              step={0.25}
+                              placeholder="0" 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormMessage />
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            Percentage of marks to deduct for wrong MCQ answers (e.g., 25% = 0.25 marks deducted for 1 mark question)
+                          </p>
+                        </FormItem>
+                      )} />
+                    </div>
+
+                    {/* Question Selection Settings */}
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Question Selection Settings</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h4 className="font-medium text-gray-800 dark:text-gray-200">Creative Questions (CQ)</h4>
+                          <FormField name="cqTotalQuestions" control={form.control} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Questions Available</FormLabel>
+                              <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField name="cqRequiredQuestions" control={form.control} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Questions to Answer</FormLabel>
+                              <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                              <FormMessage />
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Students must answer this many questions from the available options
+                              </p>
+                            </FormItem>
+                          )} />
+                        </div>
+                        
+                        <div className="space-y-4">
+                          <h4 className="font-medium text-gray-800 dark:text-gray-200">Short Questions (SQ)</h4>
+                          <FormField name="sqTotalQuestions" control={form.control} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Total Questions Available</FormLabel>
+                              <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                          <FormField name="sqRequiredQuestions" control={form.control} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Questions to Answer</FormLabel>
+                              <FormControl><Input type="number" min={0} {...field} /></FormControl>
+                              <FormMessage />
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                Students must answer this many questions from the available options
+                              </p>
+                            </FormItem>
+                          )} />
+                        </div>
+                      </div>
+                    </div>
                     
                     {classes.length === 0 && !classesLoading && (
                       <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">

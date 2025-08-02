@@ -1,4 +1,7 @@
 @import url('https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css');
+@import url('https://fonts.googleapis.com/css2?family=SolaimanLipi:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;700&display=swap');
 
 @font-face {
   font-family: 'OMRBubbles';
@@ -7,7 +10,7 @@
   font-style: normal;
 }
 .omr-bubble-font {
-  font-family: 'OMRBubbles', 'Baloo Da 2', 'Noto Serif Bengali', Arial, sans-serif !important;
+  font-family: 'OMRBubbles', 'Baloo Da 2', 'Noto Sans Bengali', Arial, sans-serif !important;
   font-size: 1.2em;
   letter-spacing: 0.05em;
 }
@@ -28,6 +31,11 @@
   @page {
     size: 8.5in 14in;
     margin: 8mm 6mm 8mm 6mm;
+  }
+  
+  /* Font settings for print */
+  body, .question-paper-container, .answer-paper-container {
+    font-family: 'SolaimanLipi', 'Times New Roman', serif !important;
   }
   .break-after-page, .print-break-page {
     break-after: page !important;
@@ -51,7 +59,7 @@
     counter-increment: page;
     content: "পৃষ্ঠা: " counter(page);
     font-size: 1rem;
-    font-family: 'Noto Serif Bengali', serif;
+    font-family: 'SolaimanLipi', serif;
   }
   body {
     counter-reset: page;

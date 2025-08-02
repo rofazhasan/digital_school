@@ -15,7 +15,7 @@ const createPrismaClient = () => {
             },
         },
         // Connection pooling settings for better performance
-        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+        log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
 };
 

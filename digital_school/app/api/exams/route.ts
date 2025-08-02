@@ -50,6 +50,11 @@ export async function GET(request: NextRequest) {
         generatedSet: exam.generatedSet || null,
         type: exam.type,
         allowRetake: exam.allowRetake || false,
+        mcqNegativeMarking: exam.mcqNegativeMarking || 0,
+        cqTotalQuestions: exam.cqTotalQuestions || 0,
+        cqRequiredQuestions: exam.cqRequiredQuestions || 0,
+        sqTotalQuestions: exam.sqTotalQuestions || 0,
+        sqRequiredQuestions: exam.sqRequiredQuestions || 0,
       };
 
       // Cache the result for 2 minutes
@@ -98,6 +103,11 @@ export async function GET(request: NextRequest) {
       createdAt: exam.createdAt,
       type: exam.type,
       allowRetake: exam.allowRetake || false,
+      mcqNegativeMarking: exam.mcqNegativeMarking || 0,
+      cqTotalQuestions: exam.cqTotalQuestions || 0,
+      cqRequiredQuestions: exam.cqRequiredQuestions || 0,
+      sqTotalQuestions: exam.sqTotalQuestions || 0,
+      sqRequiredQuestions: exam.sqRequiredQuestions || 0,
     }));
 
     // Cache the result for 1 minute
@@ -131,36 +141,46 @@ export async function POST(request: NextRequest) {
       classId,
       allowRetake,
       instructions,
+      mcqNegativeMarking,
+      cqTotalQuestions,
+      cqRequiredQuestions,
+      sqTotalQuestions,
+      sqRequiredQuestions,
     } = body;
 
     if (!name || !date || !startTime || !endTime || !duration || !type || !totalMarks || !passMarks || !classId) {
       return createApiResponse(null, 'Missing required fields', 400);
     }
 
-    const createdExam = await safeDatabaseOperation(
-      async () => {
-        const db = await DatabaseClient.getInstance();
-        return await db.exam.create({
-          data: {
-            name,
-            description,
-            date: new Date(date),
-            startTime: new Date(startTime),
-            endTime: new Date(endTime),
-            duration,
-            type,
-            totalMarks,
-            passMarks,
-            isActive: false,
-            allowRetake: allowRetake || false,
-            instructions,
-            classId,
-            createdById: auth.user.id,
+            const createdExam = await safeDatabaseOperation(
+          async () => {
+            const db = await DatabaseClient.getInstance();
+            return await db.exam.create({
+              data: {
+                name,
+                description,
+                date: new Date(date),
+                startTime: new Date(startTime),
+                endTime: new Date(endTime),
+                duration,
+                type,
+                totalMarks,
+                passMarks,
+                isActive: false,
+                allowRetake: allowRetake || false,
+                instructions,
+                mcqNegativeMarking: mcqNegativeMarking || 0,
+                cqTotalQuestions: cqTotalQuestions ?? 8,
+                cqRequiredQuestions: cqRequiredQuestions ?? 5,
+                sqTotalQuestions: sqTotalQuestions ?? 15,
+                sqRequiredQuestions: sqRequiredQuestions ?? 5,
+                classId,
+                createdById: auth.user.id,
+              },
+            });
           },
-        });
-      },
-      'Create exam'
-    );
+          'Create exam'
+        );
 
     // Invalidate exams cache
     DatabaseCache.invalidate('exams');

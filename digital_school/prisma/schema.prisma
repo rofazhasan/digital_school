@@ -153,6 +153,13 @@ model Exam {
   isActive              Boolean                    @default(false)
   allowRetake           Boolean                    @default(false)
   instructions          String?
+  // Negative marking for MCQs (percentage)
+  mcqNegativeMarking    Float?                    @default(0)
+  // Question selection settings
+  cqTotalQuestions      Int?                      @default(8)
+  cqRequiredQuestions   Int?                      @default(5)
+  sqTotalQuestions      Int?                      @default(15)
+  sqRequiredQuestions   Int?                      @default(5)
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
   createdById           String

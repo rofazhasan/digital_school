@@ -124,6 +124,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "6.6.4",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20.19.1",
     "@types/papaparse": "^5.3.16",
@@ -132,6 +133,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.3.4",
+    "jest-environment-jsdom": "30.0.5",
     "prisma": "6.10.1",
     "tailwindcss": "^4",
     "tsx": "^4.20.3",

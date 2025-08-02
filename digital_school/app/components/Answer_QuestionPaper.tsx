@@ -8,19 +8,21 @@ interface MCQ {
   q: string;
   options: { text: string }[];
   marks?: number;
+  correctAnswer?: string; // The correct option (A, B, C, D or ক, খ, গ, ঘ)
 }
 interface CQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
   subQuestions?: any[];
+  subAnswers?: string[]; // Array of answers for sub-questions
 }
 interface SQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
 }
-interface QuestionPaperProps {
+interface AnswerQuestionPaperProps {
   examInfo: {
     schoolName: string;
     schoolAddress: string;
@@ -46,22 +48,13 @@ interface QuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
-// Helper to chunk an array into N-sized pieces
-function chunkArray<T>(arr: T[], size: number): T[][] {
-  const res: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) {
-    res.push(arr.slice(i, i + size));
-  }
-  return res;
-}
-
 // Helper to render text with react-latex
 const Text = ({ children }: { children: string }) => (
   <Latex>{children}</Latex>
 );
 
-// Main QuestionPaper component (forwardRef for printing)
-const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
+// Main AnswerQuestionPaper component (forwardRef for printing)
+const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>(
   ({ examInfo, questions, qrData }, ref) => {
     const mcqs = questions.mcq || [];
     const cqs = questions.cq || [];
@@ -120,7 +113,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const mcqPages = getMCQPages();
 
     return (
-      <div ref={ref} className="question-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+      <div ref={ref} className="answer-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
         {/* Header */}
         <header className="text-center mb-4 relative border-b-2 border-black pb-2">
           <div className="absolute top-0 right-0">
@@ -137,6 +130,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             {examInfo.duration && <span><strong>সময়:</strong> {examInfo.duration}</span>}
             {examInfo.totalMarks && <span><strong>পূর্ণমান:</strong> {examInfo.totalMarks}</span>}
           </div>
+          <div className="mt-2 text-lg font-bold text-red-600 border-t-2 border-red-600 pt-2">
+            উত্তরপত্র (Answer Sheet)
+          </div>
         </header>
 
         {/* Main Content */}
@@ -146,7 +142,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             <>
               {/* MCQ Header - only once */}
               <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid">
-                <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
+                <h3>বহুনির্বাচনি প্রশ্নের উত্তর (MCQ Answers)</h3>
                 <div className="text-right">
                   <div>মোট নম্বর: {mcqTotal}</div>
                   {examInfo.mcqNegativeMarking && examInfo.mcqNegativeMarking > 0 && (
@@ -169,14 +165,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
-                                  <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
-                                    {(q.options || []).map((opt: any, oidx: number) => (
-                                      <span key={oidx} className="inline-block mr-4 text-xs font-bold">
-                                        <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
-                                      </span>
-                                    ))}
+                                  <div className="mb-1">
+                                    <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
+                                  <span className="text-red-600 font-bold">
+                                    উত্তর: {q.correctAnswer || 'ক'}
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -193,14 +187,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
-                                  <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
-                                    {(q.options || []).map((opt: any, oidx: number) => (
-                                      <span key={oidx} className="inline-block mr-4 text-xs font-bold">
-                                        <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
-                                      </span>
-                                    ))}
+                                  <div className="mb-1">
+                                    <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
+                                  <span className="text-red-600 font-bold">
+                                    উত্তর: {q.correctAnswer || 'ক'}
+                                  </span>
                                 </div>
                               </div>
                             </div>
@@ -216,14 +208,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
-                              <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                              <div className="mt-1">
-                                {(q.options || []).map((opt: any, oidx: number) => (
-                                  <span key={oidx} className="inline-block mr-4 text-xs font-bold">
-                                    <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
-                                  </span>
-                                ))}
+                              <div className="mb-1">
+                                <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                               </div>
+                              <span className="text-red-600 font-bold">
+                                উত্তর: {q.correctAnswer || 'ক'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -239,7 +229,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {cqs.length > 0 && (
             <>
               <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
-                <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
+                <h3>সৃজনশীল প্রশ্নের উত্তর (CQ Answers)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
                   {cqRequired > 0 && (
@@ -253,20 +243,31 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">
-                        <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
-                        {q.subQuestions && Array.isArray(q.subQuestions) && (
+                        <div className="text-red-600 font-bold mb-2">
+                          উত্তর:
+                        </div>
+                        {q.subQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0 ? (
                           <ul className="list-inside mt-1 ml-4">
                             {q.subQuestions.map((sub, sidx) => (
-                              <li key={sidx} className="ml-4 flex items-start">
+                              <li key={sidx} className="ml-4 flex items-start mb-2">
                                 <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
                                 <span className="flex-1">
+                                  <div className="mb-1">
+                                    <span className="text-sm text-gray-600">[{sub.marks || '?'} নম্বর]</span>
+                                  </div>
                                   <Text>
-                                    {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
+                                    {q.subAnswers && q.subAnswers[sidx] ? q.subAnswers[sidx] : 'উত্তর দেওয়া হবে'}
                                   </Text>
                                 </span>
                               </li>
                             ))}
                           </ul>
+                        ) : (
+                          <div className="ml-4">
+                            <Text>
+                              {q.modelAnswer || 'উত্তর দেওয়া হবে'}
+                            </Text>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -280,7 +281,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {sqs.length > 0 && (
             <>
               <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
-                <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
+                <h3>সংক্ষিপ্ত প্রশ্নের উত্তর (SQ Answers)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
                   {sqRequired > 0 && (
@@ -294,7 +295,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">
-                        <Text>{`${q.questionText} [${q.marks || '?'}]`}</Text>
+                        <div className="text-red-600 font-bold mb-2">
+                          উত্তর:
+                        </div>
+                        <div className="ml-4">
+                          <div className="mb-1">
+                            <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
+                          </div>
+                          <Text>
+                            {q.modelAnswer || 'উত্তর দেওয়া হবে'}
+                          </Text>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -308,5 +319,5 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
   }
 );
 
-QuestionPaper.displayName = 'QuestionPaper';
-export default QuestionPaper;
+AnswerQuestionPaper.displayName = 'AnswerQuestionPaper';
+export default AnswerQuestionPaper; 
