@@ -415,14 +415,16 @@ export default function AdminUsersPage() {
                 </DialogHeader>
                 <form className="space-y-4" onSubmit={e => {
                   e.preventDefault();
-                  const form = e.target as typeof e.target & { name: { value: string }; email: { value: string }; role: { value: User['role'] }; class?: { value: string }; section?: { value: string }; phone?: { value: string }; roll?: { value: string } };
+                  const form = e.target as typeof e.target & { name: { value: string }; email: { value: string }; role: { value: User['role'] }; class?: { value: string }; phone?: { value: string }; roll?: { value: string } };
+                  const classSectionValue = form.class?.value || '';
+                  const [className, section] = classSectionValue.split('-');
                   handleAddUser({
                     name: form.name.value,
                     email: form.email.value,
                     phone: form.phone?.value || undefined,
                     role: form.role.value,
-                    class: form.class?.value || undefined,
-                    section: form.section?.value || undefined,
+                    class: className || undefined,
+                    section: section || undefined,
                     roll: form.roll?.value || undefined,
                   });
                 }}>
@@ -436,7 +438,7 @@ export default function AdminUsersPage() {
                     <option value="SUPER_USER">Super User</option>
                   </select>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Class (if student)</label>
+                    <label className="text-sm font-medium">Class & Section (if student)</label>
                     <div className="flex gap-2">
                       <select 
                         name="class" 
@@ -447,19 +449,15 @@ export default function AdminUsersPage() {
                           }
                         }}
                       >
-                        <option value="">Select Class</option>
+                        <option value="">Select Class & Section</option>
                         {classes.map((cls) => (
-                          <option key={cls.id} value={cls.name}>
+                          <option key={cls.id} value={`${cls.name}-${cls.section}`}>
                             {cls.name} - {cls.section}
                           </option>
                         ))}
                         <option value="new">+ Create New Class</option>
                       </select>
                     </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Section (if student)</label>
-                    <Input name="section" placeholder="Section" className="rounded shadow" />
                   </div>
                   <Input name="roll" placeholder="Roll (if student)" className="rounded shadow" />
                   <DialogFooter>
@@ -499,7 +497,9 @@ export default function AdminUsersPage() {
                   <form className="space-y-4" onSubmit={e => {
                     if (!editUser) return;
                     e.preventDefault();
-                    const form = e.target as typeof e.target & { name: { value: string }; email: { value: string }; role: { value: User['role'] }; class?: { value: string }; section?: { value: string }; phone?: { value: string }; roll?: { value: string } };
+                    const form = e.target as typeof e.target & { name: { value: string }; email: { value: string }; role: { value: User['role'] }; class?: { value: string }; phone?: { value: string }; roll?: { value: string } };
+                    const classSectionValue = form.class?.value || '';
+                    const [className, section] = classSectionValue.split('-');
                     handleEditUser({
                       ...editUser,
                       id: editUser.id || String(Date.now()),
@@ -507,8 +507,8 @@ export default function AdminUsersPage() {
                       email: form.email.value,
                       phone: form.phone?.value || undefined,
                       role: form.role.value,
-                      class: form.class?.value || undefined,
-                      section: form.section?.value || undefined,
+                      class: className || undefined,
+                      section: section || undefined,
                       roll: form.roll?.value || undefined,
                     });
                   }}>
@@ -522,11 +522,11 @@ export default function AdminUsersPage() {
                       <option value="SUPER_USER">Super User</option>
                     </select>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">Class (if student)</label>
+                      <label className="text-sm font-medium">Class & Section (if student)</label>
                       <div className="flex gap-2">
                         <select 
                           name="class" 
-                          defaultValue={editUser?.class}
+                          defaultValue={editUser?.class && editUser?.section ? `${editUser.class}-${editUser.section}` : ''}
                           className="flex-1 rounded shadow p-2 border"
                           onChange={(e) => {
                             if (e.target.value === 'new') {
@@ -534,19 +534,15 @@ export default function AdminUsersPage() {
                             }
                           }}
                         >
-                          <option value="">Select Class</option>
+                          <option value="">Select Class & Section</option>
                           {classes.map((cls) => (
-                            <option key={cls.id} value={cls.name}>
+                            <option key={cls.id} value={`${cls.name}-${cls.section}`}>
                               {cls.name} - {cls.section}
                             </option>
                           ))}
                           <option value="new">+ Create New Class</option>
                         </select>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Section (if student)</label>
-                      <Input name="section" defaultValue={editUser?.section} placeholder="Section" className="rounded shadow" />
                     </div>
                     <Input name="roll" defaultValue={editUser?.roll} placeholder="Roll (if student)" className="rounded shadow" />
                     <DialogFooter>

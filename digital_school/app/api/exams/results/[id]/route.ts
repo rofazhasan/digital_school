@@ -307,81 +307,96 @@ export async function GET(
     let percentage = result?.percentage || 0;
     let grade = result?.grade || 'F';
     
-    // Always recalculate percentage and grade to ensure accuracy
-    if (totalMarks > 0) {
-      percentage = calculatePercentage(totalMarks, exam.totalMarks);
-      grade = calculateGrade(percentage);
-      
-      console.log(`📊 Grade Recalculation Debug:`, {
-        totalMarks,
-        examTotalMarks: exam.totalMarks,
-        percentage,
-        grade,
-        mcqMarks,
-        cqMarks,
-        sqMarks,
-        hasResult: !!result
-      });
-    }
+    // Check if student is suspended (either from submission or result)
+    const isSuspended = submission.exceededQuestionLimit || result?.status === 'SUSPENDED';
     
-    // Only recalculate if result doesn't have proper values
-    if (!result || result.total === 0) {
-      console.log('🔄 Recalculating marks from processed questions...');
-      
+    // If suspended, give zero marks in all sections
+    if (isSuspended) {
       mcqMarks = 0;
       cqMarks = 0;
       sqMarks = 0;
       totalMarks = 0;
+      percentage = 0;
+      grade = 'F';
       
-      processedQuestions.forEach((question: any) => {
-        if (question.type === 'MCQ') {
-          mcqMarks += question.awardedMarks;
-          totalMarks += question.awardedMarks;
-          console.log(`MCQ Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
-        } else if (question.type === 'CQ') {
-          cqMarks += question.awardedMarks;
-          totalMarks += question.awardedMarks;
-        } else if (question.type === 'SQ') {
-          sqMarks += question.awardedMarks;
-          totalMarks += question.awardedMarks;
+      console.log(`🚫 Student suspended - giving zero marks in all sections`);
+    } else {
+      // Always recalculate percentage and grade to ensure accuracy
+      if (totalMarks > 0) {
+        percentage = calculatePercentage(totalMarks, exam.totalMarks);
+        grade = calculateGrade(percentage);
+        
+        console.log(`📊 Grade Recalculation Debug:`, {
+          totalMarks,
+          examTotalMarks: exam.totalMarks,
+          percentage,
+          grade,
+          mcqMarks,
+          cqMarks,
+          sqMarks,
+          hasResult: !!result
+        });
+      }
+      
+      // Only recalculate if result doesn't have proper values
+      if (!result || result.total === 0) {
+        console.log('🔄 Recalculating marks from processed questions...');
+        
+        mcqMarks = 0;
+        cqMarks = 0;
+        sqMarks = 0;
+        totalMarks = 0;
+        
+        processedQuestions.forEach((question: any) => {
+          if (question.type === 'MCQ') {
+            mcqMarks += question.awardedMarks;
+            totalMarks += question.awardedMarks;
+            console.log(`MCQ Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
+          } else if (question.type === 'CQ') {
+            cqMarks += question.awardedMarks;
+            totalMarks += question.awardedMarks;
+          } else if (question.type === 'SQ') {
+            sqMarks += question.awardedMarks;
+            totalMarks += question.awardedMarks;
+          }
+        });
+        
+        // Ensure total marks doesn't go below 0
+        totalMarks = Math.max(0, totalMarks);
+        
+        // Calculate percentage and grade
+        percentage = calculatePercentage(totalMarks, exam.totalMarks);
+        grade = calculateGrade(percentage);
+        
+        console.log(`📊 Grade Calculation Debug:`, {
+          totalMarks,
+          examTotalMarks: exam.totalMarks,
+          percentage,
+          grade,
+          mcqMarks,
+          cqMarks,
+          sqMarks
+        });
+        
+        // Update result with calculated marks if it exists
+        if (result) {
+          await db.result.update({
+            where: { id: result.id },
+            data: { 
+              mcqMarks: mcqMarks,
+              cqMarks: cqMarks,
+              sqMarks: sqMarks,
+              total: totalMarks,
+              percentage: percentage,
+              grade: grade,
+              examSubmissionId: submission.id
+            }
+          });
         }
-      });
-      
-      // Ensure total marks doesn't go below 0
-      totalMarks = Math.max(0, totalMarks);
-      
-      // Calculate percentage and grade
-      percentage = calculatePercentage(totalMarks, exam.totalMarks);
-      grade = calculateGrade(percentage);
-      
-      console.log(`📊 Grade Calculation Debug:`, {
-        totalMarks,
-        examTotalMarks: exam.totalMarks,
-        percentage,
-        grade,
-        mcqMarks,
-        cqMarks,
-        sqMarks
-      });
-      
-          // Update result with calculated marks if it exists
-    if (result) {
-      await db.result.update({
-        where: { id: result.id },
-        data: { 
-          mcqMarks: mcqMarks,
-          cqMarks: cqMarks,
-          sqMarks: sqMarks,
-          total: totalMarks,
-          percentage: percentage,
-          grade: grade,
-          examSubmissionId: submission.id
-        }
-      });
-    }
+      }
     }
     
-    console.log(`📊 Results API - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalMarks}`);
+    console.log(`📊 Results API - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalMarks}, Suspended: ${isSuspended}`);
 
     return NextResponse.json({
       exam: {
@@ -409,7 +424,9 @@ export async function GET(
         startedAt: submission.startedAt,
         score: submission.score,
         evaluatorNotes: submission.evaluatorNotes,
-        evaluatedAt: submission.evaluatedAt
+        evaluatedAt: submission.evaluatedAt,
+        exceededQuestionLimit: submission.exceededQuestionLimit,
+        status: isSuspended ? 'SUSPENDED' : submission.status
       },
       result: result ? {
         id: result.id,
@@ -422,7 +439,9 @@ export async function GET(
         percentage: percentage,
         comment: result.comment,
         isPublished: result.isPublished || false,
-        publishedAt: result.publishedAt
+        publishedAt: result.publishedAt,
+        status: isSuspended ? 'SUSPENDED' : result.status,
+        suspensionReason: isSuspended ? 'Student answered more questions than allowed' : result.suspensionReason
       } : null,
       reviewRequest: reviewRequest ? {
         id: reviewRequest.id,

@@ -44,29 +44,100 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let cqAnswered = 0;
     let sqAnswered = 0;
     
-    // Count answered CQ and SQ questions
+    // Count answered CQ and SQ questions (both written answers and uploaded photos)
     for (const [questionId, answer] of Object.entries(data.answers)) {
-      if (answer && answer !== "" && answer !== null && answer !== undefined) {
+      // Skip image fields as they are handled separately
+      if (questionId.endsWith('_images')) {
+        continue;
+      }
+      
+      // Check if student provided any answer (written text or uploaded images)
+      const hasWrittenAnswer = answer && answer !== "" && answer !== null && answer !== undefined && answer !== "No answer provided";
+      const hasUploadedImages = data.answers[`${questionId}_images`] && Array.isArray(data.answers[`${questionId}_images`]) && data.answers[`${questionId}_images`].length > 0;
+      
+      if (hasWrittenAnswer || hasUploadedImages) {
         // Find the question to determine its type
-        const question = exam.examSets.find(set => {
-          if (set.questionsJson) {
-            const questions = Array.isArray(set.questionsJson) 
-              ? set.questionsJson 
-              : typeof set.questionsJson === "string" 
-                ? JSON.parse(set.questionsJson) 
-                : [];
-            return questions.some((q: any) => q.id === questionId);
-          }
-          return false;
-        })?.questionsJson;
+        let foundQuestion = null;
         
-        if (question) {
-          const questions = Array.isArray(question) ? question : [];
-          const foundQuestion = questions.find((q: any) => q.id === questionId);
+        // Search through all exam sets to find the question
+        for (const examSet of exam.examSets) {
+          if (examSet.questionsJson) {
+            const questions = Array.isArray(examSet.questionsJson) 
+              ? examSet.questionsJson 
+              : typeof examSet.questionsJson === "string" 
+                ? JSON.parse(examSet.questionsJson) 
+                : [];
+            
+            foundQuestion = questions.find((q: any) => q.id === questionId);
+            if (foundQuestion) {
+              break;
+            }
+          }
+        }
+        
+        if (foundQuestion) {
+          const questionType = (foundQuestion.type || foundQuestion.questionType || "").toLowerCase();
+          console.log(`📝 Question ${questionId}: type=${questionType}, hasWritten=${hasWrittenAnswer}, hasImages=${hasUploadedImages}`);
+          
+          if (questionType === "cq") {
+            cqAnswered++;
+            console.log(`   ✅ Counted as CQ answer (${cqAnswered}/${exam.cqRequiredQuestions || 'unlimited'})`);
+          } else if (questionType === "sq") {
+            sqAnswered++;
+            console.log(`   ✅ Counted as SQ answer (${sqAnswered}/${exam.sqRequiredQuestions || 'unlimited'})`);
+          }
+        } else {
+          console.log(`⚠️  Question ${questionId} not found in any exam set`);
+        }
+      }
+    }
+    
+    // Also check for image-only submissions (where no written answer was provided)
+    for (const [questionId, answer] of Object.entries(data.answers)) {
+      if (questionId.endsWith('_images')) {
+        const baseQuestionId = questionId.replace('_images', '');
+        
+        // Check if this question was already counted (has written answer)
+        const hasWrittenAnswer = data.answers[baseQuestionId] && 
+          data.answers[baseQuestionId] !== "" && 
+          data.answers[baseQuestionId] !== null && 
+          data.answers[baseQuestionId] !== undefined && 
+          data.answers[baseQuestionId] !== "No answer provided";
+        
+        // Only count if no written answer was provided (image-only submission)
+        if (!hasWrittenAnswer && Array.isArray(answer) && answer.length > 0) {
+          // Find the question to determine its type
+          let foundQuestion = null;
+          
+          // Search through all exam sets to find the question
+          for (const examSet of exam.examSets) {
+            if (examSet.questionsJson) {
+              const questions = Array.isArray(examSet.questionsJson) 
+                ? examSet.questionsJson 
+                : typeof examSet.questionsJson === "string" 
+                  ? JSON.parse(examSet.questionsJson) 
+                  : [];
+              
+              foundQuestion = questions.find((q: any) => q.id === baseQuestionId);
+              if (foundQuestion) {
+                break;
+              }
+            }
+          }
+          
           if (foundQuestion) {
             const questionType = (foundQuestion.type || foundQuestion.questionType || "").toLowerCase();
-            if (questionType === "cq") cqAnswered++;
-            else if (questionType === "sq") sqAnswered++;
+            console.log(`📝 Image-only Question ${baseQuestionId}: type=${questionType}, hasImages=true`);
+            
+            if (questionType === "cq") {
+              cqAnswered++;
+              console.log(`   ✅ Counted as CQ answer (${cqAnswered}/${exam.cqRequiredQuestions || 'unlimited'})`);
+            } else if (questionType === "sq") {
+              sqAnswered++;
+              console.log(`   ✅ Counted as SQ answer (${sqAnswered}/${exam.sqRequiredQuestions || 'unlimited'})`);
+            }
+          } else {
+            console.log(`⚠️  Image-only Question ${baseQuestionId} not found in any exam set`);
           }
         }
       }
@@ -75,9 +146,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Check if exceeded limits
     if (exam.cqRequiredQuestions && cqAnswered > exam.cqRequiredQuestions) {
       exceededQuestionLimit = true;
+      console.log(`🚫 Student exceeded CQ limit: answered ${cqAnswered}, required ${exam.cqRequiredQuestions}`);
     }
     if (exam.sqRequiredQuestions && sqAnswered > exam.sqRequiredQuestions) {
       exceededQuestionLimit = true;
+      console.log(`🚫 Student exceeded SQ limit: answered ${sqAnswered}, required ${exam.sqRequiredQuestions}`);
     }
     
     // Save submission with examSetId and exceededQuestionLimit flag
@@ -102,7 +175,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       examId,
       mcqNegativeMarking: exam.mcqNegativeMarking,
       cqRequiredQuestions: exam.cqRequiredQuestions,
-      sqRequiredQuestions: exam.sqRequiredQuestions
+      sqRequiredQuestions: exam.sqRequiredQuestions,
+      cqAnswered,
+      sqAnswered,
+      exceededQuestionLimit
     });
     let questions: Record<string, unknown>[] = [];
     const rawQuestions = exam?.examSets[0]?.questionsJson;
@@ -134,19 +210,43 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return q;
     });
     const hasCQorSQ = questions.some((q: Record<string, unknown>) => (q.type as string) === "cq" || (q.type as string) === "sq");
-    let result = null;
     
-    // If student exceeded question limits, give zero marks
+    // If student exceeded question limits, give zero marks and mark as suspended
     if (exceededQuestionLimit) {
+      // Update submission with zero score and suspension status
       await prisma.examSubmission.update({
         where: { studentId_examId: { studentId, examId } },
-        data: { score: 0 }
+        data: { 
+          score: 0,
+          exceededQuestionLimit: true
+        }
       });
       
-      result = await prisma.result.upsert({
+      // Create or update result with zero marks and suspension status
+      const result = await prisma.result.upsert({
         where: { studentId_examId: { studentId, examId } },
-        update: { mcqMarks: 0, total: 0, isPublished: true, examSubmissionId: submission.id },
-        create: { studentId, examId, mcqMarks: 0, total: 0, isPublished: true, examSubmissionId: submission.id },
+        update: { 
+          mcqMarks: 0, 
+          cqMarks: 0, 
+          sqMarks: 0, 
+          total: 0, 
+          isPublished: true, 
+          examSubmissionId: submission.id,
+          status: 'SUSPENDED',
+          comment: 'Exam suspended: Student answered more questions than allowed'
+        },
+        create: { 
+          studentId, 
+          examId, 
+          mcqMarks: 0, 
+          cqMarks: 0, 
+          sqMarks: 0, 
+          total: 0, 
+          isPublished: true, 
+          examSubmissionId: submission.id,
+          status: 'SUSPENDED',
+          comment: 'Exam suspended: Student answered more questions than allowed'
+        },
       });
       
       return NextResponse.json({ 
@@ -154,6 +254,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         autoGraded: true, 
         result: { ...result, answers: data.answers },
         exceededQuestionLimit: true,
+        suspended: true,
         message: "পরীক্ষা বাতিল হয়েছে। আপনি নির্ধারিত প্রশ্নের চেয়ে বেশি প্রশ্নের উত্তর দিয়েছেন।"
       });
     }
@@ -254,20 +355,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
       
       // Save score to Result (mcqMarks and total)
-      result = await prisma.result.upsert({
+      const result = await prisma.result.upsert({
         where: { studentId_examId: { studentId, examId } },
         update: { mcqMarks: score, total: score, isPublished: true, examSubmissionId: submission.id },
         create: { studentId, examId, mcqMarks: score, total: score, isPublished: true, examSubmissionId: submission.id },
       });
       
       // Attach answers to result for frontend scoring
-      result = { ...result, answers: data.answers };
-      console.log("[Exam Submission] Upserted result:", result);
+      const resultWithAnswers = { ...result, answers: data.answers };
+      console.log("[Exam Submission] Upserted result:", resultWithAnswers);
       
       return NextResponse.json({ 
         success: true, 
         autoGraded: true, 
-        result,
+        result: resultWithAnswers,
         gradingSummary: {
           totalCorrect,
           totalWrong,
