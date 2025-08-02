@@ -253,4 +253,3 @@ export async function POST(
     return NextResponse.json({ error: "Failed to submit all evaluations" }, { status: 500 });
   }
 } 
-} 
