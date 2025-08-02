@@ -210,7 +210,16 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
               )}
               {showEarnedMark && !hideScore && (
                 <div className="mt-2 text-xs text-right">
-                  Mark: <span className="font-bold">{earnedMark}</span> / {question.marks || 1}
+                  {isCorrect ? (
+                    <span className="text-green-600 font-bold">+{question.marks || 1} mark</span>
+                  ) : (
+                    <span className="text-red-600 font-bold">
+                      {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 
+                        ? `-${((question.marks || 1) * exam.mcqNegativeMarking / 100).toFixed(2)} mark (নেগেটিভ মার্কিং)`
+                        : "0 mark"
+                      }
+                    </span>
+                  )}
                 </div>
               )}
 

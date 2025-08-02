@@ -110,6 +110,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       hasSubmitted: !!existingSubmission,
       submissionId: existingSubmission?.id || null,
+      // Question selection settings
+      cqTotalQuestions: exam.cqTotalQuestions,
+      cqRequiredQuestions: exam.cqRequiredQuestions,
+      sqTotalQuestions: exam.sqTotalQuestions,
+      sqRequiredQuestions: exam.sqRequiredQuestions,
+      mcqNegativeMarking: exam.mcqNegativeMarking,
     });
   } catch (_) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

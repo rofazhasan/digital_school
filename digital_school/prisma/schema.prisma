@@ -588,6 +588,8 @@ model ExamSubmission {
   score          Float?
   evaluatorNotes String?
   evaluatedAt    DateTime?
+  // Track if student answered more questions than required (results in suspension and zero marks)
+  exceededQuestionLimit Boolean          @default(false)
   exam           Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSet        ExamSet?                @relation(fields: [examSetId], references: [id])
   student        StudentProfile          @relation(fields: [studentId], references: [id])

@@ -209,14 +209,25 @@ export async function GET(
             }
           }
           
-          awardedMarks = isCorrect ? maxMarks : 0;
+          if (isCorrect) {
+            awardedMarks = maxMarks;
+          } else {
+            // Apply negative marking for wrong answers if enabled
+            if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+              const negativeMarks = (maxMarks * exam.mcqNegativeMarking) / 100;
+              awardedMarks = -negativeMarks;
+            } else {
+              awardedMarks = 0;
+            }
+          }
           
           console.log(`MCQ Question ${question.id}:`, {
             studentAnswer,
             correctOptionText: question.options?.find((opt: any) => opt.isCorrect)?.text || 'No correct option found',
             isCorrect,
             awardedMarks,
-            maxMarks
+            maxMarks,
+            negativeMarking: exam.mcqNegativeMarking
           });
         }
       } else {
@@ -326,6 +337,7 @@ export async function GET(
         if (question.type === 'MCQ') {
           mcqMarks += question.awardedMarks;
           totalMarks += question.awardedMarks;
+          console.log(`MCQ Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
         } else if (question.type === 'CQ') {
           cqMarks += question.awardedMarks;
           totalMarks += question.awardedMarks;
@@ -334,6 +346,9 @@ export async function GET(
           totalMarks += question.awardedMarks;
         }
       });
+      
+      // Ensure total marks doesn't go below 0
+      totalMarks = Math.max(0, totalMarks);
       
       // Calculate percentage and grade
       percentage = calculatePercentage(totalMarks, exam.totalMarks);

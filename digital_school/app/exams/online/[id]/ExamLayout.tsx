@@ -426,13 +426,90 @@ export default function ExamLayout() {
           </div>
           <div className="mb-6">
             <div className="text-lg font-bold text-purple-700 mb-2">পরীক্ষার নির্দেশনা (Instructions):</div>
+            
+            {/* Visual Indicators */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4 p-4 bg-gray-50 rounded-lg">
+              <div className="text-center p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="text-sm font-semibold text-red-700 mb-1">নেগেটিভ মার্কিং</div>
+                <div className="text-lg font-bold text-red-600">
+                  {exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0 
+                    ? `${exam.mcqNegativeMarking}%`
+                    : "নেই"
+                  }
+                </div>
+              </div>
+              
+              <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-semibold text-blue-700 mb-1">CQ প্রশ্ন</div>
+                <div className="text-lg font-bold text-blue-600">
+                  {exam?.cqTotalQuestions && exam.cqTotalQuestions > 0 
+                    ? `${exam.cqRequiredQuestions || 0}/${exam.cqTotalQuestions}`
+                    : "নেই"
+                  }
+                </div>
+              </div>
+              
+              <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="text-sm font-semibold text-green-700 mb-1">SQ প্রশ্ন</div>
+                <div className="text-lg font-bold text-green-600">
+                  {exam?.sqTotalQuestions && exam.sqTotalQuestions > 0 
+                    ? `${exam.sqRequiredQuestions || 0}/${exam.sqTotalQuestions}`
+                    : "নেই"
+                  }
+                </div>
+              </div>
+            </div>
             <ul className="list-disc list-inside space-y-2 text-base text-gray-800">
               <li>পরীক্ষা শুরুর আগে সকল প্রস্তুতি সম্পন্ন করুন।</li>
               <li>পরীক্ষা চলাকালীন সময়ে অন্য ট্যাব/উইন্ডোতে যাবেন না।</li>
               <li>পরীক্ষা চলাকালীন কপি/পেস্ট, রাইট-ক্লিক, বা স্ক্রিনশট নেয়া নিষিদ্ধ।</li>
               <li>সমস্ত প্রশ্ন মনোযোগ সহকারে পড়ুন এবং উত্তর দিন।</li>
-              <li>MCQ প্রশ্নে সঠিক অপশন নির্বাচন করুন, CQ/SQ প্রশ্নে বিস্তারিত উত্তর লিখুন।</li>
-              <li><strong>CQ এবং SQ প্রশ্নের জন্য:</strong> হাতের লেখা উত্তর ক্যামেরা দিয়ে তুলে আপলোড করতে পারবেন। "ক্যামেরা দিয়ে ছবি তুলুন" বোতামে ক্লিক করুন।</li>
+              
+              {/* Negative Marking Instructions */}
+              <li className="font-semibold text-red-600">
+                {exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0 
+                  ? `নেগেটিভ মার্কিং: MCQ প্রশ্নে ভুল উত্তরের জন্য ${exam.mcqNegativeMarking}% নেগেটিভ মার্ক কাটা হবে।`
+                  : "নেগেটিভ মার্কিং: এই পরীক্ষায় কোনো নেগেটিভ মার্কিং নেই।"
+                }
+              </li>
+              
+              {/* CQ Instructions */}
+              <li className="font-semibold text-blue-600">
+                {exam?.cqTotalQuestions && exam.cqTotalQuestions > 0 
+                  ? `CQ (ক্রিয়েটিভ প্রশ্ন): মোট ${exam.cqTotalQuestions}টি প্রশ্ন থেকে ${exam.cqRequiredQuestions || 0}টি প্রশ্নের উত্তর দিতে হবে।`
+                  : "CQ (ক্রিয়েটিভ প্রশ্ন): এই পরীক্ষায় CQ প্রশ্ন নেই।"
+                }
+              </li>
+              
+              {/* SQ Instructions */}
+              <li className="font-semibold text-green-600">
+                {exam?.sqTotalQuestions && exam.sqTotalQuestions > 0 
+                  ? `SQ (সংক্ষিপ্ত প্রশ্ন): মোট ${exam.sqTotalQuestions}টি প্রশ্ন থেকে ${exam.sqRequiredQuestions || 0}টি প্রশ্নের উত্তর দিতে হবে।`
+                  : "SQ (সংক্ষিপ্ত প্রশ্ন): এই পরীক্ষায় SQ প্রশ্ন নেই।"
+                }
+              </li>
+              
+              {/* Answer Submission Rules */}
+              <li className="font-semibold text-orange-600">
+                উত্তর জমা দেওয়ার নিয়ম:
+              </li>
+              <li className="ml-4">• MCQ প্রশ্নে সঠিক অপশন নির্বাচন করুন।</li>
+              <li className="ml-4">• CQ/SQ প্রশ্নে বিস্তারিত উত্তর লিখুন।</li>
+              <li className="ml-4">• CQ এবং SQ প্রশ্নের জন্য হাতের লেখা উত্তর ক্যামেরা দিয়ে তুলে আপলোড করতে পারবেন।</li>
+              <li className="ml-4">• "ক্যামেরা দিয়ে ছবি তুলুন" বোতামে ক্লিক করে ছবি তুলুন।</li>
+              <li className="ml-4 font-semibold text-red-600">• উত্তর সংখ্যা নির্ধারিত সীমা অতিক্রম করলে পরীক্ষা বাতিল হবে এবং শূন্য মার্ক দেওয়া হবে।</li>
+              
+              {/* Warning Section */}
+              <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div className="font-semibold text-red-700 mb-2">⚠️ গুরুত্বপূর্ণ সতর্কতা:</div>
+                <ul className="list-disc list-inside space-y-1 text-sm text-red-600">
+                  <li>নির্ধারিত প্রশ্নের চেয়ে বেশি প্রশ্নের উত্তর দিলে পরীক্ষা বাতিল হবে।</li>
+                  <li>ভুল উত্তরের জন্য নেগেটিভ মার্ক কাটা হবে।</li>
+                  <li>পরীক্ষা চলাকালীন নিয়ম ভঙ্গ করলে শূন্য মার্ক দেওয়া হবে।</li>
+                  <li>সময় শেষ হওয়ার আগেই উত্তর জমা দিন।</li>
+                </ul>
+              </div>
+              
               <li>প্রয়োজনে প্রশ্ন মার্ক করে রাখতে পারবেন।</li>
               <li>সময় শেষ হলে পরীক্ষা স্বয়ংক্রিয়ভাবে জমা হবে।</li>
               <li>পরীক্ষা চলাকালীন ইন্টারনেট সংযোগ বজায় রাখুন।</li>

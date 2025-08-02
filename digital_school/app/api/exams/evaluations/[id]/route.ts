@@ -202,20 +202,51 @@ export async function GET(
           const answer = fixedAnswers[question.id];
           if (question.type === 'MCQ') {
             // Auto-grade MCQ
-            if (answer && question.correct) {
-              const correctAnswer = question.correct;
+            if (answer) {
+              const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+              const userAns = normalize(answer);
               let isCorrect = false;
               
-              if (typeof correctAnswer === 'number') {
-                isCorrect = answer === correctAnswer;
-              } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-                isCorrect = answer === correctAnswer.text;
-              } else {
-                isCorrect = answer === String(correctAnswer);
+              // Enhanced MCQ answer comparison logic
+              if (question.options && Array.isArray(question.options)) {
+                // Check if student answer matches any option marked as correct
+                const correctOption = question.options.find((opt: any) => opt.isCorrect);
+                if (correctOption) {
+                  const correctOptionText = normalize(correctOption.text || String(correctOption));
+                  isCorrect = userAns === correctOptionText;
+                }
+              }
+              
+              // Fallback: Check if there's a direct correctAnswer field
+              if (!isCorrect && question.correctAnswer) {
+                const correctAnswer = question.correctAnswer;
+                
+                if (typeof correctAnswer === 'number') {
+                  isCorrect = userAns === normalize(String(correctAnswer));
+                } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
+                  isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
+                } else if (Array.isArray(correctAnswer)) {
+                  // Handle array format (e.g., ["answer1", "answer2"])
+                  isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
+                } else {
+                  isCorrect = userAns === normalize(String(correctAnswer));
+                }
+              }
+              
+              // Final fallback: use question.correct
+              if (!isCorrect && question.correct) {
+                const correctAns = normalize(String(question.correct));
+                isCorrect = userAns === correctAns;
               }
               
               if (isCorrect) {
                 earnedMarks += question.marks;
+              } else {
+                // Apply negative marking for wrong answers
+                if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+                  const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
+                  earnedMarks -= negativeMarks;
+                }
               }
             }
           } else {

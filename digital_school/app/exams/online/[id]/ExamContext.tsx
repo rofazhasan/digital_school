@@ -22,6 +22,7 @@ export function ExamContextProvider({ exam, children }: { exam: any; children: R
   const [isSyncPending, setIsSyncPending] = useState(false);
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
   const [highContrast, setHighContrast] = useState(false);
+  const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
   const localKey = `exam-answers-${exam.id}`;
   const navigationKey = `exam-navigation-${exam.id}`;
 
@@ -100,6 +101,26 @@ export function ExamContextProvider({ exam, children }: { exam: any; children: R
     }
   }, [answers, isOnline], 2000);
 
+  // Calculate question counts when answers change
+  useEffect(() => {
+    let cqCount = 0;
+    let sqCount = 0;
+    
+    for (const [questionId, answer] of Object.entries(answers)) {
+      if (answer && answer !== "" && answer !== null && answer !== undefined) {
+        // Find the question to determine its type
+        const question = exam.questions?.find((q: any) => q.id === questionId);
+        if (question) {
+          const questionType = (question.type || question.questionType || "").toLowerCase();
+          if (questionType === "cq") cqCount++;
+          else if (questionType === "sq") sqCount++;
+        }
+      }
+    }
+    
+    setQuestionCounts({ cq: cqCount, sq: sqCount });
+  }, [answers, exam.questions]);
+
   // When back online, sync pending answers
   useEffect(() => {
     if (isOnline && isSyncPending && Object.keys(answers).length > 0) {
@@ -123,7 +144,7 @@ export function ExamContextProvider({ exam, children }: { exam: any; children: R
   }, [isOnline]);
 
   return (
-    <ExamContext.Provider value={{ exam, answers, setAnswers, navigation, setNavigation, saveStatus, isOnline, isSyncPending, fontSize, setFontSize, highContrast, setHighContrast }}>
+    <ExamContext.Provider value={{ exam, answers, setAnswers, navigation, setNavigation, saveStatus, isOnline, isSyncPending, fontSize, setFontSize, highContrast, setHighContrast, questionCounts }}>
       {children}
     </ExamContext.Provider>
   );
