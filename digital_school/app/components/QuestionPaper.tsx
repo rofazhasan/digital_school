@@ -34,6 +34,7 @@ interface QuestionPaperProps {
     mcqNegativeMarking?: number;
     cqRequiredQuestions?: number;
     sqRequiredQuestions?: number;
+    cqSubsections?: any[];
   };
   questions: {
     mcq: MCQ[];
@@ -247,32 +248,85 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   )}
                 </div>
               </div>
-              <div>
-                {cqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
-                    <div className="flex items-start">
-                      <span className="font-bold mr-2">{idx + 1}.</span>
-                      <div className="flex-1">
-                        <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
-                        {q.subQuestions && Array.isArray(q.subQuestions) && (
-                          <ul className="list-inside mt-1 ml-4">
-                            {q.subQuestions.map((sub, sidx) => (
-                              <li key={sidx} className="ml-4 flex items-start">
-                                <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
-                                <span className="flex-1">
-                                  <Text>
-                                    {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
-                                  </Text>
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
+              
+              {/* Render CQ questions with subsections if they exist */}
+              {examInfo.cqSubsections && examInfo.cqSubsections.length > 1 ? (
+                // Multiple subsections - render with headers
+                examInfo.cqSubsections.map((subsection: any, subIdx: number) => {
+                  const subsectionQuestions = cqs.slice(subsection.startIndex - 1, subsection.endIndex);
+                  const subsectionRequired = subsection.requiredQuestions || 0;
+                  
+                  return (
+                    <div key={subIdx} className="mb-4">
+                      {/* Subsection header */}
+                      <div className="font-semibold text-base text-blue-800 dark:text-blue-400 mb-2 border-l-4 border-blue-500 pl-3 bg-blue-50 dark:bg-blue-900/20 py-2">
+                        {subsection.name || `Subsection ${subIdx + 1}`}
+                        {subsectionRequired > 0 && (
+                          <span className="text-sm font-normal text-gray-600 dark:text-gray-400 ml-2">
+                            (যেকোনো {subsectionRequired} টি উত্তর করতে হবে)
+                          </span>
                         )}
                       </div>
+                      
+                      {/* Questions in this subsection */}
+                      <div className="ml-4">
+                        {subsectionQuestions.map((q, idx) => (
+                          <div key={idx} className="mb-3 text-left">
+                            <div className="flex items-start">
+                              <span className="font-bold mr-2">{subsection.startIndex + idx}.</span>
+                              <div className="flex-1">
+                                <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
+                                {q.subQuestions && Array.isArray(q.subQuestions) && (
+                                  <ul className="list-inside mt-1 ml-4">
+                                    {q.subQuestions.map((sub, sidx) => (
+                                      <li key={sidx} className="ml-4 flex items-start">
+                                        <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                        <span className="flex-1">
+                                          <Text>
+                                            {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
+                                          </Text>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  );
+                })
+              ) : (
+                // Single subsection or no subsections - render normally
+                <div>
+                  {cqs.map((q, idx) => (
+                    <div key={idx} className="mb-3 text-left">
+                      <div className="flex items-start">
+                        <span className="font-bold mr-2">{idx + 1}.</span>
+                        <div className="flex-1">
+                          <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
+                          {q.subQuestions && Array.isArray(q.subQuestions) && (
+                            <ul className="list-inside mt-1 ml-4">
+                              {q.subQuestions.map((sub, sidx) => (
+                                <li key={sidx} className="ml-4 flex items-start">
+                                  <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                  <span className="flex-1">
+                                    <Text>
+                                      {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
+                                    </Text>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 

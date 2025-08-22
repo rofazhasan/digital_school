@@ -11,10 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, Plus, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 const examTypes = ["ONLINE", "OFFLINE", "MIXED"];
+
+// Schema for CQ subsection
+const cqSubsectionSchema = z.object({
+  name: z.string().min(1, "Subsection name is required"),
+  startIndex: z.coerce.number().min(1, "Start index must be at least 1"),
+  endIndex: z.coerce.number().min(1, "End index must be at least 1"),
+  requiredQuestions: z.coerce.number().min(1, "Required questions must be at least 1"),
+});
 
 const schema = z.object({
   name: z.string().min(2, "Exam name is required"),
@@ -36,6 +44,8 @@ const schema = z.object({
   cqRequiredQuestions: z.coerce.number().min(0).optional(),
   sqTotalQuestions: z.coerce.number().min(0).optional(),
   sqRequiredQuestions: z.coerce.number().min(0).optional(),
+  // CQ Subsection settings
+  cqSubsections: z.array(cqSubsectionSchema).optional(),
 }).refine((data) => {
   // Validate that required questions don't exceed total questions
   // Allow both to be 0 (no questions of this type)
@@ -49,13 +59,50 @@ const schema = z.object({
       return false;
     }
   }
+  
+  // Validate CQ subsections if they exist
+  if (data.cqSubsections && data.cqSubsections.length > 0) {
+    // Check that subsection ranges don't overlap and cover all questions
+    const sortedSubsections = [...data.cqSubsections].sort((a, b) => a.startIndex - b.startIndex);
+    
+    for (let i = 0; i < sortedSubsections.length; i++) {
+      const current = sortedSubsections[i];
+      
+      // Check if start index is less than or equal to end index
+      if (current.startIndex > current.endIndex) {
+        return false;
+      }
+      
+      // Check if required questions don't exceed available questions in this subsection
+      const availableQuestions = current.endIndex - current.startIndex + 1;
+      if (current.requiredQuestions > availableQuestions) {
+        return false;
+      }
+      
+      // Check for overlaps with next subsection
+      if (i < sortedSubsections.length - 1) {
+        const next = sortedSubsections[i + 1];
+        if (current.endIndex >= next.startIndex) {
+          return false;
+        }
+      }
+    }
+    
+    // Check if subsections cover the total CQ questions
+    const totalCovered = sortedSubsections.reduce((sum, sub) => sum + (sub.endIndex - sub.startIndex + 1), 0);
+    if (data.cqTotalQuestions && totalCovered !== data.cqTotalQuestions) {
+      return false;
+    }
+  }
+  
   return true;
 }, {
-  message: "Required questions cannot exceed total questions",
-  path: ["cqRequiredQuestions", "sqRequiredQuestions"]
+  message: "Invalid question configuration",
+  path: ["cqSubsections"]
 });
 
 type ExamForm = z.infer<typeof schema>;
+type CQSubsection = z.infer<typeof cqSubsectionSchema>;
 
 type ClassOption = { id: string; name: string };
 
@@ -86,8 +133,85 @@ export default function CreateExamPage() {
       cqRequiredQuestions: 5,
       sqTotalQuestions: 15,
       sqRequiredQuestions: 5,
+      cqSubsections: [],
     },
   });
+
+  // Watch CQ total questions to update subsections
+  const cqTotalQuestions = form.watch("cqTotalQuestions");
+  const cqSubsections = form.watch("cqSubsections");
+
+  // Update subsections when CQ total questions change
+  useEffect(() => {
+    if (cqTotalQuestions && cqTotalQuestions > 0) {
+      const currentSubsections = form.getValues("cqSubsections") || [];
+      
+      // If no subsections exist, create a default one
+      if (currentSubsections.length === 0) {
+        form.setValue("cqSubsections", [{
+          name: "",
+          startIndex: 1,
+          endIndex: cqTotalQuestions,
+          requiredQuestions: Math.min(5, cqTotalQuestions),
+        }]);
+      } else {
+        // Update the last subsection's end index if it's the only one
+        if (currentSubsections.length === 1) {
+          const updatedSubsections = [...currentSubsections];
+          updatedSubsections[0].endIndex = cqTotalQuestions;
+          form.setValue("cqSubsections", updatedSubsections);
+        }
+      }
+    }
+  }, [cqTotalQuestions, form]);
+
+  // Add new subsection
+  const addSubsection = () => {
+    const currentSubsections = form.getValues("cqSubsections") || [];
+    const lastSubsection = currentSubsections[currentSubsections.length - 1];
+    
+    if (lastSubsection && lastSubsection.endIndex < (cqTotalQuestions || 0)) {
+      const newSubsection: CQSubsection = {
+        name: "",
+        startIndex: lastSubsection.endIndex + 1,
+        endIndex: Math.min(lastSubsection.endIndex + 3, cqTotalQuestions || 0),
+        requiredQuestions: 1,
+      };
+      
+      form.setValue("cqSubsections", [...currentSubsections, newSubsection]);
+    }
+  };
+
+  // Remove subsection
+  const removeSubsection = (index: number) => {
+    const currentSubsections = form.getValues("cqSubsections") || [];
+    if (currentSubsections.length > 1) {
+      const updatedSubsections = currentSubsections.filter((_, i) => i !== index);
+      form.setValue("cqSubsections", updatedSubsections);
+    }
+  };
+
+  // Update subsection ranges when one changes
+  const updateSubsectionRanges = (index: number, field: 'startIndex' | 'endIndex', value: number) => {
+    const currentSubsections = form.getValues("cqSubsections") || [];
+    const updatedSubsections = [...currentSubsections];
+    
+    if (field === 'startIndex') {
+      updatedSubsections[index].startIndex = value;
+      // Update previous subsection's end index
+      if (index > 0) {
+        updatedSubsections[index - 1].endIndex = value - 1;
+      }
+    } else if (field === 'endIndex') {
+      updatedSubsections[index].endIndex = value;
+      // Update next subsection's start index
+      if (index < updatedSubsections.length - 1) {
+        updatedSubsections[index + 1].startIndex = value + 1;
+      }
+    }
+    
+    form.setValue("cqSubsections", updatedSubsections);
+  };
 
   useEffect(() => {
     setClassesLoading(true);
@@ -155,7 +279,7 @@ export default function CreateExamPage() {
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, type: "spring" }}
-        className="w-full max-w-2xl"
+        className="w-full max-w-4xl"
       >
         <div className="rounded-2xl shadow-2xl border border-border bg-white/90 dark:bg-gray-900/90 backdrop-blur-md overflow-hidden">
           <div className="bg-gradient-to-r from-primary to-blue-500 p-6 text-white text-center">
@@ -369,6 +493,152 @@ export default function CreateExamPage() {
                         </div>
                       </div>
                     </div>
+
+                    {/* CQ Subsection Settings */}
+                    {cqTotalQuestions && cqTotalQuestions > 0 && (
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">CQ Subsection Settings</h3>
+                          <Button
+                            type="button"
+                            onClick={addSubsection}
+                            disabled={cqSubsections && cqSubsections.length > 0 && cqSubsections[cqSubsections.length - 1]?.endIndex >= cqTotalQuestions}
+                            className="flex items-center gap-2"
+                            variant="outline"
+                          >
+                            <Plus className="w-4 h-4" />
+                            Add Subsection
+                          </Button>
+                        </div>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          Define subsections for math exams (e.g., Algebra, Geometry, Trigonometry). 
+                          Each subsection specifies question ranges and required questions.
+                        </p>
+                        
+                        <div className="space-y-4">
+                          {cqSubsections && cqSubsections.map((subsection, index) => (
+                            <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="font-medium text-gray-800 dark:text-gray-200">
+                                  Subsection {index + 1}
+                                </h4>
+                                {cqSubsections.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    onClick={() => removeSubsection(index)}
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                              
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                <FormField
+                                  name={`cqSubsections.${index}.name`}
+                                  control={form.control}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Name (optional)</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          placeholder={cqSubsections.length === 1 ? "Leave empty for single section" : "e.g., Algebra"}
+                                          {...field} 
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                
+                                <FormField
+                                  name={`cqSubsections.${index}.startIndex`}
+                                  control={form.control}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Start Question</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          type="number" 
+                                          min={1} 
+                                          max={cqTotalQuestions}
+                                          {...field}
+                                          onChange={(e) => {
+                                            const value = parseInt(e.target.value);
+                                            field.onChange(value);
+                                            updateSubsectionRanges(index, 'startIndex', value);
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                
+                                <FormField
+                                  name={`cqSubsections.${index}.endIndex`}
+                                  control={form.control}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>End Question</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          type="number" 
+                                          min={1} 
+                                          max={cqTotalQuestions}
+                                          {...field}
+                                          onChange={(e) => {
+                                            const value = parseInt(e.target.value);
+                                            field.onChange(value);
+                                            updateSubsectionRanges(index, 'endIndex', value);
+                                          }}
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                                
+                                <FormField
+                                  name={`cqSubsections.${index}.requiredQuestions`}
+                                  control={form.control}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Required Questions</FormLabel>
+                                      <FormControl>
+                                        <Input 
+                                          type="number" 
+                                          min={1}
+                                          max={subsection.endIndex - subsection.startIndex + 1}
+                                          {...field} 
+                                        />
+                                      </FormControl>
+                                      <FormMessage />
+                                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                                        Max: {subsection.endIndex - subsection.startIndex + 1}
+                                      </p>
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+                              
+                              {cqSubsections.length === 1 && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Single subsection: Questions can be shuffled. Leave name empty.
+                                </p>
+                              )}
+                              {cqSubsections.length > 1 && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                  Multiple subsections: Questions cannot be shuffled. Each subsection maintains order.
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     
                     {classes.length === 0 && !classesLoading && (
                       <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">

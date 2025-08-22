@@ -36,6 +36,7 @@ interface AnswerQuestionPaperProps {
     mcqNegativeMarking?: number;
     cqRequiredQuestions?: number;
     sqRequiredQuestions?: number;
+    cqSubsections?: any[];
   };
   questions: {
     mcq: MCQ[];

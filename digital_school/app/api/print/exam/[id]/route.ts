@@ -36,6 +36,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
     mcqNegativeMarking: exam.mcqNegativeMarking || 0,
     cqRequiredQuestions: exam.cqRequiredQuestions || 0,
     sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+    cqSubsections: exam.cqSubsections || null,
   };
 
   // For each set, use questionsJson if present, else fallback to questions relation

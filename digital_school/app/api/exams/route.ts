@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         cqRequiredQuestions: exam.cqRequiredQuestions || 0,
         sqTotalQuestions: exam.sqTotalQuestions || 0,
         sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+        cqSubsections: exam.cqSubsections || null,
       };
 
       // Cache the result for 2 minutes
@@ -103,11 +104,12 @@ export async function GET(request: NextRequest) {
       createdAt: exam.createdAt,
       type: exam.type,
       allowRetake: exam.allowRetake || false,
-      mcqNegativeMarking: exam.mcqNegativeMarking ,
-      cqTotalQuestions: exam.cqTotalQuestions || 0,
-      cqRequiredQuestions: exam.cqRequiredQuestions || 0,
-      sqTotalQuestions: exam.sqTotalQuestions || 0,
-      sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+              mcqNegativeMarking: exam.mcqNegativeMarking ,
+        cqTotalQuestions: exam.cqTotalQuestions || 0,
+        cqRequiredQuestions: exam.cqRequiredQuestions || 0,
+        sqTotalQuestions: exam.sqTotalQuestions || 0,
+        sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+        cqSubsections: exam.cqSubsections || null,
     }));
 
     // Cache the result for 1 minute
@@ -146,6 +148,7 @@ export async function POST(request: NextRequest) {
       cqRequiredQuestions,
       sqTotalQuestions,
       sqRequiredQuestions,
+      cqSubsections,
     } = body;
 
     if (!name || !date || !startTime || !endTime || !duration || !type || !totalMarks || !passMarks || !classId) {
@@ -174,6 +177,7 @@ export async function POST(request: NextRequest) {
                 cqRequiredQuestions: cqRequiredQuestions ?? 0,
                 sqTotalQuestions: sqTotalQuestions ?? 0,
                 sqRequiredQuestions: sqRequiredQuestions ?? 0,
+                cqSubsections: cqSubsections || null,
                 classId,
                 createdById: auth.user.id,
               },

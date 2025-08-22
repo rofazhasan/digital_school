@@ -884,3 +884,25 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
       </div>
   );
 };
+
+// Add this test section at the end of the component, before the closing div
+{/* Test CQ Subsection Display */}
+<div className="mt-8 p-4 border border-gray-200 rounded-lg bg-gray-50">
+  <h3 className="text-lg font-semibold mb-4">Test CQ Subsection Display</h3>
+  <div className="space-y-4">
+    <div className="p-3 border border-blue-200 rounded bg-blue-50">
+      <h4 className="font-medium text-blue-800">Single Subsection (Questions can be shuffled)</h4>
+      <p className="text-sm text-blue-600">Total: 8 questions, Required: 5 questions</p>
+      <p className="text-sm text-blue-600">No subsection names needed</p>
+    </div>
+    
+    <div className="p-3 border border-green-200 rounded bg-green-50">
+      <h4 className="font-medium text-green-800">Multiple Subsections (Questions cannot be shuffled)</h4>
+      <div className="text-sm text-green-600 space-y-1">
+        <p>• Algebra (Questions 1-3): Required 2 questions</p>
+        <p>• Geometry (Questions 4-6): Required 2 questions</p>
+        <p>• Trigonometry (Questions 7-8): Required 1 question</p>
+      </div>
+    </div>
+  </div>
+</div>
