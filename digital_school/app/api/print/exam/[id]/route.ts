@@ -3,6 +3,16 @@ import prismadb from '@/lib/db';
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
 
+// Helper function to shuffle array (Fisher-Yates algorithm)
+function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 export async function GET(request: NextRequest, context: { params: { id: string } }) {
   const { id: examId } = await context.params;
   // Fetch exam with sets and questionsJson
@@ -23,7 +33,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
   const examInfo = {
     id: exam.id,
     title: exam.name,
-    subject: exam.description || '',
+    subject: exam.class?.name || '', // Fixed: Use class name as subject
     class: exam.class?.name || '',
     date: exam.date.toISOString().split('T')[0],
     duration: exam.duration ? `${exam.duration} মিনিট` : '',
@@ -65,7 +75,34 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         correctAnswer: correctAnswer,
       };
     });
-    const cq = questionsArr.filter((q: any) => q.type === 'CQ').map((q: any) => {
+    // Process CQ questions with subsection-aware shuffling
+    let cq = questionsArr.filter((q: any) => q.type === 'CQ');
+    
+    // If there are subsections, process them according to subsection rules
+    if (exam.cqSubsections && Array.isArray(exam.cqSubsections) && exam.cqSubsections.length > 1) {
+      // Multiple subsections - maintain order but shuffle within each subsection
+      const processedCq: any[] = [];
+      
+      exam.cqSubsections.forEach((subsection: any) => {
+        const startIdx = subsection.startIndex - 1; // Convert to 0-based index
+        const endIdx = subsection.endIndex;
+        const subsectionQuestions = cq.slice(startIdx, endIdx);
+        
+        if (subsectionQuestions.length > 0) {
+          // Shuffle questions within this subsection only
+          const shuffledSubsection = shuffleArray([...subsectionQuestions]);
+          processedCq.push(...shuffledSubsection);
+        }
+      });
+      
+      cq = processedCq;
+    } else if (exam.cqSubsections && Array.isArray(exam.cqSubsections) && exam.cqSubsections.length === 1) {
+      // Single subsection - can shuffle all CQ questions
+      cq = shuffleArray([...cq]);
+    }
+    // If no subsections, keep original order
+    
+    const cqWithAnswers = cq.map((q: any) => {
       const subAnswers = (q.subQuestions || []).map((sub: any) => {
         // Try different possible field names for the answer
         const answer = sub.modelAnswer || sub.answer || sub.text || sub.content || 'উত্তর দেওয়া হবে';
@@ -80,6 +117,8 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         subAnswers: subAnswers,
       };
     });
+    
+    cq = cqWithAnswers;
     const sq = questionsArr.filter((q: any) => q.type === 'SQ').map((q: any) => ({
       questionText: q.questionText,
       marks: q.marks,
