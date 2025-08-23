@@ -169,11 +169,8 @@ export default function PrintExamPage() {
           {!showAnswers ? (
             // Question Papers
             <>
-              {nonEmptySets.map((set: any, index: number) => (
-                <div key={set.setId} className="print-page-container legal-paper">
-                  {index > 0 && (
-                    <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
-                  )}
+              {nonEmptySets.map((set: any) => (
+                <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
                   <QuestionPaper
                     examInfo={{ ...examInfo, set: set.setName }}
                     questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
@@ -183,20 +180,14 @@ export default function PrintExamPage() {
               ))}
               
               {/* Render OMR Sheets only for question papers */}
-              {nonEmptySets.map((set: any, index: number) => (
-                <div key={`omr-${set.setId}`} className="print-page-container legal-paper">
-                  <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
-                  <OMRPage set={set} examInfo={examInfo} language={language} />
-                </div>
+              {nonEmptySets.map((set: any) => (
+                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
               ))}
             </>
           ) : (
             // Answer Sheets (no OMR sheets)
-            nonEmptySets.map((set: any, index: number) => (
-              <div key={`answer-${set.setId}`} className="print-page-container legal-paper">
-                {index > 0 && (
-                  <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
-                )}
+            nonEmptySets.map((set: any) => (
+              <div key={`answer-${set.setId}`} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
                 <AnswerQuestionPaper
                   examInfo={{ ...examInfo, set: set.setName }}
                   questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}

@@ -142,7 +142,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
           {mcqs.length > 0 && (
             <>
               {/* MCQ Header - only once */}
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header">
                 <h3>বহুনির্বাচনি প্রশ্নের উত্তর (MCQ Answers)</h3>
                 <div className="text-right">
                   <div>মোট নম্বর: {mcqTotal}</div>
@@ -153,7 +153,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               </div>
               
               {mcqPages.map((page, pageIdx) => (
-                <div key={pageIdx}>
+                <div key={pageIdx} className="mcq-page">
                   {page.isTwoColumn ? (
                     // Two column layout
                     <div className="grid grid-cols-2 gap-x-8">
@@ -162,7 +162,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? idx : (pageIdx * 18) + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
@@ -184,7 +184,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).right.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? ((page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx) : (pageIdx * 18) + (page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
@@ -205,7 +205,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     // Single column layout
                     <div>
                       {(page as { questions: MCQ[]; isTwoColumn: false }).questions.map((q: MCQ, idx: number) => (
-                        <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
@@ -226,10 +226,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             </>
           )}
 
-          {/* CQ Section - starts immediately after MCQ */}
+          {/* CQ Section - starts on new page after MCQ */}
           {cqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break">
                 <h3>সৃজনশীল প্রশ্নের উত্তর (CQ Answers)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
@@ -240,7 +240,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               </div>
               <div>
                 {cqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
+                  <div key={idx} className="mb-3 text-left cq-question">
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">
@@ -278,10 +278,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             </>
           )}
 
-          {/* SQ Section - starts immediately after CQ */}
+          {/* SQ Section - starts on new page after CQ */}
           {sqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break">
                 <h3>সংক্ষিপ্ত প্রশ্নের উত্তর (SQ Answers)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
@@ -292,7 +292,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               </div>
               <div>
                 {sqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
+                  <div key={idx} className="mb-3 text-left sq-question">
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">

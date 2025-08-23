@@ -44,162 +44,6 @@
     page-break-before: always !important;
     display: block !important;
   }
-  
-  /* Ensure page breaks work for question sections */
-  .page-break-before {
-    break-before: page !important;
-    page-break-before: always !important;
-    display: block !important;
-  }
-  
-  /* Prevent questions from breaking across pages */
-  .question-block, .cq-question, .sq-question {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
-  /* Ensure proper spacing between sections */
-  .cq-question, .sq-question {
-    margin-bottom: 1rem !important;
-  }
-  
-  /* Add space after section headers */
-  h3 {
-    margin-bottom: 1rem !important;
-  }
-  
-  /* Ensure page breaks work consistently */
-  .page-break-before {
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-  }
-  
-  /* Additional page break support for older browsers */
-  .page-break-before {
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    break-before: page !important;
-    page-break-before: always !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    height: 0 !important;
-    overflow: hidden !important;
-  }
-  
-  /* Ensure sections don't break inappropriately */
-  .question-paper-container {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
-  /* Print page container styling */
-  .print-page-container {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    margin-bottom: 0 !important;
-    padding-bottom: 0 !important;
-    position: relative !important;
-  }
-  
-  /* Ensure each set starts on a new page */
-  .print-page-container:not(:first-child) {
-    break-before: page !important;
-    page-break-before: always !important;
-  }
-  
-  /* Legal paper size adjustments */
-  .legal-paper {
-    min-height: 14in !important;
-    page-size: 8.5in 14in !important;
-  }
-  
-  /* Force page breaks between major sections */
-  .section-break {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-  }
-  
-  /* Ensure proper page breaks for all browsers */
-  @media print {
-    .page-break-before {
-      break-before: page !important;
-      page-break-before: always !important;
-      -webkit-break-before: page !important;
-      -moz-break-before: page !important;
-      margin-top: 0 !important;
-      padding-top: 0 !important;
-      height: 0 !important;
-      overflow: hidden !important;
-    }
-    
-    .print-page-container:not(:first-child) {
-      break-before: page !important;
-      page-break-before: always !important;
-    }
-    
-    /* Prevent orphaned headers */
-    h3 {
-      break-after: avoid !important;
-      page-break-after: avoid !important;
-    }
-    
-    /* Ensure questions don't break across pages */
-    .question-block, .cq-question, .sq-question {
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-    }
-    
-    /* Force page breaks for sections */
-    .cq-section, .sq-section {
-      break-before: page !important;
-      page-break-before: always !important;
-    }
-    
-    /* Ensure MCQ pages work properly */
-    .mcq-page {
-      break-inside: avoid !important;
-      page-break-inside: avoid !important;
-    }
-  }
-  
-  /* MCQ header styling */
-  .mcq-header {
-    margin-bottom: 1.5rem !important;
-    padding-bottom: 0.5rem !important;
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
-  /* Section headers should not break */
-  h3 {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    margin-bottom: 1rem !important;
-  }
-  
-  /* Ensure proper spacing between MCQ questions */
-  .question-block {
-    margin-bottom: 1rem !important;
-  }
-  
-  /* Question options spacing */
-  .question-options {
-    margin-top: 0.5rem !important;
-  }
-  
-  /* MCQ page breaks */
-  .mcq-page {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
-  /* Ensure MCQ questions don't break across pages */
-  .mcq-question {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
   .print-footer {
     position: fixed;
     bottom: 0;
@@ -234,6 +78,36 @@
   .katex {
     font-size: 1em !important;
   }
+  
+  /* Page break controls for different question types in print */
+  .mcq-page {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .cq-section, .sq-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  
+  .cq-question, .sq-question {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .mcq-header, h3 {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  .question-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
 }
 
 /* Tighter question and option spacing */
@@ -244,6 +118,45 @@
   margin-left: 1.2rem;
   gap: 0.7rem;
   margin-top: 0.2rem;
+}
+
+/* Page break controls for different question types */
+.mcq-page {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.cq-section, .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.cq-question, .sq-question {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  margin-bottom: 1rem !important;
+}
+
+.mcq-header, h3 {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+
+.mcq-header {
+  margin-bottom: 1.5rem !important;
+  padding-bottom: 0.5rem !important;
+}
+
+.question-block, h3 {
+  margin-bottom: 1rem !important;
+}
+
+.question-options {
+  margin-top: 0.5rem !important;
 }
 
 /* OMR instruction area (small, above OMRs) */
