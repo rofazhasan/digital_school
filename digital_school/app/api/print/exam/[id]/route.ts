@@ -22,7 +22,17 @@ export async function GET(request: NextRequest, context: { params: { id: string 
       class: true,
       examSets: {
         include: {
-          questions: true,
+          questions: {
+            select: {
+              subject: true,
+              type: true,
+              questionText: true,
+              marks: true,
+              options: true,
+              subQuestions: true,
+              modelAnswer: true,
+            }
+          },
         },
         orderBy: { createdAt: 'asc' },
       },
@@ -30,10 +40,51 @@ export async function GET(request: NextRequest, context: { params: { id: string 
   });
   if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
 
+  // Extract subject from questions - get the most common subject or first available
+  let examSubject = '';
+  const allQuestions = exam.examSets.flatMap(set => set.questions);
+  if (allQuestions.length > 0) {
+    // Get the most common subject from questions
+    const subjectCounts: { [key: string]: number } = {};
+    allQuestions.forEach(q => {
+      if (q.subject) {
+        subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
+      }
+    });
+    
+    // Find the subject with the highest count
+    const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+      (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+    );
+    
+    examSubject = mostCommonSubject[0] || '';
+  }
+  
+  // If no subject found from questions relation, try to get from questionsJson
+  if (!examSubject) {
+    for (const set of exam.examSets) {
+      if (set.questionsJson && Array.isArray(set.questionsJson)) {
+        const jsonQuestions = set.questionsJson;
+        for (const q of jsonQuestions) {
+          if (q && typeof q === 'object' && 'subject' in q && typeof q.subject === 'string') {
+            examSubject = q.subject;
+            break;
+          }
+        }
+        if (examSubject) break;
+      }
+    }
+  }
+  
+  // If still no subject, try to get from the first question's subject
+  if (!examSubject && allQuestions.length > 0) {
+    examSubject = allQuestions[0].subject || '';
+  }
+
   const examInfo = {
     id: exam.id,
     title: exam.name,
-    subject: exam.class?.name || '', // Fixed: Use class name as subject
+    subject: examSubject, // Use the actual subject from questions
     class: exam.class?.name || '',
     date: exam.date.toISOString().split('T')[0],
     duration: exam.duration ? `${exam.duration} মিনিট` : '',

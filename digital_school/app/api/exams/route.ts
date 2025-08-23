@@ -26,6 +26,15 @@ export async function GET(request: NextRequest) {
             include: {
               class: { select: { id: true, name: true } },
               createdBy: { select: { id: true, name: true } },
+              examSets: {
+                include: {
+                  questions: {
+                    select: {
+                      subject: true,
+                    }
+                  }
+                }
+              }
             },
           });
         },
@@ -36,12 +45,31 @@ export async function GET(request: NextRequest) {
         return createApiResponse(null, 'Exam not found', 404);
       }
 
+      // Extract subject from questions - get the most common subject
+      let examSubject = '';
+      const allQuestions = exam.examSets.flatMap(set => set.questions);
+      if (allQuestions.length > 0) {
+        const subjectCounts: { [key: string]: number } = {};
+        allQuestions.forEach(q => {
+          if (q.subject) {
+            subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
+          }
+        });
+        
+        // Find the subject with the highest count
+        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+          (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+        );
+        
+        examSubject = mostCommonSubject[0] || '';
+      }
+
       const examData = {
         id: exam.id,
         name: exam.name,
         description: exam.description,
         date: exam.date,
-        subject: exam.class?.name || '',
+        subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
         totalMarks: exam.totalMarks,
         isActive: exam.isActive,
         createdBy: exam.createdBy?.name || '',
@@ -85,32 +113,62 @@ export async function GET(request: NextRequest) {
           include: {
             class: { select: { id: true, name: true } },
             createdBy: { select: { id: true, name: true } },
+            examSets: {
+              include: {
+                questions: {
+                  select: {
+                    subject: true,
+                  }
+                }
+              }
+            }
           },
         });
       },
       'Fetch all exams'
     );
 
-    const examsData = exams.map((exam) => ({
-      id: exam.id,
-      name: exam.name,
-      description: exam.description,
-      date: exam.date,
-      subject: exam.class?.name || '',
-      totalMarks: exam.totalMarks,
-      isActive: exam.isActive,
-      createdBy: exam.createdBy?.name || '',
-      classId: exam.classId,
-      createdAt: exam.createdAt,
-      type: exam.type,
-      allowRetake: exam.allowRetake || false,
+    const examsData = exams.map((exam) => {
+      // Extract subject from questions - get the most common subject
+      let examSubject = '';
+      const allQuestions = exam.examSets.flatMap(set => set.questions);
+      if (allQuestions.length > 0) {
+        const subjectCounts: { [key: string]: number } = {};
+        allQuestions.forEach(q => {
+          if (q.subject) {
+            subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
+          }
+        });
+        
+        // Find the subject with the highest count
+        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+          (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+        );
+        
+        examSubject = mostCommonSubject[0] || '';
+      }
+      
+      return {
+        id: exam.id,
+        name: exam.name,
+        description: exam.description,
+        date: exam.date,
+        subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
+        totalMarks: exam.totalMarks,
+        isActive: exam.isActive,
+        createdBy: exam.createdBy?.name || '',
+        classId: exam.classId,
+        createdAt: exam.createdAt,
+        type: exam.type,
+        allowRetake: exam.allowRetake || false,
               mcqNegativeMarking: exam.mcqNegativeMarking ,
         cqTotalQuestions: exam.cqTotalQuestions || 0,
         cqRequiredQuestions: exam.cqRequiredQuestions || 0,
         sqTotalQuestions: exam.sqTotalQuestions || 0,
         sqRequiredQuestions: exam.sqRequiredQuestions || 0,
         cqSubsections: exam.cqSubsections || null,
-    }));
+      };
+    });
 
     // Cache the result for 1 minute
     DatabaseCache.set(cacheKey, examsData, 60000);
