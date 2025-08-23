@@ -554,23 +554,56 @@ interface QuestionFormProps {
   openCreateBankDialog: () => void;
   isRefiningAi?: boolean;
 }
-
 const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCancel, classes, questionBanks, openCreateBankDialog, isRefiningAi = false }) => {
   const { toast } = useToast();
-  const [type, setType] = useState(initialData?.type || 'MCQ');
-  const [questionText, setQuestionText] = useState(initialData?.questionText || '');
-  const [subject, setSubject] = useState(initialData?.subject || '');
+  const [type, setType] = useState<QuestionType>(initialData?.type || 'MCQ');
+  const [questionText, setQuestionText] = useState(initialData?.questionText || 'Enter your question here...');
+  const [subject, setSubject] = useState(initialData?.subject || 'Mathematics');
   const [topic, setTopic] = useState(initialData?.topic || '');
   const [marks, setMarks] = useState(initialData?.marks || 5);
-  const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'MEDIUM');
+  const [difficulty, setDifficulty] = useState<Difficulty>(initialData?.difficulty || 'MEDIUM');
   const [classId, setClassId] = useState(initialData?.class?.id || (classes.length > 0 ? classes[0].id : ''));
   const [questionBankIds, setQuestionBankIds] = useState<string[]>((initialData?.questionBanks || []).map((qb: QuestionBank) => qb.id) || []);
-  const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string }[]>(initialData?.options || [{ text: '', isCorrect: true, explanation: '' }, { text: '', isCorrect: false, explanation: '' }]);
-  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string }[]>(initialData?.subQuestions || [{ question: '', marks: 5, modelAnswer: '' }]);
+  const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string }[]>(
+    initialData?.options || [
+      { text: 'Option A', isCorrect: true, explanation: '' }, 
+      { text: 'Option B', isCorrect: false, explanation: '' },
+      { text: 'Option C', isCorrect: false, explanation: '' },
+      { text: 'Option D', isCorrect: false, explanation: '' }
+    ]
+  );
+  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string }[]>(
+    initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '' }]
+  );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTextarea, setActiveTextarea] = useState<{ id: string; setter: (v: any) => void; index?: number; [key: string]: any }>({ id: 'qtext', setter: setQuestionText });
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
+
+  // Update classId when classes are loaded
+  useEffect(() => {
+    if (classes.length > 0 && !classId) {
+      setClassId(classes[0].id);
+    }
+  }, [classes, classId]);
+
+  // Debug logging
+  useEffect(() => {
+    console.log('QuestionForm initial state:', {
+      type,
+      questionText,
+      subject,
+      topic,
+      marks,
+      difficulty,
+      classId,
+      questionBankIds,
+      options,
+      subQuestions,
+      modelAnswer,
+      classes: classes.length
+    });
+  }, [type, questionText, subject, topic, marks, difficulty, classId, questionBankIds, options, subQuestions, modelAnswer, classes.length]);
 
   const handleInsertSymbol = useCallback((symbol: string) => {
     if (!activeTextarea || !activeTextarea.setter) return;
@@ -590,12 +623,92 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     e.preventDefault();
     setIsSaving(true);
     const isUpdate = initialData?.id && !isRefiningAi;
+    
+    // Validate required fields before submission
+    if (!questionText.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Question content is required" });
+      setIsSaving(false);
+      return;
+    }
+    
+    if (!subject.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Subject is required" });
+      setIsSaving(false);
+      return;
+    }
+    
+    if (!classId) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Class is required" });
+      setIsSaving(false);
+      return;
+    }
+    
+    // Validate MCQ options
+    if (type === 'MCQ') {
+      if (!options || options.length < 2) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MCQ must have at least 2 options" });
+        setIsSaving(false);
+        return;
+      }
+      
+      const validOptions = options.filter(opt => opt.text.trim() !== '');
+      if (validOptions.length < 2) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MCQ must have at least 2 valid options" });
+        setIsSaving(false);
+        return;
+      }
+      
+      const correctOptions = validOptions.filter(opt => opt.isCorrect);
+      if (correctOptions.length !== 1) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MCQ must have exactly one correct option" });
+        setIsSaving(false);
+        return;
+      }
+    }
+    
+    // Validate CQ sub-questions
+    if (type === 'CQ') {
+      if (!subQuestions || subQuestions.length < 1) {
+        toast({ variant: "destructive", title: "Validation Error", description: "CQ must have at least one sub-question" });
+        setIsSaving(false);
+        return;
+      }
+      
+      const validSubQuestions = subQuestions.filter(sq => sq.question.trim() !== '');
+      if (validSubQuestions.length < 1) {
+        toast({ variant: "destructive", title: "Validation Error", description: "CQ must have at least one valid sub-question" });
+        setIsSaving(false);
+        return;
+      }
+    }
+    
+    // Validate SQ model answer
+    if (type === 'SQ' && !modelAnswer.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "SQ must have a model answer" });
+      setIsSaving(false);
+      return;
+    }
+    
     const payload = {
-      type, subject, topic, marks: Number(marks), difficulty, classId, questionText,
+      type, 
+      subject: subject.trim(), 
+      topic: topic.trim() || undefined, 
+      marks: Number(marks), 
+      difficulty, 
+      classId, 
+      questionText: questionText.trim(),
       isAiGenerated: !!initialData?.isAiGenerated,
-      options: type === 'MCQ' ? options : null,
-      subQuestions: type === 'CQ' ? subQuestions : null,
-      modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer : undefined,
+      options: type === 'MCQ' ? options.filter(opt => opt.text.trim() !== '').map(opt => ({
+        text: opt.text.trim(),
+        isCorrect: opt.isCorrect,
+        explanation: opt.explanation?.trim() || undefined
+      })) : null,
+      subQuestions: type === 'CQ' ? subQuestions.filter(sq => sq.question.trim() !== '').map(sq => ({
+        question: sq.question.trim(),
+        marks: Number(sq.marks),
+        modelAnswer: sq.modelAnswer?.trim() || undefined
+      })) : null,
+      modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() : null,
       hasMath: /\\/.test(questionText) || 
                 (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) => 
                   /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
@@ -604,18 +717,41 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))
                 )) || 
                 (type === 'SQ' && /\\/.test(modelAnswer)),
-      questionBankIds: questionBankIds.length > 0 ? questionBankIds : undefined,
+      questionBankIds: questionBankIds.length > 0 ? questionBankIds : null,
     };
+
+    console.log('Submitting payload:', payload);
 
     try {
       const url = isUpdate ? `/api/question-bank?id=${initialData.id}` : '/api/question-bank';
       const method = isUpdate ? 'PUT' : 'POST';
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      if (!response.ok) { const err = await response.json(); throw new Error(err.details?.body?._errors[0] || err.error || 'Failed to save'); }
+      
+      if (!response.ok) { 
+        const err = await response.json(); 
+        console.error('API Error Response:', err);
+        
+        // Extract detailed error information
+        let errorMessage = 'Failed to save question';
+        if (err.details?.body?._errors?.[0]) {
+          errorMessage = err.details.body._errors[0];
+        } else if (err.details?.fieldErrors && typeof err.details.fieldErrors === 'object') {
+          const fieldErrors = Object.entries(err.details.fieldErrors)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : String(errors)}`)
+            .join('; ');
+          errorMessage = `Validation errors: ${fieldErrors}`;
+        } else if (err.error) {
+          errorMessage = err.error;
+        }
+        
+        throw new Error(errorMessage); 
+      }
+      
       const savedQuestion = await response.json();
       toast({ title: "Success", description: `Question ${isUpdate ? 'updated' : 'created'}.` });
       if(onSave) onSave(savedQuestion);
     } catch (error) {
+      console.error('Form submission error:', error);
       toast({ variant: "destructive", title: "Save Error", description: (error as Error).message });
     } finally {
       setIsSaving(false);
@@ -831,9 +967,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
                           <Latex>{opt.text || `(Option ${i+1})`}</Latex>
                           {opt.isCorrect && opt.explanation && (
-                            <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+                            <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                               <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
-                              <Latex>{opt.explanation}</Latex>
+                              <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
                             </div>
                           )}
                         </li>
@@ -853,7 +989,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           </div>
                           {sq.modelAnswer && (
                             <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Model Answer:</p>
+                              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
                               <Latex>{sq.modelAnswer}</Latex>
                             </div>
                           )}
@@ -876,7 +1012,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         </div>
         <div className="flex justify-end gap-2 pt-4 border-t">
           {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
-          <Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}{initialData?.id && !isRefiningAi ? 'Save Changes' : 'Create Question'}</Button>
+          <Button type="submit" disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {initialData?.id && !isRefiningAi ? 'Save Changes' : 'Create Question'}
+          </Button>
         </div>
       </form>
   );

@@ -16,27 +16,26 @@ async function getDeveloperUserId() {
 // --- Updated Schema ---
 const questionSchema = z.object({
     type: z.nativeEnum(QuestionType),
-    subject: z.string().min(1),
-    topic: z.string().optional(),
-    marks: z.coerce.number().int().min(1),
+    subject: z.string().min(1, "Subject is required"),
+    topic: z.string().optional().nullable(),
+    marks: z.coerce.number().int().min(1, "Marks must be at least 1"),
     difficulty: z.nativeEnum(Difficulty),
-    // UNIFIED: questionText is now the single source for content
     questionText: z.string().min(1, "Question content is required"),
     hasMath: z.boolean().default(false),
-    classId: z.string().cuid(),
+    classId: z.string().cuid("Valid class ID is required"),
     isAiGenerated: z.boolean().default(false),
     options: z.array(z.object({
         text: z.string().min(1, "Option text is required"),
         isCorrect: z.boolean(),
-        explanation: z.string().optional()
-    })).optional(),
+        explanation: z.string().optional().nullable()
+    })).nullable().default(null),
     subQuestions: z.array(z.object({
         question: z.string().min(1, "Sub-question text is required"),
-        marks: z.number().int().min(1),
-        modelAnswer: z.string().optional()
-    })).optional(),
-    modelAnswer: z.string().optional(),
-    questionBankIds: z.array(z.string().cuid()).optional(),
+        marks: z.number().int().min(1, "Sub-question marks must be at least 1"),
+        modelAnswer: z.string().optional().nullable()
+    })).nullable().default(null),
+    modelAnswer: z.string().optional().nullable(),
+    questionBankIds: z.array(z.string().cuid()).optional().nullable(),
 });
 
 const aiGenerationSchema = z.object({
@@ -63,7 +62,12 @@ export async function POST(request: Request) {
 
         const validation = questionSchema.safeParse(body);
         if (!validation.success) {
-            return NextResponse.json({ error: "Invalid input", details: validation.error.flatten() }, { status: 400 });
+            console.error('Validation failed:', validation.error.flatten());
+            return NextResponse.json({ 
+                error: "Invalid input", 
+                details: validation.error.flatten(),
+                receivedData: body 
+            }, { status: 400 });
         }
 
         const { questionBankIds, ...questionData } = validation.data;
