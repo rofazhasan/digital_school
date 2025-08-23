@@ -50,6 +50,8 @@ type GeneratedQuestion = {
   subject: string;
   topic?: string;
   class: { id: string; name: string };
+  hasMath?: boolean;
+  questionLatex?: string;
 };
 
 // Add this at the top of your project (e.g., types/react-latex.d.ts):
@@ -118,14 +120,67 @@ const ThreeJSBackground: React.FC = () => {
 
 const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
   const symbols = [
-    { display: '√x', latex: '$\\sqrt{}$' }, { display: 'x²', latex: '$^{2}$' }, { display: 'x/y', latex: '$\\frac{}{}$' },
-    { display: '∑', latex: '$\\sum_{i=1}^{n}$' }, { display: '∫', latex: '$\\int_{a}^{b}$' }, { display: '→', latex: '$\\rightarrow$' },
-    { display: 'α', latex: '$\\alpha$' }, { display: 'β', latex: '$\\beta$' }, { display: 'π', latex: '$\\pi$' }, { display: '≠', latex: '$\\neq$' },
+    // Basic operations
+    { display: '√x', latex: '$\\sqrt{}$' }, 
+    { display: 'x²', latex: '$^{2}$' }, 
+    { display: 'x/y', latex: '$\\frac{}{}$' },
+    { display: '±', latex: '$\\pm$' },
+    { display: '≠', latex: '$\\neq$' },
+    { display: '≤', latex: '$\\leq$' },
+    { display: '≥', latex: '$\\geq$' },
+    
+    // Greek letters
+    { display: 'α', latex: '$\\alpha$' }, 
+    { display: 'β', latex: '$\\beta$' }, 
+    { display: 'π', latex: '$\\pi$' },
+    { display: 'θ', latex: '$\\theta$' },
+    { display: 'φ', latex: '$\\phi$' },
+    { display: 'Δ', latex: '$\\Delta$' },
+    
+    // Calculus
+    { display: '∑', latex: '$\\sum_{i=1}^{n}$' }, 
+    { display: '∫', latex: '$\\int_{a}^{b}$' }, 
+    { display: 'dx', latex: '$dx$' },
+    { display: 'dy/dx', latex: '$\\frac{dy}{dx}$' },
+    { display: 'lim', latex: '$\\lim_{x \\to a}$' },
+    
+    // Arrows and logic
+    { display: '→', latex: '$\\rightarrow$' },
+    { display: '←', latex: '$\\leftarrow$' },
+    { display: '↔', latex: '$\\leftrightarrow$' },
+    { display: '∴', latex: '$\\therefore$' },
+    { display: '∵', latex: '$\\because$' },
+    
+    // Sets and logic
+    { display: '∈', latex: '$\\in$' },
+    { display: '∉', latex: '$\\notin$' },
+    { display: '⊂', latex: '$\\subset$' },
+    { display: '∪', latex: '$\\cup$' },
+    { display: '∩', latex: '$\\cap$' },
+    
+    // Common expressions
+    { display: 'x²+y²', latex: '$x^2 + y^2$' },
+    { display: 'ax²+bx+c', latex: '$ax^2 + bx + c$' },
+    { display: 'sin(x)', latex: '$\\sin(x)$' },
+    { display: 'cos(x)', latex: '$\\cos(x)$' },
+    { display: 'tan(x)', latex: '$\\tan(x)$' },
   ];
+  
   return (
-      <div className="flex flex-wrap gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-md mb-1">
+      <div className="flex flex-wrap gap-1 p-2 bg-gray-100 dark:bg-gray-800 rounded-md mb-2">
         {symbols.map(s => (
-            <Button key={s.display} type="button" variant="ghost" size="sm" className="h-auto px-2 py-1" onMouseDown={(e) => { e.preventDefault(); onInsert(s.latex); }}>
+            <Button 
+              key={s.display} 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="h-auto px-2 py-1 text-xs" 
+              onMouseDown={(e) => { 
+                e.preventDefault(); 
+                onInsert(s.latex); 
+              }}
+              title={s.latex}
+            >
               <Latex>{`$${s.display}$`}</Latex>
             </Button>
         ))}
@@ -425,19 +480,26 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
             <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{question.subject}</Badge>
             <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{question.class.name}</Badge>
             {question.isAiGenerated && <Badge variant="outline" className="text-indigo-500 border-indigo-500"><Bot className="h-3 w-3 mr-1"/>AI</Badge>}
+            {question.hasMath && (
+              <Badge variant="outline" className="text-blue-600 border-blue-600">
+                <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                Math
+              </Badge>
+            )}
           </div>
         </CardHeader>
-        <CardContent className="flex-grow prose prose-sm dark:prose-invert max-w-full">
+        <CardContent className="flex-grow prose prose-sm dark:prose-invert max-w-none">
           {question.type === 'MCQ' && (
             <div className="space-y-2">
-              <ul className="list-disc pl-5 my-0 space-y-1">
-                                              {((question.options || []) || []).map((opt: any, i: number) => (
-                  <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
+              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
+              <ul className="list-disc pl-5 my-0 space-y-2">
+                {((question.options || []) || []).map((opt: any, i: number) => (
+                  <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
                     <Latex>{opt.text || ''}</Latex>
                     {opt.isCorrect && opt.explanation && (
-                      <div className="mt-1 ml-4 p-1 bg-green-50 dark:bg-green-900/20 rounded text-xs">
-                        <span className="font-semibold text-green-700 dark:text-green-300">Why: </span>
-                        <span className="text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></span>
+                      <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
+                        <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
+                        <span className="text-green-600 dark:text-green-400 text-xs"><Latex>{opt.explanation}</Latex></span>
                       </div>
                     )}
                   </li>
@@ -447,14 +509,18 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
           )}
           {question.type === 'CQ' && (
             <div className="space-y-2">
-              <ol className="list-decimal pl-5 my-0 space-y-2">
-                                              {((question.subQuestions || []) || []).map((sq: any, i: number) => (
-                  <li key={i} className="space-y-1">
-                    <Latex>{sq.question || ''}</Latex>
+              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
+              <ol className="list-decimal pl-5 my-0 space-y-3">
+                {((question.subQuestions || []) || []).map((sq: any, i: number) => (
+                  <li key={i} className="space-y-2">
+                    <div>
+                      <Latex>{sq.question || ''}</Latex>
+                      <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                    </div>
                     {sq.modelAnswer && (
-                      <div className="ml-4 mt-1 p-1 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-                        <span className="font-semibold text-blue-700 dark:text-blue-300">Answer: </span>
-                        <Latex>{sq.modelAnswer}</Latex>
+                      <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                        <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
+                        <span className="text-blue-600 dark:text-blue-400 text-xs"><Latex>{sq.modelAnswer}</Latex></span>
                       </div>
                     )}
                   </li>
@@ -463,9 +529,11 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
             </div>
           )}
           {question.type === 'SQ' && question.modelAnswer && (
-            <div className="mt-2 pt-2 border-t">
-              <p className="font-semibold text-xs mb-1">Answer:</p>
-              <Latex>{question.modelAnswer}</Latex>
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                <Latex>{question.modelAnswer}</Latex>
+              </div>
             </div>
           )}
         </CardContent>
@@ -497,8 +565,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   const [difficulty, setDifficulty] = useState(initialData?.difficulty || 'MEDIUM');
   const [classId, setClassId] = useState(initialData?.class?.id || (classes.length > 0 ? classes[0].id : ''));
   const [questionBankIds, setQuestionBankIds] = useState<string[]>((initialData?.questionBanks || []).map((qb: QuestionBank) => qb.id) || []);
-  const [options, setOptions] = useState<{ text: string; isCorrect: boolean }[]>(initialData?.options || [{ text: '', isCorrect: true }, { text: '', isCorrect: false }]);
-  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number }[]>(initialData?.subQuestions || [{ question: '', marks: 5 }]);
+  const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string }[]>(initialData?.options || [{ text: '', isCorrect: true, explanation: '' }, { text: '', isCorrect: false, explanation: '' }]);
+  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string }[]>(initialData?.subQuestions || [{ question: '', marks: 5, modelAnswer: '' }]);
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [isSaving, setIsSaving] = useState(false);
   const [activeTextarea, setActiveTextarea] = useState<{ id: string; setter: (v: any) => void; index?: number; [key: string]: any }>({ id: 'qtext', setter: setQuestionText });
@@ -528,7 +596,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       options: type === 'MCQ' ? options : null,
       subQuestions: type === 'CQ' ? subQuestions : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer : undefined,
-      hasMath: /\\/.test(questionText) || (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean }) => /\\/.test(opt.text))) || (type === 'SQ' && /\\/.test(modelAnswer)),
+      hasMath: /\\/.test(questionText) || 
+                (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) => 
+                  /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
+                )) || 
+                (type === 'CQ' && subQuestions.some((sq: { question: string; marks: number; modelAnswer?: string }) => 
+                  /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))
+                )) || 
+                (type === 'SQ' && /\\/.test(modelAnswer)),
       questionBankIds: questionBankIds.length > 0 ? questionBankIds : undefined,
     };
 
@@ -567,7 +642,23 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             <div>
               <Label>Question Content</Label>
               <MathToolbar onInsert={handleInsertSymbol} />
-              <Textarea ref={el => { textareaRefs.current['qtext'] = el; }} onFocus={makeFocusHandler('qtext', setQuestionText)} value={questionText} onChange={e => setQuestionText(e.target.value)} required rows={8}/>
+              <Textarea 
+                ref={el => { textareaRefs.current['qtext'] = el; }} 
+                onFocus={makeFocusHandler('qtext', setQuestionText)} 
+                value={questionText} 
+                onChange={e => setQuestionText(e.target.value)} 
+                required 
+                rows={8}
+                placeholder="Enter your question here. Use the math toolbar above for mathematical expressions..."
+              />
+              {/\\/.test(questionText) && (
+                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-xs font-medium">Mathematical content detected</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="space-y-4">
@@ -577,32 +668,210 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   <div className="space-y-2">
                     <Label>Options</Label>
                     <MathToolbar onInsert={handleInsertSymbol} />
-                                                {(options || []).map((opt: { text: string; isCorrect: boolean }, i: number) => (
-                        <div key={i} className="flex items-center gap-2">
-                                                      <Checkbox checked={opt.isCorrect} onCheckedChange={() => setOptions((options || []).map((o, idx) => ({...o, isCorrect: i === idx})))} />
-                                                      <Textarea ref={el => { textareaRefs.current[`opt-${i}`] = el; }} onFocus={makeFocusHandler(`opt-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].text = newText; setOptions(newOpts); })} value={opt.text} onChange={e => { const newOpts = [...(options || [])]; newOpts[i].text = e.target.value; setOptions(newOpts); }} placeholder={`Option ${i + 1}`} rows={1} className="h-auto" />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => setOptions((options || []).filter((_, idx) => i !== idx))}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                    {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                        <div key={i} className="space-y-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
+                          <div className="flex items-center gap-2">
+                            <Checkbox checked={opt.isCorrect} onCheckedChange={() => setOptions((options || []).map((o, idx) => ({...o, isCorrect: i === idx})))} />
+                            <Textarea 
+                              ref={el => { textareaRefs.current[`opt-${i}`] = el; }} 
+                              onFocus={makeFocusHandler(`opt-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].text = newText; setOptions(newOpts); })} 
+                              value={opt.text} 
+                              onChange={e => { const newOpts = [...(options || [])]; newOpts[i].text = e.target.value; setOptions(newOpts); }} 
+                              placeholder={`Option ${i + 1}`} 
+                              rows={2} 
+                              className="h-auto flex-grow" 
+                            />
+                            <Button type="button" variant="ghost" size="icon" onClick={() => setOptions((options || []).filter((_, idx) => i !== idx))}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
+                          {opt.isCorrect && (
+                            <div className="ml-6 space-y-2">
+                              <Label className="text-sm text-gray-600 dark:text-gray-400">Explanation (Optional)</Label>
+                              <MathToolbar onInsert={handleInsertSymbol} />
+                              <Textarea 
+                                ref={el => { textareaRefs.current[`opt-expl-${i}`] = el; }} 
+                                onFocus={makeFocusHandler(`opt-expl-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].explanation = newText; setOptions(newOpts); })} 
+                                value={opt.explanation || ''} 
+                                onChange={e => { const newOpts = [...(options || [])]; newOpts[i].explanation = e.target.value; setOptions(newOpts); }} 
+                                placeholder="Explain why this option is correct..." 
+                                rows={3} 
+                                className="h-auto" 
+                              />
+                              {opt.explanation && /\\/.test(opt.explanation) && (
+                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                    <span className="text-xs font-medium">Math detected in explanation</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {(/\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))) && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-xs font-medium">Mathematical content detected</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                     ))}
-                                          <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), {text: '', isCorrect: false}])}><PlusCircle className="mr-2 h-4 w-4" />Add Option</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), {text: '', isCorrect: false, explanation: ''}])}>
+                      <PlusCircle className="mr-2 h-4 w-4" />Add Option
+                    </Button>
                   </div>
               )}
               {type === 'SQ' && (
                   <div>
                     <Label>Model Answer</Label>
                     <MathToolbar onInsert={handleInsertSymbol} />
-                    <Textarea ref={el => { textareaRefs.current['modelans'] = el; }} onFocus={makeFocusHandler('modelans', setModelAnswer)} value={modelAnswer} onChange={e => setModelAnswer(e.target.value)} rows={4} />
+                    <Textarea 
+                      ref={el => { textareaRefs.current['modelans'] = el; }} 
+                      onFocus={makeFocusHandler('modelans', setModelAnswer)} 
+                      value={modelAnswer} 
+                      onChange={e => setModelAnswer(e.target.value)} 
+                      rows={4} 
+                      placeholder="Enter the model answer with step-by-step solution..."
+                    />
+                    {modelAnswer && /\\/.test(modelAnswer) && (
+                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-xs font-medium">Mathematical content detected in model answer</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
               )}
-              {type === 'CQ' && <div className="space-y-2"><Label>Sub-questions</Label>{(subQuestions || []).map((sq: { question: string; marks: number }, i: number) => (<div key={i} className="flex items-start gap-2 p-2 border rounded-md"><div className="flex-grow space-y-1"><Input value={sq.question} onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = e.target.value; setSubQuestions(newSQs); }} placeholder="Sub-question text" /><Input type="number" value={sq.marks} onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = Number(e.target.value); setSubQuestions(newSQs); }} placeholder="Marks" className="w-24" /></div><Button type="button" variant="ghost" size="icon" onClick={() => setSubQuestions((subQuestions || []).filter((_, idx) => i !== idx))}><Trash2 className="h-4 w-4 text-red-500" /></Button></div>))}<Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), {question: '', marks: 5}])}><PlusCircle className="mr-2 h-4 w-4" />Add Sub-question</Button></div>}
+              {type === 'CQ' && (
+                <div className="space-y-2">
+                  <Label>Sub-questions</Label>
+                  {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                    <div key={i} className="space-y-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
+                      <div className="flex items-start gap-2">
+                        <div className="flex-grow space-y-2">
+                          <div>
+                            <Label className="text-sm text-gray-600 dark:text-gray-400">Question {i + 1}</Label>
+                            <MathToolbar onInsert={handleInsertSymbol} />
+                            <Textarea 
+                              ref={el => { textareaRefs.current[`sq-${i}`] = el; }} 
+                              onFocus={makeFocusHandler(`sq-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = newText; setSubQuestions(newSQs); })} 
+                              value={sq.question} 
+                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = e.target.value; setSubQuestions(newSQs); }} 
+                              placeholder="Sub-question text" 
+                              rows={3} 
+                              className="h-auto" 
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <Label className="text-sm text-gray-600 dark:text-gray-400">Marks</Label>
+                              <Input 
+                                type="number" 
+                                value={sq.marks} 
+                                onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = Number(e.target.value); setSubQuestions(newSQs); }} 
+                                placeholder="Marks" 
+                                className="w-24" 
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="text-sm text-gray-600 dark:text-gray-400">Model Answer (Optional)</Label>
+                            <MathToolbar onInsert={handleInsertSymbol} />
+                            <Textarea 
+                              ref={el => { textareaRefs.current[`sq-ans-${i}`] = el; }} 
+                              onFocus={makeFocusHandler(`sq-ans-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = newText; setSubQuestions(newSQs); })} 
+                              value={sq.modelAnswer || ''} 
+                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = e.target.value; setSubQuestions(newSQs); }} 
+                              placeholder="Model answer for this sub-question..." 
+                              rows={3} 
+                              className="h-auto" 
+                            />
+                            {sq.modelAnswer && /\\/.test(sq.modelAnswer) && (
+                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  <span className="text-xs font-medium">Math detected in model answer</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => setSubQuestions((subQuestions || []).filter((_, idx) => i !== idx))}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
+                      {(/\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))) && (
+                        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                            <span className="text-xs font-medium">Mathematical content detected</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), {question: '', marks: 5, modelAnswer: ''}])}>
+                    <PlusCircle className="mr-2 h-4 w-4" />Add Sub-question
+                  </Button>
+                </div>
+              )}
             </motion.div></AnimatePresence>
             <Label>Live Preview</Label>
-            <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50"><div className="prose dark:prose-invert max-w-none">
-              <Latex>{questionText || ''}</Latex>
-              {type === 'MCQ' && <ul className="list-disc pl-5 mt-4 space-y-1">{(options || []).map((opt: { text: string; isCorrect: boolean }, i: number) => <li key={i} className={opt.isCorrect ? 'font-bold' : ''}><Latex>{opt.text || `(Option ${i+1})`}</Latex></li>)}</ul>}
-              {type === 'CQ' && <ol className="list-decimal pl-5 mt-4 space-y-2">{(subQuestions || []).map((sq: { question: string; marks: number }, i: number) => <li key={i}><Latex>{sq.question || `(Sub-question ${i+1})`}</Latex> <span className="text-xs font-mono">[Marks: {sq.marks || 0}]</span></li>)}</ol>}
-              {type === 'SQ' && modelAnswer && <div className="mt-4 pt-2 border-t"><p className="font-semibold">Model Answer:</p><Latex>{modelAnswer}</Latex></div>}
-            </div></Card>
+            <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
+              <div className="prose dark:prose-invert max-w-none">
+                <Latex>{questionText || ''}</Latex>
+                {type === 'MCQ' && (
+                  <div className="mt-4">
+                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
+                    <ul className="list-disc pl-5 space-y-2">
+                      {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                        <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                          <Latex>{opt.text || `(Option ${i+1})`}</Latex>
+                          {opt.isCorrect && opt.explanation && (
+                            <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+                              <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
+                              <Latex>{opt.explanation}</Latex>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {type === 'CQ' && (
+                  <div className="mt-4">
+                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
+                    <ol className="list-decimal pl-5 space-y-3">
+                      {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                        <li key={i} className="space-y-2">
+                          <div>
+                            <Latex>{sq.question || `(Sub-question ${i+1})`}</Latex>
+                            <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                          </div>
+                          {sq.modelAnswer && (
+                            <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 mb-1">Model Answer:</p>
+                              <Latex>{sq.modelAnswer}</Latex>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+                {type === 'SQ' && modelAnswer && (
+                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                      <Latex>{modelAnswer}</Latex>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
         </div>
         <div className="flex justify-end gap-2 pt-4 border-t">
@@ -773,11 +1042,17 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
             </div>
             <div><Label>Topic (Optional)</Label><Input name="topic" placeholder="e.g., Kinematics" /></div>
             <div><Label>Number of Questions</Label><Input name="count" type="number" defaultValue={3} min={1} max={10} /></div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
               <Checkbox id="include-answers" name="includeAnswers" defaultChecked />
-              <Label htmlFor="include-answers" className="text-sm">Include model answers & explanations</Label>
+              <div>
+                <Label htmlFor="include-answers" className="text-sm font-medium">Include model answers & explanations</Label>
+                <p className="text-xs text-gray-600 dark:text-gray-400">For MCQ: explanations for correct options. For CQ/SQ: detailed model answers.</p>
+              </div>
             </div>
-            <Button type="submit" className="w-full" disabled={isGenerating}>{isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}Generate Questions</Button>
+            <Button type="submit" className="w-full" disabled={isGenerating}>
+              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+              Generate Questions
+            </Button>
           </form>
           <div className="space-y-4">
             <CardTitle>Generated Preview</CardTitle>
@@ -791,6 +1066,12 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           <Badge variant="outline" className="text-xs">{q.type}</Badge>
                           <Badge variant="outline" className="text-xs">{q.marks} Marks</Badge>
                           <Badge variant="outline" className="text-xs">{q.difficulty}</Badge>
+                          {q.hasMath && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                              Math
+                            </Badge>
+                          )}
                         </div>
                         <Latex>{q.questionText || ''}</Latex>
                         
@@ -823,7 +1104,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                                 <li key={i} className="space-y-2">
                                   <div>
                                     <Latex>{sq.question || ''}</Latex>
-                                    <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks} marks]</span>
+                                    <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                                   </div>
                                   {sq.modelAnswer && (
                                     <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
@@ -884,25 +1165,3 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
       </div>
   );
 };
-
-// Add this test section at the end of the component, before the closing div
-{/* Test CQ Subsection Display */}
-<div className="mt-8 p-4 border border-gray-200 rounded-lg bg-gray-50">
-  <h3 className="text-lg font-semibold mb-4">Test CQ Subsection Display</h3>
-  <div className="space-y-4">
-    <div className="p-3 border border-blue-200 rounded bg-blue-50">
-      <h4 className="font-medium text-blue-800">Single Subsection (Questions can be shuffled)</h4>
-      <p className="text-sm text-blue-600">Total: 8 questions, Required: 5 questions</p>
-      <p className="text-sm text-blue-600">No subsection names needed</p>
-    </div>
-    
-    <div className="p-3 border border-green-200 rounded bg-green-50">
-      <h4 className="font-medium text-green-800">Multiple Subsections (Questions cannot be shuffled)</h4>
-      <div className="text-sm text-green-600 space-y-1">
-        <p>• Algebra (Questions 1-3): Required 2 questions</p>
-        <p>• Geometry (Questions 4-6): Required 2 questions</p>
-        <p>• Trigonometry (Questions 7-8): Required 1 question</p>
-      </div>
-    </div>
-  </div>
-</div>
