@@ -167,10 +167,10 @@ export default function PrintExamPage() {
         <div ref={printRef} className="relative z-10">
           {/* Render Question Papers or Answer Sheets based on toggle */}
           {!showAnswers ? (
-            // Question Papers
+            // Question Papers - Let QuestionPaper handle its own pagination
             <>
               {nonEmptySets.map((set: any) => (
-                <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
+                <div key={set.setId} className="print-page-container legal-paper">
                   <QuestionPaper
                     examInfo={{ ...examInfo, set: set.setName }}
                     questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
@@ -187,7 +187,7 @@ export default function PrintExamPage() {
           ) : (
             // Answer Sheets (no OMR sheets)
             nonEmptySets.map((set: any) => (
-              <div key={`answer-${set.setId}`} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
+              <div key={`answer-${set.setId}`} className="print-page-container legal-paper">
                 <AnswerQuestionPaper
                   examInfo={{ ...examInfo, set: set.setName }}
                   questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}

@@ -33,6 +33,32 @@
     margin: 8mm 6mm 8mm 6mm;
   }
   
+  /* Better page flow for question sections */
+  .question-paper-container {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  
+  /* Prevent section headers from breaking */
+  .section-header {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+  
+  /* Allow questions to flow naturally across pages */
+  .question-item {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Ensure MCQ columns flow properly */
+  .mcq-columns {
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+  
   /* Font settings for print */
   body, .question-paper-container, .answer-paper-container {
     font-family: 'SolaimanLipi', 'Times New Roman', serif !important;

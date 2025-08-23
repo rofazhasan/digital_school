@@ -91,12 +91,13 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         return [{ questions: mcqs, isTwoColumn: false } as const];
       } else {
         // Two columns, multiple pages - 9 questions per column (18 per page)
+        // Ensure questions flow naturally: fill left column, then right column, then next page
         const pages: Array<{ left: MCQ[]; right: MCQ[]; isTwoColumn: true }> = [];
         let remaining = [...mcqs];
         
         while (remaining.length > 0) {
           if (remaining.length <= 18) {
-            // Last page: distribute remaining questions
+            // Last page: distribute remaining questions evenly
             const leftCount = Math.ceil(remaining.length / 2);
             pages.push({
               left: remaining.slice(0, leftCount),
@@ -106,6 +107,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             break;
           } else {
             // Full page: 9+9 distribution
+            // Fill left column first, then right column
             pages.push({
               left: remaining.slice(0, 9),
               right: remaining.slice(9, 18),
@@ -146,7 +148,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {mcqs.length > 0 && (
             <>
               {/* MCQ Header - only once */}
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid section-header">
                 <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
                 <div className="text-right">
                   <div>মোট নম্বর: {mcqTotal}</div>
@@ -160,13 +162,13 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 <div key={pageIdx}>
                   {page.isTwoColumn ? (
                     // Two column layout
-                    <div className="grid grid-cols-2 gap-x-8">
+                    <div className="grid grid-cols-2 gap-x-8 mcq-columns">
                       {/* Left Column */}
                       <div>
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? idx : (pageIdx * 18) + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-item" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
@@ -213,7 +215,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     // Single column layout
                     <div>
                       {(page as { questions: MCQ[]; isTwoColumn: false }).questions.map((q: MCQ, idx: number) => (
-                        <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <div key={idx} className="mb-2 text-left question-item" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
@@ -236,15 +238,15 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             </>
           )}
 
-          {/* CQ Section - starts immediately after MCQ */}
+          {/* CQ Section - starts immediately after MCQ without page break */}
           {cqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 section-header" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                 <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
                   {cqRequired > 0 && (
-                    <div className="text-sm">(যেকোনো {cqRequired} টি উত্তর করতে হবে)</div>
+                    <div className="text-sm">(মোট {cqRequired} টি উত্তর করতে হবে)</div>
                   )}
                 </div>
               </div>
@@ -263,7 +265,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                         {subsection.name || `Subsection ${subIdx + 1}`}
                         {subsectionRequired > 0 && (
                           <span className="text-sm font-normal text-gray-600 dark:text-gray-400 ml-2">
-                            (যেকোনো {subsectionRequired} টি উত্তর করতে হবে)
+                            (কমপক্ষে {subsectionRequired} টি উত্তর করতে হবে)
                           </span>
                         )}
                       </div>
@@ -271,7 +273,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       {/* Questions in this subsection */}
                       <div className="ml-4">
                         {subsectionQuestions.map((q, idx) => (
-                          <div key={idx} className="mb-3 text-left">
+                          <div key={idx} className="mb-3 text-left question-item">
                             <div className="flex items-start">
                               <span className="font-bold mr-2">{subsection.startIndex + idx}.</span>
                               <div className="flex-1">
@@ -302,7 +304,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 // Single subsection or no subsections - render normally
                 <div>
                   {cqs.map((q, idx) => (
-                    <div key={idx} className="mb-3 text-left">
+                    <div key={idx} className="mb-3 text-left question-item">
                       <div className="flex items-start">
                         <span className="font-bold mr-2">{idx + 1}.</span>
                         <div className="flex-1">
@@ -330,21 +332,21 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             </>
           )}
 
-          {/* SQ Section - starts immediately after CQ */}
+          {/* SQ Section - starts immediately after CQ without page break */}
           {sqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 section-header" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                 <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
                   {sqRequired > 0 && (
-                    <div className="text-sm">(যেকোনো {sqRequired} টি উত্তর করতে হবে)</div>
+                    <div className="text-sm">(মোট {sqRequired} টি উত্তর করতে হবে)</div>
                   )}
                 </div>
               </div>
               <div>
                 {sqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
+                  <div key={idx} className="mb-3 text-left question-item">
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">
