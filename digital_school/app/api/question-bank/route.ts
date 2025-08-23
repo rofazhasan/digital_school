@@ -276,10 +276,27 @@ SQ (SHORT) QUESTIONS:
 ${includeAnswers ? '- Provide comprehensive \'modelAnswer\' with detailed solution steps and reasoning' : ''}
 - Use LaTeX for mathematical expressions and solutions` : ''}
 
-MATHEMATICAL CONTENT:
+MATHEMATICAL CONTENT AND FORMATTING:
 - For any mathematical content, use proper LaTeX notation
 - Common examples: $x^2 + y^2 = z^2$, $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, $\\int_{a}^{b} f(x) dx$
 - If no mathematical content, set 'questionLatex' to empty string
+
+TABLES AND DATA:
+- When presenting data in tables, use LaTeX table syntax:
+  - Simple table: $\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$
+  - Matrix: $\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$
+  - Determinant: $\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$
+- For frequency tables, use: $\\begin{array}{|c|c|} \\hline \\text{Value} & \\text{Frequency} \\\\ \\hline x_1 & f_1 \\\\ \\hline x_2 & f_2 \\\\ \\hline \\end{array}$
+
+GEOMETRY AND DIAGRAMS:
+- For geometric shapes, use LaTeX geometry commands:
+  - Triangle: $\\triangle ABC$ with sides $a$, $b$, $c$
+  - Circle: $\\odot O$ with radius $r$ and center $O$
+  - Rectangle: $\\square ABCD$ with length $l$ and width $w$
+  - Angles: $\\angle ABC = \\theta$
+  - Parallel lines: $AB \\parallel CD$
+  - Perpendicular: $AB \\perp CD$
+- For coordinate geometry: Point $A(x_1, y_1)$, Line $y = mx + c$, Circle $(x-h)^2 + (y-k)^2 = r^2$
 
 RESPONSE FORMAT:
 - Respond ONLY with a valid JSON array matching the provided schema

@@ -131,7 +131,7 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
     
     // Greek letters
     { display: 'α', latex: '$\\alpha$' }, 
-    { display: 'β', latex: '$\\beta$' }, 
+    { display: 'β', latex: '$\\beta$' },
     { display: 'π', latex: '$\\pi$' },
     { display: 'θ', latex: '$\\theta$' },
     { display: 'φ', latex: '$\\phi$' },
@@ -157,6 +157,19 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
     { display: '⊂', latex: '$\\subset$' },
     { display: '∪', latex: '$\\cup$' },
     { display: '∩', latex: '$\\cap$' },
+    
+    // Tables and matrices
+    { display: 'Table', latex: '$\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$' },
+    { display: 'Matrix', latex: '$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$' },
+    { display: 'Det', latex: '$\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$' },
+    
+    // Geometry
+    { display: '△', latex: '$\\triangle$' },
+    { display: '⊙', latex: '$\\odot$' },
+    { display: '□', latex: '$\\square$' },
+    { display: '∠', latex: '$\\angle$' },
+    { display: '∥', latex: '$\\parallel$' },
+    { display: '⊥', latex: '$\\perp$' },
     
     // Common expressions
     { display: 'x²+y²', latex: '$x^2 + y^2$' },
@@ -778,6 +791,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             <div>
               <Label>Question Content</Label>
               <MathToolbar onInsert={handleInsertSymbol} />
+              <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                <p className="text-xs text-blue-700 dark:text-blue-300">
+                  <strong>Enhanced Math Support:</strong> Use the toolbar above for mathematical expressions, tables, matrices, and geometry. 
+                  Tables are supported using LaTeX array syntax.
+                </p>
+              </div>
               <Textarea 
                 ref={el => { textareaRefs.current['qtext'] = el; }} 
                 onFocus={makeFocusHandler('qtext', setQuestionText)} 
@@ -785,7 +804,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 onChange={e => setQuestionText(e.target.value)} 
                 required 
                 rows={8}
-                placeholder="Enter your question here. Use the math toolbar above for mathematical expressions..."
+                placeholder="Enter your question here. Use the math toolbar above for mathematical expressions, tables, and geometry..."
               />
               {/\\/.test(questionText) && (
                 <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
@@ -1188,6 +1207,16 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                 <p className="text-xs text-gray-600 dark:text-gray-400">For MCQ: explanations for correct options. For CQ/SQ: detailed model answers.</p>
               </div>
             </div>
+            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
+              <div className="flex items-center gap-2 text-green-700 dark:text-green-300 mb-2">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm font-medium">Enhanced AI Features</span>
+              </div>
+              <p className="text-xs text-green-600 dark:text-green-400">
+                The AI now supports tables, matrices, and geometry using LaTeX notation. 
+                Tables will be automatically formatted using LaTeX array syntax.
+              </p>
+            </div>
             <Button type="submit" className="w-full" disabled={isGenerating}>
               {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
               Generate Questions
@@ -1212,7 +1241,9 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                             </Badge>
                           )}
                         </div>
-                        <Latex>{q.questionText || ''}</Latex>
+                        <div className="whitespace-pre-wrap overflow-x-auto">
+                          <Latex>{q.questionText || ''}</Latex>
+                        </div>
                         
                         {/* MCQ Options with Explanations */}
                         {q.type === 'MCQ' && (
