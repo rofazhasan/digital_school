@@ -452,7 +452,7 @@ export default function ExamBuilderPage() {
       return shuffledArray;
     };
 
-    // On generate, create N sets with CQ questions in original order and only MCQ questions shuffled
+    // On generate, create N sets with shuffled questions and MCQ options
     const handleGenerateSets = async () => {
         if (!isSelectionValid) {
             let errorMessage = "Validation failed: ";
@@ -469,22 +469,7 @@ export default function ExamBuilderPage() {
         setIsSubmitting(true);
         try {
             const setsToSave = Array.from({ length: numSets }).map((_, i) => {
-                // Separate questions by type
-                const cqQuestions = selectedQuestions.filter(q => q.type === 'CQ');
-                const sqQuestions = selectedQuestions.filter(q => q.type === 'SQ');
-                const mcqQuestions = selectedQuestions.filter(q => q.type === 'MCQ');
-                
-                // Shuffle only MCQ questions, keep CQ and SQ in original order
-                const shuffledMCQQuestions = shuffleArray(mcqQuestions);
-                
-                // Combine questions: CQ first (in original order), then SQ (in original order), then shuffled MCQ
-                const orderedQuestions = [
-                    ...cqQuestions,
-                    ...sqQuestions,
-                    ...shuffledMCQQuestions
-                ];
-                
-                const processedQuestions = orderedQuestions.map(q => {
+                const shuffledQuestions = shuffleArray(selectedQuestions).map(q => {
                     let processedQuestion = { ...q };
                     
                     // Shuffle MCQ options if it's an MCQ question
@@ -503,10 +488,9 @@ export default function ExamBuilderPage() {
                     
                     return processedQuestion;
                 });
-                
                 return {
                     name: `${newSetName.trim()} ${String.fromCharCode(65 + i)}`,
-                    questions: processedQuestions,
+                    questions: shuffledQuestions,
                 };
             });
             const response = await fetch(`/api/exams/${examId}/set`, {
@@ -676,12 +660,6 @@ export default function ExamBuilderPage() {
                                         onChange={e => setNumSets(Math.max(1, Math.min(10, Number(e.target.value))))}
                                         className="w-20 text-center"
                                       />
-                                    </div>
-                                    <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                                      <p className="text-xs text-blue-700 dark:text-blue-300">
-                                        <strong>Set Generation Rules:</strong> CQ and SQ questions maintain their original order to preserve sub-question logic. 
-                                        Only MCQ questions and their options are shuffled for variety.
-                                      </p>
                                     </div>
                                     <h3 className="text-md font-semibold mb-2">Selected Questions ({selectedQuestions.length})</h3>
                                     <ScrollArea className="h-[45vh] pr-4">

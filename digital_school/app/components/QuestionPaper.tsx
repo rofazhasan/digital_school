@@ -91,13 +91,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         return [{ questions: mcqs, isTwoColumn: false } as const];
       } else {
         // Two columns, multiple pages - 9 questions per column (18 per page)
-        // Ensure questions flow naturally: fill left column, then right column, then next page
         const pages: Array<{ left: MCQ[]; right: MCQ[]; isTwoColumn: true }> = [];
         let remaining = [...mcqs];
         
         while (remaining.length > 0) {
           if (remaining.length <= 18) {
-            // Last page: distribute remaining questions evenly
+            // Last page: distribute remaining questions
             const leftCount = Math.ceil(remaining.length / 2);
             pages.push({
               left: remaining.slice(0, leftCount),
@@ -107,7 +106,6 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             break;
           } else {
             // Full page: 9+9 distribution
-            // Fill left column first, then right column
             pages.push({
               left: remaining.slice(0, 9),
               right: remaining.slice(9, 18),
@@ -148,7 +146,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {mcqs.length > 0 && (
             <>
               {/* MCQ Header - only once */}
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid section-header">
+              <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-2 break-inside-avoid mcq-header">
                 <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
                 <div className="text-right">
                   <div>মোট নম্বর: {mcqTotal}</div>
@@ -159,21 +157,24 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               </div>
               
               {mcqPages.map((page, pageIdx) => (
-                <div key={pageIdx}>
+                <div key={pageIdx} className="mcq-page" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                  {pageIdx > 0 && (
+                    <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
+                  )}
                   {page.isTwoColumn ? (
                     // Two column layout
-                    <div className="grid grid-cols-2 gap-x-8 mcq-columns">
+                    <div className="grid grid-cols-2 gap-x-8">
                       {/* Left Column */}
                       <div>
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? idx : (pageIdx * 18) + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left question-item" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
                                   <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
+                                  <div className="mt-1 question-options">
                                     {(q.options || []).map((opt: any, oidx: number) => (
                                       <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                         <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
@@ -192,12 +193,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).right.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? ((page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx) : (pageIdx * 18) + (page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
                                   <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
+                                  <div className="mt-1 question-options">
                                     {(q.options || []).map((opt: any, oidx: number) => (
                                       <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                         <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
@@ -215,12 +216,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     // Single column layout
                     <div>
                       {(page as { questions: MCQ[]; isTwoColumn: false }).questions.map((q: MCQ, idx: number) => (
-                        <div key={idx} className="mb-2 text-left question-item" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
                               <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                              <div className="mt-1">
+                              <div className="mt-1 question-options">
                                 {(q.options || []).map((opt: any, oidx: number) => (
                                   <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                     <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
@@ -238,10 +239,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             </>
           )}
 
-          {/* CQ Section - starts immediately after MCQ without page break */}
+          {/* CQ Section - starts on new page after MCQ */}
           {cqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 section-header" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+              <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
+              <div className="cq-section flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-8">
                 <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
@@ -273,7 +275,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       {/* Questions in this subsection */}
                       <div className="ml-4">
                         {subsectionQuestions.map((q, idx) => (
-                          <div key={idx} className="mb-3 text-left question-item">
+                          <div key={idx} className="mb-3 text-left cq-question" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                             <div className="flex items-start">
                               <span className="font-bold mr-2">{subsection.startIndex + idx}.</span>
                               <div className="flex-1">
@@ -301,10 +303,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   );
                 })
               ) : (
-                // Single subsection or no subsections - render normally
+                                // Single subsection or no subsections - render normally
                 <div>
                   {cqs.map((q, idx) => (
-                    <div key={idx} className="mb-3 text-left question-item">
+                    <div key={idx} className="mb-3 text-left cq-question" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                       <div className="flex items-start">
                         <span className="font-bold mr-2">{idx + 1}.</span>
                         <div className="flex-1">
@@ -318,24 +320,25 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     <Text>
                                       {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
                                     </Text>
-                                  </span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
               )}
             </>
           )}
 
-          {/* SQ Section - starts immediately after CQ without page break */}
+          {/* SQ Section - starts on new page after CQ */}
           {sqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 section-header" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+              <div className="page-break-before" style={{ pageBreakBefore: 'always', breakBefore: 'page', marginTop: '0', paddingTop: '0' }}></div>
+              <div className="sq-section flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-8">
                 <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
@@ -346,7 +349,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               </div>
               <div>
                 {sqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left question-item">
+                  <div key={idx} className="mb-3 text-left sq-question" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">

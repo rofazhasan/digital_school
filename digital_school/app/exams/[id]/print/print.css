@@ -33,32 +33,6 @@
     margin: 8mm 6mm 8mm 6mm;
   }
   
-  /* Better page flow for question sections */
-  .question-paper-container {
-    page-break-inside: auto !important;
-    break-inside: auto !important;
-  }
-  
-  /* Prevent section headers from breaking */
-  .section-header {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    page-break-after: avoid !important;
-    break-after: avoid !important;
-  }
-  
-  /* Allow questions to flow naturally across pages */
-  .question-item {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-  
-  /* Ensure MCQ columns flow properly */
-  .mcq-columns {
-    page-break-inside: auto !important;
-    break-inside: auto !important;
-  }
-  
   /* Font settings for print */
   body, .question-paper-container, .answer-paper-container {
     font-family: 'SolaimanLipi', 'Times New Roman', serif !important;
@@ -69,6 +43,162 @@
     break-before: page !important;
     page-break-before: always !important;
     display: block !important;
+  }
+  
+  /* Ensure page breaks work for question sections */
+  .page-break-before {
+    break-before: page !important;
+    page-break-before: always !important;
+    display: block !important;
+  }
+  
+  /* Prevent questions from breaking across pages */
+  .question-block, .cq-question, .sq-question {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Ensure proper spacing between sections */
+  .cq-question, .sq-question {
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Add space after section headers */
+  h3 {
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Ensure page breaks work consistently */
+  .page-break-before {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+  }
+  
+  /* Additional page break support for older browsers */
+  .page-break-before {
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    break-before: page !important;
+    page-break-before: always !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+  
+  /* Ensure sections don't break inappropriately */
+  .question-paper-container {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Print page container styling */
+  .print-page-container {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+    position: relative !important;
+  }
+  
+  /* Ensure each set starts on a new page */
+  .print-page-container:not(:first-child) {
+    break-before: page !important;
+    page-break-before: always !important;
+  }
+  
+  /* Legal paper size adjustments */
+  .legal-paper {
+    min-height: 14in !important;
+    page-size: 8.5in 14in !important;
+  }
+  
+  /* Force page breaks between major sections */
+  .section-break {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+  }
+  
+  /* Ensure proper page breaks for all browsers */
+  @media print {
+    .page-break-before {
+      break-before: page !important;
+      page-break-before: always !important;
+      -webkit-break-before: page !important;
+      -moz-break-before: page !important;
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      height: 0 !important;
+      overflow: hidden !important;
+    }
+    
+    .print-page-container:not(:first-child) {
+      break-before: page !important;
+      page-break-before: always !important;
+    }
+    
+    /* Prevent orphaned headers */
+    h3 {
+      break-after: avoid !important;
+      page-break-after: avoid !important;
+    }
+    
+    /* Ensure questions don't break across pages */
+    .question-block, .cq-question, .sq-question {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    
+    /* Force page breaks for sections */
+    .cq-section, .sq-section {
+      break-before: page !important;
+      page-break-before: always !important;
+    }
+    
+    /* Ensure MCQ pages work properly */
+    .mcq-page {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+  }
+  
+  /* MCQ header styling */
+  .mcq-header {
+    margin-bottom: 1.5rem !important;
+    padding-bottom: 0.5rem !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Section headers should not break */
+  h3 {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Ensure proper spacing between MCQ questions */
+  .question-block {
+    margin-bottom: 1rem !important;
+  }
+  
+  /* Question options spacing */
+  .question-options {
+    margin-top: 0.5rem !important;
+  }
+  
+  /* MCQ page breaks */
+  .mcq-page {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  
+  /* Ensure MCQ questions don't break across pages */
+  .mcq-question {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
   .print-footer {
     position: fixed;
