@@ -30,8 +30,10 @@ if (!APPWRITE_API_KEY) {
 // Initialize Appwrite client
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
-  .setProject(APPWRITE_PROJECT_ID)
-  .setKey(APPWRITE_API_KEY);
+  .setProject(APPWRITE_PROJECT_ID);
+
+// For server-side operations, we'll use the API key in the service calls
+// The client is configured for public operations, services will handle authentication
 
 const storage = new Storage(client);
 const databases = new Databases(client);
