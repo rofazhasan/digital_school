@@ -158,6 +158,8 @@ export class AppwriteService {
       throw new Error(`Failed to list exam images: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
+
+
 }
 
 // Export singleton instance

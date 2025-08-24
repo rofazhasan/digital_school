@@ -58,27 +58,8 @@ export async function POST(req: NextRequest) {
       isBuffer: Buffer.isBuffer(buffer)
     });
     
-    // Test bucket access first
-    try {
-      console.log('🔍 Testing bucket access...');
-      const buckets = await storage.listBuckets();
-      console.log('📦 Available buckets:', buckets.buckets.map((b: any) => b.name));
-      
-      const examBucket = buckets.buckets.find((b: any) => b.name === bucketId);
-      if (!examBucket) {
-        return NextResponse.json({ 
-          error: `Bucket '${bucketId}' not found. Available buckets: ${buckets.buckets.map((b: any) => b.name).join(', ')}` 
-        }, { status: 404 });
-      }
-      
-      console.log('✅ Bucket found:', examBucket.name);
-    } catch (bucketError: any) {
-      console.error('❌ Bucket access error:', bucketError);
-      return NextResponse.json({ 
-        error: 'Failed to access bucket',
-        details: bucketError.message 
-      }, { status: 500 });
-    }
+    // Skip bucket access check for now - try direct upload
+    console.log('🔍 Skipping bucket access check, attempting direct upload...');
     
     // Upload file
     try {
