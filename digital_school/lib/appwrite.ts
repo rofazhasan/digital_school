@@ -1,3 +1,4 @@
+import './file-polyfill'; // Import File polyfill for server environment
 import { Client, Storage, ID } from 'appwrite';
 
 // Appwrite configuration
@@ -27,7 +28,9 @@ export interface ExamImageMetadata {
   questionId: string;
   questionType: 'cq' | 'sq';
   timestamp: string;
-  originalFilename: string;
+  originalFilename?: string;
+  studentName?: string;
+  questionText?: string;
 }
 
 export class AppwriteService {
@@ -49,20 +52,46 @@ export class AppwriteService {
    * Upload an image file to Appwrite storage
    */
   async uploadExamImage(
-    file: File,
+    file: File | Buffer | any,
     metadata: ExamImageMetadata
   ): Promise<UploadedImage> {
     try {
       // Generate unique filename
       const timestamp = Date.now();
-      const fileExtension = file.name.split('.').pop() || 'jpg';
+      const fileExtension = typeof file === 'object' && 'name' in file ? file.name.split('.').pop() || 'jpg' : 'txt';
       const filename = `${metadata.examId}_${metadata.studentId}_${metadata.questionId}_${timestamp}.${fileExtension}`;
+
+      // Handle different file types for server vs client
+      let fileData: any;
+      let mimeType = 'application/octet-stream';
+
+      if (typeof File !== 'undefined' && file instanceof File) {
+        // Browser environment - File object
+        fileData = file;
+        mimeType = file.type;
+      } else if (Buffer.isBuffer(file)) {
+        // Node.js environment - Buffer
+        fileData = file;
+        mimeType = 'application/octet-stream';
+      } else if (file && typeof file === 'object' && 'arrayBuffer' in file) {
+        // FormData file from server
+        try {
+          // Convert to Buffer for server-side processing
+          const arrayBuffer = await file.arrayBuffer();
+          fileData = Buffer.from(arrayBuffer);
+          mimeType = file.type || 'application/octet-stream';
+        } catch (e) {
+          throw new Error('Failed to process file data');
+        }
+      } else {
+        throw new Error('Unsupported file type');
+      }
 
       // Upload file to Appwrite
       const uploadedFile = await storage.createFile(
         this.bucketId,
         ID.unique(),
-        file
+        fileData
       );
 
       // Get file details
@@ -75,8 +104,8 @@ export class AppwriteService {
         fileId: uploadedFile.$id,
         url: url.toString(),
         filename: filename,
-        size: file.size, // Use the original file size
-        mimeType: fileDetails.mimeType,
+        size: typeof file === 'object' && 'size' in file ? file.size : (Buffer.isBuffer(fileData) ? fileData.length : 0),
+        mimeType: fileDetails.mimeType || mimeType,
         uploadedAt: new Date(uploadedFile.$createdAt)
       };
     } catch (error) {
