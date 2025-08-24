@@ -21,7 +21,8 @@
     "export-aiven-data": "node scripts/export-aiven-data.js",
     "import-to-neon": "node scripts/import-to-neon.js",
     "import-to-neon-fixed": "node scripts/import-to-neon-fixed.js",
-    "deploy:netlify": "npm run build && netlify deploy --prod"
+    "deploy:netlify": "npm run build && netlify deploy --prod",
+    "setup-appwrite": "node scripts/setup-appwrite.js"
   },
   "dependencies": {
     "@fontsource/noto-serif-bengali": "^5.2.6",
@@ -60,6 +61,7 @@
     "@types/puppeteer": "^5.4.7",
     "@types/uuid": "^10.0.0",
     "@uploadthing/react": "^7.3.2",
+    "appwrite": "18.2.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "better-react-mathjax": "^2.3.0",
