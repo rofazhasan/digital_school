@@ -53,9 +53,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       questionText
     };
     
+    console.log('📁 File received:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified
+    });
+
     // Convert FormData file to Buffer for server-side processing
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+    
+    console.log('🔄 Converted to Buffer:', {
+      bufferSize: buffer.length,
+      isBuffer: Buffer.isBuffer(buffer)
+    });
     
     // Upload to Appwrite using Buffer
     const uploadedImage = await appwriteService.uploadExamImage(buffer, metadata);

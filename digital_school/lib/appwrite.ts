@@ -3,12 +3,18 @@ import { Client, Storage, ID } from 'appwrite';
 // Appwrite configuration
 const APPWRITE_ENDPOINT = process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
 const APPWRITE_PROJECT_ID = process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '68aa7b51002070dd9a73';
+const APPWRITE_API_KEY = process.env.APPWRITE_API_KEY;
 const APPWRITE_BUCKET_ID = 'exam-images'; // We'll create this bucket
 
 // Initialize Appwrite client
 const client = new Client()
   .setEndpoint(APPWRITE_ENDPOINT)
   .setProject(APPWRITE_PROJECT_ID);
+
+// Set API key for server-side operations
+if (APPWRITE_API_KEY) {
+  client.setJWT(APPWRITE_API_KEY);
+}
 
 const storage = new Storage(client);
 
@@ -57,7 +63,7 @@ export class AppwriteService {
     try {
       // Generate unique filename
       const timestamp = Date.now();
-      const fileExtension = typeof file === 'object' && 'name' in file ? file.name.split('.').pop() || 'jpg' : 'jpg';
+      const fileExtension = metadata.originalFilename?.split('.').pop() || 'jpg';
       const filename = `${metadata.examId}_${metadata.studentId}_${metadata.questionId}_${timestamp}.${fileExtension}`;
 
       // Handle different file types for server vs client
@@ -75,6 +81,15 @@ export class AppwriteService {
       } else {
         throw new Error('Unsupported file type. Expected File or Buffer.');
       }
+
+      console.log('📤 Uploading to Appwrite:', {
+        bucketId: this.bucketId,
+        filename,
+        mimeType,
+        fileType: typeof fileData,
+        isBuffer: Buffer.isBuffer(fileData),
+        size: Buffer.isBuffer(fileData) ? fileData.length : 'N/A'
+      });
 
       // Upload file to Appwrite
       const uploadedFile = await storage.createFile(

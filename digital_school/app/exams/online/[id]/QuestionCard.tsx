@@ -232,14 +232,31 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
       
     } catch (error) {
       console.error('Error uploading image:', error);
+      
       // Remove the failed upload from answers
       const updatedImages = answers[question.id + '_images']?.filter((img: any) => 
         !img.isUploading || img.timestamp !== tempImageData.timestamp
       ) || [];
       setAnswers({ ...answers, [question.id + '_images']: updatedImages });
       
-      // Show error message
-      alert('ছবি আপলোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      // Show detailed error message
+      let errorMessage = 'ছবি আপলোড করতে সমস্যা হয়েছে।';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to upload image')) {
+          errorMessage = 'ছবি আপলোড করতে ব্যর্থ। নেটওয়ার্ক সংযোগ পরীক্ষা করুন।';
+        } else if (error.message.includes('Unauthorized')) {
+          errorMessage = 'অননুমোদিত। আবার লগইন করুন।';
+        } else if (error.message.includes('File must be an image')) {
+          errorMessage = 'শুধুমাত্র ছবি ফাইল আপলোড করা যাবে।';
+        } else if (error.message.includes('File size must be less than 10MB')) {
+          errorMessage = 'ফাইল সাইজ 10MB এর কম হতে হবে।';
+        } else {
+          errorMessage = `ত্রুটি: ${error.message}`;
+        }
+      }
+      
+      alert(errorMessage + '\n\nআবার চেষ্টা করুন।');
     }
   }, [question.id, question.text, question.questionText, question.type, answers, setAnswers, exam]);
 
