@@ -53,22 +53,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       questionText
     };
     
-    // Upload to Appwrite
-                    // Convert FormData file to proper format for Appwrite
-                let fileToUpload = file;
-                
-                // If we're on the server side, convert to Buffer
-                if (typeof File === 'undefined') {
-                  try {
-                    const arrayBuffer = await file.arrayBuffer();
-                    fileToUpload = Buffer.from(arrayBuffer);
-                  } catch (e) {
-                    console.error('Failed to convert file to Buffer:', e);
-                    return NextResponse.json({ error: "Failed to process file" }, { status: 400 });
-                  }
-                }
-
-                const uploadedImage = await appwriteService.uploadExamImage(fileToUpload, metadata);
+    // Convert FormData file to Buffer for server-side processing
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    
+    // Upload to Appwrite using Buffer
+    const uploadedImage = await appwriteService.uploadExamImage(buffer, metadata);
     
     return NextResponse.json({ 
       success: true, 

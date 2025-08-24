@@ -104,7 +104,7 @@ const MCQOption = memo(({
 MCQOption.displayName = 'MCQOption';
 
 export default function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
-  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, isSyncPending, markQuestion } = useExamContext();
+  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion } = useExamContext();
   const questions = exam.questions || [];
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
@@ -116,6 +116,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   // Normalize fields
   const text = question.text || question.questionText || "(No text)";
   const type = (question.type || "").toLowerCase();
+  const subQuestions = question.subQuestions || question.sub_questions || [];
 
   // Memoized MCQ change handler for better performance
   const handleMCQChange = useCallback(async (value: string) => {
@@ -264,6 +265,244 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const showEarnedMark = showResult && isMCQOnly;
   const earnedMark = showEarnedMark ? (correctAnswerInfo.isCorrect ? Number(question.marks) || 1 : 0) : undefined;
 
+  // Render sub-questions for CQ type
+  const renderSubQuestions = () => {
+    if (subQuestions.length === 0) return null;
+    
+    return (
+      <div className="mt-4 space-y-3">
+        <h4 className="font-semibold text-gray-700">Sub-questions:</h4>
+        {subQuestions.map((subQ: any, idx: number) => (
+          <div key={idx} className="pl-4 border-l-2 border-purple-200">
+            <div className="text-sm text-gray-600 mb-2">
+              {idx + 1}. {subQ.text || subQ.question || subQ}
+            </div>
+            <textarea
+              value={answers[`${question.id}_sub_${idx}`] || ""}
+              onChange={(e) => setAnswers({ 
+                ...answers, 
+                [`${question.id}_sub_${idx}`]: e.target.value 
+              })}
+              disabled={disabled || submitted}
+              className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              rows={3}
+              placeholder="Write your answer here..."
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render image upload section
+  const renderImageUpload = (questionType: string) => {
+    if (submitted || disabled) return null;
+    
+    return (
+      <div className="mt-4 space-y-3">
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowCamera(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+          >
+            <Camera className="w-4 h-4" />
+            Take Photo
+          </Button>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Image
+          </Button>
+        </div>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImageCapture(file);
+          }}
+          className="hidden"
+        />
+        
+        {answers[question.id + '_images'] && answers[question.id + '_images'].length > 0 && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Attached Images:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {answers[question.id + '_images'].map((img: any, idx: number) => (
+                <div key={idx} className="relative">
+                  {img.isUploading ? (
+                    <div className="w-full h-24 bg-gray-100 rounded-lg border flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <div className="text-xs text-gray-600">Uploading...</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={img.appwriteUrl || img.preview}
+                      alt={`Answer image ${idx + 1}`}
+                      className="w-full h-24 object-cover rounded-lg border"
+                      onError={(e) => {
+                        // Fallback to preview if Appwrite URL fails
+                        const target = e.target as HTMLImageElement;
+                        if (img.preview && target.src !== img.preview) {
+                          target.src = img.preview;
+                        }
+                      }}
+                    />
+                  )}
+                  
+                  {!submitted && !disabled && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="absolute top-1 right-1 w-6 h-6 p-0"
+                      onClick={() => {
+                        const newImages = answers[question.id + '_images'].filter((_: any, i: number) => i !== idx);
+                        setAnswers({ ...answers, [question.id + '_images']: newImages });
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  )}
+                  
+                  {img.appwriteFileId && (
+                    <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 py-0.5 rounded">
+                      ✓ Uploaded
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render sub-questions for CQ type
+  const renderSubQuestions = () => {
+    if (subQuestions.length === 0) return null;
+    
+    return (
+      <div className="mt-4 space-y-3">
+        <h4 className="font-semibold text-gray-700">Sub-questions:</h4>
+        {subQuestions.map((subQ: any, idx: number) => (
+          <div key={idx} className="pl-4 border-l-2 border-purple-200">
+            <div className="text-sm text-gray-600 mb-2">
+              {idx + 1}. {subQ.text || subQ.question || subQ}
+            </div>
+            <textarea
+              value={answers[`${question.id}_sub_${idx}`] || ""}
+              onChange={(e) => setAnswers({ 
+                ...answers, 
+                [`${question.id}_sub_${idx}`]: e.target.value 
+              })}
+              disabled={disabled || submitted}
+              className="w-full p-2 border border-gray-300 rounded-lg resize-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              rows={3}
+              placeholder="Write your answer here..."
+            />
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Render image upload section
+  const renderImageUpload = (questionType: string) => {
+    if (submitted || disabled) return null;
+    
+    return (
+      <div className="mt-4 space-y-3">
+        <div className="flex gap-2">
+          <Button
+            onClick={() => setShowCamera(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
+          >
+            <Camera className="w-4 h-4" />
+            Take Photo
+          </Button>
+          <Button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Image
+          </Button>
+        </div>
+        
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) handleImageCapture(file);
+          }}
+          className="hidden"
+        />
+        
+        {answers[question.id + '_images'] && answers[question.id + '_images'].length > 0 && (
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Attached Images:</label>
+            <div className="grid grid-cols-2 gap-2">
+              {answers[question.id + '_images'].map((img: any, idx: number) => (
+                <div key={idx} className="relative">
+                  {img.isUploading ? (
+                    <div className="w-full h-24 bg-gray-100 rounded-lg border flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <div className="text-xs text-gray-600">Uploading...</div>
+                      </div>
+                    </div>
+                  ) : (
+                    <img
+                      src={img.appwriteUrl || img.preview}
+                      alt={`Answer image ${idx + 1}`}
+                      className="w-full h-24 object-cover rounded-lg border"
+                      onError={(e) => {
+                        // Fallback to preview if Appwrite URL fails
+                        const target = e.target as HTMLImageElement;
+                        if (img.preview && target.src !== img.preview) {
+                          target.src = img.preview;
+                        }
+                      }}
+                    />
+                  )}
+                  
+                  {!submitted && !disabled && (
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="absolute top-1 right-1 w-6 h-6 p-0"
+                      onClick={() => {
+                        const newImages = answers[question.id + '_images'].filter((_: any, i: number) => i !== idx);
+                        setAnswers({ ...answers, [question.id + '_images']: newImages });
+                      }}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  )}
+                  
+                  {img.appwriteFileId && (
+                    <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 py-0.5 rounded">
+                      ✓ Uploaded
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
       <Card className="p-2 sm:p-6 max-w-lg w-full mx-auto rounded-3xl shadow-2xl bg-gradient-to-br from-purple-100/80 via-blue-50/80 to-pink-100/70 border-0 backdrop-blur-md h-auto">
@@ -339,92 +578,11 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                 />
               </div>
               
-              {!submitted && !disabled && (
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => setShowCamera(true)}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Take Photo
-                  </Button>
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
-                  >
-                    <Upload className="w-4 h-4" />
-                    Upload Image
-                  </Button>
-                </div>
-              )}
+              {/* Render sub-questions for CQ */}
+              {renderSubQuestions()}
               
-              {showCamera && (
-                <CameraCapture onCapture={handleImageCapture} onClose={() => setShowCamera(false)} />
-              )}
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleImageCapture(file);
-                }}
-                className="hidden"
-              />
-              
-              {answers[question.id + '_images'] && answers[question.id + '_images'].length > 0 && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Attached Images:</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {answers[question.id + '_images'].map((img: any, idx: number) => (
-                      <div key={idx} className="relative">
-                        {img.isUploading ? (
-                          <div className="w-full h-24 bg-gray-100 rounded-lg border flex items-center justify-center">
-                            <div className="text-center">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                              <div className="text-xs text-gray-600">Uploading...</div>
-                            </div>
-                          </div>
-                        ) : (
-                          <img
-                            src={img.appwriteUrl || img.preview}
-                            alt={`Answer image ${idx + 1}`}
-                            className="w-full h-24 object-cover rounded-lg border"
-                            onError={(e) => {
-                              // Fallback to preview if Appwrite URL fails
-                              const target = e.target as HTMLImageElement;
-                              if (img.preview && target.src !== img.preview) {
-                                target.src = img.preview;
-                              }
-                            }}
-                          />
-                        )}
-                        
-                        {!submitted && !disabled && (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            className="absolute top-1 right-1 w-6 h-6 p-0"
-                            onClick={() => {
-                              const newImages = answers[question.id + '_images'].filter((_: any, i: number) => i !== idx);
-                              setAnswers({ ...answers, [question.id + '_images']: newImages });
-                            }}
-                          >
-                            <X className="w-3 h-3" />
-                          </Button>
-                        )}
-                        
-                        {img.appwriteFileId && (
-                          <div className="absolute bottom-1 left-1 bg-green-500 text-white text-xs px-1 py-0.5 rounded">
-                            ✓ Uploaded
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Image upload for CQ */}
+              {renderImageUpload('cq')}
             </div>
           ) : type === "sq" ? (
             <div className="space-y-4">
@@ -439,6 +597,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                   placeholder="Write your answer here..."
                 />
               </div>
+              
+              {/* Image upload for SQ */}
+              {renderImageUpload('sq')}
             </div>
           ) : type === "numeric" ? (
             <div className="space-y-4">
@@ -480,11 +641,19 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
           {saveStatus === "error" && (
             <div className="text-xs text-red-600 text-center">Save failed. Will retry when online.</div>
           )}
-          {isSyncPending && (
-            <div className="text-xs text-yellow-600 text-center">Offline - Changes saved locally</div>
-          )}
+
         </CardContent>
       </Card>
+      
+      {/* Camera Capture Modal */}
+      {showCamera && (
+        <CameraCapture 
+          onCapture={handleImageCapture} 
+          onClose={() => setShowCamera(false)}
+          questionId={question.id}
+          examId={exam.id}
+        />
+      )}
     </MathJaxContext>
   );
 } 

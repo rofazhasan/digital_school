@@ -1,4 +1,3 @@
-import './file-polyfill'; // Import File polyfill for server environment
 import { Client, Storage, ID } from 'appwrite';
 
 // Appwrite configuration
@@ -52,18 +51,18 @@ export class AppwriteService {
    * Upload an image file to Appwrite storage
    */
   async uploadExamImage(
-    file: File | Buffer | any,
+    file: File | Buffer,
     metadata: ExamImageMetadata
   ): Promise<UploadedImage> {
     try {
       // Generate unique filename
       const timestamp = Date.now();
-      const fileExtension = typeof file === 'object' && 'name' in file ? file.name.split('.').pop() || 'jpg' : 'txt';
+      const fileExtension = typeof file === 'object' && 'name' in file ? file.name.split('.').pop() || 'jpg' : 'jpg';
       const filename = `${metadata.examId}_${metadata.studentId}_${metadata.questionId}_${timestamp}.${fileExtension}`;
 
       // Handle different file types for server vs client
       let fileData: any;
-      let mimeType = 'application/octet-stream';
+      let mimeType = 'image/jpeg';
 
       if (typeof File !== 'undefined' && file instanceof File) {
         // Browser environment - File object
@@ -72,19 +71,9 @@ export class AppwriteService {
       } else if (Buffer.isBuffer(file)) {
         // Node.js environment - Buffer
         fileData = file;
-        mimeType = 'application/octet-stream';
-      } else if (file && typeof file === 'object' && 'arrayBuffer' in file) {
-        // FormData file from server
-        try {
-          // Convert to Buffer for server-side processing
-          const arrayBuffer = await file.arrayBuffer();
-          fileData = Buffer.from(arrayBuffer);
-          mimeType = file.type || 'application/octet-stream';
-        } catch (e) {
-          throw new Error('Failed to process file data');
-        }
+        mimeType = 'image/jpeg';
       } else {
-        throw new Error('Unsupported file type');
+        throw new Error('Unsupported file type. Expected File or Buffer.');
       }
 
       // Upload file to Appwrite

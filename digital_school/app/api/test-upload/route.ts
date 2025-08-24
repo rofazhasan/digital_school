@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import '../../../lib/file-polyfill'; // Import File polyfill for server environment
-import { appwriteService } from "@/lib/appwrite";
+import { Client, Storage, ID } from 'appwrite';
 
 export async function POST(req: NextRequest) {
   try {
-    console.log('🧪 Testing Appwrite file upload...');
+    console.log('🧪 Testing direct Appwrite file upload...');
     
     const formData = await req.formData();
     const file = formData.get("image") as File;
@@ -19,48 +18,87 @@ export async function POST(req: NextRequest) {
       type: file.type
     });
 
-    // Test metadata
-    const metadata = {
-      examId: 'test-exam-123',
-      studentId: 'test-student-456',
-      questionId: 'test-question-789',
-      questionType: 'cq' as const,
-      timestamp: new Date().toISOString(),
-      originalFilename: file.name,
-      studentName: 'Test Student',
-      questionText: 'Test Question for Appwrite Integration'
-    };
+    // Initialize Appwrite client directly
+    const client = new Client()
+      .setEndpoint(process.env.NEXT_PUBLIC_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1')
+      .setProject(process.env.NEXT_PUBLIC_APPWRITE_PROJECT_ID || '68aa7b51002070dd9a73');
 
-    console.log('📋 Uploading with metadata:', metadata);
+    const storage = new Storage(client);
+    const bucketId = 'exam-images';
 
-    // Convert FormData file to proper format for Appwrite
-    let fileToUpload = file;
-    
-    // If we're on the server side, convert to Buffer
-    if (typeof File === 'undefined') {
+    console.log('📋 Uploading to bucket:', bucketId);
+
+    // Upload the file directly - Appwrite SDK should handle FormData files
+    try {
+      const uploadedFile = await storage.createFile(
+        bucketId,
+        ID.unique(),
+        file
+      );
+
+      console.log('✅ Direct upload successful:', uploadedFile);
+
+      // Get file details
+      const fileDetails = await storage.getFile(bucketId, uploadedFile.$id);
+      const url = storage.getFileView(bucketId, uploadedFile.$id);
+
+      return NextResponse.json({
+        success: true,
+        message: "File uploaded to Appwrite successfully!",
+        uploadedFile: {
+          fileId: uploadedFile.$id,
+          url: url.toString(),
+          filename: file.name,
+          size: file.size,
+          mimeType: fileDetails.mimeType || file.type,
+          uploadedAt: new Date(uploadedFile.$createdAt)
+        }
+      });
+
+    } catch (uploadError) {
+      console.error('Direct upload failed:', uploadError);
+      
+      // If direct upload fails, try converting to a proper File object
       try {
         const arrayBuffer = await file.arrayBuffer();
-        fileToUpload = Buffer.from(arrayBuffer);
-      } catch (e) {
-        console.error('Failed to convert file to Buffer:', e);
-        return NextResponse.json({ error: "Failed to process file" }, { status: 400 });
+        const blob = new Blob([arrayBuffer], { type: file.type });
+        const newFile = new File([blob], file.name, { type: file.type });
+        
+        console.log('🔄 Trying with converted File object...');
+        
+        const uploadedFile = await storage.createFile(
+          bucketId,
+          ID.unique(),
+          newFile
+        );
+
+        console.log('✅ Converted File upload successful:', uploadedFile);
+
+        // Get file details
+        const fileDetails = await storage.getFile(bucketId, uploadedFile.$id);
+        const url = storage.getFileView(bucketId, uploadedFile.$id);
+
+        return NextResponse.json({
+          success: true,
+          message: "File uploaded to Appwrite successfully using converted File!",
+          uploadedFile: {
+            fileId: uploadedFile.$id,
+            url: url.toString(),
+            filename: file.name,
+            size: file.size,
+            mimeType: fileDetails.mimeType || file.type,
+            uploadedAt: new Date(uploadedFile.$createdAt)
+          }
+        });
+        
+      } catch (conversionError) {
+        console.error('Converted File upload also failed:', conversionError);
+        throw new Error(`Both upload methods failed. Direct: ${uploadError instanceof Error ? uploadError.message : 'Unknown error'}, Converted: ${conversionError instanceof Error ? conversionError.message : 'Unknown error'}`);
       }
     }
 
-    // Upload to Appwrite
-    const uploadedImage = await appwriteService.uploadExamImage(fileToUpload, metadata);
-
-    console.log('✅ Upload successful:', uploadedImage);
-
-    return NextResponse.json({
-      success: true,
-      message: "File uploaded to Appwrite successfully!",
-      uploadedFile: uploadedImage,
-      metadata: metadata
-    });
-
   } catch (error) {
-    console.error("Appwrite upload test error:", error);
+    console.error("Direct Appwrite upload test error:", error);
     return NextResponse.json({
       error: error instanceof Error ? error.message : "Failed to upload file to Appwrite",
       details: error instanceof Error ? error.stack : undefined

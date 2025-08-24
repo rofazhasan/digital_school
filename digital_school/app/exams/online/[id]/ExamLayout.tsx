@@ -123,10 +123,7 @@ export default function ExamLayout() {
     exam, 
     navigation, 
     navigateToQuestion, 
-    saveStatus, 
-    isSyncPending, 
-    pendingSaves,
-    lastSuccessfulSave 
+    saveStatus
   } = useExamContext();
   
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -188,22 +185,13 @@ export default function ExamLayout() {
     return totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   }, [answeredCount, totalQuestions]);
 
-  // Memoized save status indicator
+  // Simple save status indicator
   const SaveStatusIndicator = useCallback(() => {
     if (isSubmitting) {
       return (
         <div className="flex items-center gap-2 text-blue-600">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
           Submitting...
-        </div>
-      );
-    }
-
-    if (pendingSaves && pendingSaves.length > 0) {
-      return (
-        <div className="flex items-center gap-2 text-yellow-600">
-          <AlertCircle className="h-4 w-4" />
-          {pendingSaves.length} pending save{pendingSaves.length > 1 ? 's' : ''}
         </div>
       );
     }
@@ -233,7 +221,7 @@ export default function ExamLayout() {
       default:
         return null;
     }
-  }, [saveStatus, isSubmitting, pendingSaves]);
+  }, [saveStatus, isSubmitting]);
 
   if (!currentQuestion) {
     return (
