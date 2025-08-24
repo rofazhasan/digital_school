@@ -68,6 +68,16 @@ export default function PrintExamPage() {
     fetchExamData();
   }, [examId]); // Dependency array is correct
 
+  // Apply page breaks when exam data changes
+  useEffect(() => {
+    if (examData && printRef.current) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        forcePageBreaks();
+      }, 100);
+    }
+  }, [examData]);
+
   // --- THE CORE PRINTING LOGIC ---
   // @ts-ignore: react-to-print typing issue, content is valid
   const handlePrint = useReactToPrint({
@@ -76,6 +86,10 @@ export default function PrintExamPage() {
     onBeforeGetContent: async () => {
       // This is the key! We wait until MathJax is ready.
       setIsPrinting(true);
+      
+      // Force page breaks for SQ sections if CSS fails
+      forcePageBreaks();
+      
       if (isMathJaxReady) {
         return; // Already ready, proceed to print
       }
@@ -95,6 +109,33 @@ export default function PrintExamPage() {
       (window as any).__IS_MATHJAX_READY = false; // Reset global flag
     },
   } as any);
+
+  // Function to force page breaks for SQ sections
+  const forcePageBreaks = () => {
+    if (!printRef.current) return;
+    
+    // Find all SQ section headers
+    const sqSections = printRef.current.querySelectorAll('.sq-section');
+    sqSections.forEach((section) => {
+      // Add inline styles to force page breaks
+      (section as HTMLElement).style.pageBreakBefore = 'always';
+      (section as HTMLElement).style.breakBefore = 'page';
+      (section as HTMLElement).style.marginTop = '0';
+      (section as HTMLElement).style.paddingTop = '0';
+      
+      // Create a page break element before the section
+      const pageBreak = document.createElement('div');
+      pageBreak.style.pageBreakBefore = 'always';
+      pageBreak.style.breakBefore = 'page';
+      pageBreak.style.height = '0';
+      pageBreak.style.margin = '0';
+      pageBreak.style.padding = '0';
+      pageBreak.style.clear = 'both';
+      
+      // Insert the page break before the section
+      section.parentNode?.insertBefore(pageBreak, section);
+    });
+  };
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
@@ -162,6 +203,13 @@ export default function PrintExamPage() {
           }`}>
             {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
           </span>
+          <button
+            onClick={forcePageBreaks}
+            className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold hover:bg-purple-700 transition"
+            title="Force page breaks for SQ sections"
+          >
+            Force Page Breaks
+          </button>
         </div>
 
         <div ref={printRef} className="relative z-10">

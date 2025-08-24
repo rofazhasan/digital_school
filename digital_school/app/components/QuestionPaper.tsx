@@ -239,7 +239,15 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* CQ Section - starts on new page after MCQ */}
           {cqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break">
+              <div 
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break"
+                style={{ 
+                  pageBreakBefore: 'always', 
+                  breakBefore: 'page',
+                  marginTop: '0',
+                  paddingTop: '0'
+                }}
+              >
                 <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
@@ -333,7 +341,15 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* SQ Section - starts on new page after CQ */}
           {sqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break">
+              <div 
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break"
+                style={{ 
+                  pageBreakBefore: 'always', 
+                  breakBefore: 'page',
+                  marginTop: '0',
+                  paddingTop: '0'
+                }}
+              >
                 <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
                 <div className="text-right">
                   <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>

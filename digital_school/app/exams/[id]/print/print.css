@@ -92,11 +92,135 @@
     -moz-break-before: page !important;
     margin-top: 0 !important;
     padding-top: 0 !important;
+    /* Force page break with additional properties */
+    display: block !important;
+    clear: both !important;
+  }
+  
+  /* Specific rule for SQ section to ensure it breaks after CQ */
+  .sq-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    /* Additional forcing properties */
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    display: block !important;
+    clear: both !important;
+  }
+  
+  /* Force page break before SQ section */
+  .sq-section::before {
+    content: "" !important;
+    display: block !important;
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+  
+  /* Additional aggressive page break rules */
+  .sq-section {
+    /* Force page break with multiple approaches */
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+    
+    /* Additional forcing properties */
+    display: block !important;
+    clear: both !important;
+    float: none !important;
+    
+    /* Ensure it's at the top of a page */
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+  }
+  
+  /* Force page break with pseudo-element */
+  .sq-section::before {
+    content: "" !important;
+    display: block !important;
+    page-break-before: always !important;
+    break-before: page !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Ultra-specific rule to force SQ page breaks */
+  .question-paper-container main .sq-section,
+  .answer-paper-container main .sq-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+    display: block !important;
+    clear: both !important;
+    float: none !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+  }
+  
+  /* Force page break for any SQ section that follows CQ */
+  .cq-section ~ .sq-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+  }
+  
+  /* ULTRA-AGGRESSIVE page break rule - highest specificity */
+  body div.question-paper-container main .sq-section,
+  body div.answer-paper-container main .sq-section,
+  body .print-page-container .question-paper-container main .sq-section,
+  body .print-page-container .answer-paper-container main .sq-section {
+    break-before: page !important;
+    page-break-before: always !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+    display: block !important;
+    clear: both !important;
+    float: none !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    min-height: 0 !important;
+    /* Force page break with additional CSS properties */
+    position: relative !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: auto !important;
+  }
+
+  /* Force page break with multiple pseudo-elements */
+  .sq-section::before,
+  .sq-section::after {
+    content: "" !important;
+    display: block !important;
+    page-break-before: always !important;
+    break-before: page !important;
+    -webkit-break-before: page !important;
+    -moz-break-before: page !important;
+    -ms-break-before: page !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    clear: both !important;
   }
   
   .cq-question, .sq-question {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    margin-bottom: 1rem !important;
   }
   
   .mcq-header, h3 {
@@ -133,6 +257,159 @@
   -moz-break-before: page !important;
   margin-top: 0 !important;
   padding-top: 0 !important;
+  /* Force page break with additional properties */
+  display: block !important;
+  clear: both !important;
+}
+
+/* Specific rule for SQ section to ensure it breaks after CQ */
+.sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  /* Additional forcing properties */
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  display: block !important;
+  clear: both !important;
+}
+
+/* Force page break before SQ section */
+.sq-section::before {
+  content: "" !important;
+  display: block !important;
+  page-break-before: always !important;
+  break-before: page !important;
+}
+
+/* Additional spacing and page break controls */
+.cq-section {
+  margin-top: 2rem !important;
+  padding-top: 1rem !important;
+}
+
+.sq-section {
+  margin-top: 2rem !important;
+  padding-top: 1rem !important;
+}
+
+/* Force page breaks with additional selectors */
+main > .cq-section,
+main > .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+}
+
+/* Ensure sections don't flow together */
+.cq-section + .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+/* Additional aggressive page break rules */
+.sq-section {
+  /* Force page break with multiple approaches */
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+  
+  /* Additional forcing properties */
+  display: block !important;
+  clear: both !important;
+  float: none !important;
+  
+  /* Ensure it's at the top of a page */
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Force page break with pseudo-element */
+.sq-section::before {
+  content: "" !important;
+  display: block !important;
+  page-break-before: always !important;
+  break-before: page !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Ultra-specific rule to force SQ page breaks */
+.question-paper-container main .sq-section,
+.answer-paper-container main .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+  display: block !important;
+  clear: both !important;
+  float: none !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Force page break for any SQ section that follows CQ */
+.cq-section ~ .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+}
+
+/* ULTRA-AGGRESSIVE page break rule - highest specificity */
+body div.question-paper-container main .sq-section,
+body div.answer-paper-container main .sq-section,
+body .print-page-container .question-paper-container main .sq-section,
+body .print-page-container .answer-paper-container main .sq-section {
+  break-before: page !important;
+  page-break-before: always !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+  display: block !important;
+  clear: both !important;
+  float: none !important;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+  min-height: 0 !important;
+  /* Force page break with additional CSS properties */
+  position: relative !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+}
+
+/* Force page break with multiple pseudo-elements */
+.sq-section::before,
+.sq-section::after {
+  content: "" !important;
+  display: block !important;
+  page-break-before: always !important;
+  break-before: page !important;
+  -webkit-break-before: page !important;
+  -moz-break-before: page !important;
+  -ms-break-before: page !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  clear: both !important;
 }
 
 .cq-question, .sq-question {
