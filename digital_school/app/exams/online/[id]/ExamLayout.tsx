@@ -128,6 +128,7 @@ export default function ExamLayout() {
   
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showInstructions, setShowInstructions] = useState(true);
 
   const questions = exam.questions || [];
   const currentQuestion = questions[navigation.current];
@@ -223,6 +224,92 @@ export default function ExamLayout() {
     }
   }, [saveStatus, isSubmitting]);
 
+  // Show instructions before exam starts
+  if (showInstructions) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-pink-50 flex items-center justify-center p-4">
+        <Card className="max-w-4xl w-full p-8">
+          <div className="text-center mb-6">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">{exam.title || exam.name || 'Online Exam'}</h1>
+            <div className="text-lg text-gray-600">Exam Instructions</div>
+          </div>
+          
+          <div className="space-y-6 text-left">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-2">📝 Question Types</h3>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• MCQ - Multiple Choice Questions</li>
+                  <li>• CQ - Creative Questions (with sub-questions)</li>
+                  <li>• SQ - Short Questions</li>
+                  <li>• Numeric - Numerical answers</li>
+                </ul>
+              </div>
+              
+              <div className="bg-green-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-green-800 mb-2">📷 Image Upload</h3>
+                <ul className="text-sm text-green-700 space-y-1">
+                  <li>• You can upload images for CQ and SQ questions</li>
+                  <li>• Use camera to take photos directly</li>
+                  <li>• Upload files from your device</li>
+                  <li>• Images are automatically saved to cloud</li>
+                </ul>
+              </div>
+              
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-purple-800 mb-2">⏰ Time Management</h3>
+                <ul className="text-sm text-purple-700 space-y-1">
+                  <li>• Total time: {exam.duration || 'Not specified'}</li>
+                  <li>• Timer will be displayed at the top</li>
+                  <li>• Auto-submit when time ends</li>
+                  <li>• Your answers are saved automatically</li>
+                </ul>
+              </div>
+              
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h3 className="font-semibold text-orange-800 mb-2">🎯 Navigation</h3>
+                <ul className="text-sm text-orange-700 space-y-1">
+                  <li>• Use Next/Previous buttons to navigate</li>
+                  <li>• Mark questions for review</li>
+                  <li>• Submit exam when completed</li>
+                  <li>• You can submit at any time</li>
+                </ul>
+              </div>
+            </div>
+            
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+              <h3 className="font-semibold text-yellow-800 mb-2">⚠️ Important Notes</h3>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• Ensure stable internet connection</li>
+                <li>• Do not refresh the browser page</li>
+                <li>• Your answers are saved automatically</li>
+                <li>• You can only submit the exam once</li>
+                <li>• Contact support if you face any technical issues</li>
+              </ul>
+            </div>
+            
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-700 mb-2">
+                Total Questions: {totalQuestions}
+              </div>
+              <div className="text-sm text-gray-600 mb-6">
+                Read all instructions carefully before starting
+              </div>
+              
+              <Button
+                onClick={() => setShowInstructions(false)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-8 py-3 text-lg"
+                size="lg"
+              >
+                Start Exam
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
   if (!currentQuestion) {
     return (
       <div className="flex items-center justify-center h-screen">
@@ -243,7 +330,17 @@ export default function ExamLayout() {
             <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-4 shadow-lg border-0">
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
                 <div className="text-center sm:text-left">
-                  <h1 className="text-xl font-bold text-gray-800 mb-2">{exam.title || 'Online Exam'}</h1>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h1 className="text-xl font-bold text-gray-800">{exam.title || exam.name || 'Online Exam'}</h1>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowInstructions(true)}
+                      className="text-xs"
+                    >
+                      📋 Instructions
+                    </Button>
+                  </div>
                   <div className="text-sm text-gray-600">
                     Question {navigation.current + 1} of {totalQuestions} • {answeredCount} answered
                   </div>
@@ -321,16 +418,14 @@ export default function ExamLayout() {
                 <ChevronRight className="h-4 w-4" />
               </Button>
               
-              {navigation.current === totalQuestions - 1 && (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isSubmitting}
-                  className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
-                >
-                  <Save className="h-4 w-4" />
-                  {showSubmitConfirm ? 'Confirm Submit' : 'Submit Exam'}
-                </Button>
-              )}
+              <Button
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+              >
+                <Save className="h-4 w-4" />
+                {showSubmitConfirm ? 'Confirm Submit' : 'Submit Exam'}
+              </Button>
             </div>
           </Card>
         </div>
