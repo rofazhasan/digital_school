@@ -1,0 +1,76 @@
+Running Gradle task 'assembleDebug'...                          
+Warning: Flutter support for your project's Android Gradle Plugin version (Android Gradle Plugin version 8.2.1) will soon be dropped. Please upgrade your Android Gradle Plugin version to a version of at least Android Gradle Plugin version 8.6.0 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's AGP version is typically defined in the plugins block of the `settings.gradle` file (/Users/md.rofazhasanrafiu/coding/study_companion/android/settings.gradle), by a plugin with the id of com.android.application. 
+If you don't see a plugins block, your project was likely created with an older template version. In this case it is most likely defined in the top-level build.gradle file (/Users/md.rofazhasanrafiu/coding/study_companion/android/build.gradle) by the following line in the dependencies block of the buildscript: "classpath 'com.android.tools.build:gradle:<version>'".
+
+Warning: Flutter support for your project's Kotlin version (1.9.0) will soon be dropped. Please upgrade your Kotlin version to a version of at least 2.1.0 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/Users/md.rofazhasanrafiu/coding/study_companion/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
+If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/Users/md.rofazhasanrafiu/coding/study_companion/android/build.gradle) by the ext.kotlin_version property.
+
+lib/features/routine/presentation/widgets/ai_planner_dialog.dart:4:8: Error: Error when reading 'lib/learning/presentation/providers/subject_provider.dart': No such file or directory
+import '../../../../learning/presentation/providers/subject_provider.dart';
+       ^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:4:8: Error: Error when reading 'lib/features/routine/ai_chat/presentation/providers/chat_provider.dart': No such file or directory
+import '../../ai_chat/presentation/providers/chat_provider.dart';
+       ^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:5:8: Error: Error when reading 'lib/features/routine/ai_chat/data/models/chat_message.dart': No such file or directory
+import '../../ai_chat/data/models/chat_message.dart';
+       ^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:18:8: Error: Type 'ChatMessage' not found.
+  List<ChatMessage> _localMessages = []; // Temporary session messages
+       ^^^^^^^^^^^
+lib/features/routine/presentation/widgets/ai_planner_dialog.dart:25:37: Error: The getter 'subjectsProvider' isn't defined for the type '_AIPlannerDialogState'.
+ - '_AIPlannerDialogState' is from 'package:study_companion/features/routine/presentation/widgets/ai_planner_dialog.dart' ('lib/features/routine/presentation/widgets/ai_planner_dialog.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'subjectsProvider'.
+    final subjectsAsync = ref.watch(subjectsProvider);
+                                    ^^^^^^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:18:8: Error: 'ChatMessage' isn't a type.
+  List<ChatMessage> _localMessages = []; // Temporary session messages
+       ^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:32:24: Error: The method 'ChatMessage' isn't defined for the type '_ReflectionSheetState'.
+ - '_ReflectionSheetState' is from 'package:study_companion/features/routine/presentation/widgets/reflection_sheet.dart' ('lib/features/routine/presentation/widgets/reflection_sheet.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'ChatMessage'.
+    final initialMsg = ChatMessage()
+                       ^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:47:21: Error: The method 'ChatMessage' isn't defined for the type '_ReflectionSheetState'.
+ - '_ReflectionSheetState' is from 'package:study_companion/features/routine/presentation/widgets/reflection_sheet.dart' ('lib/features/routine/presentation/widgets/reflection_sheet.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'ChatMessage'.
+    final userMsg = ChatMessage()
+                    ^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:70:34: Error: The getter 'aiServiceProvider' isn't defined for the type '_ReflectionSheetState'.
+ - '_ReflectionSheetState' is from 'package:study_companion/features/routine/presentation/widgets/reflection_sheet.dart' ('lib/features/routine/presentation/widgets/reflection_sheet.dart').
+Try correcting the name to the name of an existing getter, or defining a getter or field named 'aiServiceProvider'.
+      final aiService = ref.read(aiServiceProvider);
+                                 ^^^^^^^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:86:21: Error: The method 'ChatMessage' isn't defined for the type '_ReflectionSheetState'.
+ - '_ReflectionSheetState' is from 'package:study_companion/features/routine/presentation/widgets/reflection_sheet.dart' ('lib/features/routine/presentation/widgets/reflection_sheet.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'ChatMessage'.
+      final aiMsg = ChatMessage()
+                    ^^^^^^^^^^^
+lib/features/routine/presentation/widgets/reflection_sheet.dart:102:28: Error: The method 'ChatMessage' isn't defined for the type '_ReflectionSheetState'.
+ - '_ReflectionSheetState' is from 'package:study_companion/features/routine/presentation/widgets/reflection_sheet.dart' ('lib/features/routine/presentation/widgets/reflection_sheet.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'ChatMessage'.
+        _localMessages.add(ChatMessage()..role = 'ai'..content = "I'm having trouble connecting right now. But great job today!");
+                           ^^^^^^^^^^^
+Target kernel_snapshot_program failed: Exception
+
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileFlutterBuildDebug'.
+> Process 'command '/Users/md.rofazhasanrafiu/AndroidStudioProjects/flutter/bin/flutter'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+Running Gradle task 'assembleDebug'...                           2,310ms
+Gradle task assembleDebug failed with exit code 1

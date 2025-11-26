@@ -1,0 +1,32 @@
+Running Gradle task 'assembleDebug'...                          
+Warning: Flutter support for your project's Android Gradle Plugin version (Android Gradle Plugin version 8.2.1) will soon be dropped. Please upgrade your Android Gradle Plugin version to a version of at least Android Gradle Plugin version 8.6.0 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's AGP version is typically defined in the plugins block of the `settings.gradle` file (/Users/md.rofazhasanrafiu/coding/study_companion/android/settings.gradle), by a plugin with the id of com.android.application. 
+If you don't see a plugins block, your project was likely created with an older template version. In this case it is most likely defined in the top-level build.gradle file (/Users/md.rofazhasanrafiu/coding/study_companion/android/build.gradle) by the following line in the dependencies block of the buildscript: "classpath 'com.android.tools.build:gradle:<version>'".
+
+Warning: Flutter support for your project's Kotlin version (1.9.0) will soon be dropped. Please upgrade your Kotlin version to a version of at least 2.1.0 soon.
+Alternatively, use the flag "--android-skip-build-dependency-validation" to bypass this check.
+
+Potential fix: Your project's KGP version is typically defined in the plugins block of the `settings.gradle` file (/Users/md.rofazhasanrafiu/coding/study_companion/android/settings.gradle), by a plugin with the id of org.jetbrains.kotlin.android. 
+If you don't see a plugins block, your project was likely created with an older template version, in which case it is most likely defined in the top-level build.gradle file (/Users/md.rofazhasanrafiu/coding/study_companion/android/build.gradle) by the ext.kotlin_version property.
+
+e: file:///Users/md.rofazhasanrafiu/coding/study_companion/android/app/src/main/kotlin/com/example/study_companion/MainActivity.kt:3:37 Conflicting import, imported name 'FlutterActivity' is ambiguous
+e: file:///Users/md.rofazhasanrafiu/coding/study_companion/android/app/src/main/kotlin/com/example/study_companion/MainActivity.kt:9:37 Conflicting import, imported name 'FlutterActivity' is ambiguous
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugKotlin'.
+> A failure occurred while executing org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction
+   > Compilation error. See log for more details
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 6m 30s
+Running Gradle task 'assembleDebug'...                            390.9s
+Gradle task assembleDebug failed with exit code 1
