@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX } from "lucide-react";
+import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download } from "lucide-react";
 
 // --- Types ---
 type QuestionType = 'MCQ' | 'CQ' | 'SQ';
@@ -61,7 +61,7 @@ type GeneratedQuestion = {
 const ThreeJSBackground: React.FC = () => {
   const ref = useRef<any>(null);
   const [contextLost, setContextLost] = useState(false);
-  
+
   const [sphere] = useState<Float32Array>(() => {
     // Further reduce particle count to minimize WebGL context loss
     const positions = new Float32Array(1000 * 3); // Reduced from 1500 to 1000
@@ -86,8 +86,8 @@ const ThreeJSBackground: React.FC = () => {
 
   return (
     <>
-      <WebGLContextManager 
-        id="question-bank-background" 
+      <WebGLContextManager
+        id="question-bank-background"
         onContextLost={() => {
           console.log('Question bank background context lost');
           setContextLost(true);
@@ -98,17 +98,17 @@ const ThreeJSBackground: React.FC = () => {
         }}
       />
       {!contextLost && (
-        <Points 
-          ref={ref} 
-          positions={sphere} 
-          stride={3} 
+        <Points
+          ref={ref}
+          positions={sphere}
+          stride={3}
           frustumCulled={false}
         >
-          <PointMaterial 
-            transparent 
-            color="#4A5568" 
+          <PointMaterial
+            transparent
+            color="#4A5568"
             size={0.015} // Reduced size
-            sizeAttenuation={true} 
+            sizeAttenuation={true}
             depthWrite={false}
             alphaTest={0.1}
           />
@@ -121,48 +121,48 @@ const ThreeJSBackground: React.FC = () => {
 const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
   const symbols = [
     // Basic operations
-    { display: '√x', latex: '$\\sqrt{}$' }, 
-    { display: 'x²', latex: '$^{2}$' }, 
+    { display: '√x', latex: '$\\sqrt{}$' },
+    { display: 'x²', latex: '$^{2}$' },
     { display: 'x/y', latex: '$\\frac{}{}$' },
     { display: '±', latex: '$\\pm$' },
     { display: '≠', latex: '$\\neq$' },
     { display: '≤', latex: '$\\leq$' },
     { display: '≥', latex: '$\\geq$' },
-    
+
     // Greek letters
-    { display: 'α', latex: '$\\alpha$' }, 
+    { display: 'α', latex: '$\\alpha$' },
     { display: 'β', latex: '$\\beta$' },
     { display: 'π', latex: '$\\pi$' },
     { display: 'θ', latex: '$\\theta$' },
     { display: 'φ', latex: '$\\phi$' },
     { display: 'Δ', latex: '$\\Delta$' },
-    
+
     // Calculus
-    { display: '∑', latex: '$\\sum_{i=1}^{n}$' }, 
-    { display: '∫', latex: '$\\int_{a}^{b}$' }, 
+    { display: '∑', latex: '$\\sum_{i=1}^{n}$' },
+    { display: '∫', latex: '$\\int_{a}^{b}$' },
     { display: 'dx', latex: '$dx$' },
     { display: 'dy/dx', latex: '$\\frac{dy}{dx}$' },
     { display: 'lim', latex: '$\\lim_{x \\to a}$' },
-    
+
     // Arrows and logic
     { display: '→', latex: '$\\rightarrow$' },
     { display: '←', latex: '$\\leftarrow$' },
     { display: '↔', latex: '$\\leftrightarrow$' },
     { display: '∴', latex: '$\\therefore$' },
     { display: '∵', latex: '$\\because$' },
-    
+
     // Sets and logic
     { display: '∈', latex: '$\\in$' },
     { display: '∉', latex: '$\\notin$' },
     { display: '⊂', latex: '$\\subset$' },
     { display: '∪', latex: '$\\cup$' },
     { display: '∩', latex: '$\\cap$' },
-    
+
     // Tables and matrices
     { display: 'Table', latex: '$\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$' },
     { display: 'Matrix', latex: '$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$' },
     { display: 'Det', latex: '$\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$' },
-    
+
     // Geometry
     { display: '△', latex: '$\\triangle$' },
     { display: '⊙', latex: '$\\odot$' },
@@ -170,7 +170,7 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
     { display: '∠', latex: '$\\angle$' },
     { display: '∥', latex: '$\\parallel$' },
     { display: '⊥', latex: '$\\perp$' },
-    
+
     // Common expressions
     { display: 'x²+y²', latex: '$x^2 + y^2$' },
     { display: 'ax²+bx+c', latex: '$ax^2 + bx + c$' },
@@ -178,26 +178,26 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
     { display: 'cos(x)', latex: '$\\cos(x)$' },
     { display: 'tan(x)', latex: '$\\tan(x)$' },
   ];
-  
+
   return (
-      <div className="flex flex-wrap gap-1 p-2 bg-gray-100 dark:bg-gray-800 rounded-md mb-2">
-        {symbols.map(s => (
-            <Button 
-              key={s.display} 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              className="h-auto px-2 py-1 text-xs" 
-              onMouseDown={(e) => { 
-                e.preventDefault(); 
-                onInsert(s.latex); 
-              }}
-              title={s.latex}
-            >
-              <Latex>{`$${s.display}$`}</Latex>
-            </Button>
-        ))}
-      </div>
+    <div className="flex flex-wrap gap-1 p-2 bg-gray-100 dark:bg-gray-800 rounded-md mb-2">
+      {symbols.map(s => (
+        <Button
+          key={s.display}
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-2 py-1 text-xs"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            onInsert(s.latex);
+          }}
+          title={s.latex}
+        >
+          <Latex>{`$${s.display}$`}</Latex>
+        </Button>
+      ))}
+    </div>
   );
 };
 
@@ -249,7 +249,7 @@ export default function QuestionBankPage() {
       if (!qRes.ok || !qbRes.ok) throw new Error("Failed to fetch data");
       const qData = await qRes.json();
       const qbData = await qbRes.json();
-      
+
       // Ensure qData is an array
       if (Array.isArray(qData)) {
         setQuestions(qData);
@@ -258,7 +258,7 @@ export default function QuestionBankPage() {
         setQuestions([]);
         toast({ variant: "destructive", title: "Error", description: "Invalid data received from server." });
       }
-      
+
       // Ensure qbData is an array
       if (Array.isArray(qbData)) {
         setQuestionBanks(qbData);
@@ -303,7 +303,7 @@ export default function QuestionBankPage() {
 
   const handleBankCreated = (newBank: QuestionBank) => {
     setQuestionBanks(prev => [...prev, newBank]);
-    toast({ title: "Bank Created", description: `'${newBank.name}' is now available.`});
+    toast({ title: "Bank Created", description: `'${newBank.name}' is now available.` });
   };
 
   const uniqueSubjects = useMemo(() => {
@@ -314,10 +314,10 @@ export default function QuestionBankPage() {
   const filteredQuestions = useMemo(() => {
     if (!Array.isArray(questions)) return [];
     return questions
-        .filter((q: Question) => searchTerm === "" || (q.questionText || '').toLowerCase().includes(searchTerm.toLowerCase()) || (q.subject || '').toLowerCase().includes(searchTerm.toLowerCase()))
-        .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
-        .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
-        .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter);
+      .filter((q: Question) => searchTerm === "" || (q.questionText || '').toLowerCase().includes(searchTerm.toLowerCase()) || (q.subject || '').toLowerCase().includes(searchTerm.toLowerCase()))
+      .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
+      .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
+      .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter);
   }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter]);
 
   const resetFilters = () => {
@@ -328,148 +328,153 @@ export default function QuestionBankPage() {
   };
 
   return (
-      <div className="relative min-h-screen w-full bg-gray-50 dark:bg-gray-900 p-4 md:p-8 overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <WebGLErrorBoundary>
-            <WebGLFallback webglSupported={webglSupported}>
-              <Suspense fallback={
-                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800" />
-              }>
-                <Canvas 
-                  camera={{ position: [0, 0, 5] }}
-                  gl={{ 
-                    powerPreference: "high-performance",
-                    antialias: true,
-                    alpha: false,
-                    stencil: false,
-                    depth: true
-                  }}
-                  onCreated={({ gl }) => {
-                    gl.setClearColor(0x000000, 0);
-                    gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-                    
-                    // Handle WebGL context loss
-                    const canvas = gl.domElement;
-                    canvas.addEventListener('webglcontextlost', (event: Event) => {
-                      event.preventDefault();
-                      console.warn('WebGL context lost in question bank');
-                      setWebglContextLost(true);
-                      toast({
-                        title: "Graphics Issue",
-                        description: "Enhanced graphics temporarily unavailable. The page will continue to work normally.",
-                        variant: "default"
-                      });
+    <div className="relative min-h-screen w-full bg-gray-50 dark:bg-gray-900 p-4 md:p-8 overflow-hidden">
+      <div className="absolute inset-0 z-0">
+        <WebGLErrorBoundary>
+          <WebGLFallback webglSupported={webglSupported}>
+            <Suspense fallback={
+              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800" />
+            }>
+              <Canvas
+                camera={{ position: [0, 0, 5] }}
+                gl={{
+                  powerPreference: "high-performance",
+                  antialias: true,
+                  alpha: false,
+                  stencil: false,
+                  depth: true
+                }}
+                onCreated={({ gl }) => {
+                  gl.setClearColor(0x000000, 0);
+                  gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+                  // Handle WebGL context loss
+                  const canvas = gl.domElement;
+                  canvas.addEventListener('webglcontextlost', (event: Event) => {
+                    event.preventDefault();
+                    console.warn('WebGL context lost in question bank');
+                    setWebglContextLost(true);
+                    toast({
+                      title: "Graphics Issue",
+                      description: "Enhanced graphics temporarily unavailable. The page will continue to work normally.",
+                      variant: "default"
                     });
-                    
-                    canvas.addEventListener('webglcontextrestored', () => {
-                      console.log('WebGL context restored in question bank');
-                      setWebglContextLost(false);
-                      toast({
-                        title: "Graphics Restored",
-                        description: "Enhanced graphics are back online.",
-                        variant: "default"
-                      });
+                  });
+
+                  canvas.addEventListener('webglcontextrestored', () => {
+                    console.log('WebGL context restored in question bank');
+                    setWebglContextLost(false);
+                    toast({
+                      title: "Graphics Restored",
+                      description: "Enhanced graphics are back online.",
+                      variant: "default"
                     });
-                  }}
-                >
-                  <ThreeJSBackground />
-                </Canvas>
-              </Suspense>
-            </WebGLFallback>
-          </WebGLErrorBoundary>
-          {webglContextLost && (
-            <div className="absolute top-4 right-4 z-20">
-              <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                  <span>Graphics temporarily unavailable</span>
-                </div>
+                  });
+                }}
+              >
+                <ThreeJSBackground />
+              </Canvas>
+            </Suspense>
+          </WebGLFallback>
+        </WebGLErrorBoundary>
+        {webglContextLost && (
+          <div className="absolute top-4 right-4 z-20">
+            <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                <span>Graphics temporarily unavailable</span>
               </div>
             </div>
-          )}
-        </div>
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
-          <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-3xl font-bold flex items-center gap-3"><BookCopy className="w-8 h-8 text-indigo-500" />Question Repository</CardTitle>
-              <CardDescription>A centralized hub to browse, create, and intelligently generate questions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
-                  <TabsTrigger value="browse">Browse</TabsTrigger>
-                  <TabsTrigger value="create">Create Manually</TabsTrigger>
-                  <TabsTrigger value="ai">AI Generator</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="browse" className="mt-4">
-                  <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                      <div className="lg:col-span-2">
-                        <Label htmlFor="search-term">Search</Label>
-                        <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                      </div>
-                      <div>
-                        <Label htmlFor="class-filter">Class</Label>
-                        <Select value={classFilter} onValueChange={setClassFilter}>
-                          <SelectTrigger id="class-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="subject-filter">Subject</Label>
-                        <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                          <SelectTrigger id="subject-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="difficulty-filter">Difficulty</Label>
-                        <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-                          <SelectTrigger id="difficulty-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-end gap-2 lg:col-span-5">
-                        <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
-                        <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                      : filteredQuestions.length > 0 ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                            {filteredQuestions.map(q => <QuestionCard key={q.id} question={q} onEdit={handleEdit} onDelete={handleDelete} />)}
-                          </div>
-                      ) : (
-                          <div className="text-center py-16 text-gray-500">
-                            <p className="font-semibold">No questions found</p>
-                            <p className="text-sm">Try adjusting your filters or creating a new question.</p>
-                          </div>
-                      )}
-                </TabsContent>
-
-                <TabsContent value="create" className="mt-4">
-                  <QuestionForm key="create-form" initialData={null} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-                </TabsContent>
-                <TabsContent value="ai" className="mt-4">
-                  <AIGenerator onQuestionSaved={handleFormSave} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </motion.div>
-        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-          <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
-            <DialogHeader><DialogTitle>{editingQuestion ? 'Edit Question' : 'Create New Question'}</DialogTitle></DialogHeader>
-            <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
-              <QuestionForm key={editingQuestion ? editingQuestion.id : 'dialog-create-form'} initialData={editingQuestion} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-            </div>
-          </DialogContent>
-        </Dialog>
-        <CreateQuestionBankDialog isOpen={isCreateBankDialogOpen} onOpenChange={setIsCreateBankDialogOpen} onBankCreated={handleBankCreated} />
+          </div>
+        )}
       </div>
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
+        <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
+          <CardHeader>
+            <CardTitle className="text-3xl font-bold flex items-center gap-3"><BookCopy className="w-8 h-8 text-indigo-500" />Question Repository</CardTitle>
+            <CardDescription>A centralized hub to browse, create, and intelligently generate questions.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
+                <TabsTrigger value="browse">Browse</TabsTrigger>
+                <TabsTrigger value="create">Create Manually</TabsTrigger>
+                <TabsTrigger value="create">Create Manually</TabsTrigger>
+                <TabsTrigger value="ai">AI Generator</TabsTrigger>
+                <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="browse" className="mt-4">
+                <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="lg:col-span-2">
+                      <Label htmlFor="search-term">Search</Label>
+                      <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label htmlFor="class-filter">Class</Label>
+                      <Select value={classFilter} onValueChange={setClassFilter}>
+                        <SelectTrigger id="class-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="subject-filter">Subject</Label>
+                      <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                        <SelectTrigger id="subject-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="difficulty-filter">Difficulty</Label>
+                      <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                        <SelectTrigger id="difficulty-filter"><SelectValue /></SelectTrigger>
+                        <SelectContent><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-end gap-2 lg:col-span-5">
+                      <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
+                      <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
+                    </div>
+                  </div>
+                </Card>
+
+                {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                  : filteredQuestions.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredQuestions.map(q => <QuestionCard key={q.id} question={q} onEdit={handleEdit} onDelete={handleDelete} />)}
+                    </div>
+                  ) : (
+                    <div className="text-center py-16 text-gray-500">
+                      <p className="font-semibold">No questions found</p>
+                      <p className="text-sm">Try adjusting your filters or creating a new question.</p>
+                    </div>
+                  )}
+              </TabsContent>
+
+              <TabsContent value="create" className="mt-4">
+                <QuestionForm key="create-form" initialData={null} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+              </TabsContent>
+              <TabsContent value="ai" className="mt-4">
+                <AIGenerator onQuestionSaved={handleFormSave} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+              </TabsContent>
+              <TabsContent value="bulk" className="mt-4">
+                <BulkUpload onQuestionSaved={handleFormSave} />
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </motion.div>
+      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogHeader><DialogTitle>{editingQuestion ? 'Edit Question' : 'Create New Question'}</DialogTitle></DialogHeader>
+          <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
+            <QuestionForm key={editingQuestion ? editingQuestion.id : 'dialog-create-form'} initialData={editingQuestion} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+          </div>
+        </DialogContent>
+      </Dialog>
+      <CreateQuestionBankDialog isOpen={isCreateBankDialogOpen} onOpenChange={setIsCreateBankDialogOpen} onBankCreated={handleBankCreated} />
+    </div>
   );
 }
 
@@ -480,81 +485,81 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
     HARD: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
   return (
-      <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
-        <CardHeader className="pb-4">
-          <div className="flex justify-between items-start gap-2">
-            <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
-              <Latex>{question.questionText || ''}</Latex>
-            </CardTitle>
-            <Badge variant="outline">{question.marks} Marks</Badge>
-          </div>
-          <div className="flex flex-wrap gap-2 text-xs mt-2">
-            <Badge className={difficultyColors[question.difficulty]}>{question.difficulty}</Badge>
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{question.subject}</Badge>
-            <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{question.class.name}</Badge>
-            {question.isAiGenerated && <Badge variant="outline" className="text-indigo-500 border-indigo-500"><Bot className="h-3 w-3 mr-1"/>AI</Badge>}
-            {question.hasMath && (
-              <Badge variant="outline" className="text-blue-600 border-blue-600">
-                <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
-                Math
-              </Badge>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="flex-grow prose prose-sm dark:prose-invert max-w-none">
-          {question.type === 'MCQ' && (
-            <div className="space-y-2">
-              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
-              <ul className="list-disc pl-5 my-0 space-y-2">
-                {((question.options || []) || []).map((opt: any, i: number) => (
-                  <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                    <Latex>{opt.text || ''}</Latex>
-                    {opt.isCorrect && opt.explanation && (
-                      <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
-                        <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
-                        <span className="text-green-600 dark:text-green-400 text-xs"><Latex>{opt.explanation}</Latex></span>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </div>
+    <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-start gap-2">
+          <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
+            <Latex>{question.questionText || ''}</Latex>
+          </CardTitle>
+          <Badge variant="outline">{question.marks} Marks</Badge>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs mt-2">
+          <Badge className={difficultyColors[question.difficulty]}>{question.difficulty}</Badge>
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{question.subject}</Badge>
+          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{question.class.name}</Badge>
+          {question.isAiGenerated && <Badge variant="outline" className="text-indigo-500 border-indigo-500"><Bot className="h-3 w-3 mr-1" />AI</Badge>}
+          {question.hasMath && (
+            <Badge variant="outline" className="text-blue-600 border-blue-600">
+              <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+              Math
+            </Badge>
           )}
-          {question.type === 'CQ' && (
-            <div className="space-y-2">
-              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
-              <ol className="list-decimal pl-5 my-0 space-y-3">
-                {((question.subQuestions || []) || []).map((sq: any, i: number) => (
-                  <li key={i} className="space-y-2">
-                    <div>
-                      <Latex>{sq.question || ''}</Latex>
-                      <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+        </div>
+      </CardHeader>
+      <CardContent className="flex-grow prose prose-sm dark:prose-invert max-w-none">
+        {question.type === 'MCQ' && (
+          <div className="space-y-2">
+            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
+            <ul className="list-disc pl-5 my-0 space-y-2">
+              {((question.options || []) || []).map((opt: any, i: number) => (
+                <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                  <Latex>{opt.text || ''}</Latex>
+                  {opt.isCorrect && opt.explanation && (
+                    <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
+                      <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
+                      <span className="text-green-600 dark:text-green-400 text-xs"><Latex>{opt.explanation}</Latex></span>
                     </div>
-                    {sq.modelAnswer && (
-                      <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                        <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
-                        <span className="text-blue-600 dark:text-blue-400 text-xs"><Latex>{sq.modelAnswer}</Latex></span>
-                      </div>
-                    )}
-                  </li>
-                ))}
-              </ol>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {question.type === 'CQ' && (
+          <div className="space-y-2">
+            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
+            <ol className="list-decimal pl-5 my-0 space-y-3">
+              {((question.subQuestions || []) || []).map((sq: any, i: number) => (
+                <li key={i} className="space-y-2">
+                  <div>
+                    <Latex>{sq.question || ''}</Latex>
+                    <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                  </div>
+                  {sq.modelAnswer && (
+                    <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                      <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
+                      <span className="text-blue-600 dark:text-blue-400 text-xs"><Latex>{sq.modelAnswer}</Latex></span>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
+        {question.type === 'SQ' && question.modelAnswer && (
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
+            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+              <Latex>{question.modelAnswer}</Latex>
             </div>
-          )}
-          {question.type === 'SQ' && question.modelAnswer && (
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                <Latex>{question.modelAnswer}</Latex>
-              </div>
-            </div>
-          )}
-        </CardContent>
-        <CardFooter className="flex justify-end gap-2 pt-4">
-          <Button variant="ghost" size="sm" onClick={() => onEdit(question)}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
-          <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-400" onClick={() => onDelete(question.id)}><Trash2 className="h-4 w-4 mr-2" /> Delete</Button>
-        </CardFooter>
-      </Card>
+          </div>
+        )}
+      </CardContent>
+      <CardFooter className="flex justify-end gap-2 pt-4">
+        <Button variant="ghost" size="sm" onClick={() => onEdit(question)}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
+        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-400" onClick={() => onDelete(question.id)}><Trash2 className="h-4 w-4 mr-2" /> Delete</Button>
+      </CardFooter>
+    </Card>
   );
 };
 
@@ -579,7 +584,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   const [questionBankIds, setQuestionBankIds] = useState<string[]>((initialData?.questionBanks || []).map((qb: QuestionBank) => qb.id) || []);
   const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string }[]>(
     initialData?.options || [
-      { text: 'Option A', isCorrect: true, explanation: '' }, 
+      { text: 'Option A', isCorrect: true, explanation: '' },
       { text: 'Option B', isCorrect: false, explanation: '' },
       { text: 'Option C', isCorrect: false, explanation: '' },
       { text: 'Option D', isCorrect: false, explanation: '' }
@@ -590,7 +595,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTextarea, setActiveTextarea] = useState<{ id: string; setter: (v: any) => void; index?: number; [key: string]: any }>({ id: 'qtext', setter: setQuestionText });
+  const [activeTextarea, setActiveTextarea] = useState<{ id: string; setter: (v: any) => void; index?: number;[key: string]: any }>({ id: 'qtext', setter: setQuestionText });
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
 
   // Update classId when classes are loaded
@@ -636,26 +641,26 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     e.preventDefault();
     setIsSaving(true);
     const isUpdate = initialData?.id && !isRefiningAi;
-    
+
     // Validate required fields before submission
     if (!questionText.trim()) {
       toast({ variant: "destructive", title: "Validation Error", description: "Question content is required" });
       setIsSaving(false);
       return;
     }
-    
+
     if (!subject.trim()) {
       toast({ variant: "destructive", title: "Validation Error", description: "Subject is required" });
       setIsSaving(false);
       return;
     }
-    
+
     if (!classId) {
       toast({ variant: "destructive", title: "Validation Error", description: "Class is required" });
       setIsSaving(false);
       return;
     }
-    
+
     // Validate MCQ options
     if (type === 'MCQ') {
       if (!options || options.length < 2) {
@@ -663,14 +668,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         setIsSaving(false);
         return;
       }
-      
+
       const validOptions = options.filter(opt => opt.text.trim() !== '');
       if (validOptions.length < 2) {
         toast({ variant: "destructive", title: "Validation Error", description: "MCQ must have at least 2 valid options" });
         setIsSaving(false);
         return;
       }
-      
+
       const correctOptions = validOptions.filter(opt => opt.isCorrect);
       if (correctOptions.length !== 1) {
         toast({ variant: "destructive", title: "Validation Error", description: "MCQ must have exactly one correct option" });
@@ -678,7 +683,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         return;
       }
     }
-    
+
     // Validate CQ sub-questions
     if (type === 'CQ') {
       if (!subQuestions || subQuestions.length < 1) {
@@ -686,7 +691,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         setIsSaving(false);
         return;
       }
-      
+
       const validSubQuestions = subQuestions.filter(sq => sq.question.trim() !== '');
       if (validSubQuestions.length < 1) {
         toast({ variant: "destructive", title: "Validation Error", description: "CQ must have at least one valid sub-question" });
@@ -694,21 +699,21 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         return;
       }
     }
-    
+
     // Validate SQ model answer
     if (type === 'SQ' && !modelAnswer.trim()) {
       toast({ variant: "destructive", title: "Validation Error", description: "SQ must have a model answer" });
       setIsSaving(false);
       return;
     }
-    
+
     const payload = {
-      type, 
-      subject: subject.trim(), 
-      topic: topic.trim() || undefined, 
-      marks: Number(marks), 
-      difficulty, 
-      classId, 
+      type,
+      subject: subject.trim(),
+      topic: topic.trim() || undefined,
+      marks: Number(marks),
+      difficulty,
+      classId,
       questionText: questionText.trim(),
       isAiGenerated: !!initialData?.isAiGenerated,
       options: type === 'MCQ' ? options.filter(opt => opt.text.trim() !== '').map(opt => ({
@@ -722,14 +727,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         modelAnswer: sq.modelAnswer?.trim() || undefined
       })) : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() : null,
-      hasMath: /\\/.test(questionText) || 
-                (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) => 
-                  /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
-                )) || 
-                (type === 'CQ' && subQuestions.some((sq: { question: string; marks: number; modelAnswer?: string }) => 
-                  /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))
-                )) || 
-                (type === 'SQ' && /\\/.test(modelAnswer)),
+      hasMath: /\\/.test(questionText) ||
+        (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
+          /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
+        )) ||
+        (type === 'CQ' && subQuestions.some((sq: { question: string; marks: number; modelAnswer?: string }) =>
+          /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))
+        )) ||
+        (type === 'SQ' && /\\/.test(modelAnswer)),
       questionBankIds: questionBankIds.length > 0 ? questionBankIds : null,
     };
 
@@ -739,11 +744,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       const url = isUpdate ? `/api/question-bank?id=${initialData.id}` : '/api/question-bank';
       const method = isUpdate ? 'PUT' : 'POST';
       const response = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-      
-      if (!response.ok) { 
-        const err = await response.json(); 
+
+      if (!response.ok) {
+        const err = await response.json();
         console.error('API Error Response:', err);
-        
+
         // Extract detailed error information
         let errorMessage = 'Failed to save question';
         if (err.details?.body?._errors?.[0]) {
@@ -756,13 +761,13 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         } else if (err.error) {
           errorMessage = err.error;
         }
-        
-        throw new Error(errorMessage); 
+
+        throw new Error(errorMessage);
       }
-      
+
       const savedQuestion = await response.json();
       toast({ title: "Success", description: `Question ${isUpdate ? 'updated' : 'created'}.` });
-      if(onSave) onSave(savedQuestion);
+      if (onSave) onSave(savedQuestion);
     } catch (error) {
       console.error('Form submission error:', error);
       toast({ variant: "destructive", title: "Save Error", description: (error as Error).message });
@@ -772,271 +777,271 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   };
 
   return (
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
-              <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: {id: string, name: string}) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
-            </div>
-            <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Subject</Label><Input value={subject} onChange={e => setSubject(e.target.value)} required /></div>
-              <div><Label>Topic (Optional)</Label><Input value={topic} onChange={e => setTopic(e.target.value)} /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Marks</Label><Input type="number" value={marks} onChange={e => setMarks(Number(e.target.value))} required /></div>
-              <div><Label>Difficulty</Label><Select value={difficulty} onValueChange={(v: Difficulty) => setDifficulty(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
-            </div>
-            <div>
-              <Label>Question Content</Label>
-              <MathToolbar onInsert={handleInsertSymbol} />
-              <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  <strong>Enhanced Math Support:</strong> Use the toolbar above for mathematical expressions, tables, matrices, and geometry. 
-                  Tables are supported using LaTeX array syntax.
-                </p>
-              </div>
-              <Textarea 
-                ref={el => { textareaRefs.current['qtext'] = el; }} 
-                onFocus={makeFocusHandler('qtext', setQuestionText)} 
-                value={questionText} 
-                onChange={e => setQuestionText(e.target.value)} 
-                required 
-                rows={8}
-                placeholder="Enter your question here. Use the math toolbar above for mathematical expressions, tables, and geometry..."
-              />
-              {/\\/.test(questionText) && (
-                <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <span className="text-xs font-medium">Mathematical content detected</span>
-                  </div>
-                </div>
-              )}
-            </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
+            <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
-          <div className="space-y-4">
-            <Label>Type-specific Details</Label>
-            <AnimatePresence mode="wait"><motion.div key={type} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4 border rounded-md bg-gray-50 dark:bg-gray-800/50">
-              {type === 'MCQ' && (
-                  <div className="space-y-2">
-                    <Label>Options</Label>
-                    <MathToolbar onInsert={handleInsertSymbol} />
-                    {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
-                        <div key={i} className="space-y-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
-                          <div className="flex items-center gap-2">
-                            <Checkbox checked={opt.isCorrect} onCheckedChange={() => setOptions((options || []).map((o, idx) => ({...o, isCorrect: i === idx})))} />
-                            <Textarea 
-                              ref={el => { textareaRefs.current[`opt-${i}`] = el; }} 
-                              onFocus={makeFocusHandler(`opt-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].text = newText; setOptions(newOpts); })} 
-                              value={opt.text} 
-                              onChange={e => { const newOpts = [...(options || [])]; newOpts[i].text = e.target.value; setOptions(newOpts); }} 
-                              placeholder={`Option ${i + 1}`} 
-                              rows={2} 
-                              className="h-auto flex-grow" 
-                            />
-                            <Button type="button" variant="ghost" size="icon" onClick={() => setOptions((options || []).filter((_, idx) => i !== idx))}>
-                              <Trash2 className="h-4 w-4 text-red-500" />
-                            </Button>
+          <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Subject</Label><Input value={subject} onChange={e => setSubject(e.target.value)} required /></div>
+            <div><Label>Topic (Optional)</Label><Input value={topic} onChange={e => setTopic(e.target.value)} /></div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Marks</Label><Input type="number" value={marks} onChange={e => setMarks(Number(e.target.value))} required /></div>
+            <div><Label>Difficulty</Label><Select value={difficulty} onValueChange={(v: Difficulty) => setDifficulty(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
+          </div>
+          <div>
+            <Label>Question Content</Label>
+            <MathToolbar onInsert={handleInsertSymbol} />
+            <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Enhanced Math Support:</strong> Use the toolbar above for mathematical expressions, tables, matrices, and geometry.
+                Tables are supported using LaTeX array syntax.
+              </p>
+            </div>
+            <Textarea
+              ref={el => { textareaRefs.current['qtext'] = el; }}
+              onFocus={makeFocusHandler('qtext', setQuestionText)}
+              value={questionText}
+              onChange={e => setQuestionText(e.target.value)}
+              required
+              rows={8}
+              placeholder="Enter your question here. Use the math toolbar above for mathematical expressions, tables, and geometry..."
+            />
+            {/\\/.test(questionText) && (
+              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span className="text-xs font-medium">Mathematical content detected</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="space-y-4">
+          <Label>Type-specific Details</Label>
+          <AnimatePresence mode="wait"><motion.div key={type} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4 border rounded-md bg-gray-50 dark:bg-gray-800/50">
+            {type === 'MCQ' && (
+              <div className="space-y-2">
+                <Label>Options</Label>
+                <MathToolbar onInsert={handleInsertSymbol} />
+                {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                  <div key={i} className="space-y-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
+                    <div className="flex items-center gap-2">
+                      <Checkbox checked={opt.isCorrect} onCheckedChange={() => setOptions((options || []).map((o, idx) => ({ ...o, isCorrect: i === idx })))} />
+                      <Textarea
+                        ref={el => { textareaRefs.current[`opt-${i}`] = el; }}
+                        onFocus={makeFocusHandler(`opt-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].text = newText; setOptions(newOpts); })}
+                        value={opt.text}
+                        onChange={e => { const newOpts = [...(options || [])]; newOpts[i].text = e.target.value; setOptions(newOpts); }}
+                        placeholder={`Option ${i + 1}`}
+                        rows={2}
+                        className="h-auto flex-grow"
+                      />
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setOptions((options || []).filter((_, idx) => i !== idx))}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                    {opt.isCorrect && (
+                      <div className="ml-6 space-y-2">
+                        <Label className="text-sm text-gray-600 dark:text-gray-400">Explanation (Optional)</Label>
+                        <MathToolbar onInsert={handleInsertSymbol} />
+                        <Textarea
+                          ref={el => { textareaRefs.current[`opt-expl-${i}`] = el; }}
+                          onFocus={makeFocusHandler(`opt-expl-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].explanation = newText; setOptions(newOpts); })}
+                          value={opt.explanation || ''}
+                          onChange={e => { const newOpts = [...(options || [])]; newOpts[i].explanation = e.target.value; setOptions(newOpts); }}
+                          placeholder="Explain why this option is correct..."
+                          rows={3}
+                          className="h-auto"
+                        />
+                        {opt.explanation && /\\/.test(opt.explanation) && (
+                          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                            <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span className="text-xs font-medium">Math detected in explanation</span>
+                            </div>
                           </div>
-                          {opt.isCorrect && (
-                            <div className="ml-6 space-y-2">
-                              <Label className="text-sm text-gray-600 dark:text-gray-400">Explanation (Optional)</Label>
-                              <MathToolbar onInsert={handleInsertSymbol} />
-                              <Textarea 
-                                ref={el => { textareaRefs.current[`opt-expl-${i}`] = el; }} 
-                                onFocus={makeFocusHandler(`opt-expl-${i}`, (newText) => { const newOpts = [...(options || [])]; newOpts[i].explanation = newText; setOptions(newOpts); })} 
-                                value={opt.explanation || ''} 
-                                onChange={e => { const newOpts = [...(options || [])]; newOpts[i].explanation = e.target.value; setOptions(newOpts); }} 
-                                placeholder="Explain why this option is correct..." 
-                                rows={3} 
-                                className="h-auto" 
-                              />
-                              {opt.explanation && /\\/.test(opt.explanation) && (
-                                <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                                  <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                    <span className="text-xs font-medium">Math detected in explanation</span>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          {(/\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))) && (
-                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                <span className="text-xs font-medium">Mathematical content detected</span>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                    ))}
-                    <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), {text: '', isCorrect: false, explanation: ''}])}>
-                      <PlusCircle className="mr-2 h-4 w-4" />Add Option
-                    </Button>
-                  </div>
-              )}
-              {type === 'SQ' && (
-                  <div>
-                    <Label>Model Answer</Label>
-                    <MathToolbar onInsert={handleInsertSymbol} />
-                    <Textarea 
-                      ref={el => { textareaRefs.current['modelans'] = el; }} 
-                      onFocus={makeFocusHandler('modelans', setModelAnswer)} 
-                      value={modelAnswer} 
-                      onChange={e => setModelAnswer(e.target.value)} 
-                      rows={4} 
-                      placeholder="Enter the model answer with step-by-step solution..."
-                    />
-                    {modelAnswer && /\\/.test(modelAnswer) && (
+                        )}
+                      </div>
+                    )}
+                    {(/\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))) && (
                       <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
                         <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                           <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-xs font-medium">Mathematical content detected in model answer</span>
+                          <span className="text-xs font-medium">Mathematical content detected</span>
                         </div>
                       </div>
                     )}
                   </div>
-              )}
-              {type === 'CQ' && (
-                <div className="space-y-2">
-                  <Label>Sub-questions</Label>
-                  {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
-                    <div key={i} className="space-y-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
-                      <div className="flex items-start gap-2">
-                        <div className="flex-grow space-y-2">
-                          <div>
-                            <Label className="text-sm text-gray-600 dark:text-gray-400">Question {i + 1}</Label>
-                            <MathToolbar onInsert={handleInsertSymbol} />
-                            <Textarea 
-                              ref={el => { textareaRefs.current[`sq-${i}`] = el; }} 
-                              onFocus={makeFocusHandler(`sq-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = newText; setSubQuestions(newSQs); })} 
-                              value={sq.question} 
-                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = e.target.value; setSubQuestions(newSQs); }} 
-                              placeholder="Sub-question text" 
-                              rows={3} 
-                              className="h-auto" 
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <Label className="text-sm text-gray-600 dark:text-gray-400">Marks</Label>
-                              <Input 
-                                type="number" 
-                                value={sq.marks} 
-                                onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = Number(e.target.value); setSubQuestions(newSQs); }} 
-                                placeholder="Marks" 
-                                className="w-24" 
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <Label className="text-sm text-gray-600 dark:text-gray-400">Model Answer (Optional)</Label>
-                            <MathToolbar onInsert={handleInsertSymbol} />
-                            <Textarea 
-                              ref={el => { textareaRefs.current[`sq-ans-${i}`] = el; }} 
-                              onFocus={makeFocusHandler(`sq-ans-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = newText; setSubQuestions(newSQs); })} 
-                              value={sq.modelAnswer || ''} 
-                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = e.target.value; setSubQuestions(newSQs); }} 
-                              placeholder="Model answer for this sub-question..." 
-                              rows={3} 
-                              className="h-auto" 
-                            />
-                            {sq.modelAnswer && /\\/.test(sq.modelAnswer) && (
-                              <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                                <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                  <span className="text-xs font-medium">Math detected in model answer</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => setSubQuestions((subQuestions || []).filter((_, idx) => i !== idx))}>
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                      {(/\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))) && (
-                        <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                          <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                            <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                            <span className="text-xs font-medium">Mathematical content detected</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), {question: '', marks: 5, modelAnswer: ''}])}>
-                    <PlusCircle className="mr-2 h-4 w-4" />Add Sub-question
-                  </Button>
-                </div>
-              )}
-            </motion.div></AnimatePresence>
-            <Label>Live Preview</Label>
-            <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
-              <div className="prose dark:prose-invert max-w-none">
-                <Latex>{questionText || ''}</Latex>
-                {type === 'MCQ' && (
-                  <div className="mt-4">
-                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
-                    <ul className="list-disc pl-5 space-y-2">
-                      {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
-                        <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                          <Latex>{opt.text || `(Option ${i+1})`}</Latex>
-                          {opt.isCorrect && opt.explanation && (
-                            <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
-                              <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
-                              <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {type === 'CQ' && (
-                  <div className="mt-4">
-                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
-                    <ol className="list-decimal pl-5 space-y-3">
-                      {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
-                        <li key={i} className="space-y-2">
-                          <div>
-                            <Latex>{sq.question || `(Sub-question ${i+1})`}</Latex>
-                            <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
-                          </div>
-                          {sq.modelAnswer && (
-                            <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                              <Latex>{sq.modelAnswer}</Latex>
-                            </div>
-                          )}
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-                )}
-                {type === 'SQ' && modelAnswer && (
-                  <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
-                    <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
-                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                      <Latex>{modelAnswer}</Latex>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), { text: '', isCorrect: false, explanation: '' }])}>
+                  <PlusCircle className="mr-2 h-4 w-4" />Add Option
+                </Button>
+              </div>
+            )}
+            {type === 'SQ' && (
+              <div>
+                <Label>Model Answer</Label>
+                <MathToolbar onInsert={handleInsertSymbol} />
+                <Textarea
+                  ref={el => { textareaRefs.current['modelans'] = el; }}
+                  onFocus={makeFocusHandler('modelans', setModelAnswer)}
+                  value={modelAnswer}
+                  onChange={e => setModelAnswer(e.target.value)}
+                  rows={4}
+                  placeholder="Enter the model answer with step-by-step solution..."
+                />
+                {modelAnswer && /\\/.test(modelAnswer) && (
+                  <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                    <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                      <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                      <span className="text-xs font-medium">Mathematical content detected in model answer</span>
                     </div>
                   </div>
                 )}
               </div>
-            </Card>
-          </div>
+            )}
+            {type === 'CQ' && (
+              <div className="space-y-2">
+                <Label>Sub-questions</Label>
+                {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                  <div key={i} className="space-y-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-grow space-y-2">
+                        <div>
+                          <Label className="text-sm text-gray-600 dark:text-gray-400">Question {i + 1}</Label>
+                          <MathToolbar onInsert={handleInsertSymbol} />
+                          <Textarea
+                            ref={el => { textareaRefs.current[`sq-${i}`] = el; }}
+                            onFocus={makeFocusHandler(`sq-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = newText; setSubQuestions(newSQs); })}
+                            value={sq.question}
+                            onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].question = e.target.value; setSubQuestions(newSQs); }}
+                            placeholder="Sub-question text"
+                            rows={3}
+                            className="h-auto"
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label className="text-sm text-gray-600 dark:text-gray-400">Marks</Label>
+                            <Input
+                              type="number"
+                              value={sq.marks}
+                              onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].marks = Number(e.target.value); setSubQuestions(newSQs); }}
+                              placeholder="Marks"
+                              className="w-24"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-600 dark:text-gray-400">Model Answer (Optional)</Label>
+                          <MathToolbar onInsert={handleInsertSymbol} />
+                          <Textarea
+                            ref={el => { textareaRefs.current[`sq-ans-${i}`] = el; }}
+                            onFocus={makeFocusHandler(`sq-ans-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = newText; setSubQuestions(newSQs); })}
+                            value={sq.modelAnswer || ''}
+                            onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].modelAnswer = e.target.value; setSubQuestions(newSQs); }}
+                            placeholder="Model answer for this sub-question..."
+                            rows={3}
+                            className="h-auto"
+                          />
+                          {sq.modelAnswer && /\\/.test(sq.modelAnswer) && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-xs font-medium">Math detected in model answer</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setSubQuestions((subQuestions || []).filter((_, idx) => i !== idx))}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                    {(/\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))) && (
+                      <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                        <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-xs font-medium">Mathematical content detected</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), { question: '', marks: 5, modelAnswer: '' }])}>
+                  <PlusCircle className="mr-2 h-4 w-4" />Add Sub-question
+                </Button>
+              </div>
+            )}
+          </motion.div></AnimatePresence>
+          <Label>Live Preview</Label>
+          <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
+            <div className="prose dark:prose-invert max-w-none">
+              <Latex>{questionText || ''}</Latex>
+              {type === 'MCQ' && (
+                <div className="mt-4">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
+                  <ul className="list-disc pl-5 space-y-2">
+                    {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                      <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                        <Latex>{opt.text || `(Option ${i + 1})`}</Latex>
+                        {opt.isCorrect && opt.explanation && (
+                          <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+                            <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
+                            <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {type === 'CQ' && (
+                <div className="mt-4">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
+                  <ol className="list-decimal pl-5 space-y-3">
+                    {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                      <li key={i} className="space-y-2">
+                        <div>
+                          <Latex>{sq.question || `(Sub-question ${i + 1})`}</Latex>
+                          <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                        </div>
+                        {sq.modelAnswer && (
+                          <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                            <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
+                            <Latex>{sq.modelAnswer}</Latex>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+              {type === 'SQ' && modelAnswer && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                    <Latex>{modelAnswer}</Latex>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
         </div>
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
-          <Button type="submit" disabled={isSaving}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {initialData?.id && !isRefiningAi ? 'Save Changes' : 'Create Question'}
-          </Button>
-        </div>
-      </form>
+      </div>
+      <div className="flex justify-end gap-2 pt-4 border-t">
+        {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
+        <Button type="submit" disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {initialData?.id && !isRefiningAi ? 'Save Changes' : 'Create Question'}
+        </Button>
+      </div>
+    </form>
   );
 };
 
@@ -1051,25 +1056,25 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selected, onChange, 
   const [open, setOpen] = useState(false);
   const selectedNames = (options || []).filter((opt: QuestionBank) => selected.includes(opt.id)).map((opt: QuestionBank) => opt.name).join(', ');
   return (
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal"><span className="truncate">{selected.length > 0 ? selectedNames : placeholder}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-          <Command>
-            <CommandInput placeholder="Search banks..." />
-            <CommandList>
-              <CommandEmpty>No banks found. Create one!</CommandEmpty>
-              <CommandGroup>
-                <CommandItem onSelect={() => { openCreateBankDialog(); setOpen(false); }} className="text-indigo-600 dark:text-indigo-400 cursor-pointer"><PlusCircle className="mr-2 h-4 w-4" /> Create New Bank</CommandItem>
-                                            {(options || []).map((option: QuestionBank) => (
-                    <CommandItem key={option.id} value={option.name} onSelect={() => { const newSelected = selected.includes(option.id) ? selected.filter((id: string) => id !== option.id) : [...selected, option.id]; onChange(newSelected); }}>
-                      <Check className={`mr-2 h-4 w-4 ${selected.includes(option.id) ? "opacity-100" : "opacity-0"}`} />{option.name}
-                    </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild><Button variant="outline" role="combobox" className="w-full justify-between font-normal"><span className="truncate">{selected.length > 0 ? selectedNames : placeholder}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></PopoverTrigger>
+      <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+        <Command>
+          <CommandInput placeholder="Search banks..." />
+          <CommandList>
+            <CommandEmpty>No banks found. Create one!</CommandEmpty>
+            <CommandGroup>
+              <CommandItem onSelect={() => { openCreateBankDialog(); setOpen(false); }} className="text-indigo-600 dark:text-indigo-400 cursor-pointer"><PlusCircle className="mr-2 h-4 w-4" /> Create New Bank</CommandItem>
+              {(options || []).map((option: QuestionBank) => (
+                <CommandItem key={option.id} value={option.name} onSelect={() => { const newSelected = selected.includes(option.id) ? selected.filter((id: string) => id !== option.id) : [...selected, option.id]; onChange(newSelected); }}>
+                  <Check className={`mr-2 h-4 w-4 ${selected.includes(option.id) ? "opacity-100" : "opacity-0"}`} />{option.name}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
   );
 };
 
@@ -1105,20 +1110,20 @@ const CreateQuestionBankDialog: React.FC<CreateQuestionBankDialogProps> = ({ isO
     }
   };
   return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Library className="w-5 h-5" /> Create New Question Bank</DialogTitle><DialogDescription>Add a new bank to categorize your questions.</DialogDescription></DialogHeader>
-          <form onSubmit={handleCreateBank} className="space-y-4 py-4">
-            <div className="space-y-2"><Label htmlFor="bank-name">Bank Name</Label><Input id="bank-name" value={name} onChange={e => setName(e.target.value)} required /></div>
-            <div className="space-y-2"><Label htmlFor="bank-subject">Subject</Label><Input id="bank-subject" value={subject} onChange={e => setSubject(e.target.value)} required /></div>
-            <div className="space-y-2"><Label htmlFor="bank-chapter">Chapter (Optional)</Label><Input id="bank-chapter" value={chapter} onChange={e => setChapter(e.target.value)} /></div>
-            <DialogFooter>
-              <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
-              <Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Bank</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Library className="w-5 h-5" /> Create New Question Bank</DialogTitle><DialogDescription>Add a new bank to categorize your questions.</DialogDescription></DialogHeader>
+        <form onSubmit={handleCreateBank} className="space-y-4 py-4">
+          <div className="space-y-2"><Label htmlFor="bank-name">Bank Name</Label><Input id="bank-name" value={name} onChange={e => setName(e.target.value)} required /></div>
+          <div className="space-y-2"><Label htmlFor="bank-subject">Subject</Label><Input id="bank-subject" value={subject} onChange={e => setSubject(e.target.value)} required /></div>
+          <div className="space-y-2"><Label htmlFor="bank-chapter">Chapter (Optional)</Label><Input id="bank-chapter" value={chapter} onChange={e => setChapter(e.target.value)} /></div>
+          <DialogFooter>
+            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+            <Button type="submit" disabled={isSaving}>{isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Bank</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -1147,16 +1152,16 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
     try {
       const response = await fetch('/api/question-bank', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          action: 'generate-with-ai', 
-          ...data, 
+        body: JSON.stringify({
+          action: 'generate-with-ai',
+          ...data,
           className: selectedClass?.name || 'General',
           includeAnswers: String(data.includeAnswers) === 'on' || String(data.includeAnswers) === 'true'
         }),
       });
       if (!response.ok) { const err = await response.json(); throw new Error(err.details || err.error); }
       const result = await response.json();
-      setGeneratedQuestions((result.questions || []).map((q: any) => ({...q, id: generateTempId(), class: selectedClass })));
+      setGeneratedQuestions((result.questions || []).map((q: any) => ({ ...q, id: generateTempId(), class: selectedClass })));
       toast({ title: "Preview Ready", description: "Review the generated questions below." });
     } catch (error) {
       toast({ variant: "destructive", title: "Generation Error", description: (error as Error).message });
@@ -1168,7 +1173,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
   const handleSaveOne = async (questionData: GeneratedQuestion) => {
     try {
       const { id, class: qClass, ...payload } = questionData;
-      const response = await fetch('/api/question-bank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({...payload, classId: qClass.id}) });
+      const response = await fetch('/api/question-bank', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, classId: qClass.id }) });
       if (!response.ok) throw new Error("Failed to save question");
       const savedQuestion = await response.json();
       onQuestionSaved(savedQuestion as Question);
@@ -1186,152 +1191,272 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
   };
 
   return (
-      <div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
-            <CardTitle className="flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-500" />Generation Parameters</CardTitle>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Class</Label><Select name="classId" required defaultValue={classes.length > 0 ? classes[0].id : ''}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string; name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Subject</Label><Input name="subject" required placeholder="e.g., Physics" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Question Type</Label><Select name="questionType" defaultValue="MCQ"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
-              <div><Label>Difficulty</Label><Select name="difficulty" defaultValue="MEDIUM"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
-            </div>
-            <div><Label>Topic (Optional)</Label><Input name="topic" placeholder="e.g., Kinematics" /></div>
-            <div><Label>Number of Questions</Label><Input name="count" type="number" defaultValue={3} min={1} max={10} /></div>
-            <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-              <Checkbox id="include-answers" name="includeAnswers" defaultChecked />
-              <div>
-                <Label htmlFor="include-answers" className="text-sm font-medium">Include model answers & explanations</Label>
-                <p className="text-xs text-gray-600 dark:text-gray-400">For MCQ: explanations for correct options. For CQ/SQ: detailed model answers.</p>
-              </div>
-            </div>
-            <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
-              <div className="flex items-center gap-2 text-green-700 dark:text-green-300 mb-2">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-medium">Enhanced AI Features</span>
-              </div>
-              <p className="text-xs text-green-600 dark:text-green-400">
-                The AI now supports tables, matrices, and geometry using LaTeX notation. 
-                Tables will be automatically formatted using LaTeX array syntax.
-              </p>
-            </div>
-            <Button type="submit" className="w-full" disabled={isGenerating}>
-              {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
-              Generate Questions
-            </Button>
-          </form>
-          <div className="space-y-4">
-            <CardTitle>Generated Preview</CardTitle>
-            <Card className="h-full min-h-[300px] p-2 bg-gray-50 dark:bg-gray-800/50">
-              {isGenerating && <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>}
-              {generatedQuestions.length > 0 && <div className="space-y-2 max-h-[400px] overflow-y-auto p-2">
-                {generatedQuestions.map((q) => (
-                    <Card key={q.id} className="p-3 bg-white dark:bg-gray-800 shadow-sm">
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant="outline" className="text-xs">{q.type}</Badge>
-                          <Badge variant="outline" className="text-xs">{q.marks} Marks</Badge>
-                          <Badge variant="outline" className="text-xs">{q.difficulty}</Badge>
-                          {q.hasMath && (
-                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
-                              Math
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="whitespace-pre-wrap overflow-x-auto">
-                          <Latex>{q.questionText || ''}</Latex>
-                        </div>
-                        
-                        {/* MCQ Options with Explanations */}
-                        {q.type === 'MCQ' && (
-                          <div className="mt-3 space-y-2">
-                            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Options:</p>
-                            <ul className="list-disc pl-5 space-y-2">
-                              {((q.options || []) || []).map((opt, i) => (
-                                <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                                  <Latex>{opt.text || ''}</Latex>
-                                  {opt.isCorrect && opt.explanation && (
-                                    <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
-                                      <p className="text-xs font-semibold text-green-700 dark:text-green-300">Why this is correct:</p>
-                                      <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
-                                    </div>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                        
-                        {/* CQ Sub-questions with Model Answers */}
-                        {q.type === 'CQ' && (
-                          <div className="mt-3 space-y-3">
-                            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sub-questions:</p>
-                            <ol className="list-decimal pl-5 space-y-3">
-                              {((q.subQuestions || []) || []).map((sq, i) => (
-                                <li key={i} className="space-y-2">
-                                  <div>
-                                    <Latex>{sq.question || ''}</Latex>
-                                    <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
-                                  </div>
-                                  {sq.modelAnswer && (
-                                    <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                                      <Latex>{sq.modelAnswer}</Latex>
-                                    </div>
-                                  )}
-                                </li>
-                              ))}
-                            </ol>
-                          </div>
-                        )}
-                        
-                        {/* SQ Model Answer */}
-                        {q.type === 'SQ' && q.modelAnswer && (
-                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                              <Latex>{q.modelAnswer}</Latex>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-                        <Button size="sm" variant="outline" onClick={() => setEditingQuestion(q)}><Edit className="h-3 w-3 mr-1" /> Edit & Refine</Button>
-                        <Button size="sm" onClick={() => handleSaveOne(q)}><PlusCircle className="h-3 w-3 mr-1" /> Add to Bank</Button>
-                      </div>
-                    </Card>
-                ))}
-              </div>}
-              {!isGenerating && generatedQuestions.length === 0 && <div className="flex items-center justify-center h-full text-sm text-gray-500"><p>Generated questions will appear here for review.</p></div>}
-            </Card>
+    <div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+          <CardTitle className="flex items-center gap-2"><BrainCircuit className="w-6 h-6 text-indigo-500" />Generation Parameters</CardTitle>
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Class</Label><Select name="classId" required defaultValue={classes.length > 0 ? classes[0].id : ''}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string; name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
+            <div><Label>Subject</Label><Input name="subject" required placeholder="e.g., Physics" /></div>
           </div>
-        </div>
-        <Dialog open={!!editingQuestion} onOpenChange={() => setEditingQuestion(null)}>
-          <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
-            <DialogHeader><DialogTitle>Refine AI Generated Question</DialogTitle></DialogHeader>
-            <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
-              <QuestionForm 
-                key={editingQuestion?.id} 
-                initialData={editingQuestion ? {
-                  ...editingQuestion,
-                  hasMath: false,
-                  createdBy: { id: '', name: '' },
-                  questionBanks: [],
-                  createdAt: new Date().toISOString()
-                } as Question : null} 
-                onSave={handleEditAndSave} 
-                onCancel={() => setEditingQuestion(null)} 
-                classes={classes} 
-                questionBanks={questionBanks} 
-                openCreateBankDialog={openCreateBankDialog} 
-                isRefiningAi={true} 
-              />
+          <div className="grid grid-cols-2 gap-4">
+            <div><Label>Question Type</Label><Select name="questionType" defaultValue="MCQ"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
+            <div><Label>Difficulty</Label><Select name="difficulty" defaultValue="MEDIUM"><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent></Select></div>
+          </div>
+          <div><Label>Topic (Optional)</Label><Input name="topic" placeholder="e.g., Kinematics" /></div>
+          <div><Label>Number of Questions</Label><Input name="count" type="number" defaultValue={3} min={1} max={10} /></div>
+          <div className="flex items-center space-x-2 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+            <Checkbox id="include-answers" name="includeAnswers" defaultChecked />
+            <div>
+              <Label htmlFor="include-answers" className="text-sm font-medium">Include model answers & explanations</Label>
+              <p className="text-xs text-gray-600 dark:text-gray-400">For MCQ: explanations for correct options. For CQ/SQ: detailed model answers.</p>
             </div>
-          </DialogContent>
-        </Dialog>
+          </div>
+          <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
+            <div className="flex items-center gap-2 text-green-700 dark:text-green-300 mb-2">
+              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+              <span className="text-sm font-medium">Enhanced AI Features</span>
+            </div>
+            <p className="text-xs text-green-600 dark:text-green-400">
+              The AI now supports tables, matrices, and geometry using LaTeX notation.
+              Tables will be automatically formatted using LaTeX array syntax.
+            </p>
+          </div>
+          <Button type="submit" className="w-full" disabled={isGenerating}>
+            {isGenerating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Bot className="mr-2 h-4 w-4" />}
+            Generate Questions
+          </Button>
+        </form>
+        <div className="space-y-4">
+          <CardTitle>Generated Preview</CardTitle>
+          <Card className="h-full min-h-[300px] p-2 bg-gray-50 dark:bg-gray-800/50">
+            {isGenerating && <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>}
+            {generatedQuestions.length > 0 && <div className="space-y-2 max-h-[400px] overflow-y-auto p-2">
+              {generatedQuestions.map((q) => (
+                <Card key={q.id} className="p-3 bg-white dark:bg-gray-800 shadow-sm">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Badge variant="outline" className="text-xs">{q.type}</Badge>
+                      <Badge variant="outline" className="text-xs">{q.marks} Marks</Badge>
+                      <Badge variant="outline" className="text-xs">{q.difficulty}</Badge>
+                      {q.hasMath && (
+                        <Badge variant="outline" className="text-xs text-blue-600 border-blue-600">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
+                          Math
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="whitespace-pre-wrap overflow-x-auto">
+                      <Latex>{q.questionText || ''}</Latex>
+                    </div>
+
+                    {/* MCQ Options with Explanations */}
+                    {q.type === 'MCQ' && (
+                      <div className="mt-3 space-y-2">
+                        <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Options:</p>
+                        <ul className="list-disc pl-5 space-y-2">
+                          {((q.options || []) || []).map((opt, i) => (
+                            <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
+                              <Latex>{opt.text || ''}</Latex>
+                              {opt.isCorrect && opt.explanation && (
+                                <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
+                                  <p className="text-xs font-semibold text-green-700 dark:text-green-300">Why this is correct:</p>
+                                  <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {/* CQ Sub-questions with Model Answers */}
+                    {q.type === 'CQ' && (
+                      <div className="mt-3 space-y-3">
+                        <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Sub-questions:</p>
+                        <ol className="list-decimal pl-5 space-y-3">
+                          {((q.subQuestions || []) || []).map((sq, i) => (
+                            <li key={i} className="space-y-2">
+                              <div>
+                                <Latex>{sq.question || ''}</Latex>
+                                <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                              </div>
+                              {sq.modelAnswer && (
+                                <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                                  <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
+                                  <Latex>{sq.modelAnswer}</Latex>
+                                </div>
+                              )}
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    )}
+
+                    {/* SQ Model Answer */}
+                    {q.type === 'SQ' && q.modelAnswer && (
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
+                        <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
+                          <Latex>{q.modelAnswer}</Latex>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
+                    <Button size="sm" variant="outline" onClick={() => setEditingQuestion(q)}><Edit className="h-3 w-3 mr-1" /> Edit & Refine</Button>
+                    <Button size="sm" onClick={() => handleSaveOne(q)}><PlusCircle className="h-3 w-3 mr-1" /> Add to Bank</Button>
+                  </div>
+                </Card>
+              ))}
+            </div>}
+            {!isGenerating && generatedQuestions.length === 0 && <div className="flex items-center justify-center h-full text-sm text-gray-500"><p>Generated questions will appear here for review.</p></div>}
+          </Card>
+        </div>
       </div>
+      <Dialog open={!!editingQuestion} onOpenChange={() => setEditingQuestion(null)}>
+        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+          <DialogHeader><DialogTitle>Refine AI Generated Question</DialogTitle></DialogHeader>
+          <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
+            <QuestionForm
+              key={editingQuestion?.id}
+              initialData={editingQuestion ? {
+                ...editingQuestion,
+                hasMath: false,
+                createdBy: { id: '', name: '' },
+                questionBanks: [],
+                createdAt: new Date().toISOString()
+              } as Question : null}
+              onSave={handleEditAndSave}
+              onCancel={() => setEditingQuestion(null)}
+              classes={classes}
+              questionBanks={questionBanks}
+              openCreateBankDialog={openCreateBankDialog}
+              isRefiningAi={true}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => void }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
+  const { toast } = useToast();
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setFile(e.target.files[0]);
+      setResults(null);
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/question-bank/bulk-upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setResults(data);
+      if (data.success > 0) {
+        toast({ title: "Upload Complete", description: `Successfully imported ${data.success} questions.` });
+        window.location.reload();
+      }
+    } catch (error: any) {
+      console.error('Upload Error:', error);
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Card className="p-6">
+      <div className="flex flex-col items-center justify-center space-y-6">
+        <div className="text-center space-y-2">
+          <div className="bg-indigo-100 dark:bg-indigo-900/30 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto">
+            <FileSpreadsheet className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <CardTitle className="text-2xl">Bulk Upload Questions</CardTitle>
+          <CardDescription className="max-w-md mx-auto">
+            Upload an Excel file (.xlsx) containing multiple questions to add them to the question bank in one go.
+          </CardDescription>
+        </div>
+
+        <div className="w-full max-w-md space-y-4">
+          <div className="flex justify-center">
+            <Button variant="outline" onClick={() => window.open('/api/question-bank/sample-template', '_blank')}>
+              <Download className="mr-2 h-4 w-4" /> Download Sample Template
+            </Button>
+          </div>
+
+          <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+            <Input
+              type="file"
+              accept=".xlsx, .xls"
+              onChange={handleFileChange}
+              className="hidden"
+              id="excel-upload"
+            />
+            <Label htmlFor="excel-upload" className="cursor-pointer flex flex-col items-center gap-2">
+              <Upload className="w-8 h-8 text-gray-400" />
+              <span className="text-sm font-medium">{file ? file.name : "Click to select Excel file"}</span>
+              <span className="text-xs text-gray-500">.xlsx or .xls files only</span>
+            </Label>
+          </div>
+
+          <Button onClick={handleUpload} disabled={!file || isUploading} className="w-full">
+            {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+            {isUploading ? "Processing..." : "Upload & Process"}
+          </Button>
+        </div>
+
+        {results && (
+          <div className="w-full max-w-2xl mt-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <Card className="p-4 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                <div className="text-2xl font-bold text-green-700 dark:text-green-300">{results.success}</div>
+                <div className="text-sm text-green-600 dark:text-green-400">Successfully Imported</div>
+              </Card>
+              <Card className="p-4 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                <div className="text-2xl font-bold text-red-700 dark:text-red-300">{results.failed}</div>
+                <div className="text-sm text-red-600 dark:text-red-400">Failed Rows</div>
+              </Card>
+            </div>
+
+            {results.errors.length > 0 && (
+              <Card className="border-red-200 dark:border-red-800">
+                <CardHeader>
+                  <CardTitle className="text-sm text-red-700 dark:text-red-300">Error Details</CardTitle>
+                </CardHeader>
+                <CardContent className="max-h-60 overflow-y-auto">
+                  <ul className="list-disc pl-5 space-y-1 text-xs text-red-600 dark:text-red-400">
+                    {results.errors.map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+    </Card>
   );
 };
