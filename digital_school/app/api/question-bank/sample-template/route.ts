@@ -1,8 +1,24 @@
 import { NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import prisma from '@/lib/db';
 
 export async function GET() {
     try {
+        // Fetch valid classes from the database for the sample data
+        const classes = await prisma.class.findMany({
+            select: { name: true, section: true },
+            take: 3 // Get a few classes for examples
+        });
+
+        const getClassString = (index: number) => {
+            if (classes[index]) {
+                const c = classes[index];
+                // Match the format expected by bulk upload: "Name" or "Name - Section"
+                return c.section ? `${c.name} - ${c.section}` : c.name;
+            }
+            return "Example Class - Section A"; // Fallback if no classes exist
+        };
+
         // Define the headers based on the schema and requirements
         const headers = [
             "Type (MCQ/CQ/SQ)",
@@ -25,11 +41,11 @@ export async function GET() {
             "Sub-Question 2 Marks"
         ];
 
-        // Create some sample data rows
+        // Create some sample data rows with real class names
         const data = [
             [
                 "MCQ",
-                "Class 10 - Science",
+                getClassString(0),
                 "Physics",
                 "Motion",
                 "EASY",
@@ -49,7 +65,7 @@ export async function GET() {
             ],
             [
                 "SQ",
-                "Class 9 - Biology",
+                getClassString(1), // Use a different class if available
                 "Biology",
                 "Cell",
                 "MEDIUM",
@@ -69,7 +85,7 @@ export async function GET() {
             ],
             [
                 "CQ",
-                "Class 10 - Math",
+                getClassString(0), // Reuse first class
                 "Math",
                 "Algebra",
                 "HARD",
@@ -103,8 +119,19 @@ export async function GET() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
 
+        // Add a second sheet with ALL reference data (e.g. valid Classes)
+        const allClasses = await prisma.class.findMany({ select: { name: true, section: true } });
+        const referenceData = [
+            ["Valid Class Names (Copy exact name to 'Class Name' column)"],
+            ...allClasses.map((c: { name: string; section: string | null }) => [c.section ? `${c.name} - ${c.section}` : c.name])
+        ];
+        const refWorksheet = XLSX.utils.aoa_to_sheet(referenceData);
+        refWorksheet['!cols'] = [{ wch: 40 }];
+        XLSX.utils.book_append_sheet(workbook, refWorksheet, "Valid Classes Reference");
+
         // Write the workbook to a buffer
         const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
 
         // Return the response with proper headers for file download
         return new NextResponse(buffer, {
