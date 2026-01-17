@@ -4,36 +4,53 @@ import prisma from "@/lib/db";
 import { QuestionType, Difficulty } from '@prisma/client';
 
 // Helper to separate validation logic
+const s = (val: any) => String(val || '').trim(); // Safe trim
+// Safe number parsing
+const n = (val: any) => {
+    if (!val) return 0;
+    const items = String(val).match(/\d+/);
+    return items ? parseInt(items[0]) : 0;
+}
+
 async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     try {
-        const typeStr = row["Type (MCQ/CQ/SQ)"]?.toUpperCase();
+        const typeStr = s(row["Type (MCQ/CQ/SQ)"]).toUpperCase();
         if (!['MCQ', 'CQ', 'SQ'].includes(typeStr)) {
-            throw new Error(`Invalid Question Type: ${row["Type (MCQ/CQ/SQ)"]}`);
+            // If row is completely empty, it might just be trailing whitespace in Excel
+            const isEmpty = Object.values(row).every(v => !v);
+            if (isEmpty) throw new Error("Empty Row");
+            throw new Error(`Invalid Question Type: ${row["Type (MCQ/CQ/SQ)"] || 'Missing'}`);
         }
         const type = typeStr as QuestionType;
 
-        const className = row["Class Name"];
+        const className = s(row["Class Name"]);
         if (!className) throw new Error("Class Name is required");
 
         let classId = null;
-        const foundClass = classes.find(c =>
-            c.name.toLowerCase() === className.toLowerCase().trim() ||
-            `${c.name} - ${c.section}`.toLowerCase() === className.toLowerCase().trim()
-        );
+        // Normalize for comparison
+        const normClassName = className.toLowerCase();
 
-        if (!foundClass) throw new Error(`Class not found: ${className}`);
+        const foundClass = classes.find(c => {
+            if (c.name.toLowerCase() === normClassName) return true;
+            if (c.section) {
+                return `${c.name} - ${c.section}`.toLowerCase() === normClassName;
+            }
+            return false;
+        });
+
+        if (!foundClass) throw new Error(`Class not found: ${className}. (Available: ${classes.slice(0, 3).map((c: any) => c.name).join(', ')}...)`);
         classId = foundClass.id;
 
-        const subject = row["Subject"];
+        const subject = s(row["Subject"]);
         if (!subject) throw new Error("Subject is required");
 
-        const questionText = row["Question Text"];
+        const questionText = s(row["Question Text"]);
         if (!questionText) throw new Error("Question Text is required");
 
-        const marks = parseInt(row["Marks"] || '0');
+        const marks = n(row["Marks"]);
 
         let difficulty: Difficulty = 'MEDIUM';
-        const diffStr = row["Difficulty (EASY/MEDIUM/HARD)"]?.toUpperCase();
+        const diffStr = s(row["Difficulty (EASY/MEDIUM/HARD)"]).toUpperCase();
         if (['EASY', 'MEDIUM', 'HARD'].includes(diffStr)) {
             difficulty = diffStr as Difficulty;
         }
@@ -41,31 +58,31 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         // Type-specific logic
         let options = null;
         let subQuestions = null;
-        let modelAnswer = row["Model Answer"];
+        let modelAnswer = s(row["Model Answer"]);
 
         if (type === 'MCQ') {
-            const optA = row["Option A"];
-            const optB = row["Option B"];
+            const optA = s(row["Option A"]);
+            const optB = s(row["Option B"]);
             if (!optA || !optB) throw new Error("MCQ requires at least Option A and B");
 
-            const correctOpt = row["Correct Option (A/B/C/D)"]?.toUpperCase();
+            const correctOpt = s(row["Correct Option (A/B/C/D)"]).toUpperCase();
             if (!['A', 'B', 'C', 'D'].includes(correctOpt)) throw new Error("Valid Correct Option (A/B/C/D) required");
 
             options = [
-                { text: String(optA), isCorrect: correctOpt === 'A', explanation: row["Explanation"] },
-                { text: String(optB), isCorrect: correctOpt === 'B', explanation: row["Explanation"] },
-                { text: String(row["Option C"] || ''), isCorrect: correctOpt === 'C', explanation: row["Explanation"] },
-                { text: String(row["Option D"] || ''), isCorrect: correctOpt === 'D', explanation: row["Explanation"] },
-            ].filter(o => o.text.trim() !== '');
+                { text: optA, isCorrect: correctOpt === 'A', explanation: s(row["Explanation"]) },
+                { text: optB, isCorrect: correctOpt === 'B', explanation: s(row["Explanation"]) },
+                { text: s(row["Option C"]), isCorrect: correctOpt === 'C', explanation: s(row["Explanation"]) },
+                { text: s(row["Option D"]), isCorrect: correctOpt === 'D', explanation: s(row["Explanation"]) },
+            ].filter(o => o.text !== '');
         } else if (type === 'CQ') {
-            const sq1Text = row["Sub-Question 1 Text"];
-            const sq1Marks = row["Sub-Question 1 Marks"];
-            const sq2Text = row["Sub-Question 2 Text"];
-            const sq2Marks = row["Sub-Question 2 Marks"];
+            const sq1Text = s(row["Sub-Question 1 Text"]);
+            const sq1Marks = n(row["Sub-Question 1 Marks"]);
+            const sq2Text = s(row["Sub-Question 2 Text"]);
+            const sq2Marks = n(row["Sub-Question 2 Marks"]);
 
             subQuestions = [];
-            if (sq1Text) subQuestions.push({ question: sq1Text, marks: parseInt(sq1Marks || '0') });
-            if (sq2Text) subQuestions.push({ question: sq2Text, marks: parseInt(sq2Marks || '0') });
+            if (sq1Text) subQuestions.push({ question: sq1Text, marks: sq1Marks });
+            if (sq2Text) subQuestions.push({ question: sq2Text, marks: sq2Marks });
 
             if (subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
         }
@@ -75,9 +92,9 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             data: {
                 type,
                 classId,
-                className, // Exposed for fallback loopup
+                className,
                 subject,
-                topic: row["Topic"] || null,
+                topic: s(row["Topic"]) || null,
                 difficulty,
                 marks,
                 questionText,
@@ -85,10 +102,13 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                 subQuestions,
                 modelAnswer,
             },
-            _original: row // Consistent top-level placement
+            _original: row
         };
 
     } catch (err: any) {
+        // Skip empty rows silently or just mark invalid
+        if (err.message === "Empty Row") return null;
+
         return {
             isValid: false,
             error: err.message,
@@ -133,7 +153,9 @@ export async function POST(req: NextRequest) {
             const previewRows = [];
             for (let i = 0; i < jsonData.length; i++) {
                 const result = await validateAndMapRow(jsonData[i], i + 2, classes);
-                previewRows.push({ ...result, rowNum: i + 2 });
+                if (result) { // Check specific null check
+                    previewRows.push({ ...result, rowNum: i + 2 });
+                }
             }
 
             return NextResponse.json({ mode: 'preview', rows: previewRows });
