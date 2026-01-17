@@ -400,7 +400,6 @@ export default function QuestionBankPage() {
               <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
                 <TabsTrigger value="browse">Browse</TabsTrigger>
                 <TabsTrigger value="create">Create Manually</TabsTrigger>
-                <TabsTrigger value="create">Create Manually</TabsTrigger>
                 <TabsTrigger value="ai">AI Generator</TabsTrigger>
                 <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
               </TabsList>
@@ -1353,6 +1352,25 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [editedPreviewData, setEditedPreviewData] = useState<any[]>([]); // For tracking edits
 
+  // Class options for Dropdown
+  const [availableClasses, setAvailableClasses] = useState<{ id: string; name: string; section?: string }[]>([]);
+
+  // Fetch classes on mount
+  useEffect(() => {
+    const fetchClasses = async () => {
+      try {
+        const res = await fetch('/api/classes');
+        if (res.ok) {
+          const data = await res.json();
+          setAvailableClasses(data.classes || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch classes for dropdown", err);
+      }
+    };
+    fetchClasses();
+  }, []);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -1448,50 +1466,18 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
 
   const handleEditRow = (index: number, field: string, value: string) => {
     const newData = [...editedPreviewData];
-    // We update the data object which is what eventually gets sent
-    // We also update the _original field to reflect what is shown if we were showing that
-    // But importantly, we might need to update 'isValid' status manually or just let backend fail again if they enter bad data.
-    // For now, let's just update the value.
 
-    // Mapping for UI fields to Internal Data structure
-    // Provide direct access to data properties
     if (newData[index].data) {
-      if (field === 'className') {
-        // For class, we technically need a valid ID for backend, but backend lookup happens on Name. 
-        // Wait, the backend refactor does validation using the internal class list. 
-        // If we send JSON, the backend expects 'classId'.
-        // Problem: The user edits "Class Name" string. 
-        // We need to re-resolve Class ID or send the Name and let backend re-resolve.
-        // Our backend JSON mode expects 'classId' directly in the current implementation?
-        // Let's re-check backend:
-        // Backend JSON mode: gets 'questions' array. Iterates and calls prisma.create using q.classId.
-        // So backend expects resolved classId.
-        // ISSUE: Use editing "Class 10" string doesn't give us a classId on frontend easily without a lookup list.
-        // FIX: We should probably let the backend re-resolve if we send a 'className' field in JSON mode too?
-        // Or, simpler: We fetch classes on frontend and do a lookup here.
-        // Let's fetch classes in this component to help with this.
-
-        // For now, let's update the raw string in `_original` so the user sees it, 
-        // BUT `data.classId` will remain stale/wrong.
-        // This suggests that updating Class is tricky without a dropdown.
-        // Let's implement editing "Question Text" & "Subject" first as they are strings.
-        // "Class" editing is hard without a dropdown.
-        // Alternative: If invalid, we allow removing the row.
-      }
-
       // Update data fields
       (newData[index].data as any)[field] = value;
-      // Assume valid after edit? No, keeps status until re-submit. 
-      // But we can optimistically clear the error message visually if we want.
-      newData[index].isValid = true; // Optimistic
+      // Optimistically mark as valid if user edits something, 
+      // assuming they are fixing the error. 
+      // (Real validation happens on backend re-submit, but we remove the red indicator)
+      newData[index].isValid = true;
       newData[index].error = undefined;
     }
     setEditedPreviewData(newData);
   };
-
-  // NOTE: To properly support Class changes, we would need to pass `classes` prop to BulkUpload or fetch them.
-  // Given user request "fix in preview", likely they want to fix Class typos.
-  // Ideally we offer a dropdown of valid classes.
 
   const handleRemoveRow = (index: number) => {
     const newData = [...editedPreviewData];
@@ -1568,7 +1554,7 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                     <TableHead className="w-[50px]">Row</TableHead>
                     <TableHead className="w-[100px]">Status</TableHead>
                     <TableHead>Question Type</TableHead>
-                    <TableHead>Class</TableHead>
+                    <TableHead className="w-[180px]">Class</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead className="w-[300px]">Question Text</TableHead>
                     <TableHead className="w-[50px]">Marks</TableHead>
@@ -1593,12 +1579,21 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                       </TableCell>
                       <TableCell>{row.data.type}</TableCell>
                       <TableCell>
-                        <Input
-                          value={row.data.className || row._original["Class Name"]}
+                        <select
+                          className={`h-8 text-xs w-full max-w-[170px] border rounded px-1 bg-transparent dark:bg-slate-800 ${!row.data.classId && !row.isValid ? "border-red-500 bg-red-50 dark:bg-red-900/20" : ""}`}
+                          value={row.data.className || ""}
                           onChange={(e) => handleEditRow(index, 'className', e.target.value)}
-                          className={`h-8 text-xs ${!row.data.classId && !row.isValid ? "border-red-500 bg-red-50" : ""}`}
-                          placeholder="e.g. Class 10 - Science"
-                        />
+                        >
+                          <option value="" disabled>Select Class</option>
+                          {availableClasses.map(c => {
+                            const val = c.section ? `${c.name} - ${c.section}` : c.name;
+                            return <option key={c.id} value={val}>{val}</option>
+                          })}
+                          {/* Keep original value if not in list, so it isn't lost immediately */}
+                          {!availableClasses.find(c => (c.section ? `${c.name} - ${c.section}` : c.name) === row.data.className) && row.data.className && (
+                            <option value={row.data.className} disabled>{row.data.className} (Invalid)</option>
+                          )}
+                        </select>
                       </TableCell>
                       <TableCell>
                         <Input
