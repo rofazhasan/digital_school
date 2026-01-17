@@ -1468,11 +1468,29 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
     const newData = [...editedPreviewData];
 
     if (newData[index].data) {
-      // Update data fields
       (newData[index].data as any)[field] = value;
-      // Optimistically mark as valid if user edits something, 
-      // assuming they are fixing the error. 
-      // (Real validation happens on backend re-submit, but we remove the red indicator)
+
+      // Special handling for Class Name change -> Update Class ID
+      if (field === 'className') {
+        const foundClass = availableClasses.find(c =>
+          c.name === value || (c.section ? `${c.name} - ${c.section}` : c.name) === value
+        );
+        if (foundClass) {
+          newData[index].data.classId = foundClass.id;
+        } else {
+          // Try loose matching if exact match fails (e.g. if user typed it)
+          const looseFound = availableClasses.find(c =>
+            c.name.toLowerCase() === value.toLowerCase() ||
+            (c.section ? `${c.name} - ${c.section}` : c.name).toLowerCase() === value.toLowerCase()
+          );
+          if (looseFound) {
+            newData[index].data.classId = looseFound.id;
+          } else {
+            newData[index].data.classId = null;
+          }
+        }
+      }
+
       newData[index].isValid = true;
       newData[index].error = undefined;
     }
