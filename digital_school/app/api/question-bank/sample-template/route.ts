@@ -1,97 +1,176 @@
 import { NextResponse } from 'next/server';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import prisma from '@/lib/db';
 
 export async function GET() {
     try {
-        const workbook = XLSX.utils.book_new();
+        const workbook = new ExcelJS.Workbook();
+        workbook.creator = 'Digital School';
+        workbook.created = new Date();
 
         // 1. INSTRUCTIONS SHEET
-        const instructionsData = [
-            ["Digital School - Bulk Question Upload Instructions"],
-            [""],
-            ["Step 1", "Download this template and filling it with your questions."],
-            ["Step 2", "Do not change the header names in the 'Template' sheet."],
-            ["Step 3", "Consult the 'Valid Classes Reference' sheet for exact Class Names."],
-            ["Step 4", "Select values from dropdowns where available (Type, Difficulty, etc.)."],
-            ["Step 5", "Save and upload this file."],
-            [""],
-            ["Column Guide:"],
-            ["Type", "MCQ (Multiple Choice), CQ (Creative), SQ (Short Question)"],
-            ["Class Name", "Must EXACTLY match a class in the system (see Reference sheet)."],
-            ["Subject", "e.g., Physics, Math, English"],
-            ["Difficulty", "EASY, MEDIUM, or HARD"],
-            ["Options", "Required for MCQ. Leave empty for CQ/SQ."],
-            ["Correct Option", "A, B, C, or D (MCQ only)."],
-            ["Sub-Question X", "Required for CQ. Format: Text in one col, Marks in next."]
-        ];
-        const instructionSheet = XLSX.utils.aoa_to_sheet(instructionsData);
-        instructionSheet['!cols'] = [{ wch: 20 }, { wch: 80 }];
-        XLSX.utils.book_append_sheet(workbook, instructionSheet, "Instructions");
-
-        // 2. TEMPLATE SHEET
-        // Fetch valid classes from the database
-        const classes = await prisma.class.findMany({
-            select: { name: true, section: true },
-            take: 3
+        const infoSheet = workbook.addWorksheet('Instructions', {
+            views: [{ showGridLines: false }]
         });
 
-        const getClassString = (index: number) => {
-            if (classes[index]) {
-                const c = classes[index];
-                return c.section ? `${c.name} - ${c.section}` : c.name;
+        infoSheet.columns = [
+            { header: 'Step', key: 'step', width: 20 },
+            { header: 'Instruction', key: 'instruction', width: 80 }
+        ];
+
+        const instructions = [
+            ["Step 1", "Download this template and fill it with your questions."],
+            ["Step 2", "Do not change the header names in the 'Template' sheet."],
+            ["Step 3", "Select values from the dropdowns for Type, Class, Subject, Difficulty, etc."],
+            ["Step 4", "For Class Name, you MUST pick from the dropdown (these match your system classes)."],
+            ["Step 5", "Save and upload this file back to the system."],
+            [""],
+            ["FIELD GUIDE:", ""],
+            ["Type", "MCQ (Multiple Choice), CQ (Creative), SQ (Short Question)"],
+            ["Class Name", "Select from dropdown. Must exist in the system."],
+            ["Difficulty", "EASY, MEDIUM, HARD"],
+            ["Marks", "Number only."],
+            ["Correct Option", "A, B, C, or D (Only for MCQ)."],
+            ["Options A-D", "Required for MCQ. Leave blank for others."]
+        ];
+
+        instructions.forEach(row => infoSheet.addRow(row));
+
+        // Style the instructions
+        infoSheet.getRow(1).font = { bold: true, size: 14 };
+        infoSheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) {
+                row.getCell(1).font = { bold: true };
+                row.alignments = { vertical: 'middle', wrapText: true };
             }
-            return "Class 10 - Section A";
+        });
+
+        // 2. REFERENCE SHEET (Hidden logic for dropdowns)
+        const refSheet = workbook.addWorksheet('Valid Classes Reference');
+        // Retrieve classes
+        const classes = await prisma.class.findMany({ select: { name: true, section: true } });
+        const classNames = classes.map(c => c.section ? `${c.name} - ${c.section}` : c.name);
+
+        refSheet.columns = [{ header: 'Valid Classes', key: 'class', width: 50 }];
+        refSheet.addRows(classNames.map(c => [c]));
+
+        // Hide it so users don't mess with it, but keep it available for validation logic
+        refSheet.state = 'hidden';
+
+        // 3. TEMPLATE SHEET
+        const templateSheet = workbook.addWorksheet('Template');
+
+        // Headers
+        const columns = [
+            { header: "Type (MCQ/CQ/SQ)", key: "type", width: 20 },
+            { header: "Class Name", key: "className", width: 30 },
+            { header: "Subject", key: "subject", width: 15 },
+            { header: "Topic", key: "topic", width: 20 },
+            { header: "Difficulty", key: "difficulty", width: 15 },
+            { header: "Marks", key: "marks", width: 10 },
+            { header: "Question Text", key: "questionText", width: 50 },
+            { header: "Option A", key: "optionA", width: 20 },
+            { header: "Option B", key: "optionB", width: 20 },
+            { header: "Option C", key: "optionC", width: 20 },
+            { header: "Option D", key: "optionD", width: 20 },
+            { header: "Correct Option", key: "correctOption", width: 15 },
+            { header: "Explanation", key: "explanation", width: 30 },
+            { header: "Model Answer", key: "modelAnswer", width: 30 },
+            { header: "Sub-Question 1 Text", key: "sq1Text", width: 30 },
+            { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 15 },
+            { header: "Sub-Question 2 Text", key: "sq2Text", width: 30 },
+            { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 15 },
+        ];
+        templateSheet.columns = columns;
+
+        // Header Styling
+        const headerRow = templateSheet.getRow(1);
+        headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        headerRow.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FF4F46E5' } // Indigo-600 ish
         };
+        headerRow.alignment = { horizontal: 'center' };
 
-        const headers = [
-            "Type (MCQ/CQ/SQ)", "Class Name", "Subject", "Topic", "Difficulty (EASY/MEDIUM/HARD)", "Marks", "Question Text",
-            "Option A", "Option B", "Option C", "Option D", "Correct Option (A/B/C/D)", "Explanation", "Model Answer",
-            "Sub-Question 1 Text", "Sub-Question 1 Marks", "Sub-Question 2 Text", "Sub-Question 2 Marks"
-        ];
+        // DATA VALIDATION & DROPDOWNS
+        // We'll apply this to a reasonable number of rows (e.g., 500)
+        const rowCount = 500;
 
-        const sampleData = [
-            ["MCQ", getClassString(0), "Physics", "Motion", "EASY", 1, "Unit of velocity?", "m/s", "m/s^2", "N", "J", "A", "Displacement/Time", "", "", "", "", ""],
-            ["SQ", getClassString(1), "Biology", "Cell", "MEDIUM", 3, "Define Mitochondria.", "", "", "", "", "", "", "Powerhouse of cell", "", "", "", ""],
-            ["CQ", getClassString(0), "Math", "Algebra", "HARD", 10, "Solve equations.", "", "", "", "", "", "", "", "2x+5=15", 2, "3y-2=10", 3]
-        ];
+        // A helper to get column letter from index (1-based)
+        // ExcelJS handles this, we can just iterate rows.
 
-        const worksheetData = [headers, ...sampleData];
-        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        for (let i = 2; i <= rowCount; i++) {
+            const row = templateSheet.getRow(i);
 
-        // Column Widths
-        worksheet['!cols'] = headers.map(h => ({ wch: h.length + 5 }));
+            // Type Dropdown (Col 1)
+            row.getCell(1).dataValidation = {
+                type: 'list',
+                allowBlank: true,
+                formulae: ['"MCQ,CQ,SQ"'],
+                showErrorMessage: true,
+                errorTitle: 'Invalid Type',
+                error: 'Please select from the list: MCQ, CQ, SQ'
+            };
 
-        // Data Validation (Note: SheetJS Basic implementation often limits writing validation, 
-        // but we assume standard structure here attempt specific cell ranges)
-        // Range for 100 rows
-        const rows = 100;
-
-        // Helper to add validation
-        const addValidation = (colIndex: number, options: string[]) => {
-            const letter = XLSX.utils.encode_col(colIndex);
-            for (let r = 1; r < rows; r++) { // Start from row 1 (after header)
-                const cellRef = `${letter}${r + 1}`;
-                if (!worksheet[cellRef]) worksheet[cellRef] = { t: 's', v: '' }; // Ensure cell exists
-                // Note: SheetJS Community edition doesn't fully support writing DataValidation metadata 
-                // to the file. This might be ignored by some writers but it's the standard internal rep.
-                // For fully working dropdowns, we rely on the user following instructions usually.
+            // Class Name Dropdown (Col 2) - dynamic reference
+            // Refers to 'Valid Classes Reference'!$A$2:$A$N
+            if (classNames.length > 0) {
+                const lastRow = classNames.length + 1;
+                // Note: ExcelJS requires formula syntax for other sheets
+                row.getCell(2).dataValidation = {
+                    type: 'list',
+                    allowBlank: false,
+                    formulae: [`'Valid Classes Reference'!$A$2:$A$${lastRow}`],
+                    showErrorMessage: true,
+                    errorTitle: 'Invalid Class',
+                    error: 'Please select a valid class from the dropdown.'
+                };
             }
-        };
 
-        XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+            // Difficulty Dropdown (Col 5)
+            row.getCell(5).dataValidation = {
+                type: 'list',
+                allowBlank: true,
+                formulae: ['"EASY,MEDIUM,HARD"'],
+                showErrorMessage: true,
+                errorTitle: 'Invalid Difficulty',
+                error: 'Select EASY, MEDIUM, or HARD'
+            };
 
-        // 3. REFERENCE SHEET
-        const allClasses = await prisma.class.findMany({ select: { name: true, section: true } });
-        const referenceData = [
-            ["Valid Class Names (Copy these exactly)"],
-            ...allClasses.map((c: any) => [c.section ? `${c.name} - ${c.section}` : c.name])
+            // Correct Option Dropdown (Col 12)
+            row.getCell(12).dataValidation = {
+                type: 'list',
+                allowBlank: true,
+                formulae: ['"A,B,C,D"'],
+                showErrorMessage: true,
+                errorTitle: 'Invalid Option',
+                error: 'Select A, B, C, or D'
+            };
+        }
+
+        // Add Sample Data
+        templateSheet.addRow([
+            "MCQ",
+            classNames[0] || "Class 10",
+            "Physics",
+            "Motion",
+            "EASY",
+            1,
+            "What is ...?",
+            "Option A", "Option B", "Option C", "Option D",
+            "A",
+            "Because...",
+            "", "", "", "", ""
+        ]);
+
+        // Freeze top row
+        templateSheet.views = [
+            { state: 'frozen', xSplit: 0, ySplit: 1 }
         ];
-        const refWorksheet = XLSX.utils.aoa_to_sheet(referenceData);
-        refWorksheet['!cols'] = [{ wch: 40 }];
-        XLSX.utils.book_append_sheet(workbook, refWorksheet, "Valid Classes Reference");
 
-        const buffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+        // Buffer write
+        const buffer = await workbook.xlsx.writeBuffer();
 
         return new NextResponse(buffer, {
             status: 200,
