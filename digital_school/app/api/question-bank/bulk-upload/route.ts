@@ -139,7 +139,14 @@ export async function POST(req: NextRequest) {
 
             const buffer = await file.arrayBuffer();
             const workbook = XLSX.read(buffer, { type: 'buffer' });
-            const sheetName = workbook.SheetNames[0];
+
+            // Prefer "Template" sheet, fallback to first sheet
+            let sheetName: string = workbook.SheetNames.find(n => n === "Template") || workbook.SheetNames[0];
+
+            if (!sheetName) {
+                return NextResponse.json({ error: "Excel file has no sheets" }, { status: 400 });
+            }
+
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
