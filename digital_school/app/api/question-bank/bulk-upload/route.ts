@@ -189,54 +189,62 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: "No questions provided for insertion" }, { status: 400 });
             }
 
-            const results = { success: 0, failed: 0, errors: [] as string[] };
+            const preparedQuestions = [];
+            let failedCount = 0;
+            const errors: string[] = [];
 
             // TODO: Replace with actual auth user
             const creator = await prisma.user.findFirst();
             if (!creator) throw new Error("No user found to assign creator");
 
+            // 1. Prepare and Validate all questions in memory
             for (let i = 0; i < questions.length; i++) {
                 const q = questions[i];
-                // Skip if q is null (shouldn't happen if filtered correctly on frontend but good to be safe)
                 if (!q) continue;
 
                 try {
                     let classId = q.classId;
 
-                    // Resolve class ID if missing but className provided (fix-up scenario)
-                    // We trust classId if present, assuming frontend/preview logic is correct. 
-                    // But if it's missing, we try to resolve by name.
+                    // Resolve class ID if missing but className provided
                     if (!classId && q.className) {
                         classId = findClassId(q.className);
                     }
 
                     if (!classId) throw new Error(`Class not found/resolved: ${q.className || 'Unknown'}`);
 
-                    await prisma.question.create({
-                        data: {
-                            type: (q.type || 'MCQ') as any, // Cast to avoid TS enum issues
-                            classId: classId,
-                            subject: q.subject,
-                            topic: q.topic,
-                            difficulty: (q.difficulty || 'MEDIUM') as any,
-                            marks: q.marks || 1,
-                            questionText: q.questionText,
-                            options: q.options || undefined,
-                            subQuestions: q.subQuestions || undefined,
-                            modelAnswer: q.modelAnswer,
-                            createdById: creator.id,
-                            hasMath: q.questionText.includes('\\') || (!!q.modelAnswer && q.modelAnswer.includes('\\'))
-                        }
+                    preparedQuestions.push({
+                        type: (q.type || 'MCQ') as any,
+                        classId: classId,
+                        subject: q.subject,
+                        topic: q.topic,
+                        difficulty: (q.difficulty || 'MEDIUM') as any,
+                        marks: q.marks || 1,
+                        questionText: q.questionText,
+                        options: q.options || undefined,
+                        subQuestions: q.subQuestions || undefined,
+                        modelAnswer: q.modelAnswer,
+                        createdById: creator.id,
+                        hasMath: q.questionText.includes('\\') || (!!q.modelAnswer && q.modelAnswer.includes('\\'))
                     });
-                    results.success++;
                 } catch (err: any) {
-                    console.error("Insert error:", err);
-                    results.failed++;
-                    results.errors.push(`Item ${i + 1}: ${err.message}`);
+                    // Capture pre-validation errors
+                    failedCount++;
+                    errors.push(`Item ${i + 1}: ${err.message}`);
                 }
             }
 
-            return NextResponse.json(results);
+            // 2. Batch Insert
+            if (preparedQuestions.length > 0) {
+                await prisma.question.createMany({
+                    data: preparedQuestions
+                });
+            }
+
+            return NextResponse.json({
+                success: preparedQuestions.length,
+                failed: failedCount,
+                errors: errors
+            });
         }
 
         return NextResponse.json({ error: "Unsupported Content-Type" }, { status: 400 });
