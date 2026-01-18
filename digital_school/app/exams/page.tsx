@@ -8,20 +8,20 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, 
+import {
+  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search,
   Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
   Globe, Monitor, FileText, BarChart3, Settings, Download,
   RefreshCw, SortAsc, SortDesc, FilterX
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -89,10 +89,10 @@ export default function ExamsPage() {
       setExams(data);
     } catch (error) {
       console.error("Error fetching exams:", error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to fetch exams.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Failed to fetch exams.",
+        variant: "destructive"
       });
       setExams([]);
     } finally {
@@ -110,11 +110,11 @@ export default function ExamsPage() {
   const handleEdit = async (id: string) => {
     const exam = exams.find((e) => e.id === id);
     if (!exam) return;
-    
+
     const name = prompt('Edit exam name:', exam.name);
     const description = prompt('Edit description:', exam.description || '');
     if (name === null) return;
-    
+
     setLoading(true);
     try {
       const res = await fetch(`/api/exams?id=${id}`, {
@@ -126,10 +126,10 @@ export default function ExamsPage() {
       toast({ title: 'Success', description: 'Exam updated successfully.' });
       await fetchExams();
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to update exam.', 
-        variant: "destructive" 
+      toast({
+        title: 'Error',
+        description: 'Failed to update exam.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -140,7 +140,7 @@ export default function ExamsPage() {
     if (!confirm(`⚠️ PERMANENT DELETION WARNING ⚠️\n\nAre you sure you want to delete this exam?\n\nThis will permanently delete:\n• All student submissions\n• All uploaded answer images\n• All evaluation data and results\n• All exam sets and questions\n• All related records\n\nThis action CANNOT be undone!`)) {
       return;
     }
-    
+
     const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
     if (confirmation !== 'DELETE') return;
 
@@ -148,16 +148,16 @@ export default function ExamsPage() {
     try {
       const res = await fetch(`/api/exams?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete exam');
-      toast({ 
-        title: 'Success', 
-        description: 'Exam and all related data deleted permanently.' 
+      toast({
+        title: 'Success',
+        description: 'Exam and all related data deleted permanently.'
       });
       await fetchExams();
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to delete exam.', 
-        variant: "destructive" 
+      toast({
+        title: 'Error',
+        description: 'Failed to delete exam.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -176,10 +176,10 @@ export default function ExamsPage() {
       toast({ title: 'Success', description: 'Exam approved successfully.' });
       await fetchExams();
     } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to approve exam.', 
-        variant: "destructive" 
+      toast({
+        title: 'Error',
+        description: 'Failed to approve exam.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -215,21 +215,21 @@ export default function ExamsPage() {
   // Filter and sort exams
   const filteredAndSortedExams = useMemo(() => {
     let filtered = exams.filter(exam => {
-      const matchesSearch = !filters.search || 
+      const matchesSearch = !filters.search ||
         exam.name.toLowerCase().includes(filters.search.toLowerCase()) ||
         exam.description?.toLowerCase().includes(filters.search.toLowerCase()) ||
         exam.subject.toLowerCase().includes(filters.search.toLowerCase());
-      
-      const matchesStatus = filters.status === 'all' || 
+
+      const matchesStatus = filters.status === 'all' ||
         (filters.status === 'active' && exam.isActive) ||
         (filters.status === 'pending' && !exam.isActive);
-      
+
       const matchesType = filters.type === 'all' || exam.type === filters.type;
       const matchesSubject = filters.subject === 'all' || exam.subject === filters.subject;
       const matchesNegativeMarking = !filters.negativeMarking || filters.negativeMarking === 'all' ||
         (filters.negativeMarking === 'with' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) ||
         (filters.negativeMarking === 'without' && (!exam.mcqNegativeMarking || exam.mcqNegativeMarking === 0));
-      
+
       // Handle tab-based filtering
       let matchesTab = true;
       if (activeTab === 'active') {
@@ -241,14 +241,14 @@ export default function ExamsPage() {
       } else if (activeTab === 'negative-marking') {
         matchesTab = !!(exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0);
       }
-      
+
       return matchesSearch && matchesStatus && matchesType && matchesSubject && matchesNegativeMarking && matchesTab;
     });
 
     // Sort exams
     filtered.sort((a, b) => {
       let aValue: any, bValue: any;
-      
+
       switch (filters.sortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -270,7 +270,7 @@ export default function ExamsPage() {
           aValue = new Date(a.date);
           bValue = new Date(b.date);
       }
-      
+
       if (filters.sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -292,13 +292,13 @@ export default function ExamsPage() {
     const withNegativeMarking = exams.filter(e => e.mcqNegativeMarking && e.mcqNegativeMarking > 0).length;
     const withCQ = exams.filter(e => e.cqTotalQuestions && e.cqTotalQuestions > 0).length;
     const withSQ = exams.filter(e => e.sqTotalQuestions && e.sqTotalQuestions > 0).length;
-    
+
     return { total, active, pending, online, offline, mixed, withNegativeMarking, withCQ, withSQ };
   }, [exams]);
 
   const getStatusColor = (isActive: boolean) => {
-    return isActive 
-      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+    return isActive
+      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
       : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
   };
 
@@ -325,7 +325,7 @@ export default function ExamsPage() {
       <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <TooltipProvider>
           {/* Header Section */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
@@ -348,7 +348,16 @@ export default function ExamsPage() {
                   className="flex items-center gap-2"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  Refesh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/evaluations')}
+                  className="flex items-center gap-2"
+                >
+                  <FileText className="w-4 h-4" />
+                  Evaluations
                 </Button>
                 <Button
                   onClick={handleCreate}
@@ -362,7 +371,7 @@ export default function ExamsPage() {
           </motion.div>
 
           {/* Statistics Cards */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -442,7 +451,7 @@ export default function ExamsPage() {
           </motion.div>
 
           {/* Filters and Tabs */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
@@ -477,8 +486,8 @@ export default function ExamsPage() {
 
                       <div>
                         <Label htmlFor="status-filter">Status</Label>
-                        <Select 
-                          value={filters.status} 
+                        <Select
+                          value={filters.status}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
                         >
                           <SelectTrigger id="status-filter">
@@ -494,8 +503,8 @@ export default function ExamsPage() {
 
                       <div>
                         <Label htmlFor="type-filter">Type</Label>
-                        <Select 
-                          value={filters.type} 
+                        <Select
+                          value={filters.type}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
                         >
                           <SelectTrigger id="type-filter">
@@ -512,8 +521,8 @@ export default function ExamsPage() {
 
                       <div>
                         <Label htmlFor="subject-filter">Subject</Label>
-                        <Select 
-                          value={filters.subject} 
+                        <Select
+                          value={filters.subject}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, subject: value }))}
                         >
                           <SelectTrigger id="subject-filter">
@@ -530,8 +539,8 @@ export default function ExamsPage() {
 
                       <div>
                         <Label htmlFor="negative-marking-filter">Negative Marking</Label>
-                        <Select 
-                          value={filters.negativeMarking || 'all'} 
+                        <Select
+                          value={filters.negativeMarking || 'all'}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, negativeMarking: value }))}
                         >
                           <SelectTrigger id="negative-marking-filter">
@@ -546,8 +555,8 @@ export default function ExamsPage() {
                       </div>
 
                       <div className="flex items-end gap-2">
-                        <Button 
-                          variant="outline" 
+                        <Button
+                          variant="outline"
                           onClick={resetFilters}
                           className="flex items-center gap-2"
                         >
@@ -560,8 +569,8 @@ export default function ExamsPage() {
                     <div className="mt-4 flex items-center gap-4">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="sort-by">Sort by:</Label>
-                        <Select 
-                          value={filters.sortBy} 
+                        <Select
+                          value={filters.sortBy}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, sortBy: value }))}
                         >
                           <SelectTrigger className="w-32">
@@ -579,9 +588,9 @@ export default function ExamsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setFilters(prev => ({ 
-                          ...prev, 
-                          sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc' 
+                        onClick={() => setFilters(prev => ({
+                          ...prev,
+                          sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc'
                         }))}
                         className="flex items-center gap-2"
                       >
@@ -600,7 +609,7 @@ export default function ExamsPage() {
           </motion.div>
 
           {/* Exam Cards Grid */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -648,8 +657,8 @@ export default function ExamsPage() {
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: -20 }}
                       transition={{ delay: index * 0.1 }}
-                      whileHover={{ 
-                        scale: 1.02, 
+                      whileHover={{
+                        scale: 1.02,
                         y: -4,
                         transition: { duration: 0.2 }
                       }}
@@ -666,7 +675,7 @@ export default function ExamsPage() {
                                 {exam.description || 'No description provided'}
                               </CardDescription>
                             </div>
-                            
+
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -694,7 +703,7 @@ export default function ExamsPage() {
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem 
+                                <DropdownMenuItem
                                   onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
                                   className="text-red-600 focus:text-red-600"
                                 >
@@ -719,13 +728,13 @@ export default function ExamsPage() {
                                 </>
                               )}
                             </Badge>
-                            
+
                             <Badge className={getTypeColor(exam.type)}>
                               {getTypeIcon(exam.type)}
                               <span className="ml-1">
-                                {exam.type === 'ONLINE' ? 'Online' : 
-                                 exam.type === 'OFFLINE' ? 'Offline' : 
-                                 exam.type === 'MIXED' ? 'Mixed' : 'Type'}
+                                {exam.type === 'ONLINE' ? 'Online' :
+                                  exam.type === 'OFFLINE' ? 'Offline' :
+                                    exam.type === 'MIXED' ? 'Mixed' : 'Type'}
                               </span>
                             </Badge>
 
@@ -759,7 +768,7 @@ export default function ExamsPage() {
                               </div>
                               <p className="font-medium text-gray-900 dark:text-white">{exam.subject}</p>
                             </div>
-                            
+
                             <div>
                               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
                                 <Award className="w-3 h-3" />
@@ -767,7 +776,7 @@ export default function ExamsPage() {
                               </div>
                               <p className="font-medium text-gray-900 dark:text-white">{exam.totalMarks}</p>
                             </div>
-                            
+
                             <div>
                               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
                                 <Calendar className="w-3 h-3" />
@@ -777,7 +786,7 @@ export default function ExamsPage() {
                                 {new Date(exam.date).toLocaleDateString()}
                               </p>
                             </div>
-                            
+
                             <div>
                               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
                                 <Users className="w-3 h-3" />
@@ -811,7 +820,7 @@ export default function ExamsPage() {
                                     </TooltipContent>
                                   </Tooltip>
                                 )}
-                                
+
                                 {exam.sqTotalQuestions && (
                                   <Tooltip>
                                     <TooltipTrigger asChild>
@@ -836,8 +845,8 @@ export default function ExamsPage() {
 
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">
-                              <Button 
-                                variant="outline" 
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}
                                 className="flex items-center gap-2"
@@ -845,9 +854,9 @@ export default function ExamsPage() {
                                 <Eye className="w-4 h-4" />
                                 View Details
                               </Button>
-                              
-                              <Button 
-                                variant="outline" 
+
+                              <Button
+                                variant="outline"
                                 size="sm"
                                 onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}
                                 className="flex items-center gap-2"
