@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import prisma from "@/lib/db";
+import { getTokenFromRequest } from "@/lib/auth";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user || session.user.role !== 'SUPER_USER') {
+        const auth = await getTokenFromRequest(req);
+        if (!auth || !auth.user || auth.user.role !== 'SUPER_USER') {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
+        const session = { user: auth.user }; // Mapping for compatibility
 
         const body = await req.json();
         const { title, description, targetType, priority, targetClassIds } = body;

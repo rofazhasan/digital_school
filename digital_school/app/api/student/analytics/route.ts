@@ -1,14 +1,14 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextResponse, NextRequest } from "next/server";
+import prisma from "@/lib/db";
+import { getTokenFromRequest } from "@/lib/auth";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session || !session.user || session.user.role !== 'STUDENT') {
+        const auth = await getTokenFromRequest(req);
+        if (!auth || !auth.user || auth.user.role !== 'STUDENT') {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
+        const session = { user: auth.user }; // Mapping for compatibility
 
         const studentProfile = await prisma.studentProfile.findUnique({
             where: { userId: session.user.id },
@@ -30,7 +30,7 @@ export async function GET() {
         let totalScore = 0;
         let totalPossible = 0;
 
-        results.forEach(r => {
+        results.forEach((r: any) => {
             totalScore += r.total;
             // Assuming exam total marks is stored on Exam model
             totalPossible += r.exam.totalMarks;
@@ -56,7 +56,7 @@ export async function GET() {
         let lateCount = 0;
         let totalDays = attendanceRecords.length;
 
-        attendanceRecords.forEach(record => {
+        attendanceRecords.forEach((record: any) => {
             if (record.present.includes(studentProfile.id)) presentCount++;
             else if (record.absent.includes(studentProfile.id)) absentCount++;
             else if (record.late.includes(studentProfile.id)) {
@@ -73,7 +73,7 @@ export async function GET() {
         // Or calculate based on total cumulative score.
         // Let's stick to the latest result rank for "Class Rank" card.
 
-        const latestResult = results.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+        const latestResult = results.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
         const currentRank = latestResult?.rank || '-';
 
         // 4. Badges
