@@ -1,8 +1,29 @@
-"use client";
-
 import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 
 const ExamContext = createContext<any>(null);
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+}
 
 function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   const callback = useRef(effect);
@@ -14,11 +35,11 @@ function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   }, [...deps, delay]);
 }
 
-export function ExamContextProvider({ 
-  exam, 
-  children 
-}: { 
-  exam: any; 
+export function ExamContextProvider({
+  exam,
+  children
+}: {
+  exam: any;
   children: React.ReactNode;
 }) {
   const [answers, setAnswers] = useState<any>({});
@@ -27,29 +48,30 @@ export function ExamContextProvider({
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
   const [highContrast, setHighContrast] = useState(false);
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
-  
+  const isOnline = useOnlineStatus();
+
   const localKey = `exam-answers-${exam.id}`;
   const navigationKey = `exam-navigation-${exam.id}`;
 
   // Load answers and navigation from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     // Load answers
     const savedAnswers = localStorage.getItem(localKey);
     if (savedAnswers) {
       try {
         setAnswers(JSON.parse(savedAnswers));
-      } catch {}
+      } catch { }
     }
-    
+
     // Load navigation state
     const savedNavigation = localStorage.getItem(navigationKey);
     if (savedNavigation) {
       try {
         const parsedNavigation = JSON.parse(savedNavigation);
         setNavigation(parsedNavigation);
-      } catch {}
+      } catch { }
     }
   }, [localKey, navigationKey]);
 
@@ -69,10 +91,10 @@ export function ExamContextProvider({
   const saveAnswers = useCallback(async (answersToSave: any) => {
     try {
       setSaveStatus("saving");
-      
+
       // Process answers to include Appwrite image information
       const processedAnswers = { ...answersToSave };
-      
+
       // Extract Appwrite image data for questions with images
       Object.keys(processedAnswers).forEach(key => {
         if (key.endsWith('_images') && Array.isArray(processedAnswers[key])) {
@@ -89,7 +111,7 @@ export function ExamContextProvider({
           }));
         }
       });
-      
+
       const response = await fetch(`/api/exams/${exam.id}/responses`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -97,7 +119,7 @@ export function ExamContextProvider({
       });
 
       if (!response.ok) throw new Error("Failed to save");
-      
+
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 1500);
     } catch (error) {
@@ -117,12 +139,12 @@ export function ExamContextProvider({
   // Enhanced navigation with performance optimizations
   const navigateToQuestion = useCallback((index: number) => {
     if (index >= 0 && index < (exam.questions?.length || 0)) {
-      setNavigation(prev => ({ ...prev, current: index }));
+      setNavigation((prev: any) => ({ ...prev, current: index }));
     }
   }, [exam.questions?.length]);
 
   const markQuestion = useCallback((questionId: string, marked: boolean) => {
-    setNavigation(prev => ({
+    setNavigation((prev: any) => ({
       ...prev,
       marked: {
         ...prev.marked,
@@ -134,7 +156,7 @@ export function ExamContextProvider({
   // Performance-optimized question filtering
   const getQuestionsByType = useCallback((type: string) => {
     if (!exam.questions) return [];
-    return exam.questions.filter((q: any) => 
+    return exam.questions.filter((q: any) =>
       (q.type || q.questionType || "").toLowerCase() === type.toLowerCase()
     );
   }, [exam.questions]);
@@ -165,7 +187,8 @@ export function ExamContextProvider({
     navigateToQuestion,
     markQuestion,
     getQuestionsByType,
-    saveAnswers
+    saveAnswers,
+    isOnline
   };
 
   return (

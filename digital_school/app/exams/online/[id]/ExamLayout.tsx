@@ -99,7 +99,7 @@ export default function ExamLayout() {
         }
       } catch (error) {
         console.error('Submit error:', error);
-        alert(`Submission failed. Please try again.`);
+        alert(`Submission failed: ${(error as Error).message}. Please try again.`);
       } finally {
         setIsSubmitting(false);
         setShowSubmitConfirm(false);

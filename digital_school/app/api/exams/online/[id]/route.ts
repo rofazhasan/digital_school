@@ -61,7 +61,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         data: {
           examId,
           studentId,
-          answers: {},
+          // MARKER: Use _status to indicate in-progress since submittedAt has a default value
+          answers: { _status: "in_progress" },
           startedAt: new Date(),
           examSetId: assignedExamSetId
         }
@@ -113,6 +114,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return q;
     });
 
+    // Check if really submitted
+    // It is submitted if answers DOES NOT have _status: 'in_progress'
+    const answers = existingSubmission.answers as Record<string, any>;
+    const isInProgress = answers && answers._status === 'in_progress';
+    // If it's legacy (no _status), we assume it IS submitted because submittedAt is set by default.
+    // Wait, for NEW exams it works. For OLD exams?
+    // If an old exam was "started" but essentially "submitted" immediately due to the bug, the user is stuck.
+    // If we want to unblock them, we might need to assume if answers is EMPTY (or just has _status), it's not submitted.
+    // A simplified check: If answers is empty OR has _status='in_progress', it is NOT submitted.
+    const hasAnswers = answers && Object.keys(answers).filter(k => k !== '_status').length > 0;
+
+    // Final logic: It is submitted if it has answers AND not in progress.
+    // Actually, if they started but answered nothing, hasAnswers is false. We should allow them to continue? Yes.
+    // So: isSubmitted = !isInProgress && hasAnswers? 
+    // No, if they submitted an empty exam, hasAnswers is false, but they SUBMITTED.
+    // So rely strictly on `_status === 'in_progress'`.
+    // IF `_status` is missing, it is legacy. Legacy records with `submittedAt` are considered submitted.
+    // This implies existing "bugged" records are stuck as submitted. The user might need to clear them or we allow retake if score is null?
+    // Let's rely on `isInProgress` for now.
+
+    // Refined: If `_status` is 'in_progress', it's definitely NOT submitted.
+    // If `_status` is missing, it IS submitted (legacy or completed).
+
+    const hasSubmitted = !isInProgress && !!existingSubmission?.submittedAt && !exam.allowRetake;
+
     return NextResponse.json({
       id: exam.id,
       name: exam.name,
@@ -123,7 +149,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       className: exam.class?.name || '',
       questions,
       assignedExamSetId,
-      hasSubmitted: !!existingSubmission?.submittedAt && !exam.allowRetake, // If submittedAt is present, they are done
+      hasSubmitted,
       submissionId: existingSubmission?.id || null,
       startedAt: existingSubmission?.startedAt || null,
       // Question selection settings
