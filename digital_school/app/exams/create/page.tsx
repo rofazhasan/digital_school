@@ -59,26 +59,26 @@ const schema = z.object({
       return false;
     }
   }
-  
-  // Validate CQ subsections if they exist
-  if (data.cqSubsections && data.cqSubsections.length > 0) {
+
+  // Validate CQ subsections if they exist AND CQ questions are > 0
+  if (data.cqTotalQuestions && data.cqTotalQuestions > 0 && data.cqSubsections && data.cqSubsections.length > 0) {
     // Check that subsection ranges don't overlap and cover all questions
     const sortedSubsections = [...data.cqSubsections].sort((a, b) => a.startIndex - b.startIndex);
-    
+
     for (let i = 0; i < sortedSubsections.length; i++) {
       const current = sortedSubsections[i];
-      
+
       // Check if start index is less than or equal to end index
       if (current.startIndex > current.endIndex) {
         return false;
       }
-      
+
       // Check if required questions don't exceed available questions in this subsection
       const availableQuestions = current.endIndex - current.startIndex + 1;
       if (current.requiredQuestions > availableQuestions) {
         return false;
       }
-      
+
       // Check for overlaps with next subsection
       if (i < sortedSubsections.length - 1) {
         const next = sortedSubsections[i + 1];
@@ -87,17 +87,17 @@ const schema = z.object({
         }
       }
     }
-    
+
     // Check if subsections cover the total CQ questions
     const totalCovered = sortedSubsections.reduce((sum, sub) => sum + (sub.endIndex - sub.startIndex + 1), 0);
-    if (data.cqTotalQuestions && totalCovered !== data.cqTotalQuestions) {
+    if (data.cqTotalQuestions !== undefined && totalCovered !== data.cqTotalQuestions) {
       return false;
     }
   }
-  
+
   return true;
 }, {
-  message: "Invalid question configuration",
+  message: "Invalid question configuration. Check question counts and subsection ranges.",
   path: ["cqSubsections"]
 });
 
@@ -143,23 +143,30 @@ export default function CreateExamPage() {
 
   // Update subsections when CQ total questions change
   useEffect(() => {
-    if (cqTotalQuestions && cqTotalQuestions > 0) {
+    if (cqTotalQuestions !== undefined) {
       const currentSubsections = form.getValues("cqSubsections") || [];
-      
-      // If no subsections exist, create a default one
-      if (currentSubsections.length === 0) {
-        form.setValue("cqSubsections", [{
-          name: "",
-          startIndex: 1,
-          endIndex: cqTotalQuestions,
-          requiredQuestions: Math.min(5, cqTotalQuestions),
-        }]);
+
+      if (cqTotalQuestions > 0) {
+        // If no subsections exist, create a default one
+        if (currentSubsections.length === 0) {
+          form.setValue("cqSubsections", [{
+            name: "",
+            startIndex: 1,
+            endIndex: cqTotalQuestions,
+            requiredQuestions: Math.min(5, cqTotalQuestions),
+          }]);
+        } else {
+          // Update the last subsection's end index if it's the only one
+          if (currentSubsections.length === 1) {
+            const updatedSubsections = [...currentSubsections];
+            updatedSubsections[0].endIndex = cqTotalQuestions;
+            form.setValue("cqSubsections", updatedSubsections);
+          }
+        }
       } else {
-        // Update the last subsection's end index if it's the only one
-        if (currentSubsections.length === 1) {
-          const updatedSubsections = [...currentSubsections];
-          updatedSubsections[0].endIndex = cqTotalQuestions;
-          form.setValue("cqSubsections", updatedSubsections);
+        // If 0, clear subsections to avoid invalid schema state
+        if (currentSubsections.length > 0) {
+          form.setValue("cqSubsections", []);
         }
       }
     }
@@ -169,7 +176,7 @@ export default function CreateExamPage() {
   const addSubsection = () => {
     const currentSubsections = form.getValues("cqSubsections") || [];
     const lastSubsection = currentSubsections[currentSubsections.length - 1];
-    
+
     if (lastSubsection && lastSubsection.endIndex < (cqTotalQuestions || 0)) {
       const newSubsection: CQSubsection = {
         name: "",
@@ -177,7 +184,7 @@ export default function CreateExamPage() {
         endIndex: Math.min(lastSubsection.endIndex + 3, cqTotalQuestions || 0),
         requiredQuestions: 1,
       };
-      
+
       form.setValue("cqSubsections", [...currentSubsections, newSubsection]);
     }
   };
@@ -195,7 +202,7 @@ export default function CreateExamPage() {
   const updateSubsectionRanges = (index: number, field: 'startIndex' | 'endIndex', value: number) => {
     const currentSubsections = form.getValues("cqSubsections") || [];
     const updatedSubsections = [...currentSubsections];
-    
+
     if (field === 'startIndex') {
       updatedSubsections[index].startIndex = value;
       // Update previous subsection's end index
@@ -209,7 +216,7 @@ export default function CreateExamPage() {
         updatedSubsections[index + 1].startIndex = value + 1;
       }
     }
-    
+
     form.setValue("cqSubsections", updatedSubsections);
   };
 
@@ -234,10 +241,10 @@ export default function CreateExamPage() {
       .catch((error) => {
         console.error('Error fetching classes:', error);
         setClasses([]);
-        toast({ 
-          title: "Error", 
-          description: "Failed to load classes. Please refresh the page.", 
-          variant: "destructive" 
+        toast({
+          title: "Error",
+          description: "Failed to load classes. Please refresh the page.",
+          variant: "destructive"
         });
       })
       .finally(() => {
@@ -247,14 +254,14 @@ export default function CreateExamPage() {
 
   const onSubmit = async (data: ExamForm) => {
     if (classes.length === 0) {
-      toast({ 
-        title: "Error", 
-        description: "No classes available. Please ensure classes are set up first.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "No classes available. Please ensure classes are set up first.",
+        variant: "destructive"
       });
       return;
     }
-    
+
     setLoading(true);
     try {
       const res = await fetch("/api/exams", {
@@ -420,7 +427,7 @@ export default function CreateExamPage() {
                         <FormMessage />
                       </FormItem>
                     )} />
-                    
+
                     {/* Negative Marking Section */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Negative Marking Settings</h3>
@@ -428,13 +435,13 @@ export default function CreateExamPage() {
                         <FormItem>
                           <FormLabel>MCQ Negative Marking (%)</FormLabel>
                           <FormControl>
-                            <Input 
-                              type="number" 
-                              min={0} 
-                              max={100} 
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
                               step={0.25}
-                              placeholder="0" 
-                              {...field} 
+                              placeholder="0"
+                              {...field}
                             />
                           </FormControl>
                           <FormMessage />
@@ -448,7 +455,7 @@ export default function CreateExamPage() {
                     {/* Question Selection Settings */}
                     <div className="space-y-4">
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Question Selection Settings</h3>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-4">
                           <h4 className="font-medium text-gray-800 dark:text-gray-200">Creative Questions (CQ)</h4>
@@ -470,7 +477,7 @@ export default function CreateExamPage() {
                             </FormItem>
                           )} />
                         </div>
-                        
+
                         <div className="space-y-4">
                           <h4 className="font-medium text-gray-800 dark:text-gray-200">Short Questions (SQ)</h4>
                           <FormField name="sqTotalQuestions" control={form.control} render={({ field }) => (
@@ -511,10 +518,10 @@ export default function CreateExamPage() {
                           </Button>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400">
-                          Define subsections for math exams (e.g., Algebra, Geometry, Trigonometry). 
+                          Define subsections for math exams (e.g., Algebra, Geometry, Trigonometry).
                           Each subsection specifies question ranges and required questions.
                         </p>
-                        
+
                         <div className="space-y-4">
                           {cqSubsections && cqSubsections.map((subsection, index) => (
                             <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
@@ -534,7 +541,7 @@ export default function CreateExamPage() {
                                   </Button>
                                 )}
                               </div>
-                              
+
                               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <FormField
                                   name={`cqSubsections.${index}.name`}
@@ -543,16 +550,16 @@ export default function CreateExamPage() {
                                     <FormItem>
                                       <FormLabel>Name (optional)</FormLabel>
                                       <FormControl>
-                                        <Input 
+                                        <Input
                                           placeholder={cqSubsections.length === 1 ? "Leave empty for single section" : "e.g., Algebra"}
-                                          {...field} 
+                                          {...field}
                                         />
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>
                                   )}
                                 />
-                                
+
                                 <FormField
                                   name={`cqSubsections.${index}.startIndex`}
                                   control={form.control}
@@ -560,9 +567,9 @@ export default function CreateExamPage() {
                                     <FormItem>
                                       <FormLabel>Start Question</FormLabel>
                                       <FormControl>
-                                        <Input 
-                                          type="number" 
-                                          min={1} 
+                                        <Input
+                                          type="number"
+                                          min={1}
                                           max={cqTotalQuestions}
                                           {...field}
                                           onChange={(e) => {
@@ -576,7 +583,7 @@ export default function CreateExamPage() {
                                     </FormItem>
                                   )}
                                 />
-                                
+
                                 <FormField
                                   name={`cqSubsections.${index}.endIndex`}
                                   control={form.control}
@@ -584,9 +591,9 @@ export default function CreateExamPage() {
                                     <FormItem>
                                       <FormLabel>End Question</FormLabel>
                                       <FormControl>
-                                        <Input 
-                                          type="number" 
-                                          min={1} 
+                                        <Input
+                                          type="number"
+                                          min={1}
                                           max={cqTotalQuestions}
                                           {...field}
                                           onChange={(e) => {
@@ -600,7 +607,7 @@ export default function CreateExamPage() {
                                     </FormItem>
                                   )}
                                 />
-                                
+
                                 <FormField
                                   name={`cqSubsections.${index}.requiredQuestions`}
                                   control={form.control}
@@ -608,11 +615,11 @@ export default function CreateExamPage() {
                                     <FormItem>
                                       <FormLabel>Required Questions</FormLabel>
                                       <FormControl>
-                                        <Input 
-                                          type="number" 
+                                        <Input
+                                          type="number"
                                           min={1}
                                           max={subsection.endIndex - subsection.startIndex + 1}
-                                          {...field} 
+                                          {...field}
                                         />
                                       </FormControl>
                                       <FormMessage />
@@ -623,7 +630,7 @@ export default function CreateExamPage() {
                                   )}
                                 />
                               </div>
-                              
+
                               {cqSubsections.length === 1 && (
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                                   Single subsection: Questions can be shuffled. Leave name empty.
@@ -639,7 +646,7 @@ export default function CreateExamPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     {classes.length === 0 && !classesLoading && (
                       <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                         <p className="text-sm text-yellow-800 dark:text-yellow-200">
@@ -648,9 +655,9 @@ export default function CreateExamPage() {
                       </div>
                     )}
                     <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                      <Button 
-                        type="submit" 
-                        className="w-full mt-4 bg-gradient-to-r from-primary to-blue-500 text-white shadow-lg hover:shadow-xl border-0" 
+                      <Button
+                        type="submit"
+                        className="w-full mt-4 bg-gradient-to-r from-primary to-blue-500 text-white shadow-lg hover:shadow-xl border-0"
                         disabled={loading || classesLoading || classes.length === 0}
                       >
                         {loading ? "Creating..." : classesLoading ? "Loading..." : classes.length === 0 ? "No Classes Available" : "Create Exam"}
