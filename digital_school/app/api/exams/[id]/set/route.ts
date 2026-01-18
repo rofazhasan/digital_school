@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
           return await prismadb.examSet.update({
             where: { id: existing.id },
             data: {
-              questionsJson: set.questions as Prisma.InputJsonValue,
+              questionsJson: set.questions as any,
               description: set.description || '',
               updatedAt: new Date(),
             },
@@ -40,12 +40,21 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
               description: set.description || '',
               examId,
               createdById: auth.user.id,
-              questionsJson: set.questions as Prisma.InputJsonValue,
+              questionsJson: set.questions as any,
             },
           });
         }
       })
     );
+
+    // Update the exam's generatedSet column with the latest sets (as requested)
+    await prismadb.exam.update({
+      where: { id: examId },
+      data: {
+        generatedSet: sets as any
+      }
+    });
+
     return NextResponse.json({ success: true, sets: createdSets });
   } catch (error) {
     console.error('Failed to save exam sets:', error);
