@@ -50,8 +50,10 @@ export function ExamContextProvider({
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
   const isOnline = useOnlineStatus();
 
-  const localKey = `exam-answers-${exam.id}`;
-  const navigationKey = `exam-navigation-${exam.id}`;
+  // Scope to specific submission to prevent retake bleed-over
+  const submissionId = exam.submissionId || 'new';
+  const localKey = `exam-answers-${exam.id}-${submissionId}`;
+  const navigationKey = `exam-navigation-${exam.id}-${submissionId}`;
 
   // Load answers and navigation from localStorage on mount
   useEffect(() => {

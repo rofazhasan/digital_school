@@ -23,16 +23,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let questions: any[] = [];
     let assignedExamSetId = null;
 
-    // Check if student has already submitted this exam or has an active session
-    let existingSubmission = await prisma.examSubmission.findFirst({
+    // Check for existing submissions (fetch latest)
+    const submissions = await prisma.examSubmission.findMany({
       where: {
         examId: examId,
         studentId: studentId
-      }
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 1
     });
 
-    // If no submission exists, create one to mark start time
-    if (!existingSubmission) {
+    let existingSubmission = submissions[0];
+
+    // Check if the latest submission is finished
+    const isFinished = existingSubmission && (() => {
+      const answers = existingSubmission.answers as Record<string, any>;
+      // It is finished if it does NOT have "in_progress" status
+      return !answers || answers._status !== 'in_progress';
+    })();
+
+    // Decision: Should we create a new submission?
+    // Yes if: 
+    // 1. No submission exists
+    // 2. Latest is finished AND retake is allowed
+    const shouldCreateNew = !existingSubmission || (isFinished && exam.allowRetake);
+
+    // If no submission exists or we are retaking, create one
+    if (shouldCreateNew) {
       // Logic to assign exam set first (moved from below)
       if (exam.examSets.length > 0) {
         // ... (existing logic for random assignment if not exists)
@@ -68,13 +85,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       });
     } else if (!existingSubmission.startedAt) {
-      // If for some reason startedAt is missing on an existing record, set it now
+      // If for some reason startedAt is missing on an existing active record, set it now
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
         data: { startedAt: new Date() }
       });
     } else {
-      // Load assigned set if submission exists
+      // Load assigned set if submission exists and we are continuing it
       assignedExamSetId = existingSubmission.examSetId;
     }
 
