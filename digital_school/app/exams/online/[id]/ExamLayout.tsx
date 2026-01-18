@@ -59,6 +59,7 @@ MobileNavigator.displayName = 'MobileNavigator';
 export default function ExamLayout() {
   const {
     exam,
+    answers, // Use live answers state
     navigation,
     navigateToQuestion,
     saveStatus
@@ -71,7 +72,8 @@ export default function ExamLayout() {
   const questions = exam.questions || [];
   const currentQuestion = questions[navigation.current];
   const totalQuestions = questions.length;
-  const answeredCount = Object.keys(exam.answers || {}).filter(id => exam.answers[id]).length;
+  // Use live answers for count
+  const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 
   const handlePrevious = useCallback(() => {
     if (navigation.current > 0) navigateToQuestion(navigation.current - 1);
@@ -88,7 +90,7 @@ export default function ExamLayout() {
         const response = await fetch(`/api/exams/${exam.id}/submit-with-appwrite`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers: exam.answers }),
+          body: JSON.stringify({ answers: answers }), // Use live answers
         });
 
         if (response.ok) {
@@ -107,7 +109,7 @@ export default function ExamLayout() {
     } else {
       setShowSubmitConfirm(true);
     }
-  }, [showSubmitConfirm, exam.id, exam.answers]);
+  }, [showSubmitConfirm, exam.id, answers]);
 
   const progress = useMemo(() => {
     return totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
@@ -223,7 +225,7 @@ export default function ExamLayout() {
               questions={questions}
               currentIndex={navigation.current}
               onNavigate={navigateToQuestion}
-              answers={exam.answers || {}}
+              answers={answers || {}}
               marked={navigation.marked || {}}
             />
           </div>

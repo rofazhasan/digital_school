@@ -37,8 +37,19 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
 
   // Timer tick logic
   useEffect(() => {
+    // Prevent immediate trigger on mount if time is already 0 (safety)
+    // Only trigger if we were running and hit 0
     if (secondsLeft <= 0 && exam.startedAt) {
-      if (onTimeUp) onTimeUp();
+      // If time is really up (double check with calculation)
+      const durationSeconds = exam.duration * 60;
+      const startTime = new Date(exam.startedAt).getTime();
+      const now = Date.now();
+      const elapsedSeconds = Math.floor((now - startTime) / 1000);
+      const realTimeLeft = Math.max(0, durationSeconds - elapsedSeconds);
+
+      if (realTimeLeft <= 0) {
+        if (onTimeUp) onTimeUp();
+      }
       return;
     }
 
