@@ -65,7 +65,7 @@ export default function LoginPage() {
                 } else {
                     const userRole = result.user.role;
                     let redirectUrl = '/dashboard';
-                    
+
                     switch (userRole) {
                         case 'SUPER_USER':
                             redirectUrl = '/super-user/dashboard';
@@ -82,7 +82,7 @@ export default function LoginPage() {
                         default:
                             redirectUrl = '/dashboard';
                     }
-                    
+
                     window.location.href = redirectUrl;
                 }
             } catch {
@@ -107,9 +107,7 @@ export default function LoginPage() {
             {/* Header */}
             <header className="flex items-center justify-between p-6 border-b">
                 <div className="flex items-center space-x-2">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                        <span className="text-primary-foreground font-semibold text-sm">DS</span>
-                    </div>
+                    <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
                     <span className="font-semibold text-lg">Digital School</span>
                 </div>
                 <Button variant="ghost" size="sm" asChild>
@@ -174,7 +172,7 @@ export default function LoginPage() {
                                             <AlertDescription>{error}</AlertDescription>
                                         </Alert>
                                     )}
-                                    
+
                                     <FormField
                                         control={form.control}
                                         name="identifier"
@@ -184,15 +182,15 @@ export default function LoginPage() {
                                                     {loginMethod === 'email' ? 'Email' : 'Phone number'}
                                                 </FormLabel>
                                                 <FormControl>
-                                                    <Input 
+                                                    <Input
                                                         type={loginMethod === 'email' ? 'email' : 'tel'}
                                                         placeholder={
-                                                            loginMethod === 'email' 
-                                                                ? 'Enter your email' 
+                                                            loginMethod === 'email'
+                                                                ? 'Enter your email'
                                                                 : 'Enter your phone'
                                                         }
-                                                        {...field} 
-                                                        disabled={isPending} 
+                                                        {...field}
+                                                        disabled={isPending}
                                                     />
                                                 </FormControl>
                                                 <FormMessage />
@@ -208,11 +206,11 @@ export default function LoginPage() {
                                                 <FormLabel>Password</FormLabel>
                                                 <FormControl>
                                                     <div className="relative">
-                                                        <Input 
-                                                            type={showPassword ? "text" : "password"} 
-                                                            placeholder="Enter your password" 
-                                                            {...field} 
-                                                            disabled={isPending} 
+                                                        <Input
+                                                            type={showPassword ? "text" : "password"}
+                                                            placeholder="Enter your password"
+                                                            {...field}
+                                                            disabled={isPending}
                                                         />
                                                         <Button
                                                             type="button"
@@ -242,12 +240,12 @@ export default function LoginPage() {
                                     </Button>
                                 </form>
                             </Form>
-                            
+
                             <div className="text-center">
                                 <p className="text-sm text-muted-foreground">
                                     Don&apos;t have an account?{' '}
-                                    <Link 
-                                        href="/signup" 
+                                    <Link
+                                        href="/signup"
                                         className="text-primary hover:underline font-medium"
                                     >
                                         Sign up

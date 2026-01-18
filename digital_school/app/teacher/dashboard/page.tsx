@@ -148,7 +148,7 @@ export default function TeacherDashboardPage() {
                     // Redirect to appropriate dashboard based on role
                     const userRole = data.user.role;
                     let redirectUrl = '/dashboard';
-                    
+
                     switch (userRole) {
                         case 'SUPER_USER':
                             redirectUrl = '/super-user/dashboard';
@@ -162,7 +162,7 @@ export default function TeacherDashboardPage() {
                         default:
                             redirectUrl = '/dashboard';
                     }
-                    
+
                     router.push(redirectUrl);
                 } else {
                     router.push('/login');
@@ -345,7 +345,10 @@ export default function TeacherDashboardPage() {
                 <div className="flex justify-between items-center px-6 py-4">
                     <div className="flex items-center gap-4">
                         <div>
-                            <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+                            <div className="flex items-center gap-2">
+                                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
+                                <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+                            </div>
                             <p className="text-muted-foreground">
                                 Welcome back, {user.name} • {user.teacherProfile?.department}
                             </p>
@@ -564,9 +567,9 @@ export default function TeacherDashboardPage() {
                                                         <span>Submitted: {exam.submittedCount}/{exam.totalStudents}</span>
                                                         <span>{exam.totalMarks} marks</span>
                                                     </div>
-                                                    <Progress 
-                                                        value={(exam.submittedCount / exam.totalStudents) * 100} 
-                                                        className="mt-2" 
+                                                    <Progress
+                                                        value={(exam.submittedCount / exam.totalStudents) * 100}
+                                                        className="mt-2"
                                                     />
                                                 </div>
                                             ))}
@@ -1017,8 +1020,8 @@ export default function TeacherDashboardPage() {
                                         </div>
                                         <div className="mt-4 flex justify-between items-center">
                                             <div className="text-sm">
-                                                <span className="text-green-600">Present: 3</span> • 
-                                                <span className="text-red-600"> Absent: 1</span> • 
+                                                <span className="text-green-600">Present: 3</span> •
+                                                <span className="text-red-600"> Absent: 1</span> •
                                                 <span className="text-yellow-600"> Late: 1</span>
                                             </div>
                                             <Button>Save Attendance</Button>
@@ -1056,7 +1059,7 @@ export default function TeacherDashboardPage() {
                     {activeTab === 'analytics' && (
                         <div className="space-y-6">
                             <h2 className="text-2xl font-bold">Class Analytics</h2>
-                            
+
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                 <Card>
                                     <CardHeader>

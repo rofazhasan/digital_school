@@ -11,6 +11,8 @@ import { ChevronLeft, ChevronRight, Save, CheckCircle, AlertCircle, Menu, X, Clo
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 
+// ... (imports remain)
+
 // Mobile-optimized navigation component
 const MobileNavigator = memo(({
   questions,
@@ -32,10 +34,10 @@ const MobileNavigator = memo(({
         const isAnswered = !!answers[q.id];
         const isMarked = !!marked[q.id];
 
-        let bgClass = "bg-white border-gray-200 text-gray-500 hover:bg-gray-50";
-        if (isCurrent) bgClass = "bg-black text-white border-black ring-2 ring-offset-1 ring-black";
-        else if (isMarked) bgClass = "bg-amber-100 text-amber-700 border-amber-200";
-        else if (isAnswered) bgClass = "bg-indigo-50 text-indigo-600 border-indigo-200";
+        let bgClass = "bg-card border-border text-muted-foreground hover:bg-muted";
+        if (isCurrent) bgClass = "bg-primary text-primary-foreground border-primary ring-2 ring-offset-1 ring-primary";
+        else if (isMarked) bgClass = "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900 dark:text-amber-100";
+        else if (isAnswered) bgClass = "bg-primary/10 text-primary border-primary/20";
 
         return (
           <button
@@ -84,6 +86,7 @@ export default function ExamLayout() {
   }, [navigation.current, totalQuestions, navigateToQuestion]);
 
   const handleSubmit = useCallback(async () => {
+    // ... (submit logic remains same)
     if (showSubmitConfirm) {
       setIsSubmitting(true);
       try {
@@ -117,34 +120,37 @@ export default function ExamLayout() {
 
   if (showInstructions) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="max-w-3xl w-full p-8 md:p-12 shadow-2xl rounded-3xl bg-white border-0">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-3xl w-full p-8 md:p-12 shadow-2xl rounded-3xl bg-card border-border">
           <div className="text-center mb-10">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4 tracking-tight">{exam.title || exam.name || 'Online Exam'}</h1>
-            <p className="text-xl text-gray-500">Ready to start?</p>
+            <div className="flex justify-center mb-6">
+              <img src="/logo.png" alt="Digital School" className="h-16 w-auto" />
+            </div>
+            <h1 className="text-4xl font-bold text-foreground mb-4 tracking-tight">{exam.title || exam.name || 'Online Exam'}</h1>
+            <p className="text-xl text-muted-foreground">Ready to start?</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div className="bg-gray-50 p-6 rounded-2xl text-center">
-              <Clock className="w-8 h-8 mx-auto text-indigo-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-1">Time Limit</h3>
-              <p className="text-sm text-gray-500">{exam.duration} Minutes</p>
+            <div className="bg-muted/50 p-6 rounded-2xl text-center">
+              <Clock className="w-8 h-8 mx-auto text-primary mb-3" />
+              <h3 className="font-semibold text-foreground mb-1">Time Limit</h3>
+              <p className="text-sm text-muted-foreground">{exam.duration} Minutes</p>
             </div>
-            <div className="bg-gray-50 p-6 rounded-2xl text-center">
-              <HelpCircle className="w-8 h-8 mx-auto text-indigo-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-1">Questions</h3>
-              <p className="text-sm text-gray-500">{totalQuestions} Total</p>
+            <div className="bg-muted/50 p-6 rounded-2xl text-center">
+              <HelpCircle className="w-8 h-8 mx-auto text-primary mb-3" />
+              <h3 className="font-semibold text-foreground mb-1">Questions</h3>
+              <p className="text-sm text-muted-foreground">{totalQuestions} Total</p>
             </div>
-            <div className="bg-gray-50 p-6 rounded-2xl text-center">
-              <CheckCircle className="w-8 h-8 mx-auto text-indigo-500 mb-3" />
-              <h3 className="font-semibold text-gray-900 mb-1">Pass Mark</h3>
-              <p className="text-sm text-gray-500">Auto-submit on timeout</p>
+            <div className="bg-muted/50 p-6 rounded-2xl text-center">
+              <CheckCircle className="w-8 h-8 mx-auto text-primary mb-3" />
+              <h3 className="font-semibold text-foreground mb-1">Pass Mark</h3>
+              <p className="text-sm text-muted-foreground">Auto-submit on timeout</p>
             </div>
           </div>
 
           <Button
             onClick={() => setShowInstructions(false)}
-            className="w-full bg-black hover:bg-gray-800 text-white py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95"
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95"
           >
             Start Assessment
           </Button>
@@ -153,32 +159,35 @@ export default function ExamLayout() {
     );
   }
 
-  if (!currentQuestion) return <div className="flex justify-center items-center h-screen text-gray-500">Loading exam...</div>;
+  if (!currentQuestion) return <div className="flex justify-center items-center h-screen text-muted-foreground">Loading exam...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50/50">
+    <div className="min-h-screen bg-background">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Mobile Drawer */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden">
-                  <Menu className="w-5 h-5 text-gray-600" />
+                  <Menu className="w-5 h-5 text-muted-foreground" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[300px] p-0">
                 <div className="p-4 border-b">
-                  <h2 className="font-bold text-lg">Question Navigator</h2>
+                  <h2 className="font-bold text-lg text-foreground">Question Navigator</h2>
                 </div>
                 <div className="p-4">
                   <Navigator questions={questions} />
                 </div>
               </SheetContent>
             </Sheet>
-            <div className="hidden sm:block">
-              <h1 className="font-bold text-gray-900 truncate max-w-[200px]">{exam.title || exam.name}</h1>
+            <div className="flex items-center space-x-3">
+              <img src="/logo.png" alt="Digital School" className="h-8 w-auto hidden sm:block" />
+              <div className="hidden sm:block">
+                <h1 className="font-bold text-foreground truncate max-w-[200px]">{exam.title || exam.name}</h1>
+              </div>
             </div>
           </div>
 
@@ -188,19 +197,19 @@ export default function ExamLayout() {
 
           <div className="flex items-center gap-3">
             <div className="hidden sm:flex flex-col items-end mr-4">
-              <span className="text-xs text-gray-500 font-medium uppercase tracking-wider">Progress</span>
+              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Progress</span>
               <div className="flex items-center gap-2">
-                <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${progress}%` }} />
+                <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
+                  <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
                 </div>
-                <span className="text-xs font-bold text-indigo-600">{Math.round(progress)}%</span>
+                <span className="text-xs font-bold text-primary">{Math.round(progress)}%</span>
               </div>
             </div>
 
             <Button
               onClick={handleSubmit}
               variant={showSubmitConfirm ? "destructive" : "default"}
-              className={`${showSubmitConfirm ? "bg-red-500 hover:bg-red-600" : "bg-black hover:bg-gray-800"} text-white rounded-full px-6 transition-all`}
+              className={`${showSubmitConfirm ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"} text-primary-foreground rounded-full px-6 transition-all`}
             >
               {showSubmitConfirm ? "Confirm" : "Submit"}
             </Button>
@@ -243,12 +252,12 @@ export default function ExamLayout() {
               size="lg"
               onClick={handlePrevious}
               disabled={navigation.current === 0 || isSubmitting}
-              className="rounded-full px-8 border-gray-200 hover:bg-gray-100 hover:text-black"
+              className="rounded-full px-8 border-border hover:bg-muted hover:text-foreground text-muted-foreground"
             >
               <ChevronLeft className="w-4 h-4 mr-2" /> Previous
             </Button>
 
-            <div className="text-sm font-medium text-gray-400 hidden sm:block">
+            <div className="text-sm font-medium text-muted-foreground hidden sm:block">
               Question {navigation.current + 1} of {totalQuestions}
             </div>
 
@@ -256,7 +265,7 @@ export default function ExamLayout() {
               size="lg"
               onClick={handleNext}
               disabled={navigation.current === totalQuestions - 1 || isSubmitting}
-              className="rounded-full px-8 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+              className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
             >
               Next <ChevronRight className="w-4 h-4 ml-2" />
             </Button>
@@ -266,18 +275,18 @@ export default function ExamLayout() {
 
       {/* Submit Modal Overlay */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-sm w-full p-6 text-center shadow-2xl animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <Card className="max-w-sm w-full p-6 text-center shadow-2xl animate-in fade-in zoom-in duration-200 border-border">
             <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Submit Assessment?</h3>
-            <p className="text-gray-500 text-sm mb-6">You are about to submit your answers. This action cannot be undone.</p>
+            <h3 className="text-lg font-bold text-foreground mb-2">Submit Assessment?</h3>
+            <p className="text-muted-foreground text-sm mb-6">You are about to submit your answers. This action cannot be undone.</p>
             <div className="grid grid-cols-2 gap-3">
               <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12 shadow-red-200 shadow-lg">
+              <Button onClick={handleSubmit} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">
                 Submit Now
               </Button>
             </div>

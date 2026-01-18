@@ -383,12 +383,10 @@ export default function SuperUserDashboardPage() {
               </Button>
 
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <Crown className="h-4 w-4 text-primary-foreground" />
-                </div>
+                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
                 <span className="font-semibold text-lg hidden sm:block">
-  {institute?.name || "Digital School"}
-</span>
+                  {institute?.name || "Digital School"}
+                </span>
               </div>
               <Badge className="bg-purple-500 text-white hidden sm:flex">
                 <Shield className="h-4 w-4 mr-1" />
@@ -486,8 +484,8 @@ export default function SuperUserDashboardPage() {
           <nav className="p-4 space-y-2">
             {[
               { id: 'overview', label: 'Dashboard Overview', icon: Home },
-              { id: 'users', label: 'Manage Users', icon: Users,href: '/admin/users' },
-              { id: 'exams', label: 'Exam Management', icon: FileText,href: '/exams' },
+              { id: 'users', label: 'Manage Users', icon: Users, href: '/admin/users' },
+              { id: 'exams', label: 'Exam Management', icon: FileText, href: '/exams' },
               { id: 'question-bank', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
               { id: 'approvals', label: 'Pending Approvals', icon: CheckSquare },
               { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap },
@@ -529,7 +527,7 @@ export default function SuperUserDashboardPage() {
             <div className="mb-6 md:mb-8">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Super User Dashboard</h1>
               <p className="text-muted-foreground text-sm md:text-base">
-                Welcome back, {user.name}! Here's what's happening with your {} institute today.
+                Welcome back, {user.name}! Here's what's happening with your { } institute today.
               </p>
             </div>
 

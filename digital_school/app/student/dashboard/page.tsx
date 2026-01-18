@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -13,17 +13,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { 
+import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { 
-  GraduationCap, 
-  BookOpen, 
-  FileText, 
-  BarChart3, 
+import {
+  GraduationCap,
+  BookOpen,
+  FileText,
+  BarChart3,
   Calendar,
   LogOut,
   User,
@@ -110,6 +110,8 @@ export default function StudentDashboardPage() {
   const [exams, setExams] = useState<Exam[]>([]);
   const [results, setResults] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<any>(null);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [analytics, setAnalytics] = useState<any>(null); // Replace with proper type
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const router = useRouter();
@@ -128,14 +130,17 @@ export default function StudentDashboardPage() {
             .then(res => res.json())
             .then(examData => {
               let filtered = examData;
-              if (data.user.studentProfile?.class?.name) {
-                filtered = examData.filter((exam: any) => exam.subject === data.user.studentProfile.class.name);
+              // Fix filtering logic: Check if exam classId matches user classId relative to subject
+              // Actually, simply check if the exam is assigned to the student's class
+              if (data.user.studentProfile?.classId && Array.isArray(examData)) {
+                filtered = examData.filter((exam: any) => exam.classId === data.user.studentProfile.classId);
               }
               if (isMounted) setExams(filtered);
             })
             .catch(() => {
               if (isMounted) setExams([]);
             });
+
           // Fetch results
           fetch('/api/student/results')
             .then(res => res.json())
@@ -145,7 +150,8 @@ export default function StudentDashboardPage() {
             .catch(() => {
               if (isMounted) setResults([]);
             });
-          // Fetch attendance
+
+          // Fetch attendance (legacy) - Keeping for now, but analytics endpoint provides it too
           fetch('/api/student/attendance')
             .then(res => res.json())
             .then(attData => {
@@ -154,6 +160,23 @@ export default function StudentDashboardPage() {
             .catch(() => {
               if (isMounted) setAttendance(null);
             });
+
+          // Fetch new Analytics
+          fetch('/api/student/analytics')
+            .then(res => res.json())
+            .then(analyticsData => {
+              if (isMounted) setAnalytics(analyticsData.analytics);
+            })
+            .catch(console.error);
+
+          // Fetch Notices
+          fetch('/api/student/notices')
+            .then(res => res.json())
+            .then(noticeData => {
+              if (isMounted) setNotices(noticeData.notices || []);
+            })
+            .catch(console.error);
+
         } else if (data.user) {
           const userRole = data.user.role;
           let redirectUrl = '/dashboard';
@@ -186,58 +209,14 @@ export default function StudentDashboardPage() {
 
   // Use the latest result for overview and results section
   const lastResult = results && results.length > 0 ? results[0] : null;
-  const attendanceData = attendance || { percentage: 0, present: 0, absent: 0, late: 0, total: 0 };
+  const attendanceData = analytics?.attendance || attendance || { percentage: 0, present: 0, absent: 0, late: 0, total: 0 };
+  const performanceData = analytics?.performance || { averagePercentage: 0, gpa: 0, grade: '-' };
+  const classRank = analytics?.rank || '-';
+  const totalStudents = analytics?.totalStudents || '-';
 
-  const badges = [
-    {
-      id: '1',
-      name: 'Top Performer',
-      description: 'Achieved highest score in Mathematics',
-      icon: '🏆',
-      earnedAt: '2024-01-10',
-      color: 'bg-yellow-100 text-yellow-800'
-    },
-    {
-      id: '2',
-      name: 'Perfect Attendance',
-      description: '100% attendance this month',
-      icon: '📅',
-      earnedAt: '2024-01-05',
-      color: 'bg-green-100 text-green-800'
-    },
-    {
-      id: '3',
-      name: 'Quick Learner',
-      description: 'Completed 5 assignments early',
-      icon: '⚡',
-      earnedAt: '2024-01-08',
-      color: 'bg-blue-100 text-blue-800'
-    }
-  ];
-
-  const notices = [
-    {
-      id: '1',
-      title: 'Mid-Term Examination Schedule',
-      content: 'The mid-term examinations will begin from January 15th. Please check your admit cards and exam schedules.',
-      date: '2024-01-12',
-      priority: 'HIGH'
-    },
-    {
-      id: '2',
-      title: 'Science Fair Registration',
-      content: 'Registration for the annual science fair is now open. Submit your project proposals by January 20th.',
-      date: '2024-01-11',
-      priority: 'MEDIUM'
-    },
-    {
-      id: '3',
-      title: 'Library Hours Extended',
-      content: 'Library hours have been extended until 8 PM for exam preparation.',
-      date: '2024-01-10',
-      priority: 'LOW'
-    }
-  ];
+  // Real badges can be fetched or we can leave mock for now if not implemented fully in backend yet.
+  // The analytics endpoint returns badges. let's use them if available.
+  const badges = analytics?.badges || [];
 
   const handleLogout = async () => {
     try {
@@ -281,12 +260,10 @@ export default function StudentDashboardPage() {
             {/* Logo and Navigation */}
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-semibold text-sm">DS</span>
-                </div>
+                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
                 <span className="font-semibold text-lg hidden sm:block">Digital School</span>
               </div>
-              
+
               {/* Desktop Navigation */}
               <nav className="hidden md:flex items-center space-x-6">
                 {[
@@ -305,11 +282,10 @@ export default function StudentDashboardPage() {
                         setActiveTab(item.id);
                       }
                     }}
-                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      activeTab === item.id
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
+                    className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === item.id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      }`}
                   >
                     <item.icon className="h-4 w-4" />
                     <span>{item.label}</span>
@@ -378,11 +354,10 @@ export default function StudentDashboardPage() {
                     setActiveTab(item.id);
                   }
                 }}
-                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${
-                  activeTab === item.id
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
+                className={`flex items-center space-x-1 px-3 py-2 rounded-md text-xs font-medium whitespace-nowrap transition-colors ${activeTab === item.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  }`}
               >
                 <item.icon className="h-3 w-3" />
                 <span>{item.label}</span>
@@ -463,9 +438,9 @@ export default function StudentDashboardPage() {
                   <Target className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{lastResult ? lastResult.grade || '-' : '-'}</div>
+                  <div className="text-2xl font-bold">{performanceData.grade}</div>
                   <p className="text-xs text-muted-foreground">
-                    Current semester average
+                    GPA: {performanceData.gpa}
                   </p>
                 </CardContent>
               </Card>
@@ -495,13 +470,12 @@ export default function StudentDashboardPage() {
                       {Array.from({ length: attendanceData.total || 20 }, (_, i) => (
                         <div
                           key={i}
-                          className={`h-4 w-4 rounded-sm ${
-                            i < attendanceData.present
-                              ? 'bg-green-500'
-                              : i < attendanceData.present + attendanceData.late
+                          className={`h-4 w-4 rounded-sm ${i < attendanceData.present
+                            ? 'bg-green-500'
+                            : i < attendanceData.present + attendanceData.late
                               ? 'bg-yellow-500'
                               : 'bg-red-500'
-                          }`}
+                            }`}
                         />
                       ))}
                     </div>
@@ -517,9 +491,9 @@ export default function StudentDashboardPage() {
                   </CardHeader>
                   <CardContent>
                     <div className="text-center">
-                      <div className="text-4xl font-bold text-primary mb-2">{lastResult && lastResult.rank != null ? `#${lastResult.rank}` : '-'}</div>
+                      <div className="text-4xl font-bold text-primary mb-2">#{classRank}</div>
                       <p className="text-sm text-muted-foreground">
-                        Out of {lastResult && lastResult.totalStudents != null ? lastResult.totalStudents : '-'} students
+                        Out of {totalStudents} students
                       </p>
                       <div className="mt-4 flex items-center justify-center space-x-2">
                         <TrendingUp className="h-4 w-4 text-green-500" />
@@ -545,16 +519,18 @@ export default function StudentDashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {badges.map((badge) => (
+                        {badges.length > 0 ? badges.map((badge: any) => (
                           <div key={badge.id} className="flex items-center space-x-3 p-3 rounded-lg border">
-                            <div className="text-2xl">{badge.icon}</div>
+                            <div className="text-2xl">{badge.icon || '🏅'}</div>
                             <div>
-                              <div className="font-medium">{badge.name}</div>
+                              <div className="font-medium">{badge.title}</div>
                               <div className="text-sm text-muted-foreground">{badge.description}</div>
-                              <div className="text-xs text-muted-foreground">{badge.earnedAt}</div>
+                              <div className="text-xs text-muted-foreground">{badge.earnedAt ? new Date(badge.earnedAt).toLocaleDateString() : ''}</div>
                             </div>
                           </div>
-                        ))}
+                        )) : (
+                          <div className="text-muted-foreground">No badges yet. Keep studying!</div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -578,17 +554,15 @@ export default function StudentDashboardPage() {
                       ].map((student) => (
                         <div
                           key={student.rank}
-                          className={`flex items-center justify-between p-2 rounded-lg ${
-                            student.isCurrent ? 'bg-primary/10 border border-primary/20' : ''
-                          }`}
+                          className={`flex items-center justify-between p-2 rounded-lg ${student.isCurrent ? 'bg-primary/10 border border-primary/20' : ''
+                            }`}
                         >
                           <div className="flex items-center space-x-3">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                              student.rank === 1 ? 'bg-yellow-500 text-white' :
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${student.rank === 1 ? 'bg-yellow-500 text-white' :
                               student.rank === 2 ? 'bg-gray-400 text-white' :
-                              student.rank === 3 ? 'bg-orange-500 text-white' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
+                                student.rank === 3 ? 'bg-orange-500 text-white' :
+                                  'bg-muted text-muted-foreground'
+                              }`}>
                               {student.rank}
                             </div>
                             <span className={`font-medium ${student.isCurrent ? 'text-primary' : ''}`}>
@@ -775,9 +749,7 @@ export default function StudentDashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div>
               <div className="flex items-center space-x-2 mb-4">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-semibold text-sm">DS</span>
-                </div>
+                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
                 <span className="font-semibold text-lg">Digital School</span>
               </div>
               <p className="text-sm text-muted-foreground mb-4">
@@ -795,7 +767,7 @@ export default function StudentDashboardPage() {
                 </Button>
               </div>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-4">Quick Links</h3>
               <div className="space-y-2 text-sm">
@@ -805,7 +777,7 @@ export default function StudentDashboardPage() {
                 <a href="#" className="block text-muted-foreground hover:text-foreground">Terms of Service</a>
               </div>
             </div>
-            
+
             <div>
               <h3 className="font-semibold mb-4">Contact Info</h3>
               <div className="space-y-2 text-sm text-muted-foreground">
@@ -816,7 +788,7 @@ export default function StudentDashboardPage() {
               </div>
             </div>
           </div>
-          
+
           <div className="border-t mt-8 pt-8 text-center">
             <p className="text-sm text-muted-foreground">
               © 2024 Digital School. Made with ❤️ by{' '}

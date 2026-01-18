@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Users, 
-  GraduationCap, 
-  FileText, 
-  Calendar, 
-  BarChart3, 
-  Bell, 
-  Settings, 
+import {
+  Users,
+  GraduationCap,
+  FileText,
+  Calendar,
+  BarChart3,
+  Bell,
+  Settings,
   LogOut,
   Home,
   UserCheck,
@@ -123,32 +123,32 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-gray-50">
       {/* Mobile Sidebar Overlay — covers everything except the sidebar */}
       {mobileSidebarOpen && (
-          <div
-              className="fixed inset-0 z-40 lg:hidden"
-              onClick={() => setMobileSidebarOpen(false)}
-          >
-            {/* Blur + darken effect behind the sidebar */}
-            <div className="absolute inset-0 bg-gray-600 bg-opacity-60 backdrop-blur-sm" />
-          </div>
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          onClick={() => setMobileSidebarOpen(false)}
+        >
+          {/* Blur + darken effect behind the sidebar */}
+          <div className="absolute inset-0 bg-gray-600 bg-opacity-60 backdrop-blur-sm" />
+        </div>
       )}
 
       {/* Sidebar */}
       <motion.div
         initial={{ width: 280 }}
         animate={{ width: sidebarCollapsed ? 80 : 280 }}
-        className={`fixed lg:relative z-50 h-full bg-white shadow-xl border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${
-          mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-        }`}
+        className={`fixed lg:relative z-50 h-full bg-white shadow-xl border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+          }`}
       >
         <div className="p-4 lg:p-6">
           <div className="flex items-center justify-between mb-6 lg:mb-8">
-            <motion.h1
+            <motion.div
               initial={{ opacity: 1 }}
               animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-              className="text-xl lg:text-2xl font-bold text-gray-800"
+              className="flex items-center gap-2"
             >
-              Admin Panel
-            </motion.h1>
+              <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
+              <span className="text-xl lg:text-2xl font-bold text-gray-800">Digital School</span>
+            </motion.div>
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -175,19 +175,17 @@ export default function AdminDashboard() {
                   if (item.href) {
                     router.push(item.href);
                   } else {
-                  setActiveTab(item.id);
-                  setMobileSidebarOpen(false);
+                    setActiveTab(item.id);
+                    setMobileSidebarOpen(false);
                   }
                 }}
-                className={`w-full flex items-center px-3 lg:px-4 py-3 lg:py-3 rounded-lg transition-all duration-200 text-sm lg:text-base font-medium min-h-[44px] ${
-                  activeTab === item.id
+                className={`w-full flex items-center px-3 lg:px-4 py-3 lg:py-3 rounded-lg transition-all duration-200 text-sm lg:text-base font-medium min-h-[44px] ${activeTab === item.id
                     ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600 shadow-sm ring-2 ring-blue-100'
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:shadow-sm'
-                }`}
+                  }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 transition-colors ${
-                  activeTab === item.id ? 'text-blue-600' : 'text-gray-500'
-                }`} />
+                <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 transition-colors ${activeTab === item.id ? 'text-blue-600' : 'text-gray-500'
+                  }`} />
                 <motion.span
                   initial={{ opacity: 1 }}
                   animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
@@ -199,11 +197,10 @@ export default function AdminDashboard() {
                   <motion.span
                     initial={{ opacity: 1 }}
                     animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-                    className={`text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center ${
-                      activeTab === item.id 
-                        ? 'bg-blue-200 text-blue-700' 
+                    className={`text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center ${activeTab === item.id
+                        ? 'bg-blue-200 text-blue-700'
                         : 'bg-blue-100 text-blue-600'
-                    }`}
+                      }`}
                   >
                     {item.badge}
                   </motion.span>
@@ -224,9 +221,9 @@ export default function AdminDashboard() {
           >
             <Menu className="w-5 h-5 text-gray-600" />
           </button>
-          
+
           <div className="flex-1 lg:hidden" />
-          
+
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
@@ -252,7 +249,7 @@ export default function AdminDashboard() {
             )}
           </div>
         </div>
-        
+
         <div className="h-full overflow-y-auto">
           {renderContent()}
         </div>
@@ -350,12 +347,11 @@ function OverviewTab() {
               { action: 'Notice posted: Holiday Schedule', time: '1 day ago', type: 'notice' },
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  activity.type === 'student' ? 'bg-blue-500' :
-                  activity.type === 'exam' ? 'bg-purple-500' :
-                  activity.type === 'teacher' ? 'bg-green-500' :
-                  activity.type === 'result' ? 'bg-yellow-500' : 'bg-gray-500'
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${activity.type === 'student' ? 'bg-blue-500' :
+                    activity.type === 'exam' ? 'bg-purple-500' :
+                      activity.type === 'teacher' ? 'bg-green-500' :
+                        activity.type === 'result' ? 'bg-yellow-500' : 'bg-gray-500'
+                  }`} />
                 <div className="flex-1">
                   <p className="text-xs lg:text-sm font-medium text-gray-900">{activity.action}</p>
                   <p className="text-xs text-gray-500">{activity.time}</p>
@@ -461,11 +457,11 @@ function StudentsTab() {
 
   const filteredStudents = mockStudents.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.roll.includes(searchTerm);
+      student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.roll.includes(searchTerm);
     const matchesClass = selectedClass === 'all' || student.class === selectedClass;
     const matchesStatus = selectedStatus === 'all' || student.status === selectedStatus;
-    
+
     return matchesSearch && matchesClass && matchesStatus;
   });
 
@@ -637,8 +633,8 @@ function StudentsTab() {
                       <div>
                         <div className="text-sm text-gray-900">Attendance: {student.attendance}%</div>
                         <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-green-600 h-2 rounded-full" 
+                          <div
+                            className="bg-green-600 h-2 rounded-full"
                             style={{ width: `${student.attendance}%` }}
                           ></div>
                         </div>
@@ -646,8 +642,8 @@ function StudentsTab() {
                       <div>
                         <div className="text-sm text-gray-900">GPA: {student.gpa}</div>
                         <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
                             style={{ width: `${(student.gpa / 5) * 100}%` }}
                           ></div>
                         </div>
@@ -655,11 +651,10 @@ function StudentsTab() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      student.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${student.status === 'active'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
-                    }`}>
+                      }`}>
                       {student.status}
                     </span>
                   </td>
@@ -675,7 +670,7 @@ function StudentsTab() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
@@ -857,11 +852,11 @@ function TeachersTab() {
 
   const filteredTeachers = mockTeachers.filter(teacher => {
     const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         teacher.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      teacher.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      teacher.subject.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesSubject = selectedSubject === 'all' || teacher.subject === selectedSubject;
     const matchesStatus = selectedStatus === 'all' || teacher.status === selectedStatus;
-    
+
     return matchesSearch && matchesSubject && matchesStatus;
   });
 
@@ -1035,8 +1030,8 @@ function TeachersTab() {
                       <div>
                         <div className="text-sm text-gray-900">Students: {teacher.studentsCount}</div>
                         <div className="w-16 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
                             style={{ width: `${(teacher.studentsCount / 150) * 100}%` }}
                           ></div>
                         </div>
@@ -1059,11 +1054,10 @@ function TeachersTab() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      teacher.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${teacher.status === 'active'
+                        ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
-                    }`}>
+                      }`}>
                       {teacher.status}
                     </span>
                   </td>
@@ -1079,7 +1073,7 @@ function TeachersTab() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
@@ -1247,9 +1241,9 @@ function ClassesTab() {
 
   const filteredClasses = mockClasses.filter(cls => {
     const matchesSearch = cls.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         cls.teacher.toLowerCase().includes(searchTerm.toLowerCase());
+      cls.teacher.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesGrade = selectedGrade === 'all' || cls.grade === selectedGrade;
-    
+
     return matchesSearch && matchesGrade;
   });
 
@@ -1365,7 +1359,7 @@ function ClassesTab() {
                 {cls.status}
               </span>
             </div>
-            
+
             <div className="space-y-3">
               <div className="flex items-center text-sm">
                 <UserCheck className="w-4 h-4 text-gray-400 mr-2" />
@@ -1556,11 +1550,11 @@ function ExamsTab() {
 
   const filteredExams = mockExams.filter(exam => {
     const matchesSearch = exam.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exam.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         exam.teacher.toLowerCase().includes(searchTerm.toLowerCase());
+      exam.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      exam.teacher.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesType = selectedType === 'all' || exam.type === selectedType;
     const matchesStatus = selectedStatus === 'all' || exam.status === selectedStatus;
-    
+
     return matchesSearch && matchesType && matchesStatus;
   });
 
@@ -1743,8 +1737,8 @@ function ExamsTab() {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">{exam.participants} students</div>
                     <div className="w-20 bg-gray-200 rounded-full h-2 mt-1">
-                      <div 
-                        className="bg-blue-600 h-2 rounded-full" 
+                      <div
+                        className="bg-blue-600 h-2 rounded-full"
                         style={{ width: `${(exam.participants / 180) * 100}%` }}
                       ></div>
                     </div>
@@ -1762,7 +1756,7 @@ function ExamsTab() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
@@ -1975,10 +1969,10 @@ function ResultsTab() {
 
   const filteredResults = mockResults.filter(result => {
     const matchesSearch = result.examName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         result.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      result.subject.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesExam = selectedExam === 'all' || result.examName === selectedExam;
     const matchesClass = selectedClass === 'all' || result.class === selectedClass;
-    
+
     return matchesSearch && matchesExam && matchesClass;
   });
 
@@ -2151,8 +2145,8 @@ function ResultsTab() {
                       <div>
                         <div className="text-sm text-gray-900">Avg: {result.averageScore}%</div>
                         <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-blue-600 h-2 rounded-full" 
+                          <div
+                            className="bg-blue-600 h-2 rounded-full"
                             style={{ width: `${result.averageScore}%` }}
                           ></div>
                         </div>
@@ -2167,8 +2161,8 @@ function ResultsTab() {
                       <div>
                         <div className="text-sm text-gray-900">Pass Rate: {result.passRate}%</div>
                         <div className="w-20 bg-gray-200 rounded-full h-2">
-                          <div 
-                            className="bg-green-600 h-2 rounded-full" 
+                          <div
+                            className="bg-green-600 h-2 rounded-full"
                             style={{ width: `${result.passRate}%` }}
                           ></div>
                         </div>
@@ -2196,7 +2190,7 @@ function ResultsTab() {
             </tbody>
           </table>
         </div>
-        
+
         {/* Pagination */}
         <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="flex-1 flex justify-between sm:hidden">
@@ -2266,11 +2260,10 @@ function ResultsTab() {
               { action: 'English Quiz scheduled for grading', time: '3 days ago', type: 'schedule' },
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
-                <div className={`w-2 h-2 rounded-full ${
-                  activity.type === 'publish' ? 'bg-green-500' :
-                  activity.type === 'grade' ? 'bg-blue-500' :
-                  activity.type === 'review' ? 'bg-purple-500' : 'bg-yellow-500'
-                }`} />
+                <div className={`w-2 h-2 rounded-full ${activity.type === 'publish' ? 'bg-green-500' :
+                    activity.type === 'grade' ? 'bg-blue-500' :
+                      activity.type === 'review' ? 'bg-purple-500' : 'bg-yellow-500'
+                  }`} />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{activity.action}</p>
                   <p className="text-xs text-gray-500">{activity.time}</p>

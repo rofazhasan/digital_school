@@ -95,10 +95,10 @@ const HeroSection = () => {
     const mouseY = useMotionValue(0);
 
     const handleMouseMove = ({
-                                 clientX,
-                                 clientY,
-                                 currentTarget,
-                             }: React.MouseEvent) => {
+        clientX,
+        clientY,
+        currentTarget,
+    }: React.MouseEvent) => {
         const { left, top } = currentTarget.getBoundingClientRect();
         mouseX.set(clientX - left);
         mouseY.set(clientY - top);
@@ -120,6 +120,9 @@ const HeroSection = () => {
                         background: useMotionTemplate`radial-gradient(450px circle at ${mouseX}px ${mouseY}px, hsl(var(--primary) / 0.1), transparent 80%)`,
                     }}
                 />
+                <motion.div variants={itemVariants} className="mb-6">
+                    <img src="/logo.png" alt="Digital School Logo" className="h-20 w-auto mx-auto drop-shadow-lg" />
+                </motion.div>
                 <motion.h1
                     className="shimmer-text text-4xl sm:text-6xl md:text-7xl font-bold tracking-tighter"
                     variants={itemVariants}
@@ -244,11 +247,11 @@ const FeaturesSection = () => (
 );
 
 const FeatureCard = ({
-                         icon: Icon,
-                         title,
-                         description,
-                         className,
-                     }: {
+    icon: Icon,
+    title,
+    description,
+    className,
+}: {
     icon: React.ComponentType<{ size?: number }>;
     title: string;
     description: string;
@@ -488,7 +491,10 @@ const Footer = () => (
     <footer className="bg-card/30 text-foreground py-12 px-4 border-t border-border/20">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
             <div className="md:col-span-1 flex flex-col items-center md:items-start">
-                <h4 className="font-bold text-lg mb-2">Elite Exam System</h4>
+                <div className="flex items-center gap-2 mb-2">
+                    <img src="/logo.png" alt="Digital School Logo" className="h-8 w-auto" />
+                    <h4 className="font-bold text-lg">Elite Exam System</h4>
+                </div>
                 <p className="text-muted-foreground text-sm max-w-xs">The future of assessment technology for Bangladesh.</p>
             </div>
             <div>
