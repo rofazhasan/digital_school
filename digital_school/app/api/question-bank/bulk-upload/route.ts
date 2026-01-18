@@ -7,7 +7,10 @@ type QuestionType = 'MCQ' | 'CQ' | 'SQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 // Helper to separate validation logic
-const s = (val: any) => String(val || '').trim(); // Safe trim
+const s = (val: any) => {
+    if (val === null || val === undefined) return '';
+    return String(val).trim();
+}
 // Safe number parsing
 const n = (val: any) => {
     if (!val) return 0;
