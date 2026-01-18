@@ -15,24 +15,35 @@ const n = (val: any) => {
     return items ? parseInt(items[0]) : 0;
 }
 
+// Helper to get value from multiple possible keys
+const getValue = (row: any, keys: string[]) => {
+    for (const key of keys) {
+        if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
+            return row[key];
+        }
+    }
+    return '';
+}
+
 async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     // We try to interpret what we can even if validation fails later
-    const typeRaw = s(row["Type (MCQ/CQ/SQ)"]).toUpperCase();
+
+    const typeRaw = s(getValue(row, ["Type (MCQ/CQ/SQ)", "Type", "Question Type"])).toUpperCase();
     const type: QuestionType = ['MCQ', 'CQ', 'SQ'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
-    const diffRaw = s(row["Difficulty (EASY/MEDIUM/HARD)"]).toUpperCase();
+    const diffRaw = s(getValue(row, ["Difficulty (EASY/MEDIUM/HARD)", "Difficulty", "Level"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';
 
     const data: any = {
         type,
-        className: s(row["Class Name"]),
-        subject: s(row["Subject"]),
-        topic: s(row["Topic"]),
+        className: s(getValue(row, ["Class Name", "Class"])),
+        subject: s(getValue(row, ["Subject", "Subject Name"])),
+        topic: s(getValue(row, ["Topic", "Chapter"])),
         difficulty,
-        marks: n(row["Marks"]),
-        questionText: s(row["Question Text"]),
-        modelAnswer: s(row["Model Answer"]),
+        marks: n(getValue(row, ["Marks", "Mark"])),
+        questionText: s(getValue(row, ["Question Text", "Question", "Title"])),
+        modelAnswer: s(getValue(row, ["Model Answer", "Answer"])), // For non-MCQ
         classId: null,      // Will resolve
         options: null,      // Will parse
         subQuestions: null, // Will parse
@@ -43,7 +54,8 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             // If row is completely empty, it might just be trailing whitespace in Excel
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
-            throw new Error(`Invalid Question Type: ${row["Type (MCQ/CQ/SQ)"] || 'Missing'}`);
+            // If we found something but it's not a valid type, and we tried multiple headers, likely user error
+            throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
         }
 
         if (!data.className) throw new Error("Class Name is required");
@@ -66,24 +78,26 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
 
         // Type-specific logic
         if (data.type === 'MCQ') {
-            const optA = s(row["Option A"]);
-            const optB = s(row["Option B"]);
+            const optA = s(getValue(row, ["Option A", "A"]));
+            const optB = s(getValue(row, ["Option B", "B"]));
             if (!optA || !optB) throw new Error("MCQ requires at least Option A and B");
 
-            const correctOpt = s(row["Correct Option (A/B/C/D)"]).toUpperCase();
-            if (!['A', 'B', 'C', 'D'].includes(correctOpt)) throw new Error("Valid Correct Option (A/B/C/D) required");
+            const correctOpt = s(getValue(row, ["Correct Option (A/B/C/D)", "Correct Option", "Correct Answer", "Answer"])).toUpperCase();
+            if (!['A', 'B', 'C', 'D'].includes(correctOpt)) throw new Error(`Valid Correct Option (A/B/C/D) required. Found: ${correctOpt}`);
+
+            const explanation = s(getValue(row, ["Explanation", "Ans Explanation", "Solution"]));
 
             data.options = [
-                { text: optA, isCorrect: correctOpt === 'A', explanation: s(row["Explanation"]) },
-                { text: optB, isCorrect: correctOpt === 'B', explanation: s(row["Explanation"]) },
-                { text: s(row["Option C"]), isCorrect: correctOpt === 'C', explanation: s(row["Explanation"]) },
-                { text: s(row["Option D"]), isCorrect: correctOpt === 'D', explanation: s(row["Explanation"]) },
+                { text: optA, isCorrect: correctOpt === 'A', explanation },
+                { text: optB, isCorrect: correctOpt === 'B', explanation },
+                { text: s(getValue(row, ["Option C", "C"])), isCorrect: correctOpt === 'C', explanation },
+                { text: s(getValue(row, ["Option D", "D"])), isCorrect: correctOpt === 'D', explanation },
             ].filter((o: any) => o.text !== '');
         } else if (data.type === 'CQ') {
-            const sq1Text = s(row["Sub-Question 1 Text"]);
-            const sq1Marks = n(row["Sub-Question 1 Marks"]);
-            const sq2Text = s(row["Sub-Question 2 Text"]);
-            const sq2Marks = n(row["Sub-Question 2 Marks"]);
+            const sq1Text = s(getValue(row, ["Sub-Question 1 Text", "SQ1"]));
+            const sq1Marks = n(getValue(row, ["Sub-Question 1 Marks", "SQ1 Marks"]));
+            const sq2Text = s(getValue(row, ["Sub-Question 2 Text", "SQ2"]));
+            const sq2Marks = n(getValue(row, ["Sub-Question 2 Marks", "SQ2 Marks"]));
 
             data.subQuestions = [];
             if (sq1Text) data.subQuestions.push({ question: sq1Text, marks: sq1Marks });
