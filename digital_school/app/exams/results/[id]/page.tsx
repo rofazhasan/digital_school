@@ -995,7 +995,9 @@ Generated on: ${new Date().toLocaleString()}
                               </div>
                             )}
                           </div>
-                  </div>
+                        );
+                      })()}
+                    </div>
 
                     {/* Performance Summary */}
                     <div className="space-y-6">
@@ -1320,14 +1322,14 @@ Generated on: ${new Date().toLocaleString()}
                                           <div
                                             key={optIndex}
                                             className={`p-3 rounded-lg border-2 transition-all ${isCorrect && isSelected
-                                                ? 'border-green-500 bg-green-50'
-                                                : isCorrect && isUnanswered
-                                                  ? 'border-blue-500 bg-blue-50' // Different color for correct answer when unanswered
-                                                  : isSelected && !isCorrect
-                                                    ? 'border-red-500 bg-red-50'
-                                                    : isCorrect
-                                                      ? 'border-green-500 bg-green-50'
-                                                      : 'border-gray-200 bg-white'
+                                              ? 'border-green-500 bg-green-50'
+                                              : isCorrect && isUnanswered
+                                                ? 'border-blue-500 bg-blue-50' // Different color for correct answer when unanswered
+                                                : isSelected && !isCorrect
+                                                  ? 'border-red-500 bg-red-50'
+                                                  : isCorrect
+                                                    ? 'border-green-500 bg-green-50'
+                                                    : 'border-gray-200 bg-white'
                                               }`}
                                           >
                                             <div className="flex items-center gap-2">
@@ -1853,8 +1855,8 @@ Generated on: ${new Date().toLocaleString()}
               onClick={() => setShowReviewModal(true)}
               disabled={(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')}
               className={`${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
-                  ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+                ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
                 }`}
             >
               <MessageSquare className="h-5 w-5 mr-2" />
