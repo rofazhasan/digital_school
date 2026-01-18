@@ -516,6 +516,15 @@ Generated on: ${new Date().toLocaleString()}
     });
   });
 
+  // Calculate marks breakdown
+  const mcqQuestions = result?.questions?.filter((q: Question) => q.type === 'MCQ') || [];
+  const cqQuestions = result?.questions?.filter((q: Question) => q.type === 'CQ') || [];
+  const sqQuestions = result?.questions?.filter((q: Question) => q.type === 'SQ') || [];
+
+  const totalMcqMarks = mcqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+  const totalCqMarks = cqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+  const totalSqMarks = sqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+
   if (!result) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
@@ -858,145 +867,133 @@ Generated on: ${new Date().toLocaleString()}
                     <div className="space-y-6">
                       <h3 className="text-xl font-semibold text-gray-800 mb-4">Marks Breakdown</h3>
 
-                      {(() => {
-                        const mcqQuestions = result.questions.filter((q: Question) => q.type === 'MCQ');
-                        const cqQuestions = result.questions.filter((q: Question) => q.type === 'CQ');
-                        const sqQuestions = result.questions.filter((q: Question) => q.type === 'SQ');
-
-                        const totalMcqMarks = mcqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
-                        const totalCqMarks = cqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
-                        const totalSqMarks = sqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
-
-                        return (
-                          <div className="space-y-4">
-                            {mcqQuestions.length > 0 && (
-                              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  <CheckSquare className="h-5 w-5 text-blue-600" />
-                                  <span className="font-medium">MCQ Marks</span>
-                                  {result.result.mcqMarks < 0 && (
-                                    <Badge variant="destructive" className="text-xs">
-                                      Negative Marks Applied
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="text-right">
-                                  <div className={`text-2xl font-bold ${result.result.mcqMarks < 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                                    {result.result.mcqMarks}/{totalMcqMarks}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {totalMcqMarks > 0 ? ((result.result.mcqMarks / totalMcqMarks) * 100).toFixed(1) : '0.0'}%
-                                  </div>
-                                  {result.result.mcqMarks < 0 && (
-                                    <div className="text-xs text-red-600 font-medium">
-                                      Negative marking applied
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {cqQuestions.length > 0 && (
-                              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  <FileText className="h-5 w-5 text-green-600" />
-                                  <span className="font-medium">CQ Marks</span>
-                                </div>
-                                <div className="text-right">
-                                  {hasUnevaluatedQuestions() && cqQuestions.some((q: Question) => q.awardedMarks === 0 && q.marks > 0 && q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided') ? (
-                                    <>
-                                      <div className="text-lg font-bold text-yellow-600">Pending</div>
-                                      <div className="text-sm text-gray-500">Awaiting evaluation</div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="text-2xl font-bold text-green-600">
-                                        {result.result.cqMarks}/{totalCqMarks}
-                                      </div>
-                                      <div className="text-sm text-gray-500">
-                                        {totalCqMarks > 0 ? ((result.result.cqMarks / totalCqMarks) * 100).toFixed(1) : '0.0'}%
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {sqQuestions.length > 0 && (
-                              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
-                                <div className="flex items-center gap-3">
-                                  <MessageSquare className="h-5 w-5 text-yellow-600" />
-                                  <span className="font-medium">SQ Marks</span>
-                                </div>
-                                <div className="text-right">
-                                  {hasUnevaluatedQuestions() && sqQuestions.some((q: Question) => q.awardedMarks === 0 && q.marks > 0 && q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided') ? (
-                                    <>
-                                      <div className="text-lg font-bold text-yellow-600">Pending</div>
-                                      <div className="text-sm text-gray-500">Awaiting evaluation</div>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <div className="text-2xl font-bold text-yellow-600">
-                                        {result.result.sqMarks}/{totalSqMarks}
-                                      </div>
-                                      <div className="text-sm text-gray-500">
-                                        {totalSqMarks > 0 ? ((result.result.sqMarks / totalSqMarks) * 100).toFixed(1) : '0.0'}%
-                                      </div>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
-                              <div className="flex items-center gap-3">
-                                <Trophy className="h-5 w-5 text-purple-600" />
-                                <span className="font-medium">Total Score</span>
-                                {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
-                                  <Badge variant="destructive" className="text-xs">
-                                    Suspended
-                                  </Badge>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className={`text-3xl font-bold ${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? 'text-red-600' : 'text-purple-600'}`}>
-                                  {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0' : result.result.total} / {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0' : result.exam.totalMarks}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0.0' : (result.exam.totalMarks > 0 ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0')}%
-                                </div>
-                                {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
-                                  <div className="text-xs text-red-600 font-medium">
-                                    Exam suspended - zero marks
-                                  </div>
-                                )}
-                              </div>
+                      <div className="space-y-4">
+                        {mcqQuestions.length > 0 && (
+                          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <CheckSquare className="h-5 w-5 text-blue-600" />
+                              <span className="font-medium">MCQ Marks</span>
+                              {result.result.mcqMarks < 0 && (
+                                <Badge variant="destructive" className="text-xs">
+                                  Negative Marks Applied
+                                </Badge>
+                              )}
                             </div>
-
-                            {/* Final Score - Only shown after super_user releases marks */}
-                            {result.result && result.result.isPublished === true && result.result.status !== 'SUSPENDED' && (
-                              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">
-                                <div className="flex items-center gap-3">
-                                  <Crown className="h-5 w-5 text-green-600" />
-                                  <span className="font-medium">Final Score</span>
-                                  <Badge className="bg-green-100 text-green-800 text-xs">Released</Badge>
+                            <div className="text-right">
+                              <div className={`text-2xl font-bold ${result.result.mcqMarks < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                                {result.result.mcqMarks}/{totalMcqMarks}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {totalMcqMarks > 0 ? ((result.result.mcqMarks / totalMcqMarks) * 100).toFixed(1) : '0.0'}%
+                              </div>
+                              {result.result.mcqMarks < 0 && (
+                                <div className="text-xs text-red-600 font-medium">
+                                  Negative marking applied
                                 </div>
-                                <div className="text-right">
-                                  <div className="text-3xl font-bold text-green-600">
-                                    {result.result.total} / {result.exam.totalMarks}
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {cqQuestions.length > 0 && (
+                          <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <FileText className="h-5 w-5 text-green-600" />
+                              <span className="font-medium">CQ Marks</span>
+                            </div>
+                            <div className="text-right">
+                              {hasUnevaluatedQuestions() && cqQuestions.some((q: Question) => q.awardedMarks === 0 && q.marks > 0 && q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided') ? (
+                                <>
+                                  <div className="text-lg font-bold text-yellow-600">Pending</div>
+                                  <div className="text-sm text-gray-500">Awaiting evaluation</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-2xl font-bold text-green-600">
+                                    {result.result.cqMarks}/{totalCqMarks}
                                   </div>
                                   <div className="text-sm text-gray-500">
-                                    {result.exam.totalMarks > 0 ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%
+                                    {totalCqMarks > 0 ? ((result.result.cqMarks / totalCqMarks) * 100).toFixed(1) : '0.0'}%
                                   </div>
-                                  <div className="text-xs text-green-600 font-medium">
-                                    Released on {result.result.publishedAt ? new Date(result.result.publishedAt).toLocaleDateString() : 'N/A'}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {sqQuestions.length > 0 && (
+                          <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <MessageSquare className="h-5 w-5 text-yellow-600" />
+                              <span className="font-medium">SQ Marks</span>
+                            </div>
+                            <div className="text-right">
+                              {hasUnevaluatedQuestions() && sqQuestions.some((q: Question) => q.awardedMarks === 0 && q.marks > 0 && q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided') ? (
+                                <>
+                                  <div className="text-lg font-bold text-yellow-600">Pending</div>
+                                  <div className="text-sm text-gray-500">Awaiting evaluation</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-2xl font-bold text-yellow-600">
+                                    {result.result.sqMarks}/{totalSqMarks}
                                   </div>
-                                </div>
+                                  <div className="text-sm text-gray-500">
+                                    {totalSqMarks > 0 ? ((result.result.sqMarks / totalSqMarks) * 100).toFixed(1) : '0.0'}%
+                                  </div>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between p-4 bg-purple-50 rounded-lg border-2 border-purple-200">
+                          <div className="flex items-center gap-3">
+                            <Trophy className="h-5 w-5 text-purple-600" />
+                            <span className="font-medium">Total Score</span>
+                            {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
+                              <Badge variant="destructive" className="text-xs">
+                                Suspended
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-3xl font-bold ${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? 'text-red-600' : 'text-purple-600'}`}>
+                              {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0' : result.result.total} / {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0' : result.exam.totalMarks}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') ? '0.0' : (result.exam.totalMarks > 0 ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0')}%
+                            </div>
+                            {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
+                              <div className="text-xs text-red-600 font-medium">
+                                Exam suspended - zero marks
                               </div>
                             )}
                           </div>
-                        );
-                      })()}
+                        </div>
+
+                        {/* Final Score - Only shown after super_user releases marks */}
+                        {result.result && result.result.isPublished === true && result.result.status !== 'SUSPENDED' && (
+                          <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border-2 border-green-200">
+                            <div className="flex items-center gap-3">
+                              <Crown className="h-5 w-5 text-green-600" />
+                              <span className="font-medium">Final Score</span>
+                              <Badge className="bg-green-100 text-green-800 text-xs">Released</Badge>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-3xl font-bold text-green-600">
+                                {result.result.total} / {result.exam.totalMarks}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {result.exam.totalMarks > 0 ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%
+                              </div>
+                              <div className="text-xs text-green-600 font-medium">
+                                Released on {result.result.publishedAt ? new Date(result.result.publishedAt).toLocaleDateString() : 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Performance Summary */}
