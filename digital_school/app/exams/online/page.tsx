@@ -102,7 +102,7 @@ const getDashboardUrl = () => {
 };
 
 // Adaptive layout classes
-const layoutClass = "w-full max-w-5xl mx-auto px-2 sm:px-4 md:px-8 py-8 flex flex-col gap-6";
+const layoutClass = `w-full max-w-5xl mx-auto px-2 sm:px-4 md:px-8 py-8 flex flex-col gap-6`;
 
 return (
   <main className="min-h-screen font-serif bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-slate-900 dark:via-slate-800 dark:to-slate-700">
