@@ -140,6 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       update: {
         answers: processedAnswers,
         submittedAt: new Date(),
+        status: 'SUBMITTED',
         examSetId: targetExamSetId, // Use preserved or found ID
         exceededQuestionLimit
       },
@@ -147,6 +148,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         studentId,
         examId,
         answers: processedAnswers,
+        status: 'SUBMITTED',
         examSetId: targetExamSetId,
         exceededQuestionLimit
       },

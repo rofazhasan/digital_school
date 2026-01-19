@@ -41,9 +41,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Check if the latest submission is finished
     const isFinished = existingSubmission && (() => {
-      const answers = existingSubmission.answers as Record<string, any>;
-      // It is finished if it does NOT have "in_progress" status OR if submittedAt is set
-      return (!answers || answers._status !== 'in_progress') || !!existingSubmission.submittedAt;
+      // It is finished if status is SUBMITTED
+      // Fallback to legacy check if status is missing (though default is IN_PROGRESS now)
+      return existingSubmission.status === 'SUBMITTED' || !!existingSubmission.submittedAt;
     })();
 
     // Check for 'start' action
@@ -86,8 +86,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         data: {
           examId,
           studentId,
-          // MARKER: Use _status to indicate in-progress since submittedAt has a default value
-          answers: { _status: "in_progress" },
+          answers: {},
+          status: 'IN_PROGRESS',
           startedAt: new Date(),
           examSetId: assignedExamSetId
         }
@@ -96,7 +96,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // If for some reason startedAt is missing on an existing active record, set it now if action is start
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
-        data: { startedAt: new Date() }
+        data: { startedAt: new Date(), status: 'IN_PROGRESS' }
       });
     } else if (existingSubmission) {
       // Load assigned set if submission exists and we are continuing it

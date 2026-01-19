@@ -32,7 +32,8 @@ export async function GET(request: NextRequest) {
         studentId: true,
         submittedAt: true,
         score: true,
-        answers: true
+        answers: true,
+        status: true
       },
       orderBy: {
         submittedAt: 'desc'

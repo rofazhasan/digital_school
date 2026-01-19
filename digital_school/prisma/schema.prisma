@@ -585,6 +585,7 @@ model ExamSubmission {
   examId         String
   examSetId      String?
   answers        Json
+  status         SubmissionStatus        @default(IN_PROGRESS)
   startedAt      DateTime?
   submittedAt    DateTime                @default(now())
   score          Float?
@@ -783,6 +784,12 @@ enum NotificationType {
   WARNING
   ERROR
   REVIEW_RESPONSE
+}
+
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
 }
 
 enum QuestionStatus {
