@@ -46,13 +46,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return (!answers || answers._status !== 'in_progress') || !!existingSubmission.submittedAt;
     })();
 
+    // Check for 'start' action
+    const searchParams = req.nextUrl.searchParams;
+    const action = searchParams.get('action');
+
     // Decision: Should we create a new submission?
     // Yes if: 
-    // 1. No submission exists
-    // 2. Latest is finished AND retake is allowed
-    const shouldCreateNew = !existingSubmission || (isFinished && exam.allowRetake);
+    // 1. No submission exists AND action is 'start'
+    // 2. Latest is finished AND retake is allowed AND action is 'start'
+    const shouldCreateNew = (!existingSubmission || (isFinished && exam.allowRetake)) && action === 'start';
 
-    // If no submission exists or we are retaking, create one
+    // If no submission exists or we are retaking, create one ONLY if action is 'start'
     if (shouldCreateNew) {
       // Logic to assign exam set first (moved from below)
       if (exam.examSets.length > 0) {
@@ -88,13 +92,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           examSetId: assignedExamSetId
         }
       });
-    } else if (!existingSubmission.startedAt) {
-      // If for some reason startedAt is missing on an existing active record, set it now
+    } else if (existingSubmission && !existingSubmission.startedAt && action === 'start') {
+      // If for some reason startedAt is missing on an existing active record, set it now if action is start
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
         data: { startedAt: new Date() }
       });
-    } else {
+    } else if (existingSubmission) {
       // Load assigned set if submission exists and we are continuing it
       assignedExamSetId = existingSubmission.examSetId;
     }
@@ -137,33 +141,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Check if really submitted
     // It is submitted if answers DOES NOT have _status: 'in_progress'
-    const answers = existingSubmission.answers as Record<string, any>;
+    const answers = existingSubmission?.answers as Record<string, any>;
     const isInProgress = answers && answers._status === 'in_progress';
-    // If it's legacy (no _status), we assume it IS submitted because submittedAt is set by default.
-    // Wait, for NEW exams it works. For OLD exams?
-    // If an old exam was "started" but essentially "submitted" immediately due to the bug, the user is stuck.
-    // If we want to unblock them, we might need to assume if answers is EMPTY (or just has _status), it's not submitted.
-    // A simplified check: If answers is empty OR has _status='in_progress', it is NOT submitted.
-    const hasAnswers = answers && Object.keys(answers).filter(k => k !== '_status').length > 0;
+    const isExplicitlySubmitted = answers && answers._status === 'submitted';
 
-    // Final logic: It is submitted if it has answers AND not in progress.
-    // If _status is missing but submittedAt is present, we consider it submitted (legacy behavior).
-    // If _status is 'submitted', it is definitely submitted.
-    // Ideally, we trust `submittedAt` check mainly because we only set it on final submission.
-
-    const isSubmittedStatus = answers?._status === 'submitted';
-    const isLegacySubmitted = !answers?._status && !!existingSubmission?.submittedAt;
-
-    // So if it's explicitly submitted OR (legacy and has submittedAt time), it's done.
-    // Also, if `isInProgress` is true, it's definitely NOT submitted (unless bugged, but we fixed submit route).
     // UPDATE: We prioritize `isInProgress` check. If it is in progress, it is NOT submitted.
+    // If it is explicitly submitted, it IS submitted.
     // We only fall back to `submittedAt` check if the status is NOT 'in_progress' (handling legacy cases).
 
     let isActuallySubmitted = false;
-    if (isInProgress) {
+
+    // Safety check: if explicitly submitted status exists, force it to be submitted regardless of other flags
+    if (isExplicitlySubmitted) {
+      isActuallySubmitted = true;
+    } else if (isInProgress) {
       isActuallySubmitted = false;
     } else {
-      isActuallySubmitted = isSubmittedStatus || !!existingSubmission?.submittedAt;
+      isActuallySubmitted = isExplicitlySubmitted || !!existingSubmission?.submittedAt;
     }
 
     const hasSubmitted = isActuallySubmitted && !exam.allowRetake;

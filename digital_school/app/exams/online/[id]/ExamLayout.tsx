@@ -69,13 +69,35 @@ export default function ExamLayout() {
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(true);
+  // Initialize instructions visibility based on whether exam has started
+  const [showInstructions, setShowInstructions] = useState(!exam.startedAt);
+  const [isStarting, setIsStarting] = useState(false);
 
   const questions = exam.questions || [];
   const currentQuestion = questions[navigation.current];
   const totalQuestions = questions.length;
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
+
+  const handleStartExam = async () => {
+    try {
+      setIsStarting(true);
+      // Call API to explicitly start the exam
+      const res = await fetch(`/api/exams/online/${exam.id}?action=start`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error("Failed to start exam");
+
+      // Reload to sync state (Timer, startedAt, etc.)
+      window.location.reload();
+    } catch (error) {
+      console.error("Error starting exam:", error);
+      alert("Failed to start exam. Please try again.");
+      setIsStarting(false);
+    }
+  };
 
   const handlePrevious = useCallback(() => {
     if (navigation.current > 0) navigateToQuestion(navigation.current - 1);
@@ -198,10 +220,11 @@ export default function ExamLayout() {
           </div>
 
           <Button
-            onClick={() => setShowInstructions(false)}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95"
+            onClick={handleStartExam}
+            disabled={isStarting}
+            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            পরীক্ষা শুরু করুন
+            {isStarting ? "লোডিং..." : "পরীক্ষা শুরু করুন"}
           </Button>
         </Card>
       </div>
