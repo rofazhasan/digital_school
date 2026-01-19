@@ -20,6 +20,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       include: { examSets: true, class: { select: { name: true } } },
     });
 
+    if (!exam) {
+      return NextResponse.json({ error: "Exam not found" }, { status: 404 });
+    }
+
     let questions: any[] = [];
     let assignedExamSetId = null;
 
@@ -143,18 +147,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const hasAnswers = answers && Object.keys(answers).filter(k => k !== '_status').length > 0;
 
     // Final logic: It is submitted if it has answers AND not in progress.
-    // Actually, if they started but answered nothing, hasAnswers is false. We should allow them to continue? Yes.
-    // So: isSubmitted = !isInProgress && hasAnswers? 
-    // No, if they submitted an empty exam, hasAnswers is false, but they SUBMITTED.
-    // So rely strictly on `_status === 'in_progress'`.
-    // IF `_status` is missing, it is legacy. Legacy records with `submittedAt` are considered submitted.
-    // This implies existing "bugged" records are stuck as submitted. The user might need to clear them or we allow retake if score is null?
-    // Let's rely on `isInProgress` for now.
+    // If _status is missing but submittedAt is present, we consider it submitted (legacy behavior).
+    // If _status is 'submitted', it is definitely submitted.
+    // Ideally, we trust `submittedAt` check mainly because we only set it on final submission.
 
-    // Refined: If `_status` is 'in_progress', it's definitely NOT submitted.
-    // If `_status` is missing, it IS submitted (legacy or completed).
+    const isSubmittedStatus = answers?._status === 'submitted';
+    const isLegacySubmitted = !answers?._status && !!existingSubmission?.submittedAt;
 
-    const hasSubmitted = !isInProgress && !!existingSubmission?.submittedAt && !exam.allowRetake;
+    // So if it's explicitly submitted OR (legacy and has submittedAt time), it's done.
+    // Also, if `isInProgress` is true, it's definitely NOT submitted (unless bugged, but we fixed submit route).
+
+    const isActuallySubmitted = (isSubmittedStatus || isLegacySubmitted) && !isInProgress;
+
+    const hasSubmitted = isActuallySubmitted && !exam.allowRetake;
 
     return NextResponse.json({
       id: exam.id,

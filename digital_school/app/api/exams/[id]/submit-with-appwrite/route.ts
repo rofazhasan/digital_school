@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let sqAnswered = 0;
 
     // Process answers and extract Appwrite image information
-    const processedAnswers = { ...data.answers };
+    const processedAnswers = { ...data.answers, _status: 'submitted' };
     const appwriteImages: Array<{
       questionId: string;
       fileId: string;
