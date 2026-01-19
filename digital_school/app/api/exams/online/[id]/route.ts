@@ -197,6 +197,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
       startedAt: existingSubmission?.startedAt || null,
+      passMarks: exam.passMarks,
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
       cqRequiredQuestions: exam.cqRequiredQuestions,

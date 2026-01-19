@@ -150,8 +150,8 @@ export default function ExamLayout() {
     const sqMarks = sqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
 
     // Determine pass mark (default to 33% if not set, or show N/A)
-    // Assuming passMark might be in exam object, otherwise 33% of total
-    const passMark = exam.passMark || Math.ceil((exam.totalMarks || (mcqMarks + cqMarks + sqMarks)) * 0.33);
+    // Assuming passMarks might be in exam object, otherwise 33% of total
+    const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + cqMarks + sqMarks)) * 0.33);
 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans">
