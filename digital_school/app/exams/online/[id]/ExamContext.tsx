@@ -42,7 +42,7 @@ export function ExamContextProvider({
   exam: any;
   children: React.ReactNode;
 }) {
-  const [answers, setAnswers] = useState<any>({});
+  const [answers, setAnswers] = useState<any>(exam.savedAnswers || {});
   const [navigation, setNavigation] = useState<any>({ current: 0, marked: {} });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');

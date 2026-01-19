@@ -180,6 +180,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       sqTotalQuestions: exam.sqTotalQuestions,
       sqRequiredQuestions: exam.sqRequiredQuestions,
       mcqNegativeMarking: exam.mcqNegativeMarking,
+      savedAnswers: existingSubmission?.answers || {},
     });
   } catch (_) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
