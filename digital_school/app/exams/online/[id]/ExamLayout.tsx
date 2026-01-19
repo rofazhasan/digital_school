@@ -119,40 +119,89 @@ export default function ExamLayout() {
   }, [answeredCount, totalQuestions]);
 
   if (showInstructions) {
+    const mcqQuestions = questions.filter((q: any) => q.type === 'MCQ');
+    const cqQuestions = questions.filter((q: any) => q.type === 'CQ');
+    const sqQuestions = questions.filter((q: any) => q.type === 'SQ');
+
+    const mcqMarks = mcqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 1), 0);
+    const cqMarks = cqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
+    const sqMarks = sqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
+
+    // Determine pass mark (default to 33% if not set, or show N/A)
+    // Assuming passMark might be in exam object, otherwise 33% of total
+    const passMark = exam.passMark || Math.ceil((exam.totalMarks || (mcqMarks + cqMarks + sqMarks)) * 0.33);
+
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-3xl w-full p-8 md:p-12 shadow-2xl rounded-3xl bg-card border-border">
-          <div className="text-center mb-10">
-            <div className="flex justify-center mb-6">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans">
+        <Card className="max-w-3xl w-full p-6 md:p-10 shadow-2xl rounded-3xl bg-card border-border">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
               <img src="/logo.png" alt="Digital School" className="h-16 w-auto" />
             </div>
-            <h1 className="text-4xl font-bold text-foreground mb-4 tracking-tight">{exam.title || exam.name || 'Online Exam'}</h1>
-            <p className="text-xl text-muted-foreground">Ready to start?</p>
+            <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'অনলাইন পরীক্ষা'}</h1>
+            <p className="text-lg text-muted-foreground">আপনি কি পরীক্ষা শুরু করতে প্রস্তুত?</p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div className="bg-muted/50 p-6 rounded-2xl text-center">
-              <Clock className="w-8 h-8 mx-auto text-primary mb-3" />
-              <h3 className="font-semibold text-foreground mb-1">Time Limit</h3>
-              <p className="text-sm text-muted-foreground">{exam.duration} Minutes</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-muted/50 p-4 rounded-xl text-center">
+              <Clock className="w-6 h-6 mx-auto text-primary mb-2" />
+              <h3 className="font-semibold text-foreground text-sm">সময়</h3>
+              <p className="text-lg font-bold text-primary">{exam.duration} মিনিট</p>
             </div>
-            <div className="bg-muted/50 p-6 rounded-2xl text-center">
-              <HelpCircle className="w-8 h-8 mx-auto text-primary mb-3" />
-              <h3 className="font-semibold text-foreground mb-1">Questions</h3>
-              <p className="text-sm text-muted-foreground">{totalQuestions} Total</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center">
+              <HelpCircle className="w-6 h-6 mx-auto text-primary mb-2" />
+              <h3 className="font-semibold text-foreground text-sm">মোট প্রশ্ন</h3>
+              <p className="text-lg font-bold text-primary">{totalQuestions} টি</p>
             </div>
-            <div className="bg-muted/50 p-6 rounded-2xl text-center">
-              <CheckCircle className="w-8 h-8 mx-auto text-primary mb-3" />
-              <h3 className="font-semibold text-foreground mb-1">Pass Mark</h3>
-              <p className="text-sm text-muted-foreground">Auto-submit on timeout</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center">
+              <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
+              <h3 className="font-semibold text-foreground text-sm">পূর্ণমান</h3>
+              <p className="text-lg font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
             </div>
+            <div className="bg-muted/50 p-4 rounded-xl text-center">
+              <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
+              <h3 className="font-semibold text-foreground text-sm">পাস মার্ক</h3>
+              <p className="text-lg font-bold text-primary">{passMark}</p>
+            </div>
+          </div>
+
+          {/* Question Breakdown */}
+          <div className="mb-8 border rounded-xl p-4 bg-gray-50 dark:bg-gray-800/50">
+            <h3 className="font-semibold mb-3 text-center border-b pb-2">প্রশ্ন বিভাজন (Question Breakdown)</h3>
+            <div className="grid grid-cols-3 divide-x text-center text-sm">
+              <div className="px-2">
+                <div className="font-bold text-primary">MCQ</div>
+                <div>{mcqQuestions.length} টি</div>
+                <div className="text-xs text-muted-foreground">({mcqMarks} নম্বর)</div>
+              </div>
+              <div className="px-2">
+                <div className="font-bold text-primary">Creative (CQ)</div>
+                <div>{cqQuestions.length} টি</div>
+                <div className="text-xs text-muted-foreground">({cqMarks} নম্বর)</div>
+              </div>
+              <div className="px-2">
+                <div className="font-bold text-primary">Short (SQ)</div>
+                <div>{sqQuestions.length} টি</div>
+                <div className="text-xs text-muted-foreground">({sqMarks} নম্বর)</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-8 text-sm text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
+            <h3 className="font-bold mb-2 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> নির্দেশাবলি (Instructions):</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>পরীক্ষা শুরু করার পর টাইমার থামানো যাবে না।</li>
+              <li>নির্দিষ্ট সময়ের মধ্যে উত্তর জমা না দিলে স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
+              <li>প্রতিটি প্রশ্নের জন্য সঠিক উত্তর নির্বাচন করুন বা লিখুন।</li>
+              <li>ইন্টারনেট সংযোগ বিচ্ছিন্ন হলে পুনরায় সংযোগের চেষ্টা করুন, আপনার উত্তর সংরক্ষিত থাকবে।</li>
+            </ul>
           </div>
 
           <Button
             onClick={() => setShowInstructions(false)}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95"
           >
-            Start Assessment
+            পরীক্ষা শুরু করুন
           </Button>
         </Card>
       </div>
