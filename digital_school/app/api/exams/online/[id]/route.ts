@@ -42,8 +42,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Check if the latest submission is finished
     const isFinished = existingSubmission && (() => {
       const answers = existingSubmission.answers as Record<string, any>;
-      // It is finished if it does NOT have "in_progress" status
-      return !answers || answers._status !== 'in_progress';
+      // It is finished if it does NOT have "in_progress" status OR if submittedAt is set
+      return (!answers || answers._status !== 'in_progress') || !!existingSubmission.submittedAt;
     })();
 
     // Decision: Should we create a new submission?
@@ -156,8 +156,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // So if it's explicitly submitted OR (legacy and has submittedAt time), it's done.
     // Also, if `isInProgress` is true, it's definitely NOT submitted (unless bugged, but we fixed submit route).
+    // UPDATE: We now prioritize `submittedAt`. If `submittedAt` is set, it IS submitted, regardless of `_status`.
+    // This fixes the case where an exam might have `_status: in_progress` but was actually submitted (bug state or legacy).
 
-    const isActuallySubmitted = (isSubmittedStatus || isLegacySubmitted) && !isInProgress;
+    const isActuallySubmitted = isSubmittedStatus || !!existingSubmission?.submittedAt;
 
     const hasSubmitted = isActuallySubmitted && !exam.allowRetake;
 
