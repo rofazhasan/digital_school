@@ -10,7 +10,7 @@ export async function GET(
   try {
     const { id: examId } = await params;
     const token = await getTokenFromRequest(request);
-    
+
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -27,7 +27,17 @@ export async function GET(
       }
     });
 
-    if (!user || !user.studentProfile) {
+    console.log(`[ResultAPI] User: ${token.user.email} (${token.user.role})`);
+
+    if (!user) {
+      console.log(`[ResultAPI] User not found in DB`);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    if (!user.studentProfile) {
+      console.log(`[ResultAPI] Student profile not found for user ${user.id}`);
+      // Allow admins to view if they really want, but this API is structure for student view. 
+      // For now, strict 404 is correct for the logic, but let's log it.
       return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
     }
 
@@ -37,6 +47,7 @@ export async function GET(
     });
 
     if (!exam) {
+      console.log(`[ResultAPI] Exam not found: ${examId}`);
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
 
@@ -52,6 +63,7 @@ export async function GET(
     });
 
     if (!submission) {
+      console.log(`[ResultAPI] Submission not found for Exam: ${examId}, Student: ${user.studentProfile.id}`);
       return NextResponse.json({ error: 'No submission found for this exam' }, { status: 404 });
     }
 
@@ -72,7 +84,7 @@ export async function GET(
         }
       });
     }
-    
+
     // Fallback to first exam set if no specific assignment
     if (!examSet) {
       examSet = await db.examSet.findFirst({
@@ -112,8 +124,8 @@ export async function GET(
 
     // Calculate statistics with safe defaults
     const totalStudents = allResults.length;
-    const averageScore = totalStudents > 0 
-      ? allResults.reduce((sum, r) => sum + (r.total || 0), 0) / totalStudents 
+    const averageScore = totalStudents > 0
+      ? allResults.reduce((sum, r) => sum + (r.total || 0), 0) / totalStudents
       : 0;
     const highestScore = totalStudents > 0 ? Math.max(...allResults.map(r => r.total || 0)) : 0;
     const lowestScore = totalStudents > 0 ? Math.min(...allResults.map(r => r.total || 0)) : 0;
@@ -123,8 +135,8 @@ export async function GET(
     if (examSet && examSet.questionsJson) {
       try {
         // Check if it's already an object or needs parsing
-        questions = typeof examSet.questionsJson === 'string' 
-          ? JSON.parse(examSet.questionsJson) 
+        questions = typeof examSet.questionsJson === 'string'
+          ? JSON.parse(examSet.questionsJson)
           : examSet.questionsJson;
       } catch (error) {
         console.error('Error parsing questions JSON:', error);
@@ -135,8 +147,8 @@ export async function GET(
     let studentAnswers: any = {};
     if (submission.answers) {
       try {
-        studentAnswers = typeof submission.answers === 'string' 
-          ? JSON.parse(submission.answers) 
+        studentAnswers = typeof submission.answers === 'string'
+          ? JSON.parse(submission.answers)
           : submission.answers;
       } catch (error) {
         console.error('Error parsing student answers:', error);
@@ -148,7 +160,7 @@ export async function GET(
       const questionId = question.id;
       const studentAnswer = studentAnswers[questionId];
       const studentAnswerImages = studentAnswers[`${questionId}_images`];
-      
+
       // Process student answer images - extract URLs from image objects
       let processedImages: string[] = [];
       if (studentAnswerImages && Array.isArray(studentAnswerImages)) {
@@ -169,11 +181,11 @@ export async function GET(
           return null;
         }).filter(Boolean); // Remove null values
       }
-      
+
       // Get drawing data for this question (support multiple images)
       const drawingData = submission?.drawings?.find((d: any) => d.questionId === questionId && d.imageIndex === 0);
       const allDrawingsForQuestion = submission?.drawings?.filter((d: any) => d.questionId === questionId) || [];
-      
+
       let isCorrect = false;
       let awardedMarks = 0;
       const maxMarks = question.marks || 0;
@@ -189,11 +201,11 @@ export async function GET(
               isCorrect = studentAnswer === correctOption.text;
             }
           }
-          
+
           // Fallback: Check if there's a direct correctAnswer field
           if (!isCorrect && question.correctAnswer) {
             const correctAnswer = question.correctAnswer;
-            
+
             // Handle different correct answer formats
             if (typeof correctAnswer === 'number') {
               isCorrect = studentAnswer === correctAnswer;
@@ -208,7 +220,7 @@ export async function GET(
               isCorrect = studentAnswer === String(correctAnswer);
             }
           }
-          
+
           if (isCorrect) {
             awardedMarks = maxMarks;
           } else {
@@ -220,7 +232,7 @@ export async function GET(
               awardedMarks = 0;
             }
           }
-          
+
           console.log(`MCQ Question ${question.id}:`, {
             studentAnswer,
             correctOptionText: question.options?.find((opt: any) => opt.isCorrect)?.text || 'No correct option found',
@@ -234,7 +246,7 @@ export async function GET(
         // For CQ/SQ, marks are manually awarded
         // Get marks from submission answers
         awardedMarks = studentAnswers[`${questionId}_marks`] || 0;
-        
+
         // If student didn't answer and no marks were manually awarded, award 0 marks
         if ((!studentAnswer || studentAnswer.trim() === '' || studentAnswer === 'No answer') && awardedMarks === 0) {
           awardedMarks = 0;
@@ -245,7 +257,7 @@ export async function GET(
       // Get explanations and model answers based on question type
       let explanation = '';
       let modelAnswer = question.modelAnswer || '';
-      
+
       if (question.type === 'MCQ') {
         // For MCQ, get explanation from the correct option
         if (question.options && Array.isArray(question.options)) {
@@ -306,10 +318,10 @@ export async function GET(
     let totalMarks = result?.total || 0;
     let percentage = result?.percentage || 0;
     let grade = result?.grade || 'F';
-    
+
     // Check if student is suspended (either from submission or result)
     const isSuspended = submission.exceededQuestionLimit || result?.status === 'SUSPENDED';
-    
+
     // If suspended, give zero marks in all sections
     if (isSuspended) {
       mcqMarks = 0;
@@ -318,14 +330,14 @@ export async function GET(
       totalMarks = 0;
       percentage = 0;
       grade = 'F';
-      
+
       console.log(`🚫 Student suspended - giving zero marks in all sections`);
     } else {
       // Always recalculate percentage and grade to ensure accuracy
       if (totalMarks > 0) {
         percentage = calculatePercentage(totalMarks, exam.totalMarks);
         grade = calculateGrade(percentage);
-        
+
         console.log(`📊 Grade Recalculation Debug:`, {
           totalMarks,
           examTotalMarks: exam.totalMarks,
@@ -337,16 +349,16 @@ export async function GET(
           hasResult: !!result
         });
       }
-      
+
       // Only recalculate if result doesn't have proper values
       if (!result || result.total === 0) {
         console.log('🔄 Recalculating marks from processed questions...');
-        
+
         mcqMarks = 0;
         cqMarks = 0;
         sqMarks = 0;
         totalMarks = 0;
-        
+
         processedQuestions.forEach((question: any) => {
           if (question.type === 'MCQ') {
             mcqMarks += question.awardedMarks;
@@ -360,14 +372,14 @@ export async function GET(
             totalMarks += question.awardedMarks;
           }
         });
-        
+
         // Ensure total marks doesn't go below 0
         totalMarks = Math.max(0, totalMarks);
-        
+
         // Calculate percentage and grade
         percentage = calculatePercentage(totalMarks, exam.totalMarks);
         grade = calculateGrade(percentage);
-        
+
         console.log(`📊 Grade Calculation Debug:`, {
           totalMarks,
           examTotalMarks: exam.totalMarks,
@@ -377,12 +389,12 @@ export async function GET(
           cqMarks,
           sqMarks
         });
-        
+
         // Update result with calculated marks if it exists
         if (result) {
           await db.result.update({
             where: { id: result.id },
-            data: { 
+            data: {
               mcqMarks: mcqMarks,
               cqMarks: cqMarks,
               sqMarks: sqMarks,
@@ -395,7 +407,7 @@ export async function GET(
         }
       }
     }
-    
+
     console.log(`📊 Results API - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalMarks}, Suspended: ${isSuspended}`);
 
     return NextResponse.json({

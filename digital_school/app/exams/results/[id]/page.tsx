@@ -175,8 +175,30 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    fetchResult();
-    fetchNotifications();
+    // Check user role and redirect if admin/teacher
+    const checkRoleAndRedirect = async () => {
+      try {
+        const response = await fetch('/api/user');
+        if (response.ok) {
+          const data = await response.json();
+          const role = data.user?.role;
+
+          if (role === 'ADMIN' || role === 'SUPER_USER' || role === 'TEACHER') {
+            toast.info('Redirecting to Evaluation Results...');
+            router.push(`/exams/evaluations/${id}/results`);
+            return; // Stop further execution
+          }
+        }
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      }
+
+      // Only fetch result if not redirecting
+      fetchResult();
+      fetchNotifications();
+    };
+
+    checkRoleAndRedirect();
   }, [id]);
 
   useEffect(() => {
