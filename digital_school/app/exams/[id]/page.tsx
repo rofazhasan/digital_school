@@ -98,15 +98,15 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
     <div className="flex justify-between items-start gap-4">
       <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
         {question.hasMath && question.questionLatex ? (
-          <MathRenderer content={question.questionLatex} inline={false} />
+          <MathJax>{question.questionLatex}</MathJax>
         ) : (
-          <p>{question.questionText}</p>
+          <MathJax>{question.questionText || ""}</MathJax>
         )}
         {question.type === 'MCQ' && Array.isArray(question.options) && (
           <ul className="list-disc pl-5 mt-2 space-y-1">
             {question.options.map((opt: any, i: number) => (
               <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                {opt.text && /\\\(|\\\[|\\\]|\\\)|\$/.test(opt.text) ? <MathJax>{opt.text}</MathJax> : opt.text}
+                <MathJax>{opt.text || ""}</MathJax>
               </li>
             ))}
           </ul>
