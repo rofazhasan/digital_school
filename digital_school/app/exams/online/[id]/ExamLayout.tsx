@@ -112,7 +112,7 @@ export default function ExamLayout() {
     if (showSubmitConfirm) {
       setIsSubmitting(true);
       try {
-        const response = await fetch(`/api/exams/${exam.id}/submit-with-appwrite`, {
+        const response = await fetch(`/api/exams/${exam.id}/submit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ answers: answers }), // Use live answers

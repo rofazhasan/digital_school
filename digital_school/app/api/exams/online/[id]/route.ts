@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 
+// @ts-ignore - Prisma Client types might be stale in dev
+const IN_PROGRESS = 'IN_PROGRESS';
+// @ts-ignore - Prisma Client types might be stale in dev
+const SUBMITTED = 'SUBMITTED';
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = await params;
 
@@ -43,7 +48,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const isFinished = existingSubmission && (() => {
       // It is finished if status is SUBMITTED
       // Fallback to legacy check if status is missing (though default is IN_PROGRESS now)
-      return existingSubmission.status === 'SUBMITTED' || !!existingSubmission.submittedAt;
+      // @ts-ignore
+      return existingSubmission.status === SUBMITTED || !!existingSubmission.submittedAt;
     })();
 
     // Check for 'start' action
@@ -87,7 +93,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           examId,
           studentId,
           answers: {},
-          status: 'IN_PROGRESS',
+          // @ts-ignore
+          status: IN_PROGRESS,
           startedAt: new Date(),
           examSetId: assignedExamSetId
         }
@@ -96,7 +103,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       // If for some reason startedAt is missing on an existing active record, set it now if action is start
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
-        data: { startedAt: new Date(), status: 'IN_PROGRESS' }
+        // @ts-ignore
+        data: { startedAt: new Date(), status: IN_PROGRESS }
       });
     } else if (existingSubmission) {
       // Load assigned set if submission exists and we are continuing it
@@ -161,6 +169,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     const hasSubmitted = isActuallySubmitted && !exam.allowRetake;
+
+    // STRICT BLOCKING: If submitted and no retake, do NOT return questions
+    if (hasSubmitted) {
+      return NextResponse.json({
+        id: exam.id,
+        name: exam.name,
+        hasSubmitted: true,
+        redirect: `/exams/results/${exam.id}`,
+        // Return minimal data
+        allowRetake: false,
+        questions: [],
+        status: 'SUBMITTED'
+      });
+    }
 
     return NextResponse.json({
       id: exam.id,

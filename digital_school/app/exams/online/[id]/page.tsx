@@ -16,26 +16,32 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
       try {
         setLoading(true);
         setError(null);
-        
+
         const { id } = await params;
         const res = await fetch(`/api/exams/online/${id}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'
         });
-        
+
         if (!res.ok) {
           throw new Error(`Failed to load exam: ${res.status}`);
         }
-        
+
         const examData = await res.json();
-        
-        // Check if student has already submitted
+
+        // Check for server-side redirect directive
+        if (examData.redirect) {
+          router.replace(examData.redirect);
+          return;
+        }
+
+        // Check if student has already submitted (fallback)
         if (examData.hasSubmitted && !examData.allowRetake) {
           router.push(`/exams/results/${id}`);
           return;
         }
-        
+
         setExam(examData);
       } catch (err: any) {
         setError(err.message || "Failed to load exam");
@@ -43,7 +49,7 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
         setLoading(false);
       }
     };
-    
+
     loadExam();
   }, [params, router]);
 

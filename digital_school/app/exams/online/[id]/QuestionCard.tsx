@@ -5,8 +5,7 @@ import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import CameraCapture from "./CameraCapture";
-import { Camera, Upload, X, Check, AlertCircle } from "lucide-react";
+import { X, Check, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface QuestionCardProps {
@@ -106,8 +105,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const questions = exam.questions || [];
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [showCamera, setShowCamera] = useState(false);
 
   if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
 
@@ -129,78 +126,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
     } catch (e) { console.error("Autosave failed", e); }
   }, [disabled, answers, question.id, setAnswers, exam.id]);
 
-  const handleImageCapture = useCallback(async (file: File) => {
-    // Define variable outside try block for access in catch
-    const tempImageData = {
-      file: file,
-      preview: URL.createObjectURL(file),
-      timestamp: new Date().toISOString(),
-      questionId: question.id,
-      questionText: question.text || question.questionText || "Unknown Question",
-      isUploading: true
-    };
-
-    try {
-      // Add temporary image to answers
-      const prev = Array.isArray(answers[question.id + '_images']) ? answers[question.id + '_images'] : [];
-      setAnswers({ ...answers, [question.id + '_images']: [...prev, tempImageData] });
-      setShowCamera(false);
-
-      // Upload to Appwrite
-      const formData = new FormData();
-      formData.append('image', file);
-      formData.append('questionId', question.id);
-      formData.append('studentId', exam?.studentId || '');
-      formData.append('studentName', exam?.studentName || '');
-      formData.append('questionText', question.text || question.questionText || '');
-      formData.append('questionType', question.type || '');
-      formData.append('timestamp', new Date().toISOString());
-
-      const response = await fetch(`/api/exams/${exam?.id}/upload-appwrite-image`, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to upload image');
-      }
-
-      const result = await response.json();
-
-      // Update the image data with Appwrite information
-      const updatedImages = answers[question.id + '_images']?.map((img: any) => {
-        if (img.timestamp === tempImageData.timestamp) {
-          return {
-            ...img,
-            isUploading: false,
-            appwriteFileId: result.fileId,
-            appwriteUrl: result.url,
-            appwriteFilename: result.filename,
-            uploadedAt: result.uploadedAt
-          };
-        }
-        return img;
-      }) || [];
-
-      setAnswers({ ...answers, [question.id + '_images']: updatedImages });
-
-    } catch (error) {
-      console.error('Error uploading image:', error);
-
-      // Remove the failed upload from answers
-      const updatedImages = answers[question.id + '_images']?.filter((img: any) =>
-        !img.isUploading || img.timestamp !== tempImageData.timestamp
-      ) || [];
-      setAnswers({ ...answers, [question.id + '_images']: updatedImages });
-
-      // Show detailed error message
-      let errorMessage = 'Image upload failed';
-      if (error instanceof Error) errorMessage = error.message;
-      alert(errorMessage);
-    }
-  }, [question.id, question.text, question.questionText, question.type, answers, setAnswers, exam]);
-
   const handleMarkQuestion = useCallback(() => {
     if (markQuestion) {
       markQuestion(question.id, !navigation.marked[question.id]);
@@ -212,54 +137,8 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
     }
   }, [question.id, navigation.marked, markQuestion, setNavigation, navigation]);
 
-  const correctAnswer = question.correct;
   const userAnswer = answers[question.id];
   const showResult = submitted && result;
-
-  const renderImageUpload = () => {
-    if (submitted || disabled) return null;
-    return (
-      <div className="mt-6 pt-4 border-t border-gray-100">
-        <label className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3 block">Attachments</label>
-        <div className="flex gap-3 mb-4">
-          <Button variant="outline" onClick={() => setShowCamera(true)} className="flex-1 h-32 flex-col gap-2 border-dashed border-2 hover:bg-gray-50">
-            <Camera className="w-6 h-6 text-gray-400" />
-            <span className="text-xs text-gray-500">Camera</span>
-          </Button>
-          <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="flex-1 h-32 flex-col gap-2 border-dashed border-2 hover:bg-gray-50">
-            <Upload className="w-6 h-6 text-gray-400" />
-            <span className="text-xs text-gray-500">Upload</span>
-          </Button>
-        </div>
-        <input ref={fileInputRef} type="file" accept="image/*" onChange={(e) => e.target.files?.[0] && handleImageCapture(e.target.files[0])} className="hidden" />
-
-        {answers[question.id + '_images']?.length > 0 && (
-          <div className="grid grid-cols-3 gap-3">
-            {answers[question.id + '_images'].map((img: any, idx: number) => (
-              <div key={idx} className="relative aspect-square rounded-lg overflow-hidden border bg-gray-100">
-                {img.isUploading ? (
-                  <div className="flex items-center justify-center h-full"><div className="animate-spin w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full" /></div>
-                ) : (
-                  <img src={img.appwriteUrl || img.preview} alt="Answer" className="w-full h-full object-cover" />
-                )}
-                {!submitted && (
-                  <button
-                    className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 hover:bg-red-500"
-                    onClick={() => {
-                      const newImages = answers[question.id + '_images'].filter((_: any, i: number) => i !== idx);
-                      setAnswers({ ...answers, [question.id + '_images']: newImages });
-                    }}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
 
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
@@ -271,7 +150,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs font-semibold tracking-wider text-gray-500 border-gray-200">
-                  {type.toUpperCase()}
+                  {(type || "").toUpperCase()}
                 </Badge>
                 <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-transparent">
                   {question.marks} Point{Number(question.marks) !== 1 && 's'}
@@ -305,7 +184,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
               <div className="grid grid-cols-1 gap-3">
                 {(question.options || []).map((opt: any, i: number) => {
                   const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-                  const isCorrect = question.correct === i || String(question.correct) === String(i); // Simplistic check, relying on logic above
+                  const isCorrect = question.correct === i || String(question.correct) === String(i);
                   const isSelected = String(userAnswer).trim() === label.trim();
                   return (
                     <MCQOption
@@ -313,7 +192,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       option={opt}
                       index={i}
                       isSelected={isSelected}
-                      isCorrect={isCorrect} // This is actually handled better in the original logic, let's trust simple compare or fix if visual bugs
+                      isCorrect={isCorrect}
                       showResult={showResult}
                       userAnswer={userAnswer}
                       disabled={!!disabled}
@@ -344,7 +223,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                     />
                   </div>
                 ))}
-                {renderImageUpload()}
               </div>
             )}
 
@@ -372,7 +250,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
         </CardContent>
       </Card>
-      {showCamera && <CameraCapture onCapture={handleImageCapture} onClose={() => setShowCamera(false)} questionId={question.id} examId={exam.id} />}
     </MathJaxContext>
   );
 } 

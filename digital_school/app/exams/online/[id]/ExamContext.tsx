@@ -97,22 +97,7 @@ export function ExamContextProvider({
       // Process answers to include Appwrite image information
       const processedAnswers = { ...answersToSave };
 
-      // Extract Appwrite image data for questions with images
-      Object.keys(processedAnswers).forEach(key => {
-        if (key.endsWith('_images') && Array.isArray(processedAnswers[key])) {
-          processedAnswers[key] = processedAnswers[key].map((img: any) => ({
-            appwriteFileId: img.appwriteFileId,
-            appwriteUrl: img.appwriteUrl,
-            appwriteFilename: img.appwriteFilename,
-            timestamp: img.timestamp,
-            questionId: img.questionId,
-            questionText: img.questionText,
-            uploadedAt: img.uploadedAt,
-            // Keep preview for fallback if needed
-            preview: img.preview
-          }));
-        }
-      });
+      // Process answers
 
       const response = await fetch(`/api/exams/${exam.id}/responses`, {
         method: "PATCH",
