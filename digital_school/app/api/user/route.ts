@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 export async function GET(request: NextRequest) {
   try {
     const authData = await getTokenFromRequest(request);
-    
+
     if (!authData) {
       return NextResponse.json(
         { error: "Not authenticated" },
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Get user error:", error);
-    
+
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
@@ -69,10 +69,10 @@ export async function POST(request: NextRequest) {
     if (!authData || (authData.user.role !== 'ADMIN' && authData.user.role !== 'SUPER_USER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     // Get database client with automatic initialization
     const prismadb = await getDatabaseClient();
-    
+
     const body = await request.json();
     if (!Array.isArray(body)) {
       return NextResponse.json({ error: 'Expected an array of users' }, { status: 400 });
@@ -134,10 +134,10 @@ export async function PATCH(request: NextRequest) {
     if (!authData || (authData.user.role !== 'ADMIN' && authData.user.role !== 'SUPER_USER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     // Get database client with automatic initialization
     const prismadb = await getDatabaseClient();
-    
+
     const body = await request.json();
     const { id, name, email, role, class: className, section } = body;
     if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
@@ -176,10 +176,10 @@ export async function DELETE(request: NextRequest) {
     if (!authData || (authData.user.role !== 'ADMIN' && authData.user.role !== 'SUPER_USER')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     // Get database client with automatic initialization
     const prismadb = await getDatabaseClient();
-    
+
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
@@ -191,17 +191,92 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Admins cannot delete other admins or superusers' }, { status: 403 });
     }
     // Prevent superuser from deleting other superusers
+    // Prevent superuser from deleting other superusers (except self, but logic above prevents that too mostly)
     if (authData.user.role === 'SUPER_USER' && userToDelete.role === 'SUPER_USER' && authData.user.id !== userToDelete.id) {
       return NextResponse.json({ error: 'Superusers cannot delete other superusers' }, { status: 403 });
     }
-    // Delete related profiles
-    await prismadb.studentProfile.deleteMany({ where: { userId: id } });
-    await prismadb.teacherProfile.deleteMany({ where: { userId: id } });
-    // Delete user
-    await prismadb.user.delete({ where: { id } });
-    return NextResponse.json({ message: 'User deleted' });
-  } catch (error) {
+
+    const adminId = authData.user.id;
+
+    // Perform deletion in a transaction to handle all dependencies
+    await prismadb.$transaction(async (tx) => {
+      // 1. Reassign Content (Preserve academic assets)
+      // Assessments
+      await tx.question.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
+      await tx.exam.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
+      await tx.exam.updateMany({ where: { assignedById: id }, data: { assignedById: null } }); // Unassign exams assigned *by* this user
+      await tx.questionBank.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
+      await tx.examSet.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
+
+      // Educational
+      await tx.notice.updateMany({ where: { postedById: id }, data: { postedById: adminId } });
+      await tx.attendance.updateMany({ where: { teacherId: id }, data: { teacherId: adminId } }); // Maintain attendance history
+
+      // Profiles Relations (Nullify before profile deletion to avoid constraint errors)
+      // Note: TeacherProfile deletion usually cascades to relations if configured, but we nullify to be safe/keep data
+      // Questions linked to teacher profile
+      // We can't query by teacherProfileId easily without fetching profile first, or we assume teacherProfile gets deleted and we just need to ensure Question doesn't block it.
+      // Actually, Question.teacherProfileId is optional. If we delete TeacherProfile, we rely on SetNull or manual nullify.
+      // Let's manually nullify to be safe.
+      const teacherProfile = await tx.teacherProfile.findUnique({ where: { userId: id } });
+      if (teacherProfile) {
+        await tx.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } });
+        await tx.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } });
+      }
+
+      // 2. Clear Operational Dependencies
+      await tx.examEvaluationAssignment.deleteMany({ where: { evaluatorId: id } }); // Remove pending evaluations
+      await tx.examEvaluationAssignment.updateMany({ where: { assignedById: id }, data: { assignedById: adminId } });
+      await tx.examSubmissionDrawing.updateMany({ where: { evaluatorId: id }, data: { evaluatorId: adminId } });
+
+      // 3. Delete Personal Data & Logs
+      await tx.log.deleteMany({ where: { userId: id } });
+      await tx.notification.deleteMany({ where: { userId: id } });
+      await tx.exportJob.deleteMany({ where: { triggeredById: id } });
+      await tx.aIActivity.deleteMany({ where: { userId: id } });
+      await tx.billing.deleteMany({ where: { userId: id } });
+      await tx.activityAudit.updateMany({ where: { userId: id }, data: { userId: null } }); // Keep audit trail anonymous
+      await tx.badge.deleteMany({ where: { earnedById: id } }); // Delete badges earned by this user
+
+      // Result Reviews (as reviewer)
+      await tx.resultReview.updateMany({ where: { reviewedById: id }, data: { reviewedById: adminId } });
+
+      // Chat Sessions (Must delete messages first)
+      const sessions = await tx.chatSession.findMany({ where: { userId: id }, select: { id: true } });
+      if (sessions.length > 0) {
+        await tx.chatMessage.deleteMany({ where: { sessionId: { in: sessions.map(s => s.id) } } });
+        await tx.chatSession.deleteMany({ where: { userId: id } });
+      }
+
+      // 4. Delete Profiles & Related Student Data
+      // If user has a student profile, we must clean up its dependencies due to lack of CASCADE in schema
+      const studentProfile = await tx.studentProfile.findUnique({ where: { userId: id } });
+      if (studentProfile) {
+        const studentId = studentProfile.id;
+        // Academic Records
+        // Note: We delete these because they are strictly tied to the student's performance. 
+        // Reassigning them doesn't make sense.
+        await tx.examSubmissionDrawing.deleteMany({ where: { studentId } });
+        await tx.examSubmission.deleteMany({ where: { studentId } });
+        await tx.result.deleteMany({ where: { studentId } });
+        await tx.admitCard.deleteMany({ where: { studentId } });
+        await tx.oMRSheet.deleteMany({ where: { studentId } });
+        await tx.examStudentMap.deleteMany({ where: { studentId } });
+        await tx.badge.deleteMany({ where: { studentId } }); // Badges linked to student profile
+        await tx.resultReview.deleteMany({ where: { studentId } });
+
+        await tx.studentProfile.delete({ where: { id: studentId } });
+      }
+
+      await tx.teacherProfile.deleteMany({ where: { userId: id } });
+
+      // 5. Delete User
+      await tx.user.delete({ where: { id } });
+    });
+
+    return NextResponse.json({ message: 'User deleted successfully' });
+  } catch (error: any) {
     console.error('User delete error:', error);
-    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+    return NextResponse.json({ error: `Failed to delete user: ${error.message}` }, { status: 500 });
   }
 } 
