@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback, Ref
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Points, PointMaterial } from "@react-three/drei";
 import { motion, AnimatePresence } from "framer-motion";
-import Latex from "react-latex";
+// import Latex from "react-latex"; // Replaced by MathJax
 import "katex/dist/katex.min.css";
 import { WebGLContextManager } from "@/components/ui/webgl-context-manager";
 import { WebGLFallback, useWebGLSupport } from "@/components/ui/webgl-fallback";
@@ -195,12 +195,17 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
           }}
           title={s.latex}
         >
-          <Latex>{`$${s.display}$`}</Latex>
+          <MathJax inline>{`$${s.display}$`}</MathJax>
         </Button>
       ))}
     </div>
   );
 };
+
+import { DatePickerWithRange } from "@/components/ui/date-range-picker";
+import { DateRange } from "react-day-picker";
+import { addDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { MathJax, MathJaxContext } from "better-react-mathjax";
 
 // --- Main Page Component ---
 export default function QuestionBankPage() {
@@ -216,6 +221,7 @@ export default function QuestionBankPage() {
   const { toast } = useToast();
   const webglSupported = useWebGLSupport();
 
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
   const [classFilter, setClassFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
@@ -318,163 +324,185 @@ export default function QuestionBankPage() {
       .filter((q: Question) => searchTerm === "" || (q.questionText || '').toLowerCase().includes(searchTerm.toLowerCase()) || (q.subject || '').toLowerCase().includes(searchTerm.toLowerCase()))
       .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
       .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
-      .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter);
-  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter]);
+      .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter)
+      .filter((q: Question) => {
+        if (!dateRange || !dateRange.from) return true;
+        const qDate = new Date(q.createdAt);
+        const start = startOfDay(dateRange.from);
+        const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
+        return isWithinInterval(qDate, { start, end });
+      });
+  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, dateRange]);
 
   const resetFilters = () => {
     setSearchTerm("");
     setClassFilter("all");
     setSubjectFilter("all");
     setDifficultyFilter("all");
+    setDateRange(undefined);
+  };
+
+  const mathJaxConfig = {
+    loader: { load: ["input/tex", "output/chtml"] },
+    tex: {
+      inlineMath: [["$", "$"], ["\\(", "\\)"]],
+      displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+    }
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-gray-50 dark:bg-gray-900 p-4 md:p-8 overflow-hidden">
-      <div className="absolute inset-0 z-0">
-        <WebGLErrorBoundary>
-          <WebGLFallback webglSupported={webglSupported}>
-            <Suspense fallback={
-              <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800" />
-            }>
-              <Canvas
-                camera={{ position: [0, 0, 5] }}
-                gl={{
-                  powerPreference: "high-performance",
-                  antialias: true,
-                  alpha: false,
-                  stencil: false,
-                  depth: true
-                }}
-                onCreated={({ gl }) => {
-                  gl.setClearColor(0x000000, 0);
-                  gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    <MathJaxContext config={mathJaxConfig}>
+      <div className="relative min-h-screen w-full bg-gray-50 dark:bg-gray-900 p-4 md:p-8 overflow-hidden">
+        <div className="absolute inset-0 z-0">
+          <WebGLErrorBoundary>
+            <WebGLFallback webglSupported={webglSupported}>
+              <Suspense fallback={
+                <div className="w-full h-full bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800" />
+              }>
+                <Canvas
+                  camera={{ position: [0, 0, 5] }}
+                  gl={{
+                    powerPreference: "high-performance",
+                    antialias: true,
+                    alpha: false,
+                    stencil: false,
+                    depth: true
+                  }}
+                  onCreated={({ gl }) => {
+                    gl.setClearColor(0x000000, 0);
+                    gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-                  // Handle WebGL context loss
-                  const canvas = gl.domElement;
-                  canvas.addEventListener('webglcontextlost', (event: Event) => {
-                    event.preventDefault();
-                    console.warn('WebGL context lost in question bank');
-                    setWebglContextLost(true);
-                    toast({
-                      title: "Graphics Issue",
-                      description: "Enhanced graphics temporarily unavailable. The page will continue to work normally.",
-                      variant: "default"
+                    // Handle WebGL context loss
+                    const canvas = gl.domElement;
+                    canvas.addEventListener('webglcontextlost', (event: Event) => {
+                      event.preventDefault();
+                      console.warn('WebGL context lost in question bank');
+                      setWebglContextLost(true);
+                      toast({
+                        title: "Graphics Issue",
+                        description: "Enhanced graphics temporarily unavailable. The page will continue to work normally.",
+                        variant: "default"
+                      });
                     });
-                  });
 
-                  canvas.addEventListener('webglcontextrestored', () => {
-                    console.log('WebGL context restored in question bank');
-                    setWebglContextLost(false);
-                    toast({
-                      title: "Graphics Restored",
-                      description: "Enhanced graphics are back online.",
-                      variant: "default"
+                    canvas.addEventListener('webglcontextrestored', () => {
+                      console.log('WebGL context restored in question bank');
+                      setWebglContextLost(false);
+                      toast({
+                        title: "Graphics Restored",
+                        description: "Enhanced graphics are back online.",
+                        variant: "default"
+                      });
                     });
-                  });
-                }}
-              >
-                <ThreeJSBackground />
-              </Canvas>
-            </Suspense>
-          </WebGLFallback>
-        </WebGLErrorBoundary>
-        {webglContextLost && (
-          <div className="absolute top-4 right-4 z-20">
-            <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
-                <span>Graphics temporarily unavailable</span>
+                  }}
+                >
+                  <ThreeJSBackground />
+                </Canvas>
+              </Suspense>
+            </WebGLFallback>
+          </WebGLErrorBoundary>
+          {webglContextLost && (
+            <div className="absolute top-4 right-4 z-20">
+              <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg px-3 py-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <span>Graphics temporarily unavailable</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
+          <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="text-3xl font-bold flex items-center gap-3"><BookCopy className="w-8 h-8 text-indigo-500" />Question Repository</CardTitle>
+              <CardDescription>A centralized hub to browse, create, and intelligently generate questions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
+                  <TabsTrigger value="browse">Browse</TabsTrigger>
+                  <TabsTrigger value="create">Create Manually</TabsTrigger>
+                  <TabsTrigger value="ai">AI Generator</TabsTrigger>
+                  <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="browse" className="mt-4">
+                  <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="lg:col-span-2">
+                        <Label htmlFor="search-term">Search</Label>
+                        <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                      </div>
+                      <div>
+                        <Label htmlFor="class-filter">Class</Label>
+                        <Select value={classFilter} onValueChange={setClassFilter}>
+                          <SelectTrigger id="class-filter"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="subject-filter">Subject</Label>
+                        <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                          <SelectTrigger id="subject-filter"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label htmlFor="difficulty-filter">Difficulty</Label>
+                        <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                          <SelectTrigger id="difficulty-filter"><SelectValue /></SelectTrigger>
+                          <SelectContent><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
+                        </Select>
+                      </div>
+                      <div>
+                        <Label>Date Range</Label>
+                        <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
+                      </div>
+                      <div className="flex items-end gap-2 lg:col-span-5">
+                        <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
+                        <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    : filteredQuestions.length > 0 ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        {filteredQuestions.map(q => <QuestionCard key={q.id} question={q} onEdit={handleEdit} onDelete={handleDelete} />)}
+                      </div>
+                    ) : (
+                      <div className="text-center py-16 text-gray-500">
+                        <p className="font-semibold">No questions found</p>
+                        <p className="text-sm">Try adjusting your filters or creating a new question.</p>
+                      </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="create" className="mt-4">
+                  <QuestionForm key="create-form" initialData={null} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+                </TabsContent>
+                <TabsContent value="ai" className="mt-4">
+                  <AIGenerator onQuestionSaved={handleFormSave} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+                </TabsContent>
+                <TabsContent value="bulk" className="mt-4">
+                  <BulkUpload onQuestionSaved={handleFormSave} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </motion.div>
+        <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+          <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
+            <DialogHeader><DialogTitle>{editingQuestion ? 'Edit Question' : 'Create New Question'}</DialogTitle></DialogHeader>
+            <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
+              <QuestionForm key={editingQuestion ? editingQuestion.id : 'dialog-create-form'} initialData={editingQuestion} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
+            </div>
+          </DialogContent>
+        </Dialog>
+        <CreateQuestionBankDialog isOpen={isCreateBankDialogOpen} onOpenChange={setIsCreateBankDialogOpen} onBankCreated={handleBankCreated} />
       </div>
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
-        <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
-          <CardHeader>
-            <CardTitle className="text-3xl font-bold flex items-center gap-3"><BookCopy className="w-8 h-8 text-indigo-500" />Question Repository</CardTitle>
-            <CardDescription>A centralized hub to browse, create, and intelligently generate questions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
-                <TabsTrigger value="browse">Browse</TabsTrigger>
-                <TabsTrigger value="create">Create Manually</TabsTrigger>
-                <TabsTrigger value="ai">AI Generator</TabsTrigger>
-                <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="browse" className="mt-4">
-                <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                    <div className="lg:col-span-2">
-                      <Label htmlFor="search-term">Search</Label>
-                      <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                    </div>
-                    <div>
-                      <Label htmlFor="class-filter">Class</Label>
-                      <Select value={classFilter} onValueChange={setClassFilter}>
-                        <SelectTrigger id="class-filter"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="subject-filter">Subject</Label>
-                      <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                        <SelectTrigger id="subject-filter"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="difficulty-filter">Difficulty</Label>
-                      <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-                        <SelectTrigger id="difficulty-filter"><SelectValue /></SelectTrigger>
-                        <SelectContent><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-end gap-2 lg:col-span-5">
-                      <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
-                      <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
-                    </div>
-                  </div>
-                </Card>
-
-                {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                  : filteredQuestions.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                      {filteredQuestions.map(q => <QuestionCard key={q.id} question={q} onEdit={handleEdit} onDelete={handleDelete} />)}
-                    </div>
-                  ) : (
-                    <div className="text-center py-16 text-gray-500">
-                      <p className="font-semibold">No questions found</p>
-                      <p className="text-sm">Try adjusting your filters or creating a new question.</p>
-                    </div>
-                  )}
-              </TabsContent>
-
-              <TabsContent value="create" className="mt-4">
-                <QuestionForm key="create-form" initialData={null} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-              </TabsContent>
-              <TabsContent value="ai" className="mt-4">
-                <AIGenerator onQuestionSaved={handleFormSave} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-              </TabsContent>
-              <TabsContent value="bulk" className="mt-4">
-                <BulkUpload onQuestionSaved={handleFormSave} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </motion.div>
-      <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-5xl h-[90vh] flex flex-col">
-          <DialogHeader><DialogTitle>{editingQuestion ? 'Edit Question' : 'Create New Question'}</DialogTitle></DialogHeader>
-          <div className="flex-grow overflow-y-auto -mx-6 px-6 pb-4">
-            <QuestionForm key={editingQuestion ? editingQuestion.id : 'dialog-create-form'} initialData={editingQuestion} onSave={handleFormSave} onCancel={() => setIsFormOpen(false)} classes={classes} questionBanks={questionBanks} openCreateBankDialog={() => setIsCreateBankDialogOpen(true)} />
-          </div>
-        </DialogContent>
-      </Dialog>
-      <CreateQuestionBankDialog isOpen={isCreateBankDialogOpen} onOpenChange={setIsCreateBankDialogOpen} onBankCreated={handleBankCreated} />
-    </div>
+    </MathJaxContext>
   );
 }
 
@@ -489,7 +517,7 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
       <CardHeader className="pb-4">
         <div className="flex justify-between items-start gap-2">
           <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
-            <Latex>{question.questionText || ''}</Latex>
+            <MathJax>{question.questionText || ''}</MathJax>
           </CardTitle>
           <Badge variant="outline">{question.marks} Marks</Badge>
         </div>
@@ -513,11 +541,11 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
             <ul className="list-disc pl-5 my-0 space-y-2">
               {((question.options || []) || []).map((opt: any, i: number) => (
                 <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                  <Latex>{opt.text || ''}</Latex>
+                  <MathJax inline>{opt.text || ''}</MathJax>
                   {opt.isCorrect && opt.explanation && (
                     <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
                       <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
-                      <span className="text-green-600 dark:text-green-400 text-xs"><Latex>{opt.explanation}</Latex></span>
+                      <span className="text-green-600 dark:text-green-400 text-xs"><MathJax inline>{opt.explanation}</MathJax></span>
                     </div>
                   )}
                 </li>
@@ -532,13 +560,13 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
               {((question.subQuestions || []) || []).map((sq: any, i: number) => (
                 <li key={i} className="space-y-2">
                   <div>
-                    <Latex>{sq.question || ''}</Latex>
+                    <MathJax>{sq.question || ''}</MathJax>
                     <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                   </div>
                   {sq.modelAnswer && (
                     <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
                       <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
-                      <span className="text-blue-600 dark:text-blue-400 text-xs"><Latex>{sq.modelAnswer}</Latex></span>
+                      <span className="text-blue-600 dark:text-blue-400 text-xs"><MathJax>{sq.modelAnswer}</MathJax></span>
                     </div>
                   )}
                 </li>
@@ -550,7 +578,7 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-              <Latex>{question.modelAnswer}</Latex>
+              <MathJax>{question.modelAnswer}</MathJax>
             </div>
           </div>
         )}
@@ -982,18 +1010,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           <Label>Live Preview</Label>
           <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
             <div className="prose dark:prose-invert max-w-none">
-              <Latex>{questionText || ''}</Latex>
+              <MathJax>{questionText || ''}</MathJax>
               {type === 'MCQ' && (
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
                   <ul className="list-disc pl-5 space-y-2">
                     {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
                       <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                        <Latex>{opt.text || `(Option ${i + 1})`}</Latex>
+                        <MathJax inline>{opt.text || `(Option ${i + 1})`}</MathJax>
                         {opt.isCorrect && opt.explanation && (
                           <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                             <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
-                            <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
+                            <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{opt.explanation}</MathJax></p>
                           </div>
                         )}
                       </li>
@@ -1008,13 +1036,13 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
                       <li key={i} className="space-y-2">
                         <div>
-                          <Latex>{sq.question || `(Sub-question ${i + 1})`}</Latex>
+                          <MathJax>{sq.question || `(Sub-question ${i + 1})`}</MathJax>
                           <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                         </div>
                         {sq.modelAnswer && (
                           <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                            <Latex>{sq.modelAnswer}</Latex>
+                            <MathJax>{sq.modelAnswer}</MathJax>
                           </div>
                         )}
                       </li>
@@ -1026,7 +1054,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                    <Latex>{modelAnswer}</Latex>
+                    <MathJax>{modelAnswer}</MathJax>
                   </div>
                 </div>
               )}
@@ -1247,7 +1275,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       )}
                     </div>
                     <div className="whitespace-pre-wrap overflow-x-auto">
-                      <Latex>{q.questionText || ''}</Latex>
+                      <MathJax>{q.questionText || ''}</MathJax>
                     </div>
 
                     {/* MCQ Options with Explanations */}
@@ -1257,11 +1285,11 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                         <ul className="list-disc pl-5 space-y-2">
                           {((q.options || []) || []).map((opt, i) => (
                             <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                              <Latex>{opt.text || ''}</Latex>
+                              <MathJax inline>{opt.text || ''}</MathJax>
                               {opt.isCorrect && opt.explanation && (
                                 <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-green-700 dark:text-green-300">Why this is correct:</p>
-                                  <p className="text-xs text-green-600 dark:text-green-400"><Latex>{opt.explanation}</Latex></p>
+                                  <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{opt.explanation}</MathJax></p>
                                 </div>
                               )}
                             </li>
@@ -1278,13 +1306,13 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                <Latex>{sq.question || ''}</Latex>
+                                <MathJax>{sq.question || ''}</MathJax>
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (
                                 <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                                  <Latex>{sq.modelAnswer}</Latex>
+                                  <MathJax>{sq.modelAnswer}</MathJax>
                                 </div>
                               )}
                             </li>
@@ -1298,7 +1326,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                          <Latex>{q.modelAnswer}</Latex>
+                          <MathJax>{q.modelAnswer}</MathJax>
                         </div>
                       </div>
                     )}

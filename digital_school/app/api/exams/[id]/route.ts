@@ -13,8 +13,9 @@ const getQuestionsQuerySchema = z.object({
   type: z.nativeEnum(QuestionType).optional(),
   difficulty: z.nativeEnum(Difficulty).optional(),
   subject: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
 });
-
 
 // GET handler to fetch exam details and a paginated/filtered list of available questions
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -42,7 +43,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!exam) {
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
-
     // 2. Validate and parse query parameters for filtering and pagination
     const queryParams = Object.fromEntries(request.nextUrl.searchParams.entries());
     const validation = getQuestionsQuerySchema.safeParse(queryParams);
@@ -50,7 +50,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!validation.success) {
       return NextResponse.json({ error: 'Invalid query parameters', details: validation.error.flatten() }, { status: 400 });
     }
-    const { page, limit, type, difficulty, subject } = validation.data;
+    const { page, limit, type, difficulty, subject, startDate, endDate } = validation.data;
     const skip = (page - 1) * limit;
 
     // 3. Construct a dynamic where clause for professional-grade filtering
@@ -60,6 +60,16 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       ...(type && { type }),
       ...(difficulty && { difficulty }),
       ...(subject && { subject: { contains: subject, mode: 'insensitive' } }),
+      ...(startDate && endDate ? {
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        }
+      } : (startDate ? {
+        createdAt: { gte: new Date(startDate) }
+      } : (endDate ? {
+        createdAt: { lte: new Date(endDate) }
+      } : {}))),
     };
 
     // 4. Fetch the filtered and paginated questions and the total count for pagination UI
@@ -96,8 +106,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
 // PUT handler for MANUAL exam set creation
 export async function PUT(
-    request: NextRequest,
-    context: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { params } = context;
@@ -147,8 +157,8 @@ export async function PUT(
 
 // POST handler for AUTOMATIC exam set generation
 export async function POST(
-    request: NextRequest,
-    context: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { params } = context;
