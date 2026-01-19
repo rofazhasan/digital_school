@@ -5,7 +5,7 @@ import { getTokenFromRequest } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     const token = await getTokenFromRequest(request);
-    
+
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -31,7 +31,8 @@ export async function GET(request: NextRequest) {
         examId: true,
         studentId: true,
         submittedAt: true,
-        score: true
+        score: true,
+        answers: true
       },
       orderBy: {
         submittedAt: 'desc'

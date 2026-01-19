@@ -37,6 +37,7 @@ interface ExamSubmission {
   studentId: string;
   submittedAt: string;
   score?: number;
+  answers?: any;
 }
 
 const fetchUser = async () => {
@@ -107,10 +108,16 @@ export default function OnlineExamsPage() {
   // Helper to get result for an exam
   const getResult = (examId: string) => results.find((r) => r.examId === examId);
 
-  // Helper to check if user has submitted an exam
+  // Helper to check if user has submitted an exam (finished)
   const hasSubmitted = (examId: string) => {
     if (!user?.studentProfile?.id) return false;
-    return submissions.some((s) => s.examId === examId && s.studentId === user.studentProfile.id);
+    return submissions.some((s) => s.examId === examId && s.studentId === user.studentProfile.id && (s.answers as any)?._status !== 'in_progress');
+  };
+
+  // Helper to check if user has an in-progress exam
+  const hasInProgress = (examId: string) => {
+    if (!user?.studentProfile?.id) return false;
+    return submissions.some((s) => s.examId === examId && s.studentId === user.studentProfile.id && (s.answers as any)?._status === 'in_progress');
   };
 
   // Helper to determine exam status
@@ -169,10 +176,10 @@ export default function OnlineExamsPage() {
             <DarkModeToggle />
           </div>
         </div>
-        
+
         <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="sm"
             onClick={() => setShowAllExams(!showAllExams)}
             className="flex-1 sm:flex-none"
@@ -195,7 +202,7 @@ export default function OnlineExamsPage() {
           </TabsList>
           <TabsContent value="online">
             {(() => {
-              const onlineExams = showAllExams 
+              const onlineExams = showAllExams
                 ? exams.filter((e) => !e.type || e.type === "ONLINE")
                 : exams.filter((e) => (!e.type || e.type === "ONLINE") && e.classId === userClassId);
               console.log('🔍 Online exams after filtering:', {
@@ -211,6 +218,7 @@ export default function OnlineExamsPage() {
                   getResult={getResult}
                   getExamStatus={getExamStatus}
                   hasSubmitted={hasSubmitted}
+                  hasInProgress={hasInProgress}
                   loading={loading}
                 />
               );
@@ -218,7 +226,7 @@ export default function OnlineExamsPage() {
           </TabsContent>
           <TabsContent value="mixed">
             {(() => {
-              const mixedExams = showAllExams 
+              const mixedExams = showAllExams
                 ? exams.filter((e) => e.type === "MIXED")
                 : exams.filter((e) => e.type === "MIXED" && e.classId === userClassId);
               console.log('🔍 Mixed exams after filtering:', {
@@ -234,6 +242,7 @@ export default function OnlineExamsPage() {
                   getResult={getResult}
                   getExamStatus={getExamStatus}
                   hasSubmitted={hasSubmitted}
+                  hasInProgress={hasInProgress}
                   loading={loading}
                 />
               );
@@ -245,16 +254,17 @@ export default function OnlineExamsPage() {
   );
 }
 
-function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
+function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, hasInProgress, loading }: {
   exams: Exam[];
   getResult: (examId: string) => Result | undefined;
   getExamStatus: (exam: Exam) => string;
   hasSubmitted: (examId: string) => boolean;
+  hasInProgress: (examId: string) => boolean;
   loading: boolean;
 }) {
   if (loading) return <div className="text-center py-8">লোড হচ্ছে...</div>;
   if (!exams.length) return <Alert className="glass"><AlertTitle>কোনো পরীক্ষা নেই</AlertTitle><AlertDescription>এই মুহূর্তে কোনো পরীক্ষা পাওয়া যায়নি।</AlertDescription></Alert>;
-  
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       <AnimatePresence>
@@ -262,8 +272,9 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
           const status = getExamStatus(exam);
           const result = getResult(exam.id);
           const submitted = hasSubmitted(exam.id);
+          const inProgress = hasInProgress(exam.id);
           const isInactive = exam.isActive === false;
-          
+
           return (
             <motion.div
               key={exam.id}
@@ -277,12 +288,17 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
                   <div className="flex items-start justify-between gap-2">
                     <CardTitle className="text-lg leading-tight">{exam.name}</CardTitle>
                     <div className="flex flex-wrap gap-1">
-                      {hasSubmitted(exam.id) && (
+                      {submitted && (
                         <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                           ✓ জমা দেওয়া হয়েছে
                         </Badge>
                       )}
-                      {exam.allowRetake && (
+                      {inProgress && !submitted && (
+                        <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">
+                          ⏱️ চলমান
+                        </Badge>
+                      )}
+                      {exam.allowRetake && submitted && (
                         <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
                           🔄 পুনরায় পরীক্ষা
                         </Badge>
@@ -296,7 +312,7 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
                   </div>
                   <CardDescription className="text-sm">{exam.subject}</CardDescription>
                 </CardHeader>
-                
+
                 <CardContent className="pb-3">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center gap-2">
@@ -317,7 +333,7 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
                     </div>
                   </div>
                 </CardContent>
-                
+
                 <CardFooter className="pt-0">
                   {!isInactive && (
                     <div className="w-full">
@@ -345,6 +361,10 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
                               <a href={`/exams/results/${exam.id}`}>ফলাফল দেখুন</a>
                             </Button>
                           </div>
+                        ) : inProgress ? (
+                          <Button asChild variant="default" className="w-full bg-amber-600 hover:bg-amber-700">
+                            <a href={`/exams/online/${exam.id}`}>পরীক্ষা চালিয়ে যান</a>
+                          </Button>
                         ) : (
                           <Button asChild variant="default" className="w-full">
                             <a href={`/exams/online/${exam.id}`}>পরীক্ষা দিন</a>
@@ -355,7 +375,7 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
                       )}
                     </div>
                   )}
-                  
+
                   {isInactive && (
                     <div className="w-full text-center">
                       <div className="text-sm text-muted-foreground">
@@ -388,7 +408,7 @@ function ResultCard({ result }: { result: Result }) {
       </CardContent>
       <CardFooter>
         <div className="flex flex-col gap-2 w-full">
-        <Badge variant="outline">{result.isPublished ? "প্রকাশিত" : "অপ্রকাশিত"}</Badge>
+          <Badge variant="outline">{result.isPublished ? "প্রকাশিত" : "অপ্রকাশিত"}</Badge>
           {result.isPublished && (
             <Button asChild variant="outline" size="sm">
               <a href={`/exams/results/${result.examId}`}>বিস্তারিত দেখুন</a>
