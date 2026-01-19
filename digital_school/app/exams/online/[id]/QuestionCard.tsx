@@ -21,7 +21,10 @@ interface QuestionCardProps {
 
 const mathJaxConfig = {
   loader: { load: ["input/tex", "output/chtml"] },
-  tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']]
+  },
 };
 
 // Clean MCQ Option Component
@@ -82,7 +85,7 @@ const MCQOption = memo(({
 
       {/* Option Text */}
       <div className="flex-1 pt-1.5 text-sm md:text-base leading-relaxed break-words font-medium">
-        <MathJax dynamic inline>{label || ""}</MathJax>
+        <MathJax dynamic>{label || ""}</MathJax>
       </div>
 
       {/* Result Icons */}
@@ -293,7 +296,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
           {/* Question Text */}
           <div className="prose prose-indigo max-w-none text-gray-800 text-lg md:text-xl font-medium leading-relaxed mb-8">
-            <MathJax dynamic inline>{text || ""}</MathJax>
+            <MathJax dynamic>{text || ""}</MathJax>
           </div>
 
           {/* Inputs */}
