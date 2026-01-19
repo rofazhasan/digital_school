@@ -179,9 +179,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let isActuallySubmitted = false;
 
     // Safety check: if explicitly submitted status exists, force it to be submitted regardless of other flags
+    // Also respect DB status if it is explicitly IN_PROGRESS indicating an active session
+    // @ts-ignore
+    const dbStatus = existingSubmission?.status;
+
     if (isExplicitlySubmitted) {
       isActuallySubmitted = true;
-    } else if (isInProgress) {
+    } else if (isInProgress || dbStatus === IN_PROGRESS) {
       isActuallySubmitted = false;
     } else {
       isActuallySubmitted = isExplicitlySubmitted || !!existingSubmission?.submittedAt;
