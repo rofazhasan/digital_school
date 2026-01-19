@@ -156,10 +156,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // So if it's explicitly submitted OR (legacy and has submittedAt time), it's done.
     // Also, if `isInProgress` is true, it's definitely NOT submitted (unless bugged, but we fixed submit route).
-    // UPDATE: We now prioritize `submittedAt`. If `submittedAt` is set, it IS submitted, regardless of `_status`.
-    // This fixes the case where an exam might have `_status: in_progress` but was actually submitted (bug state or legacy).
+    // UPDATE: We prioritize `isInProgress` check. If it is in progress, it is NOT submitted.
+    // We only fall back to `submittedAt` check if the status is NOT 'in_progress' (handling legacy cases).
 
-    const isActuallySubmitted = isSubmittedStatus || !!existingSubmission?.submittedAt;
+    let isActuallySubmitted = false;
+    if (isInProgress) {
+      isActuallySubmitted = false;
+    } else {
+      isActuallySubmitted = isSubmittedStatus || !!existingSubmission?.submittedAt;
+    }
 
     const hasSubmitted = isActuallySubmitted && !exam.allowRetake;
 
