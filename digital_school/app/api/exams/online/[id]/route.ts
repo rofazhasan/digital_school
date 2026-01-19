@@ -183,7 +183,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // @ts-ignore
     const dbStatus = existingSubmission?.status;
 
-    if (isExplicitlySubmitted) {
+    if (dbStatus === SUBMITTED) {
+      isActuallySubmitted = true;
+    } else if (isExplicitlySubmitted) {
       isActuallySubmitted = true;
     } else if (isInProgress || dbStatus === IN_PROGRESS) {
       isActuallySubmitted = false;
