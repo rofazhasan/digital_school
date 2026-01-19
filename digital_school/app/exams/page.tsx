@@ -26,7 +26,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 // Mock user role (replace with real auth logic)
-const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
+// Mock user role (replace with real auth logic)
+// const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
 
 type Exam = {
   id: string;
@@ -71,12 +72,28 @@ export default function ExamsPage() {
     sortOrder: 'desc'
   });
   const [activeTab, setActiveTab] = useState('all');
+  const [userRole, setUserRole] = useState<string>("");
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
     fetchExams();
+    fetchUserRole();
   }, []);
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await fetch("/api/user");
+      if (response.ok) {
+        const data = await response.json();
+        if (data.user && data.user.role) {
+          setUserRole(data.user.role);
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch user role:", error);
+    }
+  };
 
   const fetchExams = async () => {
     setLoading(true);
@@ -687,7 +704,14 @@ export default function ExamsPage() {
                                   <Eye className="w-4 h-4 mr-2" />
                                   View Details
                                 </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}>
+                                <DropdownMenuItem onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (userRole === "SUPER_USER" || userRole === "ADMIN") {
+                                    router.push(`/exams/evaluations/${exam.id}/results`);
+                                  } else {
+                                    router.push(`/exams/results/${exam.id}`);
+                                  }
+                                }}>
                                   <BarChart3 className="w-4 h-4 mr-2" />
                                   View Results
                                 </DropdownMenuItem>

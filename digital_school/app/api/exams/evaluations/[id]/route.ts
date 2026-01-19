@@ -113,7 +113,7 @@ export async function GET(
     // Get questions from exam sets - each student might have different questions
     const allQuestions: any[] = [];
     const studentQuestionsMap = new Map();
-    
+
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
       const generatedSet = exam.generatedSet as any;
@@ -121,14 +121,14 @@ export async function GET(
         allQuestions.push(...generatedSet.questions);
       }
     }
-    
+
     // Get questions from examSets
     if ((exam as any).examSets) {
       for (const examSet of (exam as any).examSets) {
         if (examSet.questionsJson) {
           try {
-            const questionsJson = typeof examSet.questionsJson === 'string' 
-              ? JSON.parse(examSet.questionsJson) 
+            const questionsJson = typeof examSet.questionsJson === 'string'
+              ? JSON.parse(examSet.questionsJson)
               : examSet.questionsJson;
             if (Array.isArray(questionsJson)) {
               // Store questions by examSet ID
@@ -141,7 +141,7 @@ export async function GET(
         }
       }
     }
-    
+
 
 
     // Process submissions to include evaluation data
@@ -149,7 +149,7 @@ export async function GET(
       (exam as any).examSubmissions.map(async (submission: any) => {
         // Get questions for this specific student based on their exam set
         let studentQuestions = allQuestions;
-        
+
         // Try to get student's specific exam set questions
         const examStudentMap = await prisma.examStudentMap.findUnique({
           where: {
@@ -159,11 +159,11 @@ export async function GET(
             }
           }
         });
-        
+
         if (examStudentMap?.examSetId && studentQuestionsMap.has(examStudentMap.examSetId)) {
           studentQuestions = studentQuestionsMap.get(examStudentMap.examSetId);
         }
-        
+
         // Calculate total marks and earned marks
         let totalMarks = 0;
         let earnedMarks = 0;
@@ -180,12 +180,12 @@ export async function GET(
               const path = require('path');
               if (fs.existsSync(uploadDir)) {
                 const files = fs.readdirSync(uploadDir);
-                const imageFiles = files.filter((file: string) => 
+                const imageFiles = files.filter((file: string) =>
                   file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
                 );
                 if (imageFiles.length > 0) {
                   // Replace blob URLs with actual file paths
-                  fixedAnswers[questionId] = imageFiles.map((file: string) => 
+                  fixedAnswers[questionId] = imageFiles.map((file: string) =>
                     `/uploads/exam-answers/${examId}/${submission.studentId}/${questionBaseId}/${file}`
                   );
                 }
@@ -198,7 +198,7 @@ export async function GET(
 
         for (const question of studentQuestions) {
           totalMarks += question.marks;
-          
+
           const answer = fixedAnswers[question.id];
           if (question.type === 'MCQ') {
             // Auto-grade MCQ
@@ -206,7 +206,7 @@ export async function GET(
               const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
               const userAns = normalize(answer);
               let isCorrect = false;
-              
+
               // Enhanced MCQ answer comparison logic
               if (question.options && Array.isArray(question.options)) {
                 // Check if student answer matches any option marked as correct
@@ -216,11 +216,11 @@ export async function GET(
                   isCorrect = userAns === correctOptionText;
                 }
               }
-              
+
               // Fallback: Check if there's a direct correctAnswer field
               if (!isCorrect && question.correctAnswer) {
                 const correctAnswer = question.correctAnswer;
-                
+
                 if (typeof correctAnswer === 'number') {
                   isCorrect = userAns === normalize(String(correctAnswer));
                 } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
@@ -232,13 +232,13 @@ export async function GET(
                   isCorrect = userAns === normalize(String(correctAnswer));
                 }
               }
-              
+
               // Final fallback: use question.correct
               if (!isCorrect && question.correct) {
                 const correctAns = normalize(String(question.correct));
                 isCorrect = userAns === correctAns;
               }
-              
+
               if (isCorrect) {
                 earnedMarks += question.marks;
               } else {
@@ -258,12 +258,12 @@ export async function GET(
 
         // Get evaluation status - check if submission has evaluation data
         let evaluationStatus = 'PENDING';
-        
+
         // Check if any questions have been manually graded
-        const hasManualGrading = Object.keys(submission.answers).some(key => 
+        const hasManualGrading = Object.keys(submission.answers).some(key =>
           key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
         );
-        
+
         if (submission.evaluatedAt) {
           evaluationStatus = 'COMPLETED';
         } else if (hasManualGrading || submission.evaluatorNotes) {
@@ -297,7 +297,8 @@ export async function GET(
             cqMarks: result.cqMarks,
             sqMarks: result.sqMarks,
             total: result.total
-          } : null
+          } : null,
+          submissionStatus: submission.status // Expose raw submission status (IN_PROGRESS/SUBMITTED)
         };
 
         console.log(`📊 Submission ${submission.id} result data:`, {
@@ -312,7 +313,7 @@ export async function GET(
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
-    
+
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
       const generatedSet = exam.generatedSet as any;
@@ -320,14 +321,14 @@ export async function GET(
         baseQuestions = generatedSet.questions;
       }
     }
-    
+
     // If no questions from generatedSet, try to get from exam sets
     if (baseQuestions.length === 0 && studentQuestionsMap.size > 0) {
       // Use the first available exam set's questions
       const firstExamSetId = Array.from(studentQuestionsMap.keys())[0];
       baseQuestions = studentQuestionsMap.get(firstExamSetId);
     }
-    
+
     // If still no questions, try to get from a specific student's exam set
     if (baseQuestions.length === 0 && processedSubmissions.length > 0) {
       const firstStudent = processedSubmissions[0];
@@ -339,14 +340,14 @@ export async function GET(
           }
         }
       });
-      
+
       if (studentMap?.examSetId && studentQuestionsMap.has(studentMap.examSetId)) {
         baseQuestions = studentQuestionsMap.get(studentMap.examSetId);
       }
     }
-    
 
-    
+
+
     const examData = {
       id: exam.id,
       name: exam.name,
@@ -357,15 +358,15 @@ export async function GET(
         let parsedSubQuestions = null;
         if (q.subQuestions) {
           try {
-            parsedSubQuestions = typeof q.subQuestions === 'string' 
-              ? JSON.parse(q.subQuestions) 
+            parsedSubQuestions = typeof q.subQuestions === 'string'
+              ? JSON.parse(q.subQuestions)
               : q.subQuestions;
           } catch (e) {
             console.error('Error parsing subQuestions:', e);
             parsedSubQuestions = null;
           }
         }
-        
+
         return {
           id: q.id,
           type: q.type.toLowerCase(),
