@@ -86,9 +86,12 @@ export default function ExamsPage() {
       const response = await fetch("/api/user");
       if (response.ok) {
         const data = await response.json();
+        console.log("Fetched user role:", data.user?.role); // Debug log
         if (data.user && data.user.role) {
           setUserRole(data.user.role);
         }
+      } else {
+        console.error("Failed to fetch user role, status:", response.status);
       }
     } catch (error) {
       console.error("Failed to fetch user role:", error);
@@ -691,6 +694,7 @@ export default function ExamsPage() {
                               <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
                                 {exam.description || 'No description provided'}
                               </CardDescription>
+                              <div className="hidden">{/* Debug hidden element */}{userRole}</div>
                             </div>
 
                             <DropdownMenu>
@@ -706,7 +710,8 @@ export default function ExamsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
-                                  if (userRole === "SUPER_USER" || userRole === "ADMIN") {
+                                  const role = userRole?.toUpperCase();
+                                  if (role === "SUPER_USER" || role === "ADMIN" || role === "TEACHER") {
                                     router.push(`/exams/evaluations/${exam.id}/results`);
                                   } else {
                                     router.push(`/exams/results/${exam.id}`);
