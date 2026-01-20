@@ -73,10 +73,15 @@ export default function MaintenancePage() {
                     )}
 
                     {!isAdmin && (
-                        <Button onClick={() => window.location.reload()} variant="outline" className="w-full">
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Check Status
-                        </Button>
+                        <div className="space-y-3">
+                            <Button onClick={() => window.location.reload()} variant="outline" className="w-full">
+                                <RefreshCw className="mr-2 h-4 w-4" />
+                                Check Status
+                            </Button>
+                            <Button onClick={() => router.push('/login')} variant="ghost" className="w-full text-xs text-muted-foreground">
+                                Admin Login
+                            </Button>
+                        </div>
                     )}
                 </div>
 
