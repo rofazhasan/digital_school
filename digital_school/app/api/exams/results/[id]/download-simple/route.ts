@@ -2,38 +2,39 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
 
+// Explicitly export dynamic to prevent static optimization issues
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('🔍 CSV Download API called:', { 
+    console.log('🔍 CSV Download API called:', {
       url: request.url,
       method: request.method,
-      headers: Object.fromEntries(request.headers.entries())
     });
-    
+
+    // 1. Authentication
     const token = await getTokenFromRequest(request);
-    
-    console.log('🔍 CSV Token result:', { 
-      hasToken: !!token,
-      userRole: token?.user?.role,
-      userId: token?.user?.id
-    });
-    
+
     if (!token) {
+      console.warn('⚠️ CSV Download: Unauthorized attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = token.user;
+    const { user } = token;
     const { id: examId } = await params;
 
-    // Check permissions - only teachers, admins, and super users can download results
+    console.log('👤 User requesting CSV:', { userId: user.id, role: user.role, examId });
+
+    // 2. Permission Check
     if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(user.role)) {
+      console.warn('⛔ CSV Download: Insufficient permissions for user', user.id);
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Fetch exam and results data
+    // 3. Data Fetching
     const exam = await prismadb.exam.findUnique({
       where: { id: examId },
       include: {
@@ -46,11 +47,16 @@ export async function POST(
     });
 
     if (!exam) {
+      console.error('❌ CSV Download: Exam not found', examId);
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
 
-    // Check institute access for teachers and admins
+    // 4. Institute Access Check
     if (user.role !== 'SUPER_USER' && user.instituteId !== exam.class.instituteId) {
+      console.warn('⛔ CSV Download: Institute mismatch', {
+        userInstitute: user.instituteId,
+        examInstitute: exam.class.instituteId
+      });
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -60,9 +66,7 @@ export async function POST(
         student: {
           include: {
             user: {
-              select: {
-                name: true
-              }
+              select: { name: true }
             },
             class: true
           }
@@ -75,10 +79,11 @@ export async function POST(
     });
 
     if (results.length === 0) {
+      console.warn('⚠️ CSV Download: No results found for exam', examId);
       return NextResponse.json({ error: 'No results found for this exam' }, { status: 404 });
     }
 
-    // Calculate statistics
+    // 5. Statistics Calculation
     const totalStudents = results.length;
     const totalScore = results.reduce((sum, r) => sum + r.total, 0);
     const averageScore = totalScore / totalStudents;
@@ -87,7 +92,8 @@ export async function POST(
     const passCount = results.filter(r => r.total >= exam.passMarks).length;
     const passRate = (passCount / totalStudents) * 100;
 
-    // Generate CSV instead of PDF for simplicity
+    // 6. CSV Generation
+    console.log('📄 Generating CSV...');
     const csvContent = generateCSVResults({
       exam,
       results,
@@ -101,21 +107,27 @@ export async function POST(
       },
       institute: exam.class.institute
     });
+    console.log('✅ CSV Generated successfully, length:', csvContent.length);
 
+    // 7. Response
     return new NextResponse(csvContent, {
       headers: {
         'Content-Type': 'text/csv',
-        'Content-Disposition': `attachment; filename="exam-results-${exam.name}-${exam.class.name}-${exam.class.section}.csv"`
+        'Content-Disposition': `attachment; filename="exam-results-${sanitizeFilename(exam.name)}.csv"`
       }
     });
 
   } catch (error) {
-    console.error('Error generating results CSV:', error);
+    console.error('💥 Error generating results CSV:', error);
     return NextResponse.json(
       { error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
 interface CSVData {
@@ -140,46 +152,45 @@ function generateCSVResults(data: CSVData): string {
     day: 'numeric'
   });
 
-  // Helper function to sanitize text for CSV
-  function sanitizeText(text: string): string {
-    if (!text) return '';
-    // Remove or replace Unicode characters that cause issues
-    return text.replace(/[^\x00-\x7F]/g, (char) => {
-      // Replace Bengali/Unicode characters with ASCII equivalents or remove them
-      const replacements: { [key: string]: string } = {
-        'আ': 'A', 'ব': 'B', 'গ': 'G', 'ঘ': 'Gh', 'ঙ': 'Ng',
-        'চ': 'Ch', 'ছ': 'Chh', 'জ': 'J', 'ঝ': 'Jh', 'ঞ': 'Ny',
-        'ট': 'T', 'ঠ': 'Th', 'ড': 'D', 'ঢ': 'Dh', 'ণ': 'N',
-        'ত': 'T', 'থ': 'Th', 'দ': 'D', 'ধ': 'Dh', 'ন': 'N',
-        'প': 'P', 'ফ': 'Ph', 'ব': 'B', 'ভ': 'Bh', 'ম': 'M',
-        'য': 'Y', 'র': 'R', 'ল': 'L', 'শ': 'Sh', 'ষ': 'Sh',
-        'স': 'S', 'হ': 'H', 'ড়': 'R', 'ঢ়': 'Rh', 'য়': 'Y',
-        'ৎ': 'K', 'ং': 'Ng', 'ঃ': 'H', 'ঁ': 'N',
-        // Add more replacements as needed
-      };
-      return replacements[char] || '?';
-    });
-  }
+  // Helper function to escape CSV fields
+  const escape = (text: string | number | null | undefined) => {
+    if (text === null || text === undefined) return '""';
+    const str = String(text);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return `"${str}"`;
+  };
 
-  // Create English CSV header
-  let csv = `"${sanitizeText(institute?.name || 'Educational Institute')}"\n`;
-  csv += `"Class: ${sanitizeText(exam.class.name)} ${sanitizeText(exam.class.section)}"\n`;
-  csv += `"Exam: ${sanitizeText(exam.name)}"\n`;
-  csv += `"Total Marks: ${exam.totalMarks} | Pass Marks: ${exam.passMarks}"\n\n`;
-  
-  // Add results table with English headers
-  csv += `"Serial No.","Roll No.","Student Name","Total Marks","Rank","Comments"\n`;
-  
+  let csv = [];
+
+  // Header Info
+  csv.push([escape(institute?.name || 'Educational Institute')]);
+  csv.push([escape(`Class: ${exam.class.name} ${exam.class.section}`)]);
+  csv.push([escape(`Exam: ${exam.name}`)]);
+  csv.push([escape(`Total Marks: ${exam.totalMarks} | Pass Marks: ${exam.passMarks}`)]);
+  csv.push([]); // Empty line
+
+  // Table Headers
+  csv.push(['Serial No.', 'Roll No.', 'Student Name', 'Total Marks', 'Rank', 'Status'].map(escape).join(','));
+
+  // Rows
   results.forEach((result, index) => {
     const comment = result.total >= exam.passMarks ? 'Pass' : 'Fail';
-    csv += `"${index + 1}","${sanitizeText(result.student.roll)}","${sanitizeText(result.student.user.name)}","${result.total}","${result.rank || 'N/A'}","${comment}"\n`;
+    csv.push([
+      escape(index + 1),
+      escape(result.student.roll),
+      escape(result.student.user.name),
+      escape(result.total),
+      escape(result.rank || 'N/A'),
+      escape(comment)
+    ].join(','));
   });
-  
-  // Add summary in English
-  csv += `\n"Summary: Out of ${statistics.totalStudents} students, ${statistics.passCount} students passed the examination."\n`;
-  csv += `"Generated on: ${currentDate}"\n`;
-  csv += `"Head Master: ${sanitizeText(institute?.name || 'Educational Institute')}"\n`;
-  csv += `"QR Code for verification: ${exam.id}"\n`;
-  
-  return csv;
+
+  // Summary
+  csv.push([]);
+  csv.push([escape(`Summary: Out of ${statistics.totalStudents} students, ${statistics.passCount} students passed the examination.`)]);
+  csv.push([escape(`Generated on: ${currentDate}`)]);
+
+  return csv.join('\n');
 } 
