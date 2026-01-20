@@ -197,6 +197,16 @@ export default function SuperUserDashboardPage() {
       .then(data => { if (data.institute) setInstitute(data.institute); })
       .catch(console.error);
 
+    // Fetch initial settings
+    fetch('/api/settings')
+      .then(res => res.json())
+      .then(data => {
+        if (data && typeof data.maintenanceMode === 'boolean') {
+          setInstitute(prev => prev ? ({ ...prev, maintenanceMode: data.maintenanceMode }) : null);
+        }
+      })
+      .catch(console.error);
+
     fetch('/api/stats')
       .then(res => res.json())
       .then(data => setStats(data.stats))

@@ -55,3 +55,23 @@ export async function PATCH(request: NextRequest) {
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 }
+
+export async function GET(request: NextRequest) {
+    try {
+        const token = await getTokenFromRequest(request);
+
+        if (!token || token.user.role !== 'SUPER_USER') {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        }
+
+        const settings = await db.settings.findFirst();
+
+        return NextResponse.json({
+            maintenanceMode: settings?.maintenanceMode || false
+        });
+
+    } catch (error) {
+        console.error('Error fetching settings:', error);
+        return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+}
