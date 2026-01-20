@@ -12,7 +12,6 @@ export async function PATCH(request: NextRequest) {
         }
 
         const body = await request.json();
-        // Destructure all possible fields
         const {
             maintenanceMode,
             instituteName,
@@ -25,7 +24,6 @@ export async function PATCH(request: NextRequest) {
             colorTheme
         } = body;
 
-        // Find existing settings or bootstrap
         let settings = await db.settings.findFirst({
             include: { institute: true }
         });
@@ -41,45 +39,60 @@ export async function PATCH(request: NextRequest) {
                     instituteId: institute.id,
                     instituteName: instituteName || institute.name,
                     maintenanceMode: typeof maintenanceMode === 'boolean' ? maintenanceMode : false,
-                    // valid json fields
-                    colorTheme: colorTheme || undefined,
-                    logoUrl: logoUrl || undefined,
-                    signatureUrl: signatureUrl || undefined
+                    colorTheme: colorTheme ?? undefined,
+                    logoUrl: logoUrl ?? undefined,
+                    signatureUrl: signatureUrl ?? undefined,
+                    contactInfo: { phone, email, website, address }
                 },
                 include: { institute: true }
             });
         }
 
-        // Update Institute Table (Source of truth for global app)
-        if (settings.instituteId) {
+        // Prepare update data for Institute
+        const instituteUpdate: any = {};
+        if (instituteName !== undefined) instituteUpdate.name = instituteName;
+        if (address !== undefined) instituteUpdate.address = address;
+        if (phone !== undefined) instituteUpdate.phone = phone;
+        if (email !== undefined) instituteUpdate.email = email;
+        if (website !== undefined) instituteUpdate.website = website;
+        if (logoUrl !== undefined) instituteUpdate.logoUrl = logoUrl;
+        if (signatureUrl !== undefined) instituteUpdate.signatureUrl = signatureUrl;
+        if (colorTheme !== undefined) instituteUpdate.colorTheme = colorTheme;
+
+        if (Object.keys(instituteUpdate).length > 0 && settings.instituteId) {
             await db.institute.update({
                 where: { id: settings.instituteId },
-                data: {
-                    name: instituteName,
-                    address,
-                    phone,
-                    email,
-                    website,
-                    logoUrl,
-                    signatureUrl,
-                    colorTheme: colorTheme // Ensure strictly valid JSON or atomic value
-                }
+                data: instituteUpdate
             });
         }
 
-        // Update Settings Table (Sync redundant fields)
-        settings = await db.settings.update({
-            where: { id: settings.id },
-            data: {
-                maintenanceMode: typeof maintenanceMode === 'boolean' ? maintenanceMode : settings.maintenanceMode,
-                instituteName,
-                logoUrl,
-                signatureUrl,
-                colorTheme,
-                contactInfo: { phone, email, website, address } // Store extra contact info in JSON if needed
-            },
-            include: { institute: true }
-        });
+        // Prepare update data for Settings
+        const settingsUpdate: any = {};
+        if (typeof maintenanceMode === 'boolean') settingsUpdate.maintenanceMode = maintenanceMode;
+        if (instituteName !== undefined) settingsUpdate.instituteName = instituteName;
+        if (logoUrl !== undefined) settingsUpdate.logoUrl = logoUrl;
+        if (signatureUrl !== undefined) settingsUpdate.signatureUrl = signatureUrl;
+        if (colorTheme !== undefined) settingsUpdate.colorTheme = colorTheme;
+
+        // Merge contact info if any field is present
+        if (phone !== undefined || email !== undefined || website !== undefined || address !== undefined) {
+            const currentContact = settings.contactInfo as any || {};
+            settingsUpdate.contactInfo = {
+                ...currentContact,
+                ...(phone !== undefined && { phone }),
+                ...(email !== undefined && { email }),
+                ...(website !== undefined && { website }),
+                ...(address !== undefined && { address }),
+            };
+        }
+
+        if (Object.keys(settingsUpdate).length > 0) {
+            settings = await db.settings.update({
+                where: { id: settings.id },
+                data: settingsUpdate,
+                include: { institute: true }
+            });
+        }
 
         return NextResponse.json({
             success: true,

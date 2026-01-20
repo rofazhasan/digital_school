@@ -10,10 +10,20 @@ import MaintenanceGuard from "@/components/MaintenanceGuard";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Digital School",
-  description: "A comprehensive digital school management system",
-};
+import db from "@/lib/db";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await db.settings.findFirst({
+    select: { instituteName: true, institute: { select: { name: true } } }
+  });
+
+  const title = settings?.instituteName || settings?.institute?.name || "Digital School";
+
+  return {
+    title: title,
+    description: "A comprehensive digital school management system",
+  };
+}
 
 export default function RootLayout({
   children,

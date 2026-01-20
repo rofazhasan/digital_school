@@ -48,6 +48,7 @@ import {
   Phone,
   MapPin
 } from "lucide-react";
+import { AppFooter } from "@/components/AppFooter";
 
 interface User {
   id: string;
@@ -743,62 +744,7 @@ export default function StudentDashboardPage() {
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="border-t bg-muted/50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
-                <span className="font-semibold text-lg">Digital School</span>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Empowering education through technology. Providing comprehensive digital solutions for modern learning.
-              </p>
-              <div className="flex space-x-4">
-                <Button variant="ghost" size="sm">
-                  <Mail className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <Phone className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="sm">
-                  <MapPin className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Quick Links</h3>
-              <div className="space-y-2 text-sm">
-                <a href="#" className="block text-muted-foreground hover:text-foreground">About Us</a>
-                <a href="#" className="block text-muted-foreground hover:text-foreground">Contact</a>
-                <a href="#" className="block text-muted-foreground hover:text-foreground">Privacy Policy</a>
-                <a href="#" className="block text-muted-foreground hover:text-foreground">Terms of Service</a>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-semibold mb-4">Contact Info</h3>
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>123 Education Street</p>
-                <p>Dhaka, Bangladesh</p>
-                <p>Phone: +880 1234-567890</p>
-                <p>Email: info@digitalschool.edu</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t mt-8 pt-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              © 2024 Digital School. Made with ❤️ by{' '}
-              <a href="#" className="text-primary hover:underline font-medium">
-                Md. Rofaz Hasan Rafiu
-              </a>
-            </p>
-          </div>
-        </div>
-      </footer>
+      <AppFooter />
     </div>
   );
 } 
