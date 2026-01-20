@@ -8,10 +8,14 @@ declare global {
 
 // Enhanced Prisma Client with connection pooling and timeout settings
 const createPrismaClient = () => {
+    const url = process.env.DATABASE_URL || 'postgresql://build:build@localhost:5432/builddb';
+    if (!process.env.DATABASE_URL) {
+        console.warn('⚠️ DATABASE_URL is missing. Using dummy connection string for build.');
+    }
     return new PrismaClient({
         datasources: {
             db: {
-                url: process.env.DATABASE_URL,
+                url: url,
             },
         },
         // Connection pooling settings for better performance
@@ -40,7 +44,7 @@ export class DatabaseClient {
 
         this.isConnecting = true;
         this.connectionPromise = this.connectWithRetry();
-        
+
         try {
             this.instance = await this.connectionPromise;
             return this.instance;
@@ -57,16 +61,16 @@ export class DatabaseClient {
             try {
                 // Test the connection
                 await prismadb.$connect();
-                
+
                 // Verify connection with a simple query
                 await prismadb.$queryRaw`SELECT 1`;
-                
+
                 console.log(`✅ Database connected successfully (attempt ${attempt})`);
                 return prismadb;
             } catch (error) {
                 lastError = error as Error;
                 console.error(`❌ Database connection attempt ${attempt} failed:`, error);
-                
+
                 if (attempt < maxRetries) {
                     // Wait before retrying (exponential backoff)
                     const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
@@ -93,7 +97,7 @@ export class DatabaseClient {
     ): Promise<T> {
         return Promise.race([
             operation(),
-            new Promise<never>((_, reject) => 
+            new Promise<never>((_, reject) =>
                 setTimeout(() => reject(new Error('Database operation timed out')), timeoutMs)
             )
         ]);

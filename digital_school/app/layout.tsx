@@ -13,11 +13,15 @@ const inter = Inter({ subsets: ["latin"] });
 import db from "@/lib/db";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const settings = await db.settings.findFirst({
-    select: { instituteName: true, institute: { select: { name: true } } }
-  });
-
-  const title = settings?.instituteName || settings?.institute?.name || "Digital School";
+  let title = "Digital School";
+  try {
+    const settings = await db.settings.findFirst({
+      select: { instituteName: true, institute: { select: { name: true } } }
+    });
+    title = settings?.instituteName || settings?.institute?.name || "Digital School";
+  } catch (error) {
+    console.warn("Failed to fetch settings for metadata (likely build time):", error);
+  }
 
   return {
     title: title,
