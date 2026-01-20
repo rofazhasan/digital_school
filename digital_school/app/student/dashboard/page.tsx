@@ -621,15 +621,11 @@ export default function StudentDashboardPage() {
         {activeTab === 'exams' && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">Offline & Mixed Exams</h2>
-              <Button variant="default" size="sm" onClick={() => router.push('/exams/online')}>
-                See Online Exams
-              </Button>
+              <h2 className="text-2xl font-bold">All Exams</h2>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {exams.length > 0 ? (
                 exams
-                  .filter(exam => exam.type === 'OFFLINE' || exam.type === 'MIXED')
                   .map((exam) => (
                     <Card key={exam.id} className="hover:shadow-lg transition-shadow">
                       <CardHeader>
@@ -645,10 +641,17 @@ export default function StudentDashboardPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="flex space-x-2">
-                          <Button variant="outline" className="flex-1">
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Admit Card
-                          </Button>
+                          {exam.type === 'ONLINE' ? (
+                            <Button className="flex-1" onClick={() => router.push('/exams/online')}>
+                              <Play className="h-4 w-4 mr-2" />
+                              Take Exam
+                            </Button>
+                          ) : (
+                            <Button variant="outline" className="flex-1">
+                              <Download className="h-4 w-4 mr-2" />
+                              Download Admit Card
+                            </Button>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
