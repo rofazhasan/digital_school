@@ -621,41 +621,43 @@ export default function StudentDashboardPage() {
         {activeTab === 'exams' && (
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold">All Exams</h2>
+              <h2 className="text-2xl font-bold">My Exams</h2>
+              <Button variant="default" size="sm" onClick={() => router.push('/exams/online')}>
+                See Online Exams
+              </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {exams.length > 0 ? (
-                exams
-                  .map((exam) => (
-                    <Card key={exam.id} className="hover:shadow-lg transition-shadow">
-                      <CardHeader>
-                        <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg">{exam.name}</CardTitle>
-                          <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'}>
-                            {exam.type}
-                          </Badge>
-                        </div>
-                        <CardDescription>
-                          {exam.subject} • {exam.date ? new Date(exam.date).toLocaleDateString() : ''}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex space-x-2">
-                          {exam.type === 'ONLINE' ? (
-                            <Button className="flex-1" onClick={() => router.push('/exams/online')}>
-                              <Play className="h-4 w-4 mr-2" />
-                              Take Exam
-                            </Button>
-                          ) : (
-                            <Button variant="outline" className="flex-1">
-                              <Download className="h-4 w-4 mr-2" />
-                              Download Admit Card
-                            </Button>
-                          )}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))
+                exams.map((exam) => (
+                  <Card key={exam.id} className="hover:shadow-lg transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg">{exam.name}</CardTitle>
+                        <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'}>
+                          {exam.type}
+                        </Badge>
+                      </div>
+                      <CardDescription>
+                        {exam.subject} • {exam.date ? new Date(exam.date).toLocaleDateString() : ''}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex space-x-2">
+                        {exam.type === 'ONLINE' ? (
+                          <Button className="flex-1" onClick={() => router.push('/exams/online')}>
+                            <Play className="h-4 w-4 mr-2" />
+                            Go to Online Portal
+                          </Button>
+                        ) : (
+                          <Button variant="outline" className="flex-1">
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Admit Card
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
               ) : (
                 <div className="text-muted-foreground">No exams found</div>
               )}
