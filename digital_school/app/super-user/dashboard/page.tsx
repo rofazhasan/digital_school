@@ -151,6 +151,7 @@ interface AIUsage {
 export default function SuperUserDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [institute, setInstitute] = useState<Institute | null>(null);
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -757,10 +758,10 @@ export default function SuperUserDashboardPage() {
                       </div>
                       <div className="flex items-center space-x-2">
                         <Button
-                          variant={institute?.maintenanceMode ? "destructive" : "default"}
+                          variant={maintenanceMode ? "destructive" : "default"}
                           onClick={async () => {
                             try {
-                              const newState = !institute?.maintenanceMode;
+                              const newState = !maintenanceMode;
                               const res = await fetch('/api/settings', {
                                 method: 'PATCH',
                                 headers: { 'Content-Type': 'application/json' },
@@ -769,14 +770,14 @@ export default function SuperUserDashboardPage() {
 
                               if (res.ok) {
                                 const data = await res.json();
-                                setInstitute(prev => prev ? ({ ...prev, maintenanceMode: data.maintenanceMode }) : null);
+                                setMaintenanceMode(data.maintenanceMode);
                               }
                             } catch (err) {
                               console.error('Failed to toggle maintenance mode', err);
                             }
                           }}
                         >
-                          {institute?.maintenanceMode ? 'Disable Maintenance' : 'Enable MaintenanceMode'}
+                          {maintenanceMode ? 'Disable Maintenance' : 'Enable Maintenance'}
                         </Button>
                       </div>
                     </div>
