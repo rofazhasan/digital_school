@@ -108,6 +108,7 @@ interface Institute {
   logo?: string;
   primaryColor?: string;
   signature?: string;
+  maintenanceMode?: boolean;
 }
 
 interface Exam {
@@ -719,8 +720,77 @@ export default function SuperUserDashboardPage() {
               </div>
             )}
 
+            {/* Settings Tab */}
+            {activeTab === 'settings' && (
+              <div className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <SettingsIcon className="mr-2 h-5 w-5" />
+                      Institute Settings
+                    </CardTitle>
+                    <CardDescription>
+                      Manage global settings for your institute
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                      <div className="space-y-0.5">
+                        <div className="flex items-center">
+                          <AlertTriangle className="mr-2 h-4 w-4 text-yellow-600" />
+                          <h3 className="font-medium text-base">Maintenance Mode</h3>
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          When enabled, only Admins and Super Users can access the system.
+                          <br />Students and Teachers will be logged out and blocked.
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant={institute?.maintenanceMode ? "destructive" : "default"}
+                          onClick={async () => {
+                            try {
+                              const newState = !institute?.maintenanceMode;
+                              const res = await fetch('/api/settings', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ maintenanceMode: newState })
+                              });
+
+                              if (res.ok) {
+                                const data = await res.json();
+                                setInstitute(prev => prev ? ({ ...prev, maintenanceMode: data.maintenanceMode }) : null);
+                              }
+                            } catch (err) {
+                              console.error('Failed to toggle maintenance mode', err);
+                            }
+                          }}
+                        >
+                          {institute?.maintenanceMode ? 'Disable Maintenance' : 'Enable MaintenanceMode'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Other settings placeholders */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="p-4 border rounded-lg">
+                        <h3 className="font-medium mb-2">General Information</h3>
+                        <p className="text-sm text-muted-foreground mb-4">Update institute name, address, and contacts.</p>
+                        <Button variant="outline" size="sm">Manage Info</Button>
+                      </div>
+                      <div className="p-4 border rounded-lg">
+                        <h3 className="font-medium mb-2">Branding</h3>
+                        <p className="text-sm text-muted-foreground mb-4">Upload logo, signature, and set colors.</p>
+                        <Button variant="outline" size="sm">Manage Branding</Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
             {/* Other tabs placeholder */}
-            {activeTab !== 'overview' && (
+            {activeTab !== 'overview' && activeTab !== 'settings' && (
               <Card>
                 <CardHeader>
                   <CardTitle>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</CardTitle>

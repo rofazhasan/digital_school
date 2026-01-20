@@ -24,10 +24,10 @@ export async function POST(request: NextRequest) {
             const phoneSchema = z.string().regex(/^\+?[\d\s\-\(\)]{10,15}$/, 'Invalid phone number format');
             phoneSchema.parse(identifier);
         }
-        
+
         // Find user by email or phone
         const user = await prismadb.user.findFirst({
-            where: loginMethod === 'email' 
+            where: loginMethod === 'email'
                 ? { email: identifier }
                 : { phone: identifier },
             select: {
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
                 },
             },
         });
-        
+
         if (!user) {
             return NextResponse.json(
                 { error: `Invalid ${loginMethod} or password` },
@@ -83,7 +83,21 @@ export async function POST(request: NextRequest) {
                 { status: 401 }
             );
         }
-        
+
+        // Check for maintenance mode
+        if (user.role === 'STUDENT' || user.role === 'TEACHER') {
+            const settings = await prismadb.settings.findFirst({
+                select: { maintenanceMode: true }
+            });
+
+            if (settings?.maintenanceMode) {
+                return NextResponse.json(
+                    { error: 'System is currently under maintenance. Please try again later.' },
+                    { status: 503 }
+                );
+            }
+        }
+
         // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
@@ -92,7 +106,7 @@ export async function POST(request: NextRequest) {
                 { status: 401 }
             );
         }
-        
+
         // Create JWT token
         const token = await createToken({
             userId: user.id,
@@ -110,7 +124,7 @@ export async function POST(request: NextRequest) {
         // Return user data without password
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password: _password, ...userWithoutPassword } = user;
-        
+
         // Create response with cookie
         const response = NextResponse.json({
             message: 'Login successful',
@@ -129,14 +143,14 @@ export async function POST(request: NextRequest) {
         return response;
     } catch (error) {
         console.error('Login error:', error);
-        
+
         if (error instanceof z.ZodError) {
             return NextResponse.json(
                 { error: 'Invalid input data', details: error.errors },
                 { status: 400 }
             );
         }
-        
+
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }
