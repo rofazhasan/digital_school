@@ -237,6 +237,12 @@ export default function StudentDashboardPage() {
     }
   };
 
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -251,12 +257,6 @@ export default function StudentDashboardPage() {
   if (!user) {
     return null;
   }
-
-  const [instituteSettings, setInstituteSettings] = useState<any>(null);
-
-  useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
-  }, []);
 
   const instituteName = instituteSettings?.instituteName || "Digital School";
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
