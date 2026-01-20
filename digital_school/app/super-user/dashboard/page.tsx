@@ -148,11 +148,101 @@ interface AIUsage {
   lastUsed: string;
 }
 
+// Add Dialog imports
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { PuterFileUpload } from "@/components/ui/puter-file-upload";
+
 export default function SuperUserDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [institute, setInstitute] = useState<Institute | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+
+  // Settings State
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [brandingOpen, setBrandingOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form State
+  const [formData, setFormData] = useState({
+    instituteName: '',
+    address: '',
+    phone: '',
+    email: '',
+    website: '',
+    logoUrl: '',
+    signatureUrl: '',
+    primaryColor: '#000000'
+  });
+
+  // Load initial data into form
+  useEffect(() => {
+    if (institute) {
+      setFormData(prev => ({
+        ...prev,
+        instituteName: institute.name || '',
+        address: institute.address || '',
+        phone: institute.phone || '',
+        email: institute.email || '',
+        website: institute.website || '',
+        logoUrl: institute.logoUrl || '',
+        signatureUrl: institute.signatureUrl || '',
+        primaryColor: (institute.colorTheme as any)?.primary || '#000000'
+      }));
+    }
+  }, [institute]);
+
+  const handleSaveSettings = async (type: 'info' | 'branding') => {
+    try {
+      setIsSaving(true);
+      const payload: any = {};
+
+      if (type === 'info') {
+        payload.instituteName = formData.instituteName;
+        payload.address = formData.address;
+        payload.phone = formData.phone;
+        payload.email = formData.email;
+        payload.website = formData.website;
+      } else {
+        payload.logoUrl = formData.logoUrl;
+        payload.signatureUrl = formData.signatureUrl;
+        payload.colorTheme = { primary: formData.primaryColor };
+      }
+
+      const res = await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        // Reload institute data
+        const updated = await res.json();
+        // We might need to refresh the whole page or just re-fetch institute
+        // Ideally, just update state:
+        fetch('/api/institute')
+          .then(r => r.json())
+          .then(d => { if (d.institute) setInstitute(d.institute); });
+
+        setSettingsOpen(false);
+        setBrandingOpen(false);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSaving(false);
+    }
+  };
   const [darkMode, setDarkMode] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -787,12 +877,132 @@ export default function SuperUserDashboardPage() {
                       <div className="p-4 border rounded-lg">
                         <h3 className="font-medium mb-2">General Information</h3>
                         <p className="text-sm text-muted-foreground mb-4">Update institute name, address, and contacts.</p>
-                        <Button variant="outline" size="sm">Manage Info</Button>
+
+                        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">Manage Info</Button>
+                          </DialogTrigger>
+                          <DialogContent>
+                            <DialogHeader>
+                              <DialogTitle>General Information</DialogTitle>
+                              <DialogDescription>Update your institute's public details.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                              <div className="space-y-2">
+                                <Label>Institute Name</Label>
+                                <Input value={formData.instituteName} onChange={e => setFormData({ ...formData, instituteName: e.target.value })} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Address</Label>
+                                <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Phone</Label>
+                                <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Email</Label>
+                                <Input value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Website</Label>
+                                <Input value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} />
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={() => handleSaveSettings('info')} disabled={isSaving}>
+                                {isSaving ? 'Saving...' : 'Save Changes'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
+
                       <div className="p-4 border rounded-lg">
                         <h3 className="font-medium mb-2">Branding</h3>
                         <p className="text-sm text-muted-foreground mb-4">Upload logo, signature, and set colors.</p>
-                        <Button variant="outline" size="sm">Manage Branding</Button>
+
+                        <Dialog open={brandingOpen} onOpenChange={setBrandingOpen}>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">Manage Branding</Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-xl">
+                            <DialogHeader>
+                              <DialogTitle>Institute Branding</DialogTitle>
+                              <DialogDescription>Customize your institute's look and feel.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-6 py-4">
+                              <div className="space-y-2">
+                                <Label>Details</Label>
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <Label className="text-xs">Primary Color</Label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                      <input
+                                        type="color"
+                                        value={formData.primaryColor}
+                                        onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                        className="h-8 w-12 cursor-pointer"
+                                      />
+                                      <Input
+                                        value={formData.primaryColor}
+                                        onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                        className="h-8"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Institute Logo</Label>
+                                <div className="border rounded p-2">
+                                  {formData.logoUrl && <img src={formData.logoUrl} alt="Logo" className="h-10 mb-2 object-contain" />}
+                                  <PuterFileUpload
+                                    title="Upload Logo"
+                                    accept="image/*"
+                                    maxSize={2 * 1024 * 1024}
+                                    onFileUpload={(files) => {
+                                      if (files?.[0]?.url) {
+                                        setFormData({ ...formData, logoUrl: files[0].url });
+                                      } else if (files?.[0]?.name) {
+                                        // Fallback if URL is not directly returned, might need to construct it or store path
+                                        // Assuming PUTER returns a usable URL or we need to Serve it.
+                                        // For now, let's assume valid URL or fallback to path?
+                                        // Actually puter file object has `url` if public? 
+                                        // Or we use name. Let's hope for URL.
+                                        // If not, we might need a transform.
+                                        setFormData({ ...formData, logoUrl: files[0].url || '' });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2">
+                                <Label>Digital Signature</Label>
+                                <div className="border rounded p-2">
+                                  {formData.signatureUrl && <img src={formData.signatureUrl} alt="Signature" className="h-10 mb-2 object-contain" />}
+                                  <PuterFileUpload
+                                    title="Upload Signature"
+                                    accept="image/*"
+                                    maxSize={2 * 1024 * 1024}
+                                    onFileUpload={(files) => {
+                                      if (files?.[0]?.url) {
+                                        setFormData({ ...formData, signatureUrl: files[0].url });
+                                      }
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                            <DialogFooter>
+                              <Button onClick={() => handleSaveSettings('branding')} disabled={isSaving}>
+                                {isSaving ? 'Saving...' : 'Save Branding'}
+                              </Button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       </div>
                     </div>
                   </CardContent>
