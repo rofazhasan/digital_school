@@ -105,9 +105,9 @@ interface Institute {
   phone: string;
   address: string;
   website: string;
-  logo?: string;
-  primaryColor?: string;
-  signature?: string;
+  logoUrl?: string; // Corrected from logo
+  colorTheme?: any; // Added colorTheme
+  signatureUrl?: string; // Corrected from signature
   maintenanceMode?: boolean;
 }
 
@@ -161,6 +161,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PuterFileUpload } from "@/components/ui/puter-file-upload";
+import { AppFooter } from "@/components/AppFooter";
 
 export default function SuperUserDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -485,7 +486,7 @@ export default function SuperUserDashboardPage() {
               </Button>
 
               <div className="flex items-center space-x-2">
-                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
+                <img src={institute?.logoUrl || "/logo.png"} alt={institute?.name || "Digital School"} className="h-8 w-auto object-contain" />
                 <span className="font-semibold text-lg hidden sm:block">
                   {institute?.name || "Digital School"}
                 </span>
@@ -1027,6 +1028,7 @@ export default function SuperUserDashboardPage() {
               </Card>
             )}
           </div>
+          <AppFooter />
         </main>
       </div>
     </div>

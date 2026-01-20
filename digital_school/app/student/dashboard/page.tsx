@@ -252,6 +252,15 @@ export default function StudentDashboardPage() {
     return null;
   }
 
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+  }, []);
+
+  const instituteName = instituteSettings?.instituteName || "Digital School";
+  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -261,8 +270,8 @@ export default function StudentDashboardPage() {
             {/* Logo and Navigation */}
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-2">
-                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
-                <span className="font-semibold text-lg hidden sm:block">Digital School</span>
+                <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
+                <span className="font-semibold text-lg hidden sm:block">{instituteName}</span>
               </div>
 
               {/* Desktop Navigation */}

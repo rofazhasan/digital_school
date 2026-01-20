@@ -56,6 +56,7 @@ import {
     Wifi,
     WifiOff
 } from "lucide-react";
+import { AppFooter } from '@/components/AppFooter';
 
 interface User {
     id: string;
@@ -338,6 +339,15 @@ export default function TeacherDashboardPage() {
         return null;
     }
 
+    const [instituteSettings, setInstituteSettings] = useState<any>(null);
+
+    useEffect(() => {
+        fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+    }, []);
+
+    const instituteName = instituteSettings?.instituteName || "Digital School";
+    const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+
     return (
         <div className="min-h-screen bg-background">
             {/* Header */}
@@ -346,8 +356,8 @@ export default function TeacherDashboardPage() {
                     <div className="flex items-center gap-4">
                         <div>
                             <div className="flex items-center gap-2">
-                                <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
-                                <h1 className="text-2xl font-bold">Teacher Dashboard</h1>
+                                <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
+                                <h1 className="text-2xl font-bold">{instituteName} Teacher Dashboard</h1>
                             </div>
                             <p className="text-muted-foreground">
                                 Welcome back, {user.name} • {user.teacherProfile?.department}
@@ -1214,6 +1224,7 @@ export default function TeacherDashboardPage() {
                     )}
                 </div>
             </div>
+            <AppFooter />
         </div>
     );
 }

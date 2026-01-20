@@ -24,6 +24,7 @@ import {
   Scan
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { AppFooter } from '@/components/AppFooter';
 
 
 
@@ -119,6 +120,15 @@ export default function AdminDashboard() {
     }
   };
 
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+  }, []);
+
+  const instituteName = instituteSettings?.instituteName || "Digital School";
+  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Mobile Sidebar Overlay — covers everything except the sidebar */}
@@ -146,8 +156,8 @@ export default function AdminDashboard() {
               animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
               className="flex items-center gap-2"
             >
-              <img src="/logo.png" alt="Digital School" className="h-8 w-auto" />
-              <span className="text-xl lg:text-2xl font-bold text-gray-800">Digital School</span>
+              <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
+              <span className="text-xl lg:text-2xl font-bold text-gray-800">{instituteName}</span>
             </motion.div>
             <div className="flex items-center space-x-2">
               <button
@@ -180,8 +190,8 @@ export default function AdminDashboard() {
                   }
                 }}
                 className={`w-full flex items-center px-3 lg:px-4 py-3 lg:py-3 rounded-lg transition-all duration-200 text-sm lg:text-base font-medium min-h-[44px] ${activeTab === item.id
-                    ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600 shadow-sm ring-2 ring-blue-100'
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:shadow-sm'
+                  ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600 shadow-sm ring-2 ring-blue-100'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:shadow-sm'
                   }`}
               >
                 <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 transition-colors ${activeTab === item.id ? 'text-blue-600' : 'text-gray-500'
@@ -198,8 +208,8 @@ export default function AdminDashboard() {
                     initial={{ opacity: 1 }}
                     animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
                     className={`text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center ${activeTab === item.id
-                        ? 'bg-blue-200 text-blue-700'
-                        : 'bg-blue-100 text-blue-600'
+                      ? 'bg-blue-200 text-blue-700'
+                      : 'bg-blue-100 text-blue-600'
                       }`}
                   >
                     {item.badge}
@@ -212,7 +222,7 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden flex flex-col">
         {/* Top Bar with User Menu */}
         <div className="flex items-center justify-between px-4 lg:px-8 py-4 bg-white border-b border-gray-200 relative z-10 shadow-sm">
           <button
@@ -250,8 +260,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="h-full overflow-y-auto">
+        <div className="flex-1 overflow-y-auto">
           {renderContent()}
+          <AppFooter />
         </div>
       </div>
     </div>
@@ -348,9 +359,9 @@ function OverviewTab() {
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className={`w-2 h-2 rounded-full ${activity.type === 'student' ? 'bg-blue-500' :
-                    activity.type === 'exam' ? 'bg-purple-500' :
-                      activity.type === 'teacher' ? 'bg-green-500' :
-                        activity.type === 'result' ? 'bg-yellow-500' : 'bg-gray-500'
+                  activity.type === 'exam' ? 'bg-purple-500' :
+                    activity.type === 'teacher' ? 'bg-green-500' :
+                      activity.type === 'result' ? 'bg-yellow-500' : 'bg-gray-500'
                   }`} />
                 <div className="flex-1">
                   <p className="text-xs lg:text-sm font-medium text-gray-900">{activity.action}</p>
@@ -652,8 +663,8 @@ function StudentsTab() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${student.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
                       }`}>
                       {student.status}
                     </span>
@@ -1055,8 +1066,8 @@ function TeachersTab() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${teacher.status === 'active'
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      ? 'bg-green-100 text-green-800'
+                      : 'bg-red-100 text-red-800'
                       }`}>
                       {teacher.status}
                     </span>
@@ -2261,8 +2272,8 @@ function ResultsTab() {
             ].map((activity, index) => (
               <div key={index} className="flex items-center space-x-3">
                 <div className={`w-2 h-2 rounded-full ${activity.type === 'publish' ? 'bg-green-500' :
-                    activity.type === 'grade' ? 'bg-blue-500' :
-                      activity.type === 'review' ? 'bg-purple-500' : 'bg-yellow-500'
+                  activity.type === 'grade' ? 'bg-blue-500' :
+                    activity.type === 'review' ? 'bg-purple-500' : 'bg-yellow-500'
                   }`} />
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{activity.action}</p>
