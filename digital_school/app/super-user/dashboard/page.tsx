@@ -203,7 +203,7 @@ export default function SuperUserDashboardPage() {
       .then(res => res.json())
       .then(data => {
         if (data && typeof data.maintenanceMode === 'boolean') {
-          setInstitute(prev => prev ? ({ ...prev, maintenanceMode: data.maintenanceMode }) : null);
+          setMaintenanceMode(data.maintenanceMode);
         }
       })
       .catch(console.error);
