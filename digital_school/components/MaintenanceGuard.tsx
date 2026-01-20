@@ -21,8 +21,8 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
             try {
                 setChecking(true);
                 const [maintenanceRes, userRes] = await Promise.all([
-                    fetch('/api/maintenance'),
-                    fetch('/api/user')
+                    fetch('/api/maintenance', { cache: 'no-store' }),
+                    fetch('/api/user', { cache: 'no-store' })
                 ]);
 
                 if (maintenanceRes.ok) {
@@ -37,6 +37,13 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
                             // If user is Admin or Super User, DO NOT redirect
                             if (role === 'ADMIN' || role === 'SUPER_USER') {
                                 return;
+                            }
+
+                            // Force logout for restricted users
+                            try {
+                                await fetch('/api/auth/logout', { method: 'POST' });
+                            } catch (e) {
+                                console.error('Logout failed', e);
                             }
                         }
 
