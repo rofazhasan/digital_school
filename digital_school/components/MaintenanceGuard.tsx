@@ -20,16 +20,27 @@ export default function MaintenanceGuard({ children }: { children: React.ReactNo
         const checkStatus = async () => {
             try {
                 setChecking(true);
-                const res = await fetch('/api/maintenance');
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.maintenanceMode) {
-                        // Check user role if possible, or just strict redirect and let maintenance page handle logic
-                        // Ideally we should check if user is admin, if not, redirect.
-                        // Since we can't easily sync get user here without auth context, 
-                        // we'll rely on the API to return maintenance mode AND maybe we need to check auth.
+                const [maintenanceRes, userRes] = await Promise.all([
+                    fetch('/api/maintenance'),
+                    fetch('/api/user')
+                ]);
 
-                        // Strategy: Redirect to /maintenance. The maintenance page will check if user is admin and redirect back if allowed.
+                if (maintenanceRes.ok) {
+                    const maintenanceData = await maintenanceRes.json();
+
+                    if (maintenanceData.maintenanceMode) {
+                        // Check if user is exempt
+                        if (userRes.ok) {
+                            const userData = await userRes.json();
+                            const role = userData.user?.role;
+
+                            // If user is Admin or Super User, DO NOT redirect
+                            if (role === 'ADMIN' || role === 'SUPER_USER') {
+                                return;
+                            }
+                        }
+
+                        // Otherwise, redirect to maintenance page
                         router.push('/maintenance');
                     }
                 }
