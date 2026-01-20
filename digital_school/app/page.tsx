@@ -472,14 +472,13 @@ const DeveloperTrademarkSection = () => (
             <Card className="glass-card p-6 md:p-8 text-center">
                 <h3 className="font-semibold text-lg">Developed with ❤️ by Md. Rofaz Hasan Rafiu</h3>
                 <div className="flex justify-center gap-6 mt-4">
-                    <a href="https://linkedin.com/in/rafiu-dev" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin /></a>
-                    <a href="https://facebook.com/rafiu.dev" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Facebook /></a>
-                    <a href="mailto:contact.rafiu.dev@gmail.com" className="text-muted-foreground hover:text-primary transition-colors"><Mail /></a>
+                    <a href="https://www.linkedin.com/in/md-rofaz-hasan-rafiu/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin /></a>
+                    <a href="https://github.com/rofazhasan" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Code /></a>
+                    <a href="mailto:mdrofazhasanrafiu@gmail.com" className="text-muted-foreground hover:text-primary transition-colors"><Mail /></a>
                 </div>
                 <div className="mt-6 border-t border-border/50 pt-6">
-                    <p className="text-sm text-muted-foreground">In official partnership with</p>
-                    <p className="font-bold text-xl">Elite School & College, Rangpur</p>
-                    <a href="mailto:contact.eliteschool@example.com" className="text-sm text-muted-foreground hover:text-primary transition-colors">contact.eliteschool@example.com</a>
+                    <p className="font-bold text-xl">Address</p>
+                    <p className="text-md text-muted-foreground">Kalihati, Tangail</p>
                 </div>
             </Card>
         </div>
@@ -509,9 +508,9 @@ const Footer = () => (
             <div>
                 <h4 className="font-bold mb-4">Contact</h4>
                 <ul className="space-y-2 text-muted-foreground">
-                    <li><a href="mailto:contact.eliteschool@example.com" className="hover:text-primary transition-colors">School Inquiries</a></li>
-                    <li><a href="mailto:support.elite@example.com" className="hover:text-primary transition-colors">Technical Support</a></li>
-                    <li><a href="mailto:contact.rafiu.dev@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">School Inquiries</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Technical Support</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
                 </ul>
             </div>
             <div className="flex flex-col items-center md:items-start">
@@ -520,7 +519,7 @@ const Footer = () => (
             </div>
         </div>
         <div className="text-center text-muted-foreground/50 mt-12 pt-8 border-t border-border/20">
-            <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved. A concern of Elite School & College.</p>
+            <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved.</p>
         </div>
     </footer>
 );
