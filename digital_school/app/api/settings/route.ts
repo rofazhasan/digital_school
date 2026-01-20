@@ -121,17 +121,34 @@ export async function GET(request: NextRequest) {
         });
 
         if (!settings) {
-            return NextResponse.json({ maintenanceMode: false });
+            // Fallback: If no settings record, fetch directly from Institute
+            const institute = await db.institute.findFirst();
+            if (institute) {
+                return NextResponse.json({
+                    maintenanceMode: false,
+                    instituteName: institute.name,
+                    address: institute.address,
+                    phone: institute.phone,
+                    email: institute.email,
+                    website: institute.website,
+                    logoUrl: institute.logoUrl,
+                    signatureUrl: institute.signatureUrl,
+                    colorTheme: institute.colorTheme
+                });
+            }
+            return NextResponse.json({ maintenanceMode: false, instituteName: "Digital School" });
         }
+
+        const contactInfo = settings.contactInfo as any || {};
 
         return NextResponse.json({
             maintenanceMode: settings.maintenanceMode,
-            instituteName: settings.institute?.name || settings.instituteName,
-            address: settings.institute?.address,
-            phone: settings.institute?.phone,
-            email: settings.institute?.email,
-            website: settings.institute?.website,
-            logoUrl: settings.institute?.logoUrl || settings.logoUrl,
+            instituteName: settings.institute?.name || settings.instituteName || "Digital School",
+            address: settings.institute?.address || contactInfo.address,
+            phone: settings.institute?.phone || contactInfo.phone,
+            email: settings.institute?.email || contactInfo.email,
+            website: settings.institute?.website || contactInfo.website,
+            logoUrl: settings.institute?.logoUrl || settings.logoUrl || "/logo.png",
             signatureUrl: settings.institute?.signatureUrl || settings.signatureUrl,
             colorTheme: settings.institute?.colorTheme || settings.colorTheme
         });
