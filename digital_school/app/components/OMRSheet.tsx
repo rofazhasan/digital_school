@@ -41,9 +41,10 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   subjectName = 'বিষয়',
   uniqueCode,
 }) => {
-  // Always 50 questions, split into two columns
-  const totalQuestions = 50;
-  const answerBubbleSize = 28; // MCQ answer bubbles (bigger)
+  // Always 100 questions, split into four columns
+  const totalQuestions = 100;
+  const answerBubbleSize = 24; // Smaller to fit 4 cols
+
   // Vertical field helper with box, box and bubble same width
   const verticalField = (label: string, digits: number, fontClass: string = 'omr-bubble-font', width = 1, colClass = '', size = bubbleSize) => (
     <div className={`flex flex-col items-center mx-0.5 ${colClass}`} style={{ minWidth: width * (size + 4) }}>
@@ -70,6 +71,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       </div>
     </div>
   );
+
   // Render a single column of 25 questions
   const renderMCQColumn = (startIdx: number, endIdx: number) => (
     <table className="w-full text-center border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
@@ -99,6 +101,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       </tbody>
     </table>
   );
+
   return (
     <div className="w-full h-full flex flex-col items-stretch p-0 gap-0 omr-bg-pink relative" style={{ fontFamily, borderRadius: 8, border: '2px solid #222', maxWidth: '8.27in', minHeight: '11.69in', background: '#ffb6e6', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       {/* Header: Exam info, logo, confidential, etc. */}
@@ -131,12 +134,15 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <div className="absolute left-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
       {/* Bottom-Right */}
       <div className="absolute right-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
+
       {/* Main OMR body */}
       <div className="flex-1 w-full flex flex-row items-stretch p-2 gap-0 omr-bg-pink">
-        {/* Left: Two-column MCQ Answer Table (fit 50 questions, no header) */}
-        <div className="flex-[2] flex flex-row gap-0 border border-black rounded bg-white p-2 justify-between min-w-0">
-          <div className="w-1/2 min-w-0">{renderMCQColumn(0, 25)}</div>
-          <div className="w-1/2 min-w-0">{renderMCQColumn(25, 50)}</div>
+        {/* Left: Four-column MCQ Answer Table (fit 100 questions) */}
+        <div className="flex-[4] flex flex-row gap-0 border border-black rounded bg-white p-1 justify-between min-w-0">
+          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(0, 25)}</div>
+          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(25, 50)}</div>
+          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(50, 75)}</div>
+          <div className="w-1/4 min-w-0">{renderMCQColumn(75, 100)}</div>
         </div>
         {/* Vertical black bar between answer grid and right column */}
         <div className="w-2 bg-black mx-1"></div>

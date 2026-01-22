@@ -11,274 +11,16 @@ import jsQR from 'jsqr';
 import { toast } from "sonner";
 
 export default function OMRScannerPage() {
-    const [activeTab, setActiveTab] = useState("camera");
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [scanResult, setScanResult] = useState<any>(null);
-    const [debugLog, setDebugLog] = useState<string[]>([]);
+    const [activeTab, setActiveTab] = useState("upload"); // Default to upload
 
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const animationFrameRef = useRef<number>(null);
-
-    // --- Logger ---
-    const log = (msg: string) => {
-        console.log(`[OMR] ${msg}`);
-        setDebugLog(prev => [msg, ...prev].slice(0, 10));
-    };
-
-    // --- Camera Logic ---
-    const startCamera = async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
-            });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                videoRef.current.play();
-                requestAnimationFrame(tick);
-            }
-        } catch (err) {
-            log(`Camera Error: ${err}`);
-            toast.error("Could not access camera. Please allow permissions.");
-        }
-    };
-
-    const stopCamera = () => {
-        if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(track => track.stop());
-            videoRef.current.srcObject = null;
-        }
-        if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-        }
-    };
-
-    useEffect(() => {
-        if (activeTab === 'camera') {
-            startCamera();
-        } else {
-            stopCamera();
-        }
-        return () => stopCamera();
-    }, [activeTab]);
-
-    // --- Scanning Loop ---
-    const tick = () => {
-        if (videoRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-            if (!isProcessing && !scanResult) {
-                scanFrame(videoRef.current);
-            }
-        }
-        animationFrameRef.current = requestAnimationFrame(tick);
-    };
-
-    const scanFrame = (source: CanvasImageSource) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        // Draw frame to canvas for processing
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        if (!ctx) return;
-
-        // Set canvas dimensions to match source
-        if (source instanceof HTMLVideoElement) {
-            canvas.width = source.videoWidth;
-            canvas.height = source.videoHeight;
-        } else if (source instanceof HTMLImageElement) {
-            canvas.width = source.naturalWidth;
-            canvas.height = source.naturalHeight;
-        }
-
-        ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
-
-        // 1. QR Code Detection
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(imageData.data, imageData.width, imageData.height, {
-            inversionAttempts: "dontInvert",
-        });
-
-        if (code) {
-            // Draw box around QR
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = "#00FF00";
-            ctx.beginPath();
-            ctx.moveTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
-            ctx.lineTo(code.location.topRightCorner.x, code.location.topRightCorner.y);
-            ctx.lineTo(code.location.bottomRightCorner.x, code.location.bottomRightCorner.y);
-            ctx.lineTo(code.location.bottomLeftCorner.x, code.location.bottomLeftCorner.y);
-            ctx.lineTo(code.location.topLeftCorner.x, code.location.topLeftCorner.y);
-            ctx.stroke();
-
-            try {
-                const qrData = JSON.parse(code.data);
-                if (qrData.examId && qrData.setId) {
-                    // If we found a valid QR, stop scanning loop and process further?
-                    // Or verify with user?
-                    // For now, let's just log it and maybe pause
-                    log(`Found QR: Set ${qrData.set}`);
-
-                    // TODO: Trigger Full OMR Processing here using the QR as an anchor reference
-                    // processOMR(imageData, code.location);
-                }
-            } catch (e) {
-                // Not our JSON format
-            }
-        }
-        // 2. Anchor Detection
-        // Only run anchor detection if we have a QR code or every 5th frame to save CPU
-        const binary = binarize(imageData.data, canvas.width, canvas.height, 90);
-
-        // Visualize binary on a small overlay or debug? No, stick to anchors.
-        const blobs = findBlobs(binary, canvas.width, canvas.height);
-        const anchors = findAnchors(blobs, canvas.width, canvas.height);
-
-        if (anchors) {
-            ctx.fillStyle = "rgba(0, 0, 255, 0.5)";
-            ctx.strokeStyle = "blue";
-            ctx.lineWidth = 2;
-
-            // Draw Anchors
-            [anchors.tl, anchors.tr, anchors.bl, anchors.br].forEach(p => {
-                ctx.beginPath();
-                ctx.arc(p.cx, p.cy, 10, 0, 2 * Math.PI);
-                ctx.fill();
-                ctx.stroke();
-            });
-
-            // Draw Hull
-            ctx.beginPath();
-            ctx.moveTo(anchors.tl.cx, anchors.tl.cy);
-            ctx.lineTo(anchors.tr.cx, anchors.tr.cy);
-            ctx.lineTo(anchors.br.cx, anchors.br.cy);
-            ctx.lineTo(anchors.bl.cx, anchors.bl.cy);
-            ctx.closePath();
-            ctx.stroke();
-
-            // 3. Extract Grid Data
-            const transform = getPerspectiveTransform(
-                [anchors.tl, anchors.tr, anchors.bl, anchors.br],
-                []
-            );
-
-            const results = extractBubbles(binary, canvas.width, canvas.height, transform, ctx);
-
-            if (results && results.roll.replace(/\?/g, '').length > 0) {
-                if (!scanResult || scanResult.roll !== results.roll) {
-                    log(`Roll Detected: ${results.roll}`);
-                    setScanResult((prev: any) => ({ ...prev, ...results }));
-                    if (results.roll.includes('22')) { // User requested optimization
-                        toast.success("Found Roll 22!");
-                    }
-                }
-            }
-        }
-    };
-
-    // --- OMR Processing Helpers ---
-
-    // 1. Binarize (Thresholding)
-    const binarize = (data: Uint8ClampedArray, width: number, height: number, threshold = 100) => {
-        const binary = new Uint8Array(width * height);
-        for (let i = 0; i < data.length; i += 4) {
-            const gray = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
-            binary[i / 4] = gray < threshold ? 1 : 0;
-        }
-        return binary;
-    };
-
-    // 2. Find Blobs (Simple recursive flood fill or iterative union-find)
-    // Using an iterative stack-based fill to avoid recursion depth issues
-    const findBlobs = (binary: Uint8Array, width: number, height: number) => {
-        const visited = new Uint8Array(width * height);
-        const blobs = [];
-        const minSize = 25; // Ignore dust
-
-        for (let y = 0; y < height; y += 4) { // stride for speed
-            for (let x = 0; x < width; x += 4) {
-                const idx = y * width + x;
-                if (binary[idx] === 1 && visited[idx] === 0) {
-                    // New blob found
-                    let size = 0;
-                    let minX = x, maxX = x, minY = y, maxY = y;
-                    let cx = 0, cy = 0;
-
-                    const stack = [idx];
-                    visited[idx] = 1;
-
-                    while (stack.length > 0) {
-                        const curr = stack.pop()!;
-                        const cy_ = Math.floor(curr / width);
-                        const cx_ = curr % width;
-
-                        size++;
-                        cx += cx_;
-                        cy += cy_;
-
-                        if (cx_ < minX) minX = cx_;
-                        if (cx_ > maxX) maxX = cx_;
-                        if (cy_ < minY) minY = cy_;
-                        if (cy_ > maxY) maxY = cy_;
-
-                        // Check neighbors (4-connectivity)
-                        const neighbors = [curr - 1, curr + 1, curr - width, curr + width];
-                        for (const n of neighbors) {
-                            if (n >= 0 && n < binary.length && binary[n] === 1 && visited[n] === 0) {
-                                visited[n] = 1;
-                                stack.push(n);
-                            }
-                        }
-                    }
-
-                    if (size > minSize) {
-                        blobs.push({
-                            x: minX, y: minY, w: maxX - minX, h: maxY - minY,
-                            cx: cx / size, cy: cy / size, size
-                        });
-                    }
-                }
-            }
-        }
-        return blobs;
-    };
-
-    // 4. Perspective Transform (Homography)
-    // Maps a point (x,y) in the idealized unit square (0,0) -> (1,1) to the distorted image quad
-    // We compute the matrix based on the 4 anchors
-    const getPerspectiveTransform = (src: any[], dst: any[]) => {
-        // Basic 4-point transform. For OMR, bilinear interpolation is often "good enough" if aligned well,
-        // but homography is more accurate for tilts.
-        // A generic solver is complex to write from scratch.
-        // Let's use a simpler bi-linear interpolation for now, assuming the paper isn't wildly folded.
-        // Point P(u, v) where u,v are 0..1
-
-        return (u: number, v: number) => {
-            // Top edge interpolation
-            const xt = src[0].cx + (src[1].cx - src[0].cx) * u;
-            const yt = src[0].cy + (src[1].cy - src[0].cy) * u;
-
-            // Bottom edge interpolation
-            const xb = src[2].cx + (src[3].cx - src[2].cx) * u;
-            const yb = src[2].cy + (src[3].cy - src[2].cy) * u;
-
-            // Interpolate vertically between top and bottom
-            const x = xt + (xb - xt) * v;
-            const y = yt + (yb - yt) * v;
-
-            return { x, y };
-        };
-    };
+    // ...
 
     // 5. Extract Bubbles
     const extractBubbles = (binary: Uint8Array, width: number, height: number, transform: (u: number, v: number) => { x: number, y: number }, ctx?: CanvasRenderingContext2D) => {
         // We define the zones relative to the 4 anchors (0,0 to 1,1)
-        // This requires knowing the EXACT relative geometry of the OMRSheet component.
-        // Based on OMRSheet.tsx: 
-        //  - Paper is approx 8.27in x 11.69in (A4)
-        //  - Margins are small.
-        //  - Left Column (Answers): x ~ 0.05 to 0.65
-        //  - Right Column (Roll/Reg): x ~ 0.70 to 0.95
+        // With 4 column layout for answers, the Answer Grid takes up approx 75% of width.
+        // Columns evenly spaced 0-0.75 range?
+        // Let's recalibrate roughly based on visual inspection of OMRSheet layout.
 
         const output = {
             roll: '' as string,
@@ -307,29 +49,32 @@ export default function OMRScannerPage() {
                     }
                 }
             }
-            return totalCount > 0 ? (blackCount / totalCount) : 0;
+
+            const fill = totalCount > 0 ? (blackCount / totalCount) : 0;
+            // Debug Visualization
+            if (ctx) {
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, rPx, 0, 2 * Math.PI);
+                ctx.strokeStyle = fill > 0.4 ? "red" : "rgba(0,255,0,0.3)";
+                ctx.lineWidth = 1;
+                ctx.stroke();
+            }
+            return fill;
         };
 
         // --- DECODE ROLL (Right Column) ---
-        // Need calibration coords. Let's approximate based on visual layout.
-        // Roll is at Top-Right quadrant.
-        // 6 Columns, 10 Rows (0-9)
-        // u start ~ 0.75, u end ~ 0.9
-        // v start ~ 0.15, v end ~ 0.35
-
+        // Right side column
         const rollCols = 6;
         const rollRows = 10;
-        const rollStartU = 0.76;
-        const rollStepU = 0.032; // width per col
-        const rollStartV = 0.18;
-        const rollStepV = 0.018; // height per row
+        const rollStartU = 0.82; // Shifted slightly right due to wider answer grid
+        const rollStepU = 0.025;
+        const rollStartV = 0.20;
+        const rollStepV = 0.018;
 
-        // This calibration needs to be precise or dynamic. 
-        // For now, let's try a best guess scan.
         let detectedRoll = [];
         for (let c = 0; c < rollCols; c++) {
             let bestR = -1;
-            let maxFill = 0.4; // Min 40% fill
+            let maxFill = 0.4;
             for (let r = 0; r < rollRows; r++) {
                 const u = rollStartU + (c * rollStepU);
                 const v = rollStartV + (r * rollStepV);
@@ -342,6 +87,48 @@ export default function OMRScannerPage() {
             detectedRoll.push(bestR !== -1 ? bestR : '?');
         }
         output.roll = detectedRoll.join('');
+
+        // --- DECODE ANSWERS (100 Questions) ---
+        // 4 Columns: Q1-25, Q26-50, Q51-75, Q76-100
+        // Total Answer Grid Width approx 0.75
+        // Each Col Width approx 0.18
+
+        const answerCols = 4; // A, B, C, D
+        const questionsPerBlock = 25;
+        const blockCount = 4;
+
+        const blockStartU = 0.06;
+        const blockStepU = 0.19; // Move right for next block
+
+        const optStartU = 0.055; // Relative to block start
+        const optStepU = 0.032;
+
+        const rowStartV = 0.12;
+        const rowStepV = 0.033;
+
+        for (let b = 0; b < blockCount; b++) {
+            const baseU = blockStartU + (b * blockStepU);
+
+            for (let q = 0; q < questionsPerBlock; q++) {
+                const qNum = (b * questionsPerBlock) + q + 1;
+
+                let bestOpt = -1;
+                let maxFill = 0.35;
+
+                for (let opt = 0; opt < 4; opt++) {
+                    const u = baseU + optStartU + (opt * optStepU);
+                    const v = rowStartV + (q * rowStepV);
+                    const fill = countBlack(u, v, 0.006, 0.006);
+                    if (fill > maxFill) {
+                        maxFill = fill;
+                        bestOpt = opt;
+                    }
+                }
+                if (bestOpt !== -1) {
+                    output.answers[qNum] = ['A', 'B', 'C', 'D'][bestOpt];
+                }
+            }
+        }
 
         return output;
     };
