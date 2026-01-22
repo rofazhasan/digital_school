@@ -104,13 +104,20 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
                 }
 
                 console.log("Loading BlazeFace model...");
-                const model = await blazeface.load();
+                // Add timeout to model loading
+                const modelPromise = blazeface.load();
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Model load timeout")), 15000)
+                );
+
+                const model = await Promise.race([modelPromise, timeoutPromise]) as blazeface.BlazeFaceModel;
+
                 modelRef.current = model;
                 setModelLoaded(true);
                 console.log("BlazeFace model loaded successfully");
             } catch (err) {
                 console.error('Error loading face detection model:', err);
-                setModelError('Failed to load AI model. Please refresh.');
+                setModelError('Failed to load AI model. Please check connection and refresh.');
                 toast.error('Proctoring AI failed to load.');
             }
         };

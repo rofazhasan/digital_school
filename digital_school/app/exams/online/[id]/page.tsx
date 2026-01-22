@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ExamLayout from "./ExamLayout";
 import { ExamContextProvider } from "./ExamContext";
 
@@ -10,6 +10,7 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   useEffect(() => {
     const loadExam = async () => {
@@ -18,7 +19,9 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
         setError(null);
 
         const { id } = await params;
-        const res = await fetch(`/api/exams/online/${id}`, {
+        const action = searchParams.get('action');
+        const queryParams = action ? `?action=${action}` : '';
+        const res = await fetch(`/api/exams/online/${id}${queryParams}`, {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include'

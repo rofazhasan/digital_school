@@ -355,7 +355,7 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, hasInProgres
                           <div className="space-y-2">
                             {exam.allowRetake && (
                               <Button asChild variant="default" size="sm" className="w-full">
-                                <a href={`/exams/online/${exam.id}`}>পুনরায় পরীক্ষা দিন</a>
+                                <a href={`/exams/online/${exam.id}?action=start`}>পুনরায় পরীক্ষা দিন</a>
                               </Button>
                             )}
                             <Button asChild variant="outline" size="sm" className="w-full">

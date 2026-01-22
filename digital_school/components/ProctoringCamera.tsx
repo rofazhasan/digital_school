@@ -67,8 +67,13 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
             {(!isCameraReady || !modelLoaded) && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 space-y-2 bg-black/50 backdrop-blur-sm">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                    <span className="text-xs font-medium">
-                        {!isCameraReady ? "Waiting for Camera..." : "Loading AI Model..."}
+                    <span className="text-xs font-medium text-center px-2">
+                        {!isCameraReady
+                            ? "Waiting for Camera..."
+                            : (
+                                <LoadingText />
+                            )
+                        }
                     </span>
                 </div>
             )}
@@ -105,3 +110,16 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
         </Card>
     );
 };
+
+function LoadingText() {
+    const [text, setText] = React.useState("Loading AI Model...");
+
+    React.useEffect(() => {
+        const t1 = setTimeout(() => setText("Downloading Model..."), 3000);
+        const t2 = setTimeout(() => setText("Still loading... (check connection)"), 8000);
+        const t3 = setTimeout(() => setText("Almost there..."), 13000);
+        return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+    }, []);
+
+    return <>{text}</>;
+}
