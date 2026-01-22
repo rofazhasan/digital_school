@@ -122,11 +122,15 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           )}
         </div>
       </div>
-      {/* Crosshair/circle at corners - SOLID BLACK for easier CV detection */}
-      <div className="absolute left-0 top-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
-      <div className="absolute right-0 top-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
-      <div className="absolute left-0 bottom-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
-      <div className="absolute right-0 bottom-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
+      {/* Anchors for Computer Vision - Large Solid Squares */}
+      {/* Top-Left */}
+      <div className="absolute left-2 top-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
+      {/* Top-Right */}
+      <div className="absolute right-2 top-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
+      {/* Bottom-Left */}
+      <div className="absolute left-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
+      {/* Bottom-Right */}
+      <div className="absolute right-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
       {/* Main OMR body */}
       <div className="flex-1 w-full flex flex-row items-stretch p-2 gap-0 omr-bg-pink">
         {/* Left: Two-column MCQ Answer Table (fit 50 questions, no header) */}

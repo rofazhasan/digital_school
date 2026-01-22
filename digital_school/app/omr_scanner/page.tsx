@@ -243,29 +243,6 @@ export default function OMRScannerPage() {
         return blobs;
     };
 
-    // 3. Find 4 Corners
-    const findAnchors = (blobs: any[], width: number, height: number) => {
-        // Anchors should be somewhat substantial and near corners
-        if (blobs.length < 4) return null;
-
-        // Heuristic: Sort by summing/subtracting coords to find extremes
-        let tl = blobs[0], tr = blobs[0], bl = blobs[0], br = blobs[0];
-        let minSum = Infinity, maxSum = -Infinity, minDiff = Infinity, maxDiff = -Infinity;
-
-        blobs.forEach(b => {
-            const sum = b.cx + b.cy;
-            const diff = b.cx - b.cy;
-            if (sum < minSum) { minSum = sum; tl = b; }
-            if (sum > maxSum) { maxSum = sum; br = b; }
-            if (diff < minDiff) { minDiff = diff; bl = b; }
-            if (diff > maxDiff) { maxDiff = diff; tr = b; }
-        });
-
-        // Check distinctness
-        if (new Set([tl, tr, bl, br]).size < 4) return null;
-        return { tl, tr, bl, br };
-    };
-
     // 4. Perspective Transform (Homography)
     // Maps a point (x,y) in the idealized unit square (0,0) -> (1,1) to the distorted image quad
     // We compute the matrix based on the 4 anchors
@@ -294,7 +271,7 @@ export default function OMRScannerPage() {
     };
 
     // 5. Extract Bubbles
-    const extractBubbles = (binary: Uint8Array, width: number, height: number, transform: (u: number, v: number) => { x: number, y: number }) => {
+    const extractBubbles = (binary: Uint8Array, width: number, height: number, transform: (u: number, v: number) => { x: number, y: number }, ctx?: CanvasRenderingContext2D) => {
         // We define the zones relative to the 4 anchors (0,0 to 1,1)
         // This requires knowing the EXACT relative geometry of the OMRSheet component.
         // Based on OMRSheet.tsx: 
@@ -369,11 +346,12 @@ export default function OMRScannerPage() {
         return output;
     };
 
+    // --- PDF Worker Configuration ---
+    // Use specific version matching package.json
     const pdfjsLib = require("pdfjs-dist/legacy/build/pdf");
-
-    // Dynamic import workaround for worker
     if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        // Use unpkg or cdnjs for the exact version 5.3.31
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.3.31/legacy/build/pdf.worker.min.mjs`;
     }
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -384,7 +362,14 @@ export default function OMRScannerPage() {
                 try {
                     toast.info("Processing PDF...");
                     const arrayBuffer = await file.arrayBuffer();
-                    const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+
+                    // Loading document
+                    const loadingTask = pdfjsLib.getDocument({
+                        data: arrayBuffer,
+                        verbosity: 0
+                    });
+
+                    const pdf = await loadingTask.promise;
                     const page = await pdf.getPage(1); // Scan first page
 
                     const viewport = page.getViewport({ scale: 2.0 }); // High res
@@ -395,10 +380,11 @@ export default function OMRScannerPage() {
 
                     await page.render({ canvasContext: context, viewport: viewport }).promise;
                     scanFrame(canvas);
-                    toast.success("PDF Rendered");
-                } catch (err) {
-                    log(`PDF Error: ${err}`);
-                    toast.error("Failed to parse PDF");
+                    toast.success("PDF Rendered Successfully");
+                } catch (err: any) {
+                    console.error(err);
+                    log(`PDF Error: ${err.message}`);
+                    toast.error(`Failed to parse PDF: ${err.message}`);
                 }
             } else {
                 const reader = new FileReader();
@@ -412,6 +398,30 @@ export default function OMRScannerPage() {
                 reader.readAsDataURL(file);
             }
         }
+    };
+
+    // --- Updated Anchor Logic for Squares ---
+    const findAnchors = (blobs: any[], width: number, height: number) => {
+        // Filter out small noise, but keep large square anchors
+        // Anchors are now 24px (+ margin). In a 2MP image, they will be significant.
+        const candidates = blobs.filter(b => b.size > 100);
+
+        if (candidates.length < 4) return null;
+
+        let tl = candidates[0], tr = candidates[0], bl = candidates[0], br = candidates[0];
+        let minSum = Infinity, maxSum = -Infinity, minDiff = Infinity, maxDiff = -Infinity;
+
+        candidates.forEach(b => {
+            const sum = b.cx + b.cy;
+            const diff = b.cx - b.cy;
+            if (sum < minSum) { minSum = sum; tl = b; }
+            if (sum > maxSum) { maxSum = sum; br = b; }
+            if (diff < minDiff) { minDiff = diff; bl = b; }
+            if (diff > maxDiff) { maxDiff = diff; tr = b; }
+        });
+
+        if (new Set([tl, tr, bl, br]).size < 4) return null;
+        return { tl, tr, bl, br };
     };
 
     // --- Grading Logic ---
@@ -460,16 +470,16 @@ export default function OMRScannerPage() {
             toast.dismiss();
             toast.success(`Grading Complete: ${score} / ${total}`);
 
-            setScanResult(prev => ({
+            setScanResult((prev: any) => ({
                 ...prev,
                 score,
                 total,
                 graded: true
             }));
 
-        } catch (err) {
+        } catch (err: any) {
             toast.dismiss();
-            toast.error("Grading Failed: " + err.message);
+            toast.error("Grading Failed: " + (err?.message || String(err)));
         }
     };
 
