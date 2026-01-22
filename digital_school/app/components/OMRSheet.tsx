@@ -22,7 +22,7 @@ interface OMRSheetProps {
   uniqueCode?: string;
 }
 
-const MCQ_LABELS = ['ক','খ','গ','ঘ'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
 const DIGITS = Array.from({ length: 10 }, (_, i) => i);
 
 const OMRSheet: React.FC<OMRSheetProps> = ({
@@ -122,11 +122,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           )}
         </div>
       </div>
-      {/* Crosshair/circle at corners */}
-      <div className="absolute left-0 top-0 w-4 h-4 border-2 border-black rounded-full" style={{ zIndex: 10 }}></div>
-      <div className="absolute right-0 top-0 w-4 h-4 border-2 border-black rounded-full" style={{ zIndex: 10 }}></div>
-      <div className="absolute left-0 bottom-0 w-4 h-4 border-2 border-black rounded-full" style={{ zIndex: 10 }}></div>
-      <div className="absolute right-0 bottom-0 w-4 h-4 border-2 border-black rounded-full" style={{ zIndex: 10 }}></div>
+      {/* Crosshair/circle at corners - SOLID BLACK for easier CV detection */}
+      <div className="absolute left-0 top-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
+      <div className="absolute right-0 top-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
+      <div className="absolute left-0 bottom-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
+      <div className="absolute right-0 bottom-0 w-4 h-4 rounded-full bg-black" style={{ zIndex: 10 }}></div>
       {/* Main OMR body */}
       <div className="flex-1 w-full flex flex-row items-stretch p-2 gap-0 omr-bg-pink">
         {/* Left: Two-column MCQ Answer Table (fit 50 questions, no header) */}
@@ -170,29 +170,29 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
             {setName && <div className="text-xs font-bold mt-1">সেট: {setName}</div>}
           </div>
           <div className="flex flex-row justify-between w-full gap-2 mt-1">
-              <div className="flex flex-col items-center flex-1">
+            <div className="flex flex-col items-center flex-1">
               <div className="  w-12 h-6"></div>
-                
-              </div>
+
             </div>
-            <div className="flex flex-row justify-between w-full gap-2 mt-1">
-              <div className="flex flex-col items-center flex-1">
+          </div>
+          <div className="flex flex-row justify-between w-full gap-2 mt-1">
+            <div className="flex flex-col items-center flex-1">
               <div className="  w-12 h-6"></div>
-                
-              </div>
+
             </div>
+          </div>
           {/* Signature box */}
           <div className="flex flex-row justify-between w-full gap-2 mt-1">
-              <div className="flex flex-col items-center flex-1">
+            <div className="flex flex-col items-center flex-1">
               <div className="border border-black w-full h-10 flex flex-col justify-center items-center"></div>
-                
-              </div>
+
             </div>
+          </div>
           <div className="flex flex-col items-center w-full mt-2 mb-1">
             <div className="">
               <span className="text-xs font-bold">কক্ষ পরিদর্শকের স্বাক্ষর ও তারিখ</span>
             </div>
-            
+
           </div>
           {/* Large instruction block at bottom */}
           <div className="w-full mt-2 p-2 border-2 border-black rounded bg-white text-xs font-bold text-center leading-tight" style={{ fontWeight: 700 }}>
