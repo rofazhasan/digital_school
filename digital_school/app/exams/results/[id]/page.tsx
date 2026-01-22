@@ -377,32 +377,48 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       const jsPDF = (await import('jspdf')).default;
 
       // Select the element to capture (using the main container class or ID if available, otherwise document.body)
-      // Ideally we should wrap the content in a specific ID, but body works for "whole page" request
       const element = document.getElementById('exam-result-content') || document.body;
+      if (!element) {
+        throw new Error("Content element not found");
+      }
+      console.log('Element found, dimensions:', element.scrollWidth, element.scrollHeight);
 
-      const canvas = await html2canvas(element, {
-        scale: 2, // Higher scale for better quality
-        useCORS: true, // Handle images from other domains
-        logging: false,
-        backgroundColor: '#ffffff', // Ensure white background
-        windowWidth: element.scrollWidth,
-        windowHeight: element.scrollHeight
-      });
+      try {
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: true, // Enable logging to see issues
+          backgroundColor: '#ffffff',
+          windowWidth: element.scrollWidth,
+          windowHeight: element.scrollHeight,
+          ignoreElements: (node) => node.classList?.contains('no-print') // Optional: hide buttons
+        });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [canvas.width, canvas.height] // Custom format to fit the whole long page
-      });
+        console.log('Canvas created successfully');
+        const imgData = canvas.toDataURL('image/png');
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'px',
+          format: [canvas.width, canvas.height]
+        });
 
-      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-      pdf.save(`${result.student.name}_${result.exam.name}_Result.pdf`);
+        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+        pdf.save(`${result.student.name}_${result.exam.name}_Result.pdf`);
+        toast.success('PDF downloaded successfully');
+      } catch (canvasError) {
+        console.error("html2canvas failed, trying backup:", canvasError);
+        // Fallback or retry with lower scale?
+        throw canvasError;
+      }
 
-      toast.success('PDF downloaded successfully');
     } catch (error) {
       console.error('Error generating PDF:', error);
-      toast.error('Failed to generate PDF. Please try again.');
+      toast.error('PDF Generation failed. Opening Print dialog instead...');
+
+      // Fallback to native print
+      setTimeout(() => {
+        window.print();
+      }, 1000);
     } finally {
       setDownloading(false);
     }
