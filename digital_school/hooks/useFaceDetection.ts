@@ -17,6 +17,10 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
     const [warnings, setWarnings] = useState(0);
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [modelLoaded, setModelLoaded] = useState(false);
+
+    // Grace Period Logic
+    const GRACE_PERIOD_MS = 40000; // 40 Seconds
+    const [faceMissingSince, setFaceMissingSince] = useState<number | null>(null);
     const lastViolationTime = useRef<number>(0);
 
     // Initialize Camera
@@ -64,7 +68,6 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
                 setModelLoaded(true);
             } catch (err) {
                 console.error('Error loading face detection model:', err);
-                // Fallback to CPU if WebGL fails?
                 try {
                     await tf.setBackend('cpu');
                     const model = await blazeface.load();
@@ -82,43 +85,6 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         }
     }, [isExamActive]);
 
-    // Detection Loop
-    const detectFace = useCallback(async () => {
-        if (!videoRef.current || !modelRef.current || !isExamActive || !isCameraReady) return;
-
-        try {
-            const returnTensors = false;
-            const predictions = await modelRef.current.estimateFaces(videoRef.current, returnTensors);
-
-            const now = Date.now();
-            // Debounce violations (e.g., waiting 5 seconds between warnings)
-            if (now - lastViolationTime.current > 5000) {
-
-                if (predictions.length === 0) {
-                    // No face detected
-                    triggerViolation("No face detected! Please look at the screen.");
-                } else if (predictions.length > 1) {
-                    // Multiple faces detected
-                    triggerViolation("Multiple faces detected! Only the examinee should be visible.");
-                } else {
-                    // Optional: Basic gaze estimation logic could go here based on landmarks
-                    // But for lightweight, existence is the primary check.
-                    // We can check face probability
-                    /*
-                    const face = predictions[0] as any;
-                    if (face.probability && face.probability[0] < 0.9) {
-                        // Low confidence
-                    }
-                    */
-                }
-            }
-        } catch (err) {
-            console.error('Detection error:', err);
-        }
-
-        requestRef.current = requestAnimationFrame(detectFace);
-    }, [isExamActive, isCameraReady]);
-
     const triggerViolation = (reason: string) => {
         lastViolationTime.current = Date.now();
         setWarnings(prev => {
@@ -132,7 +98,52 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
             onViolation(newCount);
             return newCount;
         });
+        // Reset missing timer after violation to give another full grace period
+        setFaceMissingSince(null);
     };
+
+    // Detection Loop
+    const detectFace = useCallback(async () => {
+        if (!videoRef.current || !modelRef.current || !isExamActive || !isCameraReady) return;
+
+        try {
+            const returnTensors = false;
+            const predictions = await modelRef.current.estimateFaces(videoRef.current, returnTensors);
+            const now = Date.now();
+
+            if (predictions.length === 0) {
+                // --- NO FACE DETECTED ---
+                setFaceMissingSince(prev => {
+                    if (prev === null) return now; // Start timer
+
+                    const elapsed = now - prev;
+                    if (elapsed > GRACE_PERIOD_MS) {
+                        // Timout exceeded
+                        triggerViolation("Face not visible for 40 seconds. Please keep your face in the camera frame.");
+                        return null; // Reset to null so it restarts if they stay missing (or we can keep triggering?)
+                        // Let's reset so they get another 40s.
+                    }
+                    return prev; // Keep existing start time
+                });
+
+            } else {
+                // --- FACE DETECTED ---
+                setFaceMissingSince(null); // Reset timer immediately
+
+                if (predictions.length > 1) {
+                    // Multiple faces - immediate violation with debounce
+                    if (now - lastViolationTime.current > 5000) {
+                        triggerViolation("Multiple faces detected! Only the examinee should be visible.");
+                    }
+                }
+            }
+
+        } catch (err) {
+            console.error('Detection error:', err);
+        }
+
+        requestRef.current = requestAnimationFrame(detectFace);
+    }, [isExamActive, isCameraReady]);
 
     useEffect(() => {
         if (isExamActive && isCameraReady && modelLoaded) {
