@@ -134,12 +134,14 @@ export default function OMRScannerPage() {
     };
 
     // --- PDF Worker Configuration ---
-    // Use specific version matching package.json
-    const pdfjsLib = require("pdfjs-dist/legacy/build/pdf");
-    if (typeof window !== 'undefined' && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-        // Use unpkg or cdnjs for the exact version 5.3.31
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.3.31/legacy/build/pdf.worker.min.mjs`;
-    }
+    // --- PDF Worker Configuration ---
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const pdfjsLib = require("pdfjs-dist/legacy/build/pdf");
+            // Use specific version matching package.json (5.3.31)
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@5.3.31/legacy/build/pdf.worker.min.mjs`;
+        }
+    }, []);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
