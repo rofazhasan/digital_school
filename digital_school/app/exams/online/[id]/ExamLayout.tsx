@@ -468,6 +468,7 @@ export default function ExamLayout() {
           modelLoaded={modelLoaded}
           warnings={faceWarnings}
           maxWarnings={5}
+          faceMissingSince={faceMissingSince}
         />
       )}
     </div>

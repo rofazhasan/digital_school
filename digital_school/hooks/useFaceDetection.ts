@@ -145,6 +145,7 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         videoRef,
         warnings,
         isCameraReady,
-        modelLoaded
+        modelLoaded,
+        faceMissingSince
     };
 };
