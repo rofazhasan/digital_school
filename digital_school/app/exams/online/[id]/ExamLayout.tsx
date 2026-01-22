@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, memo } from "react";
+import React, { useState, useMemo, useCallback, memo, useEffect } from "react";
 import { useExamContext } from "./ExamContext";
 import QuestionCard from "./QuestionCard";
 import Timer from "./Timer";
 import Navigator from "./Navigator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Save, CheckCircle, AlertCircle, Menu, X, Clock, HelpCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, CheckCircle, AlertCircle, Menu, X, Clock, HelpCircle, ShieldAlert, Maximize2 } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
+import { useProctoring } from "@/hooks/useProctoring";
+import { toast } from "sonner";
 
 // ... (imports remain)
 
@@ -79,38 +81,16 @@ export default function ExamLayout() {
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 
-  const handleStartExam = async () => {
-    try {
-      setIsStarting(true);
-      // Call API to explicitly start the exam
-      const res = await fetch(`/api/exams/online/${exam.id}?action=start`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
+  // ------------ PROCTORING INTEGRATION ------------
+  const [isExamActive, setIsExamActive] = useState(!!exam.startedAt && !showInstructions);
 
-      if (!res.ok) throw new Error("Failed to start exam");
-
-      // Reload to sync state (Timer, startedAt, etc.)
-      window.location.reload();
-    } catch (error) {
-      console.error("Error starting exam:", error);
-      alert("Failed to start exam. Please try again.");
-      setIsStarting(false);
-    }
-  };
-
-  const handlePrevious = useCallback(() => {
-    if (navigation.current > 0) navigateToQuestion(navigation.current - 1);
-  }, [navigation.current, navigateToQuestion]);
-
-  const handleNext = useCallback(() => {
-    if (navigation.current < totalQuestions - 1) navigateToQuestion(navigation.current + 1);
-  }, [navigation.current, totalQuestions, navigateToQuestion]);
-
-  const handleSubmit = useCallback(async () => {
+  const handleSubmit = useCallback(async (forced: boolean = false) => {
     // ... (submit logic remains same)
-    if (showSubmitConfirm) {
+    if (showSubmitConfirm || forced) {
       setIsSubmitting(true);
+      if (forced) {
+        toast.error("Exam auto-submitted due to security violations or time limit.");
+      }
       try {
         const response = await fetch(`/api/exams/${exam.id}/submit`, {
           method: 'POST',
@@ -136,9 +116,85 @@ export default function ExamLayout() {
     }
   }, [showSubmitConfirm, exam.id, answers]);
 
+  const onViolation = useCallback((count: number) => {
+    if (count >= 3) {
+      handleSubmit(true);
+    }
+  }, [handleSubmit]);
+
+  const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
+    onViolation,
+    maxWarnings: 3,
+    isExamActive: isExamActive // Only act if exam is strictly active
+  });
+
+  // Check initial start state
+  useEffect(() => {
+    if (exam.startedAt) {
+      setIsExamActive(true);
+    }
+  }, [exam.startedAt]);
+
+  const handleStartExam = async () => {
+    try {
+      // 1. Enter Fullscreen FIRST
+      await enterFullscreen();
+
+      setIsStarting(true);
+      // Call API to explicitly start the exam
+      const res = await fetch(`/api/exams/online/${exam.id}?action=start`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!res.ok) throw new Error("Failed to start exam");
+
+      setIsExamActive(true);
+      // Reload to sync state (Timer, startedAt, etc.)
+      window.location.reload();
+    } catch (error) {
+      console.error("Error starting exam:", error);
+      alert("Failed to start exam. Please try again.");
+      setIsStarting(false);
+    }
+  };
+
+  const handlePrevious = useCallback(() => {
+    if (navigation.current > 0) navigateToQuestion(navigation.current - 1);
+  }, [navigation.current, navigateToQuestion]);
+
+  const handleNext = useCallback(() => {
+    if (navigation.current < totalQuestions - 1) navigateToQuestion(navigation.current + 1);
+  }, [navigation.current, totalQuestions, navigateToQuestion]);
+
   const progress = useMemo(() => {
     return totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   }, [answeredCount, totalQuestions]);
+
+  // --------------- BLOCKING MODAL FOR PROCTORING ---------------
+  if (isExamActive && (!isFullscreen || !isTabActive)) {
+    return (
+      <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
+          <ShieldAlert className="w-12 h-12 text-red-600" />
+        </div>
+        <h1 className="text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
+        <p className="text-lg text-muted-foreground max-w-md mb-8">
+          You have left fullscreen mode or switched tabs. This is recorded as a violation.
+          <br /><br />
+          <span className="font-bold text-red-500">Warning {warnings}/3</span>
+        </p>
+        <Button
+          size="lg"
+          onClick={enterFullscreen}
+          className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl"
+        >
+          <Maximize2 className="w-6 h-6 mr-2" />
+          Return to Fullscreen to Continue
+        </Button>
+      </div>
+    );
+  }
 
   if (showInstructions) {
     const mcqQuestions = questions.filter((q: any) => q.type === 'MCQ');
@@ -216,6 +272,7 @@ export default function ExamLayout() {
               <li>নির্দিষ্ট সময়ের মধ্যে উত্তর জমা না দিলে স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
               <li>প্রতিটি প্রশ্নের জন্য সঠিক উত্তর নির্বাচন করুন বা লিখুন।</li>
               <li>ইন্টারনেট সংযোগ বিচ্ছিন্ন হলে পুনরায় সংযোগের চেষ্টা করুন, আপনার উত্তর সংরক্ষিত থাকবে।</li>
+              <li className="font-bold text-red-600 dark:text-red-400 mt-2">সতর্কতা: ফুলস্ক্রিন থেকে বের হলে বা ট্যাব পরিবর্তন করলে পরীক্ষা বাতিল হতে পারে।</li>
             </ul>
           </div>
 
@@ -224,7 +281,7 @@ export default function ExamLayout() {
             disabled={isStarting}
             className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {isStarting ? "লোডিং..." : "পরীক্ষা শুরু করুন"}
+            {isStarting ? "লোডিং..." : "পরীক্ষা শুরু করুন (Enter Fullscreen)"}
           </Button>
         </Card>
       </div>
@@ -264,10 +321,18 @@ export default function ExamLayout() {
           </div>
 
           <div className="absolute left-1/2 transform -translate-x-1/2">
-            <Timer onTimeUp={handleSubmit} />
+            <Timer onTimeUp={() => handleSubmit(true)} />
           </div>
 
           <div className="flex items-center gap-3">
+            {/* Warnings Indicator */}
+            {warnings > 0 && (
+              <Badge variant="destructive" className="animate-pulse hidden sm:flex gap-1">
+                <ShieldAlert className="w-3 h-3" />
+                Warnings: {warnings}/3
+              </Badge>
+            )}
+
             <div className="hidden sm:flex flex-col items-end mr-4">
               <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Progress</span>
               <div className="flex items-center gap-2">
@@ -279,7 +344,7 @@ export default function ExamLayout() {
             </div>
 
             <Button
-              onClick={handleSubmit}
+              onClick={() => handleSubmit(false)}
               variant={showSubmitConfirm ? "destructive" : "default"}
               className={`${showSubmitConfirm ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"} text-primary-foreground rounded-full px-6 transition-all`}
             >
@@ -358,7 +423,7 @@ export default function ExamLayout() {
               <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">
                 Cancel
               </Button>
-              <Button onClick={handleSubmit} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">
+              <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">
                 Submit Now
               </Button>
             </div>
