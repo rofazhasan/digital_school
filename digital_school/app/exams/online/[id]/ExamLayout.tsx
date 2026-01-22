@@ -141,7 +141,7 @@ export default function ExamLayout() {
   });
 
   // AI Face Detection hooks
-  const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded } = useFaceDetection({
+  const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded, faceMissingSince } = useFaceDetection({
     isExamActive: isExamActive,
     onViolation: onFaceViolation,
     maxWarnings: 5
