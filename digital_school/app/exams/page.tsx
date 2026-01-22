@@ -12,7 +12,7 @@ import {
   Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search,
   Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
   Globe, Monitor, FileText, BarChart3, Settings, Download,
-  RefreshCw, SortAsc, SortDesc, FilterX
+  RefreshCw, SortAsc, SortDesc, FilterX, Save, X
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -24,8 +24,17 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
-// Mock user role (replace with real auth logic)
 // Mock user role (replace with real auth logic)
 // const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
 
@@ -34,6 +43,9 @@ type Exam = {
   name: string;
   description: string;
   date: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
   subject: string;
   totalMarks: number;
   isActive: boolean;
@@ -73,6 +85,21 @@ export default function ExamsPage() {
   });
   const [activeTab, setActiveTab] = useState('all');
   const [userRole, setUserRole] = useState<string>("");
+
+  // Edit Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  // Form states
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    duration: 0,
+    allowRetake: false
+  });
+
   const { toast } = useToast();
   const router = useRouter();
 
@@ -127,23 +154,70 @@ export default function ExamsPage() {
     toast({ title: "Refreshed", description: "Exam list updated." });
   };
 
-  const handleEdit = async (id: string) => {
+  const handleEdit = (id: string) => {
     const exam = exams.find((e) => e.id === id);
     if (!exam) return;
 
-    const name = prompt('Edit exam name:', exam.name);
-    const description = prompt('Edit description:', exam.description || '');
-    if (name === null) return;
+    setEditingExam(exam);
+
+    // Parse times
+    const dateObj = new Date(exam.date);
+    const startDate = exam.startTime ? new Date(exam.startTime) : dateObj;
+    const endDate = exam.endTime ? new Date(exam.endTime) : dateObj;
+
+    const formatDate = (d: Date) => d.toISOString().split('T')[0];
+    const formatTime = (d: Date) => d.toTimeString().substring(0, 5); // HH:mm
+
+    setEditForm({
+      name: exam.name,
+      description: exam.description || '',
+      date: formatDate(dateObj),
+      startTime: formatTime(startDate),
+      endTime: formatTime(endDate),
+      duration: exam.duration || 0,
+      allowRetake: exam.allowRetake || false
+    });
+
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateExam = async () => {
+    if (!editingExam) return;
 
     setLoading(true);
     try {
-      const res = await fetch(`/api/exams?id=${id}`, {
+      // Reconstruct ISO strings
+      const baseDate = new Date(editForm.date);
+      const [startH, startM] = editForm.startTime.split(':').map(Number);
+      const [endH, endM] = editForm.endTime.split(':').map(Number);
+
+      const startDateTime = new Date(baseDate);
+      startDateTime.setHours(startH, startM, 0);
+
+      const endDateTime = new Date(baseDate);
+      endDateTime.setHours(endH, endM, 0);
+
+      // Adjust for duration automatically if needed? No, let user set it or just trust inputs.
+      // Actually typically duration is derived or vice versa. We send all.
+
+      const res = await fetch(`/api/exams?id=${editingExam.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          date: baseDate.toISOString(),
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          duration: Number(editForm.duration),
+          allowRetake: editForm.allowRetake
+        }),
       });
+
       if (!res.ok) throw new Error('Failed to update exam');
+
       toast({ title: 'Success', description: 'Exam updated successfully.' });
+      setIsEditOpen(false);
       await fetchExams();
     } catch (error) {
       toast({
@@ -710,6 +784,7 @@ export default function ExamsPage() {
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onClick={(e) => {
                                   e.stopPropagation();
+                                  console.log("Redirecting with role:", userRole);
                                   const role = userRole?.toUpperCase();
                                   if (role === "SUPER_USER" || role === "ADMIN" || role === "TEACHER") {
                                     router.push(`/exams/evaluations/${exam.id}/results`);
@@ -904,6 +979,109 @@ export default function ExamsPage() {
             )}
           </motion.div>
         </TooltipProvider>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Exam</DialogTitle>
+              <DialogDescription>
+                Make changes to the exam here. Click save when you're done.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editForm.date}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startTime" className="text-right">
+                  Start Time
+                </Label>
+                <Input
+                  id="startTime"
+                  type="time"
+                  value={editForm.startTime}
+                  onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endTime" className="text-right">
+                  End Time
+                </Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={editForm.endTime}
+                  onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">
+                  Duration (mins)
+                </Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={editForm.duration}
+                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="retake" className="text-right">
+                  Allow Retake
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <Switch
+                    id="retake"
+                    checked={editForm.allowRetake}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
+                  />
+                  <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateExam} disabled={loading}>
+                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

@@ -88,6 +88,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       }
 
+      // DELETE PREVIOUS SUBMISSION BEFORE STARTING NEW ONE (RETAKE LOGIC)
+      if (existingSubmission) {
+        console.log(`♻️ Retake initiated: Deleting previous submission ${existingSubmission.id} for student ${studentId}`);
+        await prisma.examSubmission.deleteMany({
+          where: {
+            examId: examId,
+            studentId: studentId
+          }
+        });
+      }
+
       existingSubmission = await prisma.examSubmission.create({
         data: {
           examId,

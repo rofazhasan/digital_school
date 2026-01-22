@@ -85,6 +85,14 @@ export default function ExamLayout() {
 
   // ------------ PROCTORING INTEGRATION ------------
   const [isExamActive, setIsExamActive] = useState(!!exam.startedAt && !showInstructions);
+  const [instituteSettings, setInstituteSettings] = useState<any>(null);
+
+  useEffect(() => {
+    fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
+  }, []);
+
+  const instituteName = instituteSettings?.instituteName || "Digital School";
+  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
   const handleSubmit = useCallback(async (forced: boolean = false) => {
     // ... (submit logic remains same)
@@ -141,7 +149,7 @@ export default function ExamLayout() {
   });
 
   // AI Face Detection hooks
-  const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded, faceMissingSince } = useFaceDetection({
+  const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded, faceMissingSince, cameraError, modelError } = useFaceDetection({
     isExamActive: isExamActive,
     onViolation: onFaceViolation,
     maxWarnings: 5
@@ -233,7 +241,7 @@ export default function ExamLayout() {
         <Card className="max-w-3xl w-full p-6 md:p-10 shadow-2xl rounded-3xl bg-card border-border">
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
-              <img src="/logo.png" alt="Digital School" className="h-16 w-auto" />
+              <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
             <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'অনলাইন পরীক্ষা'}</h1>
             <p className="text-lg text-muted-foreground">আপনি কি পরীক্ষা শুরু করতে প্রস্তুত?</p>
@@ -312,7 +320,8 @@ export default function ExamLayout() {
   return (
     <div className="min-h-screen bg-background">
       {/* Sticky Header */}
-      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border shadow-sm">
+      {/* Sticky Header */}
+      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Mobile Drawer */}
@@ -332,7 +341,7 @@ export default function ExamLayout() {
               </SheetContent>
             </Sheet>
             <div className="flex items-center space-x-3">
-              <img src="/logo.png" alt="Digital School" className="h-8 w-auto hidden sm:block" />
+              <img src={instituteLogo} alt={instituteName} className="h-8 w-auto hidden sm:block object-contain" />
               <div className="hidden sm:block">
                 <h1 className="font-bold text-foreground truncate max-w-[200px]">{exam.title || exam.name}</h1>
               </div>
@@ -469,8 +478,10 @@ export default function ExamLayout() {
           warnings={faceWarnings}
           maxWarnings={5}
           faceMissingSince={faceMissingSince}
+          cameraError={cameraError}
+          modelError={modelError}
         />
       )}
     </div>
   );
-} 
+}

@@ -15,8 +15,12 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
     const modelRef = useRef<blazeface.BlazeFaceModel | null>(null);
     const requestRef = useRef<number>(0);
     const [warnings, setWarnings] = useState(0);
+
+    // Detailed Status States
     const [isCameraReady, setIsCameraReady] = useState(false);
     const [modelLoaded, setModelLoaded] = useState(false);
+    const [cameraError, setCameraError] = useState<string | null>(null);
+    const [modelError, setModelError] = useState<string | null>(null);
 
     // Grace Period Logic
     const GRACE_PERIOD_MS = 40000; // 40 Seconds
@@ -28,7 +32,15 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         let stream: MediaStream | null = null;
 
         const startCamera = async () => {
+            if (!isExamActive) return;
+
+            setCameraError(null);
             try {
+                // Check if browser supports getUserMedia
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error("Browser API not supported");
+                }
+
                 stream = await navigator.mediaDevices.getUserMedia({
                     video: { width: 320, height: 240, facingMode: 'user' },
                     audio: false,
@@ -36,54 +48,77 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
 
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
-                    videoRef.current.onloadedmetadata = () => {
-                        setIsCameraReady(true);
-                        videoRef.current?.play();
+                    // Wait for metadata to load to ensure video is ready used
+                    videoRef.current.onloadedmetadata = async () => {
+                        try {
+                            await videoRef.current?.play();
+                            setIsCameraReady(true);
+                        } catch (playErr) {
+                            console.error('Video play error:', playErr);
+                            setCameraError('Failed to start video stream.');
+                        }
                     };
                 }
             } catch (err) {
                 console.error('Error accessing camera:', err);
-                toast.error('Camera access is required for proctoring. Please allow camera access.');
+                // Differentiate error types if possible
+                if (err instanceof DOMException && err.name === 'NotAllowedError') {
+                    setCameraError('Permission denied. Please allow camera access.');
+                    toast.error('Camera access denied. Please enable permissions.');
+                } else {
+                    setCameraError('Failed to access camera.');
+                    toast.error('Camera access failed.');
+                }
             }
         };
 
         if (isExamActive) {
             startCamera();
+        } else {
+            setIsCameraReady(false);
         }
 
         return () => {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
+            setIsCameraReady(false);
         };
     }, [isExamActive]);
 
     // Load Model
     useEffect(() => {
         const loadModel = async () => {
+            if (!isExamActive) return;
+
+            setModelError(null);
             try {
-                await tf.setBackend('webgl');
+                // Ensure backend is ready
+                await tf.ready();
+
+                try {
+                    await tf.setBackend('webgl');
+                } catch (bgErr) {
+                    console.warn('WebGL backend failed, falling back to cpu', bgErr);
+                    await tf.setBackend('cpu');
+                }
+
+                console.log("Loading BlazeFace model...");
                 const model = await blazeface.load();
                 modelRef.current = model;
                 setModelLoaded(true);
+                console.log("BlazeFace model loaded successfully");
             } catch (err) {
                 console.error('Error loading face detection model:', err);
-                try {
-                    await tf.setBackend('cpu');
-                    const model = await blazeface.load();
-                    modelRef.current = model;
-                    setModelLoaded(true);
-                } catch (cpuErr) {
-                    console.error('Failed to load model on CPU as well', cpuErr);
-                    toast.error('Failed to load proctoring system.');
-                }
+                setModelError('Failed to load AI model. Please refresh.');
+                toast.error('Proctoring AI failed to load.');
             }
         };
 
-        if (isExamActive) {
+        if (isExamActive && !modelLoaded) {
             loadModel();
         }
-    }, [isExamActive]);
+    }, [isExamActive, modelLoaded]);
 
     const triggerViolation = (reason: string) => {
         lastViolationTime.current = Date.now();
@@ -120,8 +155,7 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
                     if (elapsed > GRACE_PERIOD_MS) {
                         // Timout exceeded
                         triggerViolation("Face not visible for 40 seconds. Please keep your face in the camera frame.");
-                        return null; // Reset to null so it restarts if they stay missing (or we can keep triggering?)
-                        // Let's reset so they get another 40s.
+                        return null; // Reset to give fresh grace period
                     }
                     return prev; // Keep existing start time
                 });
@@ -157,6 +191,8 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         warnings,
         isCameraReady,
         modelLoaded,
-        faceMissingSince
+        faceMissingSince,
+        cameraError,
+        modelError
     };
 };
