@@ -11,6 +11,7 @@ interface ProctoringCameraProps {
     faceMissingSince: number | null;
     cameraError?: string | null;
     modelError?: string | null;
+    onRetry?: () => void;
 }
 
 export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
@@ -21,10 +22,23 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
     maxWarnings,
     faceMissingSince,
     cameraError,
-    modelError
+    modelError,
+    onRetry
 }) => {
     // Calculate remaining seconds if face is missing
     const [secondsRemaining, setSecondsRemaining] = React.useState(40);
+    const [showRetry, setShowRetry] = React.useState(false);
+
+    React.useEffect(() => {
+        // Show retry button if not ready after 10 seconds
+        let timer: NodeJS.Timeout;
+        if (!isCameraReady) {
+            timer = setTimeout(() => setShowRetry(true), 10000);
+        } else {
+            setShowRetry(false);
+        }
+        return () => clearTimeout(timer);
+    }, [isCameraReady]);
 
     React.useEffect(() => {
         if (!faceMissingSince) {
@@ -44,10 +58,18 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
     // Error State
     if (cameraError || modelError) {
         return (
-            <Card className="fixed bottom-4 right-4 w-56 h-40 z-50 flex flex-col items-center justify-center bg-red-900/90 border-red-500 shadow-2xl p-4 text-center">
+            <Card className="fixed bottom-4 right-4 w-56 h-auto z-50 flex flex-col items-center justify-center bg-red-900/90 border-red-500 shadow-2xl p-4 text-center">
                 <CameraOff className="w-8 h-8 text-red-300 mb-2" />
-                <p className="text-xs text-white font-bold">{cameraError || modelError}</p>
-                <p className="text-[10px] text-white/70 mt-1">Please allow camera or refresh.</p>
+                <p className="text-xs text-white font-bold mb-2">{cameraError || modelError}</p>
+                <p className="text-[10px] text-white/70 mb-3">Please allow camera or refresh.</p>
+                {onRetry && (
+                    <button
+                        onClick={onRetry}
+                        className="px-3 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded shadow-lg transition-colors border border-red-500"
+                    >
+                        Retry Camera
+                    </button>
+                )}
             </Card>
         );
     }
@@ -65,7 +87,7 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
 
             {/* Loading / Status State */}
             {(!isCameraReady || !modelLoaded) && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 space-y-2 bg-black/50 backdrop-blur-sm">
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-white/70 space-y-2 bg-black/50 backdrop-blur-sm z-20">
                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     <span className="text-xs font-medium text-center px-2">
                         {!isCameraReady
@@ -75,6 +97,14 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
                             )
                         }
                     </span>
+                    {showRetry && onRetry && !isCameraReady && (
+                        <button
+                            onClick={onRetry}
+                            className="mt-2 px-3 py-1 bg-primary/20 hover:bg-primary/40 text-primary text-[10px] rounded border border-primary/50 transition-colors"
+                        >
+                            Retry Access
+                        </button>
+                    )}
                 </div>
             )}
 

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import {
   User,
   FileText,
@@ -117,6 +118,7 @@ const mathJaxConfig = {
 
 export default function ExamEvaluationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { data: session } = useSession();
   const [exam, setExam] = useState<Exam | null>(null);
 
@@ -1121,6 +1123,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 <Button variant="outline" onClick={() => window.history.back()}>
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Back
+                </Button>
+                <Button variant="outline" onClick={() => router.push("/dashboard")}>
+                  <LayoutDashboard className="h-4 w-4 mr-2" />
+                  Dashboard
                 </Button>
                 <Button
                   variant="outline"

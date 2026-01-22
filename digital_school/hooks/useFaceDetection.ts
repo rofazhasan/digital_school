@@ -27,51 +27,69 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
     const [faceMissingSince, setFaceMissingSince] = useState<number | null>(null);
     const lastViolationTime = useRef<number>(0);
 
+    const startCamera = useCallback(async () => {
+        if (!isExamActive) return;
+
+        setCameraError(null);
+        setIsCameraReady(false);
+
+        try {
+            // Check if browser supports getUserMedia
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Browser API not supported");
+            }
+
+            console.log("Requesting camera access...");
+
+            // Add timeout for camera permission
+            const streamPromise = navigator.mediaDevices.getUserMedia({
+                video: { width: 320, height: 240, facingMode: 'user' },
+                audio: false,
+            });
+
+            // Timeout after 10 seconds if permission dialog is ignored
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Camera permission timeout")), 10000)
+            );
+
+            const stream = await Promise.race([streamPromise, timeoutPromise]) as MediaStream;
+            console.log("Camera access granted, stream id:", stream.id);
+
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                // Wait for metadata to load to ensure video is ready used
+                videoRef.current.onloadedmetadata = async () => {
+                    try {
+                        console.log("Video metadata loaded, attempting to play");
+                        await videoRef.current?.play();
+                        setIsCameraReady(true);
+                        console.log("Camera ready and playing");
+                    } catch (playErr) {
+                        console.error('Video play error:', playErr);
+                        setCameraError('Failed to start video stream.');
+                    }
+                };
+            } else {
+                console.error("videoRef.current is null when setting stream");
+                setCameraError("Internal error: Video element not found. Please refresh.");
+            }
+        } catch (err) {
+            console.error('Error accessing camera:', err);
+            // Differentiate error types if possible
+            if (err instanceof DOMException && err.name === 'NotAllowedError') {
+                setCameraError('Permission denied. Please allow camera access.');
+                toast.error('Camera access denied. Please enable permissions.');
+            } else if (err instanceof Error && err.message === "Camera permission timeout") {
+                setCameraError('Camera request timed out. Please check permissions.');
+            } else {
+                setCameraError('Failed to access camera.');
+                toast.error('Camera access failed.');
+            }
+        }
+    }, [isExamActive]);
+
     // Initialize Camera
     useEffect(() => {
-        let stream: MediaStream | null = null;
-
-        const startCamera = async () => {
-            if (!isExamActive) return;
-
-            setCameraError(null);
-            try {
-                // Check if browser supports getUserMedia
-                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                    throw new Error("Browser API not supported");
-                }
-
-                stream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 320, height: 240, facingMode: 'user' },
-                    audio: false,
-                });
-
-                if (videoRef.current) {
-                    videoRef.current.srcObject = stream;
-                    // Wait for metadata to load to ensure video is ready used
-                    videoRef.current.onloadedmetadata = async () => {
-                        try {
-                            await videoRef.current?.play();
-                            setIsCameraReady(true);
-                        } catch (playErr) {
-                            console.error('Video play error:', playErr);
-                            setCameraError('Failed to start video stream.');
-                        }
-                    };
-                }
-            } catch (err) {
-                console.error('Error accessing camera:', err);
-                // Differentiate error types if possible
-                if (err instanceof DOMException && err.name === 'NotAllowedError') {
-                    setCameraError('Permission denied. Please allow camera access.');
-                    toast.error('Camera access denied. Please enable permissions.');
-                } else {
-                    setCameraError('Failed to access camera.');
-                    toast.error('Camera access failed.');
-                }
-            }
-        };
-
         if (isExamActive) {
             startCamera();
         } else {
@@ -79,12 +97,13 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         }
 
         return () => {
-            if (stream) {
+            if (videoRef.current && videoRef.current.srcObject) {
+                const stream = videoRef.current.srcObject as MediaStream;
                 stream.getTracks().forEach(track => track.stop());
             }
             setIsCameraReady(false);
         };
-    }, [isExamActive]);
+    }, [isExamActive, startCamera]);
 
     // Load Model
     useEffect(() => {
@@ -200,6 +219,7 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
         modelLoaded,
         faceMissingSince,
         cameraError,
-        modelError
+        modelError,
+        retryCamera: startCamera
     };
 };

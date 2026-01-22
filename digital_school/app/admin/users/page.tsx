@@ -5,7 +5,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Upload, UserPlus, Edit, Trash2, Users, Shield, BookOpen, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Upload, UserPlus, Edit, Trash2, Users, Shield, BookOpen, Loader2, CheckCircle, XCircle, LayoutDashboard } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -79,7 +79,7 @@ export default function AdminUsersPage() {
       return;
     }
     setLoading(true);
-    
+
     // Fetch users and classes in parallel
     Promise.all([
       fetch("/api/user?all=true").then(res => res.json()),
@@ -104,7 +104,7 @@ export default function AdminUsersPage() {
     try {
       setLoading(true);
       setError(null);
-      
+
       const response = await fetch('/api/user', {
         method: 'POST',
         headers: {
@@ -114,7 +114,7 @@ export default function AdminUsersPage() {
       });
 
       const data = await response.json();
-      
+
       if (response.ok) {
         // Refresh the users list
         const usersResponse = await fetch('/api/user?all=true');
@@ -302,8 +302,8 @@ export default function AdminUsersPage() {
             <Button onClick={() => setShowAddUser(true)} className="shadow-lg flex items-center gap-2">
               <UserPlus className="h-4 w-4" /> Add User
             </Button>
-            <Button onClick={() => router.push("/")} className="shadow-md flex items-center gap-2">
-              <BookOpen className="h-4 w-4" /> Home
+            <Button onClick={() => router.push("/dashboard")} className="shadow-md flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" /> Dashboard
             </Button>
           </div>
         </div>
@@ -440,8 +440,8 @@ export default function AdminUsersPage() {
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Class & Section (if student)</label>
                     <div className="flex gap-2">
-                      <select 
-                        name="class" 
+                      <select
+                        name="class"
                         className="flex-1 rounded shadow p-2 border"
                         onChange={(e) => {
                           if (e.target.value === 'new') {
@@ -524,8 +524,8 @@ export default function AdminUsersPage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Class & Section (if student)</label>
                       <div className="flex gap-2">
-                        <select 
-                          name="class" 
+                        <select
+                          name="class"
                           defaultValue={editUser?.class && editUser?.section ? `${editUser.class}-${editUser.section}` : ''}
                           className="flex-1 rounded shadow p-2 border"
                           onChange={(e) => {
@@ -585,13 +585,13 @@ export default function AdminUsersPage() {
                     const formData = new FormData(e.currentTarget);
                     const className = formData.get('className') as string;
                     const section = formData.get('section') as string;
-                    
+
                     const response = await fetch('/api/classes', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
                       body: JSON.stringify({ name: className, section }),
                     });
-                    
+
                     if (response.ok) {
                       const newClass = await response.json();
                       setClasses([...classes, newClass]);
