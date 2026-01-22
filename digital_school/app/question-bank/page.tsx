@@ -1495,6 +1495,78 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
     fetchClasses();
   }, []);
 
+  // JSON Input State
+  const [inputType, setInputType] = useState<'file' | 'json'>('file');
+  const [jsonInput, setJsonInput] = useState('');
+
+  const sampleJson = [
+    {
+      "questionText": "What is the capital of France?",
+      "type": "MCQ",
+      "marks": 1,
+      "difficulty": "EASY",
+      "subject": "Geography",
+      "className": "Class 9",
+      "options": ["Paris", "London", "Berlin", "Madrid"],
+      "correctAnswer": "Paris"
+    },
+    {
+      "questionText": "Explain Newton's Second Law.",
+      "type": "CQ",
+      "marks": 5,
+      "difficulty": "MEDIUM",
+      "subject": "Physics",
+      "className": "Class 10",
+      "modelAnswer": "Newton's second law states that the rate of change of momentum..."
+    }
+  ];
+
+  const handleLoadSample = () => {
+    setJsonInput(JSON.stringify(sampleJson, null, 2));
+    toast({ title: "Sample Loaded", description: "Sample JSON format loaded." });
+  };
+
+  const handleParseJson = () => {
+    try {
+      if (!jsonInput.trim()) return;
+      const parsed = JSON.parse(jsonInput);
+      const dataArray = Array.isArray(parsed) ? parsed : [parsed];
+      const rows = dataArray.map((item, idx) => ({
+        rowNum: idx + 1,
+        isValid: true, // Optimistic
+        data: item,
+        errors: []
+      }));
+      setPreviewData(rows);
+      setEditedPreviewData(rows);
+      setIsPreviewMode(true);
+      toast({ title: "JSON Parsed", description: `Loaded ${rows.length} questions.` });
+    } catch {
+      toast({ variant: "destructive", title: "Invalid JSON", description: "Check format." });
+    }
+  };
+
+  const handleAddManualQuestion = () => {
+    const newQuestion = {
+      rowNum: editedPreviewData.length + 1,
+      isValid: true,
+      data: {
+        questionText: "New Question",
+        type: "MCQ",
+        marks: 1,
+        difficulty: "EASY",
+        subject: "General",
+        className: availableClasses[0]?.name || "Class 10",
+        options: ["Option A", "Option B", "Option C", "Option D"],
+        correctAnswer: "Option A"
+      },
+      errors: []
+    };
+    const newData = [...editedPreviewData, newQuestion];
+    setEditedPreviewData(newData);
+    setPreviewData(newData);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -1640,36 +1712,73 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
               </div>
               <CardTitle className="text-2xl">Bulk Upload Questions</CardTitle>
               <CardDescription className="max-w-md mx-auto">
-                Upload an Excel file (.xlsx) containing multiple questions. We'll preview them before importing.
+                Upload an Excel file (.xlsx) or paste JSON data to add questions in bulk.
               </CardDescription>
             </div>
 
             <div className="w-full max-w-md space-y-4">
-              <div className="flex justify-center">
-                <Button variant="outline" onClick={() => window.open('/api/question-bank/sample-template', '_blank')}>
-                  <Download className="mr-2 h-4 w-4" /> Download Sample Template
-                </Button>
+              <div className="flex border rounded-lg overflow-hidden">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium ${inputType === 'file' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
+                  onClick={() => setInputType('file')}
+                >
+                  <FileSpreadsheet className="w-4 h-4 inline-block mr-2" /> File Upload
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium ${inputType === 'json' ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80'}`}
+                  onClick={() => setInputType('json')}
+                >
+                  <BrainCircuit className="w-4 h-4 inline-block mr-2" /> Paste JSON
+                </button>
               </div>
 
-              <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                <Input
-                  type="file"
-                  accept=".xlsx, .xls"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="excel-upload"
-                />
-                <Label htmlFor="excel-upload" className="cursor-pointer flex flex-col items-center gap-2">
-                  <Upload className="w-8 h-8 text-gray-400" />
-                  <span className="text-sm font-medium">{file ? file.name : "Click to select Excel file"}</span>
-                  <span className="text-xs text-gray-500">.xlsx or .xls files only</span>
-                </Label>
-              </div>
+              {inputType === 'file' ? (
+                <>
+                  <div className="flex justify-center">
+                    <Button variant="outline" onClick={() => window.open('/api/question-bank/sample-template', '_blank')}>
+                      <Download className="mr-2 h-4 w-4" /> Download Sample Template
+                    </Button>
+                  </div>
 
-              <Button onClick={handlePreviewUpload} disabled={!file || isUploading} className="w-full">
-                {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
-                {isUploading ? "Processing..." : "Upload & Preview"}
-              </Button>
+                  <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                    <Input
+                      type="file"
+                      accept=".xlsx, .xls"
+                      onChange={handleFileChange}
+                      className="hidden"
+                      id="excel-upload"
+                    />
+                    <Label htmlFor="excel-upload" className="cursor-pointer flex flex-col items-center gap-2">
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <span className="text-sm font-medium">{file ? file.name : "Click to select Excel file"}</span>
+                      <span className="text-xs text-gray-500">.xlsx or .xls files only</span>
+                    </Label>
+                  </div>
+
+                  <Button onClick={handlePreviewUpload} disabled={!file || isUploading} className="w-full">
+                    {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Upload className="mr-2 h-4 w-4" />}
+                    {isUploading ? "Processing..." : "Upload & Preview"}
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <Label>Paste JSON Data</Label>
+                    <Button variant="outline" size="sm" onClick={handleLoadSample}>
+                      <BookCopy className="w-3 h-3 mr-1" /> Load Sample
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={jsonInput}
+                    onChange={(e) => setJsonInput(e.target.value)}
+                    placeholder={`[\n  {\n    "questionText": "...",\n    "type": "MCQ",\n    ...\n  }\n]`}
+                    className="font-mono text-xs h-64"
+                  />
+                  <Button onClick={handleParseJson} className="w-full">
+                    <ArrowRight className="w-4 h-4 mr-2" /> Parse & Preview
+                  </Button>
+                </div>
+              )}
             </div>
           </>
         ) : (
@@ -1681,6 +1790,9 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                 <CardDescription>Review and edit questions before finalizing. Rows with errors are highlighted.</CardDescription>
               </div>
               <div className="flex gap-2">
+                <Button variant="outline" onClick={handleAddManualQuestion}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Question
+                </Button>
                 <Button variant="outline" onClick={() => setIsPreviewMode(false)}>Cancel</Button>
                 <Button onClick={handleFinalSubmit} disabled={isUploading}>
                   {isUploading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

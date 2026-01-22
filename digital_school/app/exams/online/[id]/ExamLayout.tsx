@@ -11,8 +11,6 @@ import { ChevronLeft, ChevronRight, Save, CheckCircle, AlertCircle, Menu, X, Clo
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
-import { useFaceDetection } from "@/hooks/useFaceDetection";
-import { ProctoringCamera } from "@/components/ProctoringCamera";
 import { toast } from "sonner";
 
 // ... (imports remain)
@@ -134,29 +132,11 @@ export default function ExamLayout() {
     }
   }, [handleSubmit]);
 
-  // Face Violation Handler (Limit 5)
-  const onFaceViolation = useCallback((count: number) => {
-    if (count >= 5) {
-      handleSubmit(true);
-    }
-  }, [handleSubmit]);
-
   // Browser/Tab Proctoring
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
     maxWarnings: 3,
     isExamActive: isExamActive // Only act if exam is strictly active
-  });
-
-  // AI Face Detection hooks
-  const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded, faceMissingSince, cameraError, modelError, retryCamera } = useFaceDetection({
-    isExamActive: isExamActive,
-    onViolation: onFaceViolation,
-    maxWarnings: 5,
-    onAutoSubmit: (reason) => {
-      toast.error(reason);
-      handleSubmit(true);
-    }
   });
 
   // Check initial start state
@@ -281,7 +261,7 @@ export default function ExamLayout() {
               <li>নির্দিষ্ট সময়ের মধ্যে উত্তর জমা না দিলে স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
               <li>প্রতিটি প্রশ্নের জন্য সঠিক উত্তর নির্বাচন করুন বা লিখুন।</li>
               <li>ইন্টারনেট সংযোগ বিচ্ছিন্ন হলে পুনরায় সংযোগের চেষ্টা করুন, আপনার উত্তর সংরক্ষিত থাকবে।</li>
-              <li className="font-bold text-red-600 dark:text-red-400 mt-2">সতর্কতা: ফুলস্ক্রিন ও ফেস ট্র্যাকিং চালু থাকবে।</li>
+              <li className="font-bold text-red-600 dark:text-red-400 mt-2">সতর্কতা: ফুলস্ক্রিন মোড চালু থাকবে।</li>
             </ul>
           </div>
 
@@ -336,18 +316,12 @@ export default function ExamLayout() {
 
           <div className="flex items-center gap-3">
             {/* Warnings Indicator */}
-            {(warnings > 0 || faceWarnings > 0) && (
+            {warnings > 0 && (
               <div className="flex gap-2">
                 {warnings > 0 && (
                   <Badge variant="destructive" className="animate-pulse hidden sm:flex gap-1">
                     <ShieldAlert className="w-3 h-3" />
                     Sys: {warnings}/3
-                  </Badge>
-                )}
-                {faceWarnings > 0 && (
-                  <Badge variant="destructive" className="bg-yellow-600 animate-pulse hidden sm:flex gap-1">
-                    <ShieldAlert className="w-3 h-3" />
-                    Face: {faceWarnings}/5
                   </Badge>
                 )}
               </div>
@@ -449,21 +423,6 @@ export default function ExamLayout() {
             </div>
           </Card>
         </div>
-      )}
-
-      {/* Proctoring Camera (Only in Exam) */}
-      {isExamActive && (
-        <ProctoringCamera
-          videoRef={videoRef}
-          isCameraReady={isCameraReady}
-          modelLoaded={modelLoaded}
-          warnings={faceWarnings}
-          maxWarnings={5}
-          faceMissingSince={faceMissingSince}
-          cameraError={cameraError}
-          modelError={modelError}
-          onRetry={retryCamera}
-        />
       )}
 
       {/* Security Violation Overlay (Refactored from early return) */}

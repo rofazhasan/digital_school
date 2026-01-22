@@ -367,102 +367,42 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   const downloadResult = async () => {
     if (!result) return;
-
     setDownloading(true);
-    try {
-      console.log('Starting download for exam:', id);
 
-      const response = await fetch(`/api/exams/results/${id}/download-individual`, {
-        method: 'GET',
-        credentials: 'include',
+    try {
+      console.log('Starting PDF generation...');
+
+      // Dynamically import libraries to avoid SSR issues
+      const html2canvas = (await import('html2canvas')).default;
+      const jsPDF = (await import('jspdf')).default;
+
+      // Select the element to capture (using the main container class or ID if available, otherwise document.body)
+      // Ideally we should wrap the content in a specific ID, but body works for "whole page" request
+      const element = document.getElementById('exam-result-content') || document.body;
+
+      const canvas = await html2canvas(element, {
+        scale: 2, // Higher scale for better quality
+        useCORS: true, // Handle images from other domains
+        logging: false,
+        backgroundColor: '#ffffff', // Ensure white background
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
       });
 
-      console.log('Download response status:', response.status);
-      console.log('Download response headers:', Object.fromEntries(response.headers.entries()));
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height] // Custom format to fit the whole long page
+      });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Download error response:', errorData);
-        throw new Error(errorData.error || 'Failed to download result');
-      }
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save(`${result.student.name}_${result.exam.name}_Result.pdf`);
 
-      // Create blob from response
-      const blob = await response.blob();
-      console.log('Download blob size:', blob.size);
-
-      if (blob.size === 0) {
-        throw new Error('Downloaded file is empty');
-      }
-
-      const url = URL.createObjectURL(blob);
-
-      // Create download link
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${result.student.name}_${result.exam.name}_Result.txt`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      console.log('Download completed successfully');
-      toast.success('Result downloaded successfully');
+      toast.success('PDF downloaded successfully');
     } catch (error) {
-      console.error('Error downloading result:', error);
-
-      // Fallback to client-side generation if server fails
-      try {
-        console.log('Attempting fallback client-side download...');
-        const content = `
-EXAM RESULT - ${result.exam.name}
-=====================================
-
-STUDENT INFORMATION:
-Name: ${result.student.name}
-Roll: ${result.student.roll}
-Registration: ${result.student.registrationNo}
-Class: ${result.student.class}
-
-EXAM DETAILS:
-Exam: ${result.exam.name}
-Description: ${result.exam.description}
-Total Marks: ${result.exam.totalMarks}
-Duration: ${result.exam.duration} minutes
-
-RESULT SUMMARY:
-MCQ Marks: ${result.result?.mcqMarks || 0}
-CQ Marks: ${result.result?.cqMarks || 0}
-SQ Marks: ${result.result?.sqMarks || 0}
-Total Score: ${result.result?.total || 0}/${result.exam.totalMarks}
-Percentage: ${(result.result?.percentage || 0).toFixed(1)}%
-Grade: ${result.result?.grade || 'N/A'}
-Rank: ${result.result?.rank || 'N/A'}
-
-STATISTICS:
-Total Students: ${result.statistics.totalStudents}
-Average Score: ${(result.statistics.averageScore || 0).toFixed(1)}
-Highest Score: ${result.statistics.highestScore}
-Lowest Score: ${result.statistics.lowestScore}
-
-Generated on: ${new Date().toLocaleString()}
-        `;
-
-        const blob = new Blob([content], { type: 'text/plain' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${result.student.name}_${result.exam.name}_Result.txt`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        console.log('Fallback download completed successfully');
-        toast.success('Result downloaded successfully (fallback method)');
-      } catch (fallbackError) {
-        console.error('Fallback download also failed:', fallbackError);
-        toast.error('Failed to download result. Please try again later.');
-      }
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF. Please try again.');
     } finally {
       setDownloading(false);
     }
@@ -573,7 +513,7 @@ Generated on: ${new Date().toLocaleString()}
 
   return (
     <MathJaxContext config={mathJaxConfig}>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
+      <div id="exam-result-content" className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
         {/* Animated Background */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400/10 to-purple-400/10"></div>
