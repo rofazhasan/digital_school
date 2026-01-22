@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 
 // --- Helper function to get a valid user for development ---
 async function getDeveloperUserId() {
-  // Get the first user in the database (or throw if none found)
-  const user = await prisma.user.findFirst();
-  if (!user) throw new Error('No user found in the database. Please seed a user.');
-  return user.id;
+    // Get the first user in the database (or throw if none found)
+    const user = await prisma.user.findFirst();
+    if (!user) throw new Error('No user found in the database. Please seed a user.');
+    return user.id;
 }
 
 // --- Updated Schema ---
@@ -63,10 +63,10 @@ export async function POST(request: Request) {
         const validation = questionSchema.safeParse(body);
         if (!validation.success) {
             console.error('Validation failed:', validation.error.flatten());
-            return NextResponse.json({ 
-                error: "Invalid input", 
+            return NextResponse.json({
+                error: "Invalid input",
                 details: validation.error.flatten(),
-                receivedData: body 
+                receivedData: body
             }, { status: 400 });
         }
 
@@ -172,6 +172,18 @@ export async function DELETE(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const ids = searchParams.get('ids');
+
+        if (ids) {
+            const idList = ids.split(',').filter(Boolean);
+            if (idList.length === 0) return NextResponse.json({ error: "No valid IDs provided" }, { status: 400 });
+
+            await prisma.question.deleteMany({
+                where: { id: { in: idList } }
+            });
+            return NextResponse.json({ message: "Questions deleted successfully" });
+        }
+
         if (!id) return NextResponse.json({ error: "Question ID is required" }, { status: 400 });
 
         await prisma.question.delete({ where: { id } });
@@ -201,33 +213,33 @@ async function handleAIGeneration(body: any) {
                 questionLatex: { type: "STRING", description: "LaTeX for math equations. Empty string if none." },
                 marks: { type: "NUMBER", description: "Marks for the question." },
                 ...(questionType === 'MCQ' && {
-                    options: { 
-                        type: "ARRAY", 
-                        description: "MUST contain 4 options for an MCQ question.", 
-                        items: { 
-                            type: "OBJECT", 
-                            properties: { 
-                                text: { type: "STRING" }, 
+                    options: {
+                        type: "ARRAY",
+                        description: "MUST contain 4 options for an MCQ question.",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                text: { type: "STRING" },
                                 isCorrect: { type: "BOOLEAN" },
                                 ...(includeAnswers && { explanation: { type: "STRING", description: "Explanation for why this option is correct (only for correct option)" } })
-                            }, 
-                            required: ["text", "isCorrect"] 
-                        } 
+                            },
+                            required: ["text", "isCorrect"]
+                        }
                     }
                 }),
                 ...(questionType === 'CQ' && {
-                    subQuestions: { 
-                        type: "ARRAY", 
-                        description: "MUST contain 2 to 4 sub-questions for a CQ question.", 
-                        items: { 
-                            type: "OBJECT", 
-                            properties: { 
-                                question: { type: "STRING" }, 
+                    subQuestions: {
+                        type: "ARRAY",
+                        description: "MUST contain 2 to 4 sub-questions for a CQ question.",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                question: { type: "STRING" },
                                 marks: { type: "NUMBER" },
                                 ...(includeAnswers && { modelAnswer: { type: "STRING", description: "Model answer for this sub-question" } })
-                            }, 
-                            required: ["question", "marks"] 
-                        } 
+                            },
+                            required: ["question", "marks"]
+                        }
                     }
                 }),
                 ...(questionType === 'SQ' && {
@@ -242,8 +254,8 @@ async function handleAIGeneration(body: any) {
         }
     };
 
-   
- const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
+
+    const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
 
 REQUIREMENTS:
 - Class: ${className}, Subject: ${subject}, Topic: ${topic || 'General'}, Difficulty: ${difficulty}, Type: ${questionType}

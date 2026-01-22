@@ -226,6 +226,8 @@ export default function QuestionBankPage() {
   const [classFilter, setClassFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
+  const [topicFilter, setTopicFilter] = useState("");
+  const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/classes')
@@ -293,9 +295,48 @@ export default function QuestionBankPage() {
       const res = await fetch(`/api/question-bank?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error("Deletion failed on server");
       setQuestions(prev => prev.filter(q => q.id !== id));
+      setSelectedQuestions(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
       toast({ title: "Success", description: "Question deleted." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Could not delete question." });
+    }
+  };
+
+  const toggleSelection = (id: string) => {
+    setSelectedQuestions(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedQuestions.size === filteredQuestions.length && filteredQuestions.length > 0) {
+      setSelectedQuestions(new Set());
+    } else {
+      setSelectedQuestions(new Set(filteredQuestions.map(q => q.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuestions.size === 0) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedQuestions.size} questions? This cannot be undone.`)) return;
+
+    try {
+      const ids = Array.from(selectedQuestions).join(',');
+      const res = await fetch(`/api/question-bank?ids=${ids}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error("Bulk deletion failed");
+
+      setQuestions(prev => prev.filter(q => !selectedQuestions.has(q.id)));
+      setSelectedQuestions(new Set());
+      toast({ title: "Success", description: `${selectedQuestions.size} questions deleted.` });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Could not delete selected questions." });
     }
   };
 
@@ -325,20 +366,23 @@ export default function QuestionBankPage() {
       .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
       .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
       .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter)
+      .filter((q: Question) => topicFilter === "" || (q.topic || '').toLowerCase().includes(topicFilter.toLowerCase()))
       .filter((q: Question) => {
         if (!dateRange || !dateRange.from) return true;
         const qDate = new Date(q.createdAt);
         const start = startOfDay(dateRange.from);
         const end = dateRange.to ? endOfDay(dateRange.to) : endOfDay(dateRange.from);
         return isWithinInterval(qDate, { start, end });
-      });
-  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, dateRange]);
+      })
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, topicFilter, dateRange]);
 
   const resetFilters = () => {
     setSearchTerm("");
     setClassFilter("all");
     setSubjectFilter("all");
     setDifficultyFilter("all");
+    setTopicFilter("");
     setDateRange(undefined);
   };
 
@@ -456,20 +500,54 @@ export default function QuestionBankPage() {
                         </Select>
                       </div>
                       <div>
+                        <Label htmlFor="topic-filter">Topic</Label>
+                        <Input id="topic-filter" placeholder="Filter by topic..." value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} />
+                      </div>
+                      <div>
                         <Label>Date Range</Label>
                         <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
                       </div>
                       <div className="flex items-end gap-2 lg:col-span-5">
                         <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
                         <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
+                        <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Go to Dashboard</Button>
                       </div>
                     </div>
                   </Card>
 
+                  {filteredQuestions.length > 0 && (
+                    <div className="flex items-center justify-between mb-4 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="select-all"
+                          checked={selectedQuestions.size === filteredQuestions.length && filteredQuestions.length > 0}
+                          onCheckedChange={toggleSelectAll}
+                        />
+                        <Label htmlFor="select-all" className="cursor-pointer">
+                          Select All ({filteredQuestions.length})
+                        </Label>
+                      </div>
+                      {selectedQuestions.size > 0 && (
+                        <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                          <Trash2 className="h-4 w-4 mr-2" /> Delete Selected ({selectedQuestions.size})
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
                     : filteredQuestions.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredQuestions.map(q => <QuestionCard key={q.id} question={q} onEdit={handleEdit} onDelete={handleDelete} />)}
+                        {filteredQuestions.map(q => (
+                          <QuestionCard
+                            key={q.id}
+                            question={q}
+                            onEdit={handleEdit}
+                            onDelete={handleDelete}
+                            isSelected={selectedQuestions.has(q.id)}
+                            onSelect={() => toggleSelection(q.id)}
+                          />
+                        ))}
                       </div>
                     ) : (
                       <div className="text-center py-16 text-gray-500">
@@ -506,7 +584,13 @@ export default function QuestionBankPage() {
   );
 }
 
-const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void; onDelete: (id: string) => void }> = ({ question, onEdit, onDelete }) => {
+const QuestionCard: React.FC<{
+  question: Question;
+  onEdit: (q: Question) => void;
+  onDelete: (id: string) => void;
+  isSelected?: boolean;
+  onSelect?: () => void;
+}> = ({ question, onEdit, onDelete, isSelected, onSelect }) => {
   const difficultyColors: Record<Difficulty, string> = {
     EASY: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     MEDIUM: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
@@ -516,14 +600,26 @@ const QuestionCard: React.FC<{ question: Question; onEdit: (q: Question) => void
     <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
       <CardHeader className="pb-4">
         <div className="flex justify-between items-start gap-2">
-          <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
-            <MathJax>{question.questionText || ''}</MathJax>
-          </CardTitle>
-          <Badge variant="outline">{question.marks} Marks</Badge>
+          <div className="flex items-start gap-3 w-full">
+            {onSelect && (
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => onSelect()}
+                className="mt-1"
+              />
+            )}
+            <div className="flex-1">
+              <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
+                <MathJax>{question.questionText || ''}</MathJax>
+              </CardTitle>
+            </div>
+          </div>
+          <Badge variant="outline" className="whitespace-nowrap">{question.marks} Marks</Badge>
         </div>
         <div className="flex flex-wrap gap-2 text-xs mt-2">
           <Badge className={difficultyColors[question.difficulty]}>{question.difficulty}</Badge>
           <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{question.subject}</Badge>
+          {question.topic && <Badge variant="outline" className="text-teal-600 border-teal-600 dark:text-teal-400 dark:border-teal-400">{question.topic}</Badge>}
           <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{question.class.name}</Badge>
           {question.isAiGenerated && <Badge variant="outline" className="text-indigo-500 border-indigo-500"><Bot className="h-3 w-3 mr-1" />AI</Badge>}
           {question.hasMath && (

@@ -3,7 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PlusCircle, Printer, Save, X, Loader2, Eye, AlertTriangle, BookOpen, ClipboardList, Wand2, ChevronLeft, ChevronRight, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +39,7 @@ interface Question {
   options?: any;
   questionLatex?: string | null;
   negativeMarks?: number;
+  topic?: string | null;
 }
 
 interface ExamSet {
@@ -154,6 +155,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
+        {question.topic && <Badge variant="outline" className="text-teal-600 border-teal-600 dark:text-teal-400 dark:border-teal-400">{question.topic}</Badge>}
         {selectionReason && (
           <Badge variant="outline" className="text-xs">{selectionReason}</Badge>
         )}
@@ -229,6 +231,7 @@ export default function ExamBuilderPage() {
     type: '',
     difficulty: '',
     subject: '',
+    topic: '',
   });
 
   // Add state for number of sets
@@ -245,6 +248,7 @@ export default function ExamBuilderPage() {
       type: string;
       difficulty: string;
       subject: string;
+      topic: string;
     }, dateRange?: DateRange) => {
       if (!examId) return;
       setIsLoading(true);
@@ -255,6 +259,7 @@ export default function ExamBuilderPage() {
           ...(currentFilters.type && { type: currentFilters.type }),
           ...(currentFilters.difficulty && { difficulty: currentFilters.difficulty }),
           ...(currentFilters.subject && { subject: currentFilters.subject }),
+          ...(currentFilters.topic && { topic: currentFilters.topic }),
         };
 
         if (dateRange?.from) {
@@ -408,7 +413,7 @@ export default function ExamBuilderPage() {
     setSelectedQuestions(prev => prev.filter(q => q.id !== questionId));
   };
 
-  const handleFilterChange = (key: 'type' | 'difficulty' | 'subject', value: string) => {
+  const handleFilterChange = (key: 'type' | 'difficulty' | 'subject' | 'topic', value: string) => {
     const v = value === 'all' ? '' : value;
     setFilters(prev => ({ ...prev, [key]: v, page: 1 }));
     if (key !== 'subject') {
@@ -580,6 +585,7 @@ export default function ExamBuilderPage() {
 
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" size="sm" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
                   <Button variant="outline" onClick={() => router.push(`/exams/${examId}/print`)}><Printer className="mr-2 h-4 w-4" />Print Sets ({exam.examSets.length})</Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
@@ -607,6 +613,7 @@ export default function ExamBuilderPage() {
                   <CardDescription>Filter and select questions for the exam.</CardDescription>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-4">
                     <Input placeholder="Search by subject..." onChange={(e) => handleFilterChange('subject', e.target.value)} />
+                    <Input placeholder="Search by topic..." onChange={(e) => handleFilterChange('topic', e.target.value)} />
                     <Select value={filters.type} onValueChange={(v) => handleFilterChange('type', v)}>
                       <SelectTrigger><SelectValue placeholder="Filter by Type" /></SelectTrigger>
                       <SelectContent>

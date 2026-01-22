@@ -7,12 +7,12 @@ import { DatabaseClient } from '@/lib/db';
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const id = url.searchParams.get('id');
-  
+
   if (id) {
     // Fetch single exam by ID with caching
     const cacheKey = `exam:${id}`;
     const cached = DatabaseCache.get(cacheKey);
-    
+
     if (cached) {
       return createApiResponse(cached);
     }
@@ -55,12 +55,12 @@ export async function GET(request: NextRequest) {
             subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
           }
         });
-        
+
         // Find the subject with the highest count
-        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
           (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
         );
-        
+
         examSubject = mostCommonSubject[0] || '';
       }
 
@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
 
       // Cache the result for 2 minutes
       DatabaseCache.set(cacheKey, examData, 120000);
-      
+
       return createApiResponse(examData);
     } catch (error) {
       console.error('Failed to fetch exam:', error);
@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
   // Fetch all exams with caching
   const cacheKey = 'exams:all';
   const cached = DatabaseCache.get(cacheKey);
-  
+
   if (cached) {
     return createApiResponse(cached);
   }
@@ -109,7 +109,7 @@ export async function GET(request: NextRequest) {
       async () => {
         const db = await DatabaseClient.getInstance();
         return await db.exam.findMany({
-          orderBy: { date: 'desc' },
+          orderBy: { createdAt: 'desc' },
           include: {
             class: { select: { id: true, name: true } },
             createdBy: { select: { id: true, name: true } },
@@ -139,15 +139,15 @@ export async function GET(request: NextRequest) {
             subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
           }
         });
-        
+
         // Find the subject with the highest count
-        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
           (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
         );
-        
+
         examSubject = mostCommonSubject[0] || '';
       }
-      
+
       return {
         id: exam.id,
         name: exam.name,
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
         createdAt: exam.createdAt,
         type: exam.type,
         allowRetake: exam.allowRetake || false,
-              mcqNegativeMarking: exam.mcqNegativeMarking ,
+        mcqNegativeMarking: exam.mcqNegativeMarking,
         cqTotalQuestions: exam.cqTotalQuestions || 0,
         cqRequiredQuestions: exam.cqRequiredQuestions || 0,
         sqTotalQuestions: exam.sqTotalQuestions || 0,
@@ -172,7 +172,7 @@ export async function GET(request: NextRequest) {
 
     // Cache the result for 1 minute
     DatabaseCache.set(cacheKey, examsData, 60000);
-    
+
     return createApiResponse(examsData);
   } catch (error) {
     console.error('Failed to fetch exams:', error);
@@ -213,36 +213,36 @@ export async function POST(request: NextRequest) {
       return createApiResponse(null, 'Missing required fields', 400);
     }
 
-            const createdExam = await safeDatabaseOperation(
-          async () => {
-            const db = await DatabaseClient.getInstance();
-            return await db.exam.create({
-              data: {
-                name,
-                description,
-                date: new Date(date),
-                startTime: new Date(startTime),
-                endTime: new Date(endTime),
-                duration,
-                type,
-                totalMarks,
-                passMarks,
-                isActive: false,
-                allowRetake: allowRetake || false,
-                instructions,
-                mcqNegativeMarking: mcqNegativeMarking ?? 0,
-                cqTotalQuestions: cqTotalQuestions ?? 0,
-                cqRequiredQuestions: cqRequiredQuestions ?? 0,
-                sqTotalQuestions: sqTotalQuestions ?? 0,
-                sqRequiredQuestions: sqRequiredQuestions ?? 0,
-                cqSubsections: cqSubsections || null,
-                classId,
-                createdById: auth.user.id,
-              },
-            });
+    const createdExam = await safeDatabaseOperation(
+      async () => {
+        const db = await DatabaseClient.getInstance();
+        return await db.exam.create({
+          data: {
+            name,
+            description,
+            date: new Date(date),
+            startTime: new Date(startTime),
+            endTime: new Date(endTime),
+            duration,
+            type,
+            totalMarks,
+            passMarks,
+            isActive: false,
+            allowRetake: allowRetake || false,
+            instructions,
+            mcqNegativeMarking: mcqNegativeMarking ?? 0,
+            cqTotalQuestions: cqTotalQuestions ?? 0,
+            cqRequiredQuestions: cqRequiredQuestions ?? 0,
+            sqTotalQuestions: sqTotalQuestions ?? 0,
+            sqRequiredQuestions: sqRequiredQuestions ?? 0,
+            cqSubsections: cqSubsections || null,
+            classId,
+            createdById: auth.user.id,
           },
-          'Create exam'
-        );
+        });
+      },
+      'Create exam'
+    );
 
     // Invalidate exams cache
     DatabaseCache.invalidate('exams');

@@ -13,6 +13,7 @@ const getQuestionsQuerySchema = z.object({
   type: z.nativeEnum(QuestionType).optional(),
   difficulty: z.nativeEnum(Difficulty).optional(),
   subject: z.string().optional(),
+  topic: z.string().optional(),
   startDate: z.string().datetime().optional(),
   endDate: z.string().datetime().optional(),
 });
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!validation.success) {
       return NextResponse.json({ error: 'Invalid query parameters', details: validation.error.flatten() }, { status: 400 });
     }
-    const { page, limit, type, difficulty, subject, startDate, endDate } = validation.data;
+    const { page, limit, type, difficulty, subject, topic, startDate, endDate } = validation.data;
     const skip = (page - 1) * limit;
 
     // 3. Construct a dynamic where clause for professional-grade filtering
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       ...(type && { type }),
       ...(difficulty && { difficulty }),
       ...(subject && { subject: { contains: subject, mode: 'insensitive' } }),
+      ...(topic && { topic: { contains: topic, mode: 'insensitive' } }),
       ...(startDate && endDate ? {
         createdAt: {
           gte: new Date(startDate),

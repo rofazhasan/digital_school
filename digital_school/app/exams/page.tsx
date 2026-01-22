@@ -12,7 +12,7 @@ import {
   Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search,
   Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
   Globe, Monitor, FileText, BarChart3, Settings, Download,
-  RefreshCw, SortAsc, SortDesc, FilterX, Save, X
+  RefreshCw, SortAsc, SortDesc, FilterX, Save, X, ArrowRight
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -80,7 +80,7 @@ export default function ExamsPage() {
     status: 'all',
     type: 'all',
     subject: 'all',
-    sortBy: 'date',
+    sortBy: 'created',
     sortOrder: 'desc'
   });
   const [activeTab, setActiveTab] = useState('all');
@@ -360,6 +360,10 @@ export default function ExamsPage() {
           aValue = a.subject.toLowerCase();
           bValue = b.subject.toLowerCase();
           break;
+        case 'created':
+          aValue = a.createdAt ? new Date(a.createdAt) : new Date(0);
+          bValue = b.createdAt ? new Date(b.createdAt) : new Date(0);
+          break;
         default:
           aValue = new Date(a.date);
           bValue = new Date(b.date);
@@ -452,6 +456,15 @@ export default function ExamsPage() {
                 >
                   <FileText className="w-4 h-4" />
                   Evaluations
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                  Dashboard
                 </Button>
                 <Button
                   onClick={handleCreate}
@@ -672,6 +685,7 @@ export default function ExamsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="date">Date</SelectItem>
+                            <SelectItem value="created">Recently Created</SelectItem>
                             <SelectItem value="name">Name</SelectItem>
                             <SelectItem value="marks">Marks</SelectItem>
                             <SelectItem value="subject">Subject</SelectItem>
