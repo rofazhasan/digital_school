@@ -198,30 +198,8 @@ export default function ExamLayout() {
     return totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   }, [answeredCount, totalQuestions]);
 
-  // --------------- BLOCKING MODAL FOR PROCTORING ---------------
-  if (isExamActive && (!isFullscreen || !isTabActive)) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-background flex flex-col items-center justify-center p-6 text-center">
-        <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
-          <ShieldAlert className="w-12 h-12 text-red-600" />
-        </div>
-        <h1 className="text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
-        <p className="text-lg text-muted-foreground max-w-md mb-8">
-          You have left fullscreen mode or switched tabs. This is recorded as a violation.
-          <br /><br />
-          <span className="font-bold text-red-500">Warning {warnings}/3</span>
-        </p>
-        <Button
-          size="lg"
-          onClick={enterFullscreen}
-          className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl"
-        >
-          <Maximize2 className="w-6 h-6 mr-2" />
-          Return to Fullscreen to Continue
-        </Button>
-      </div>
-    );
-  }
+  // --------------- BLOCKING MODAL FOR PROCTORING (Overlay) ---------------
+  const isBlocked = isExamActive && (!isFullscreen || !isTabActive);
 
   if (showInstructions) {
     const mcqQuestions = questions.filter((q: any) => q.type === 'MCQ');
@@ -482,6 +460,29 @@ export default function ExamLayout() {
           modelError={modelError}
           onRetry={retryCamera}
         />
+      )}
+
+      {/* Security Violation Overlay (Refactored from early return) */}
+      {isBlocked && (
+        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
+            <ShieldAlert className="w-12 h-12 text-red-600" />
+          </div>
+          <h1 className="text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
+          <p className="text-lg text-muted-foreground max-w-md mb-8">
+            You have left fullscreen mode or switched tabs. This is recorded as a violation.
+            <br /><br />
+            <span className="font-bold text-red-500">Warning {warnings}/3</span>
+          </p>
+          <Button
+            size="lg"
+            onClick={enterFullscreen}
+            className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl"
+          >
+            <Maximize2 className="w-6 h-6 mr-2" />
+            Return to Fullscreen to Continue
+          </Button>
+        </div>
       )}
     </div>
   );

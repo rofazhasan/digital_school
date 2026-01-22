@@ -75,7 +75,7 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
     }
 
     return (
-        <Card className="fixed bottom-4 right-4 w-48 h-36 z-50 overflow-hidden shadow-2xl border-2 border-primary/20 bg-black/90 group transition-all hover:scale-105">
+        <Card className="fixed bottom-24 right-4 w-32 h-24 z-50 overflow-hidden shadow-2xl border-2 border-primary/20 bg-black/90 group transition-all hover:scale-105">
             {/* Video Feed */}
             <video
                 ref={videoRef}

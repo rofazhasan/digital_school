@@ -70,8 +70,17 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
                     }
                 };
             } else {
-                console.error("videoRef.current is null when setting stream");
-                setCameraError("Internal error: Video element not found. Please refresh.");
+                console.warn("videoRef.current is null, retrying attachment in 500ms");
+                // Retry once after a short delay
+                setTimeout(() => {
+                    if (videoRef.current) {
+                        videoRef.current.srcObject = stream;
+                        videoRef.current.play().then(() => setIsCameraReady(true)).catch(e => console.error(e));
+                    } else {
+                        console.error("videoRef.current is still null");
+                        setCameraError("Camera initialized but video element missing. Please refresh.");
+                    }
+                }, 500);
             }
         } catch (err) {
             console.error('Error accessing camera:', err);
