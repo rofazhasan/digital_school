@@ -8,9 +8,10 @@ interface UseFaceDetectionProps {
     isExamActive: boolean;
     onViolation: (count: number) => void;
     maxWarnings: number;
+    onAutoSubmit?: (reason: string) => void;
 }
 
-export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: UseFaceDetectionProps) => {
+export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings, onAutoSubmit }: UseFaceDetectionProps) => {
     const videoRef = useRef<HTMLVideoElement>(null);
     const modelRef = useRef<blazeface.BlazeFaceModel | null>(null);
     const requestRef = useRef<number>(0);
@@ -26,6 +27,7 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
     const GRACE_PERIOD_MS = 40000; // 40 Seconds
     const [faceMissingSince, setFaceMissingSince] = useState<number | null>(null);
     const lastViolationTime = useRef<number>(0);
+    const isLookingAwayRef = useRef<number | null>(null);
 
     const startCamera = useCallback(async () => {
         if (!isExamActive) return;
@@ -203,6 +205,46 @@ export const useFaceDetection = ({ isExamActive, onViolation, maxWarnings }: Use
                     // Multiple faces - immediate violation with debounce
                     if (now - lastViolationTime.current > 5000) {
                         triggerViolation("Multiple faces detected! Only the examinee should be visible.");
+                    }
+                } else {
+                    // --- GAZE / HEAD POSE DETECTION (Single Face) ---
+                    const face = predictions[0];
+                    if (face.landmarks) {
+                        // Landmarks: 0=RightEye, 1=LeftEye, 2=Nose, 3=Mouth, 4=RightEar, 5=LeftEar
+                        const landmarks = face.landmarks as number[][];
+                        const rightEye = landmarks[0] as [number, number];
+                        const leftEye = landmarks[1] as [number, number];
+                        const nose = landmarks[2] as [number, number];
+
+                        // Calculate horizontal center of eyes
+                        const eyesCenter = (rightEye[0] + leftEye[0]) / 2;
+
+                        // Calculate face width (approximate)
+                        const faceWidth = Math.abs(rightEye[0] - leftEye[0]);
+
+                        // Calculate nose deviation from center
+                        // If nose is significantly to the left or right of eye center, head is turned
+                        const deviation = nose[0] - eyesCenter;
+
+                        // Normalize deviation by face width
+                        // Threshold: 0.5 means nose is halfway to the ear (approx)
+                        const turnRatio = deviation / (faceWidth || 1);
+
+                        // If ratio > 0.6 (Right) or < -0.6 (Left) -> Looking away
+                        // We use a looser threshold to avoid false positives
+                        if (Math.abs(turnRatio) > 0.65) {
+                            if (!isLookingAwayRef.current) {
+                                isLookingAwayRef.current = now;
+                            } else if (now - isLookingAwayRef.current > 4000) {
+                                // Looking away for > 4 seconds
+                                if (now - lastViolationTime.current > 10000) { // Debounce violations
+                                    triggerViolation("Please look at the screen. Head turned away detected.");
+                                    isLookingAwayRef.current = null; // Reset
+                                }
+                            }
+                        } else {
+                            isLookingAwayRef.current = null; // Reset if looking straight
+                        }
                     }
                 }
             }

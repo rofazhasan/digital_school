@@ -152,7 +152,11 @@ export default function ExamLayout() {
   const { videoRef, warnings: faceWarnings, isCameraReady, modelLoaded, faceMissingSince, cameraError, modelError, retryCamera } = useFaceDetection({
     isExamActive: isExamActive,
     onViolation: onFaceViolation,
-    maxWarnings: 5
+    maxWarnings: 5,
+    onAutoSubmit: (reason) => {
+      toast.error(reason);
+      handleSubmit(true);
+    }
   });
 
   // Check initial start state
