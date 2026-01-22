@@ -8,6 +8,7 @@ interface ProctoringCameraProps {
     modelLoaded: boolean;
     warnings: number;
     maxWarnings: number;
+    faceMissingSince: number | null;
 }
 
 export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
@@ -15,8 +16,27 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
     isCameraReady,
     modelLoaded,
     warnings,
-    maxWarnings
+    maxWarnings,
+    faceMissingSince
 }) => {
+    // Calculate remaining seconds if face is missing
+    const [secondsRemaining, setSecondsRemaining] = React.useState(40);
+
+    React.useEffect(() => {
+        if (!faceMissingSince) {
+            setSecondsRemaining(40);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            const elapsed = Date.now() - faceMissingSince;
+            const remaining = Math.max(0, 40 - Math.ceil(elapsed / 1000));
+            setSecondsRemaining(remaining);
+        }, 500);
+
+        return () => clearInterval(interval);
+    }, [faceMissingSince]);
+
     return (
         <Card className="fixed bottom-4 right-4 w-48 h-36 z-50 overflow-hidden shadow-2xl border-2 border-primary/20 bg-black/90 group transition-all hover:scale-105">
             {/* Video Feed */}
@@ -45,7 +65,17 @@ export const ProctoringCamera: React.FC<ProctoringCameraProps> = ({
                 )}
             </div>
 
-            {warnings > 0 && (
+            {/* Missing Face Countdown Overlay */}
+            {faceMissingSince && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[1px] text-yellow-500 animate-in fade-in duration-300">
+                    <p className="text-[10px] font-bold uppercase tracking-wider">Face Not Detected</p>
+                    <p className="text-3xl font-black font-mono my-1">{secondsRemaining}s</p>
+                    <p className="text-[9px] text-white/80 text-center px-2">Show face to avoid violation</p>
+                </div>
+            )}
+
+            {/* Violation Banner */}
+            {warnings > 0 && !faceMissingSince && (
                 <div className="absolute bottom-0 left-0 right-0 bg-red-600/90 text-white text-[10px] font-bold py-1 text-center">
                     {warnings} VIOLATIONS DETECTED
                 </div>
