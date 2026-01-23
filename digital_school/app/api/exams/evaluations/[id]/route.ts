@@ -375,7 +375,8 @@ export async function GET(
           correct: q.correct,
           options: q.options,
           subQuestions: parsedSubQuestions,
-          modelAnswer: q.modelAnswer || null
+          modelAnswer: q.modelAnswer || null,
+          explanation: q.difficultyDetail || null
         };
       }),
       submissions: processedSubmissions

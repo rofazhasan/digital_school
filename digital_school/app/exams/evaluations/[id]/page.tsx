@@ -97,7 +97,9 @@ interface Question {
   marks: number;
   correct?: any;
   options?: any[];
+  explanation?: string;
   subQuestions?: any[];
+  modelAnswer?: string;
 }
 
 interface Exam {
@@ -1709,6 +1711,68 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       )}
                                     </div>
                                   )}
+
+                                  {/* Explanation & Correct Answer */}
+                                  <div className="mt-4 pt-4 border-t border-gray-200">
+                                    {/* MCQ Options Display */}
+                                    {currentQuestion.type === 'mcq' && currentQuestion.options && (
+                                      <div className="mb-4">
+                                        <h5 className="font-semibold text-gray-700 mb-2">Options:</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                          {currentQuestion.options.map((opt: any, idx: number) => {
+                                            const normalize = (s: string) => String(s).trim().toLowerCase();
+                                            const optText = opt.text || String(opt);
+                                            const isSelected = currentAnswer && normalize(currentAnswer) === normalize(optText);
+                                            const isCorrect = opt.isCorrect;
+
+                                            let bgClass = "bg-white border-gray-200";
+                                            if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                            if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
+                                            if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
+
+                                            return (
+                                              <div key={idx} className={`p-3 rounded border ${bgClass} flex items-center justify-between`}>
+                                                <div className="flex items-center gap-2">
+                                                  <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
+                                                  <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
+                                                    <MathJax inline>{optText}</MathJax>
+                                                  </span>
+                                                </div>
+                                                {isCorrect && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                                {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600" />}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Correct Answer (Non-MCQ or if options missing) */}
+                                    {(currentQuestion.type !== 'mcq' || !currentQuestion.options) && (currentQuestion.modelAnswer || currentQuestion.correct) && (
+                                      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                                        <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
+                                          <CheckCircle className="h-4 w-4" />
+                                          Correct / Model Answer:
+                                        </h5>
+                                        <div className="text-green-900">
+                                          <MathJax>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Explanation */}
+                                    {currentQuestion.explanation && (
+                                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                                        <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
+                                          <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
+                                          Explanation:
+                                        </h5>
+                                        <div className="text-blue-900 text-sm">
+                                          <MathJax>{currentQuestion.explanation}</MathJax>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
 

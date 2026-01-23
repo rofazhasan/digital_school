@@ -215,7 +215,7 @@ model Question {
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
   class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])
-  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   clones                 Question[]               @relation("ClonedQuestion")
   createdBy              User                     @relation(fields: [createdById], references: [id])
   editedBy               User?                    @relation("EditedQuestions", fields: [editedById], references: [id])
@@ -566,7 +566,7 @@ model QuestionVersion {
   versionNumber Int
   data          Json
   createdAt     DateTime @default(now())
-  question      Question @relation("QuestionVersions", fields: [questionId], references: [id])
+  question      Question @relation("QuestionVersions", fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model QuestionToQuestionBank {

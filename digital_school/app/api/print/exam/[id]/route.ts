@@ -31,6 +31,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
               options: true,
               subQuestions: true,
               modelAnswer: true,
+              difficultyDetail: true,
             }
           },
         },
@@ -51,15 +52,15 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
       }
     });
-    
+
     // Find the subject with the highest count
-    const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) => 
+    const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
       (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
     );
-    
+
     examSubject = mostCommonSubject[0] || '';
   }
-  
+
   // If no subject found from questions relation, try to get from questionsJson
   if (!examSubject) {
     for (const set of exam.examSets) {
@@ -75,7 +76,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
       }
     }
   }
-  
+
   // If still no subject, try to get from the first question's subject
   if (!examSubject && allQuestions.length > 0) {
     examSubject = allQuestions[0].subject || '';
@@ -111,55 +112,56 @@ export async function GET(request: NextRequest, context: { params: { id: string 
     const mcq = questionsArr.filter((q: any) => q.type === 'MCQ').map((q: any) => {
       // Extract correct answer index from MCQ options and map to Bengali labels
       let correctAnswer = 'ক'; // Default fallback
-      
+
       if (Array.isArray(q.options)) {
         const correctIndex = q.options.findIndex((opt: any) => opt.isCorrect);
         if (correctIndex !== -1 && correctIndex < MCQ_LABELS.length) {
           correctAnswer = MCQ_LABELS[correctIndex];
         }
       }
-      
+
       return {
         q: q.questionText,
         options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
         marks: q.marks,
         correctAnswer: correctAnswer,
+        explanation: q.difficultyDetail, // Add explanation
       };
     });
     // Process CQ questions with subsection-aware shuffling
     let cq = questionsArr.filter((q: any) => q.type === 'CQ');
-    
+
     // If there are subsections, process them according to subsection rules
     if (exam.cqSubsections && Array.isArray(exam.cqSubsections) && exam.cqSubsections.length > 1) {
       // Multiple subsections - maintain order but shuffle within each subsection
       const processedCq: any[] = [];
-      
+
       exam.cqSubsections.forEach((subsection: any) => {
         const startIdx = subsection.startIndex - 1; // Convert to 0-based index
         const endIdx = subsection.endIndex;
         const subsectionQuestions = cq.slice(startIdx, endIdx);
-        
+
         if (subsectionQuestions.length > 0) {
           // Shuffle questions within this subsection only
           const shuffledSubsection = shuffleArray([...subsectionQuestions]);
           processedCq.push(...shuffledSubsection);
         }
       });
-      
+
       cq = processedCq;
     } else if (exam.cqSubsections && Array.isArray(exam.cqSubsections) && exam.cqSubsections.length === 1) {
       // Single subsection - can shuffle all CQ questions
       cq = shuffleArray([...cq]);
     }
     // If no subsections, keep original order
-    
+
     const cqWithAnswers = cq.map((q: any) => {
       const subAnswers = (q.subQuestions || []).map((sub: any) => {
         // Try different possible field names for the answer
         const answer = sub.modelAnswer || sub.answer || sub.text || sub.content || 'উত্তর দেওয়া হবে';
         return answer;
       });
-      
+
       return {
         questionText: q.questionText,
         marks: q.marks,
@@ -168,7 +170,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         subAnswers: subAnswers,
       };
     });
-    
+
     cq = cqWithAnswers;
     const sq = questionsArr.filter((q: any) => q.type === 'SQ').map((q: any) => ({
       questionText: q.questionText,
