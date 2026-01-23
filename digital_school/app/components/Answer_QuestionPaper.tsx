@@ -1,7 +1,6 @@
 import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
-import { MathJax, MathJaxContext } from 'better-react-mathjax';
-import Latex from 'react-latex';
+import { MathJax } from 'better-react-mathjax';
 
 // --- TYPES ---
 interface MCQ {
@@ -50,9 +49,9 @@ interface AnswerQuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
-// Helper to render text with react-latex
+// Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
-  <Latex>{children}</Latex>
+  <MathJax>{children}</MathJax>
 );
 
 // Main AnswerQuestionPaper component (forwardRef for printing)

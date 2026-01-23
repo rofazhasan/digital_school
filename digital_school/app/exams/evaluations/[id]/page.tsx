@@ -112,7 +112,9 @@ interface Exam {
 }
 
 const mathJaxConfig = {
+  loader: { load: ["[tex]/ams"] },
   tex: {
+    packages: { '[+]': ['ams'] },
     inlineMath: [['$', '$'], ['\\(', '\\)']],
     displayMath: [['$$', '$$'], ['\\[', '\\]']],
   },
@@ -1595,7 +1597,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   </div>
                                 </div>
                                 <div className="text-lg mb-4">
-                                  <MathJax dynamic>{currentQuestion.text}</MathJax>
+                                  <MathJax key={currentQuestion.id} dynamic>{currentQuestion.text}</MathJax>
                                 </div>
 
                                 {/* Subquestions */}
@@ -1755,7 +1757,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Correct / Model Answer:
                                         </h5>
                                         <div className="text-green-900">
-                                          <MathJax dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
+                                          <MathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
                                         </div>
                                       </div>
                                     )}
@@ -1768,7 +1770,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Explanation:
                                         </h5>
                                         <div className="text-blue-900 text-sm">
-                                          <MathJax dynamic>{currentQuestion.explanation}</MathJax>
+                                          <MathJax key={currentQuestion.id} dynamic>{currentQuestion.explanation}</MathJax>
                                         </div>
                                       </div>
                                     )}
