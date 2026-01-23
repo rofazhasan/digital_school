@@ -1636,7 +1636,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           ) : (
                                             <XCircle className="h-5 w-5 text-red-600" />
                                           )}
-                                          <span className="text-lg">{currentAnswer}</span>
+                                          <span className="text-lg"><MathJax inline>{currentAnswer}</MathJax></span>
                                         </div>
                                       ) : (
                                         <span className="text-gray-500">No answer provided</span>
@@ -1649,7 +1649,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                           {/* Text answer */}
                                           {typeof currentAnswer === 'string' && (
-                                            <div className="whitespace-pre-wrap">{currentAnswer}</div>
+                                            <div className="whitespace-pre-wrap"><MathJax>{currentAnswer}</MathJax></div>
                                           )}
 
                                           {/* Image answers */}
@@ -1735,7 +1735,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 <div className="flex items-center gap-2">
                                                   <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
                                                   <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                    <MathJax inline>{optText}</MathJax>
+                                                    <MathJax inline dynamic>{optText}</MathJax>
                                                   </span>
                                                 </div>
                                                 {isCorrect && <CheckCircle className="h-4 w-4 text-green-600" />}
@@ -1755,7 +1755,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Correct / Model Answer:
                                         </h5>
                                         <div className="text-green-900">
-                                          <MathJax>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
+                                          <MathJax dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
                                         </div>
                                       </div>
                                     )}
@@ -1768,7 +1768,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Explanation:
                                         </h5>
                                         <div className="text-blue-900 text-sm">
-                                          <MathJax>{currentQuestion.explanation}</MathJax>
+                                          <MathJax dynamic>{currentQuestion.explanation}</MathJax>
                                         </div>
                                       </div>
                                     )}
