@@ -101,6 +101,50 @@ export async function GET(request: NextRequest, context: { params: { id: string 
     cqSubsections: exam.cqSubsections || null,
   };
 
+  // Collect all question IDs to fetch fresh difficultyDetail/explanation
+  const questionIds = new Set<string>();
+
+  exam.examSets.forEach(set => {
+    let questionsArr: any[] = [];
+    if (set['questionsJson'] && Array.isArray(set['questionsJson'])) {
+      questionsArr = set['questionsJson'];
+    } else if (set.questions && Array.isArray(set.questions)) {
+      questionsArr = set.questions;
+    }
+
+    questionsArr.forEach((q: any) => {
+      if (q && q.id) {
+        questionIds.add(q.id);
+      }
+    });
+  });
+
+  // Fetch fresh details from DB
+  let questionDetailsMap = new Map<string, string>();
+  if (questionIds.size > 0) {
+    try {
+      const dbQuestions = await prismadb.question.findMany({
+        where: {
+          id: {
+            in: Array.from(questionIds)
+          }
+        },
+        select: {
+          id: true,
+          difficultyDetail: true
+        }
+      });
+
+      dbQuestions.forEach(q => {
+        if (q.difficultyDetail) {
+          questionDetailsMap.set(q.id, q.difficultyDetail);
+        }
+      });
+    } catch (error) {
+      console.error("Error fetching question details:", error);
+    }
+  }
+
   // For each set, use questionsJson if present, else fallback to questions relation
   const sets = exam.examSets.map((set) => {
     let questionsArr: any[] = [];
@@ -125,7 +169,7 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
         marks: q.marks,
         correctAnswer: correctAnswer,
-        explanation: q.difficultyDetail, // Add explanation
+        explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation, // Prefer fresh from DB, then JSON fallback
       };
     });
     // Process CQ questions with subsection-aware shuffling

@@ -142,6 +142,40 @@ export async function GET(
       }
     }
 
+    // Collect all question IDs to fetch fresh difficultyDetail/explanation
+    const questionIds = new Set<string>();
+    allQuestions.forEach(q => {
+      if (q && q.id) {
+        questionIds.add(q.id);
+      }
+    });
+
+    // Fetch fresh details from DB
+    const questionDetailsMap = new Map<string, string>();
+    if (questionIds.size > 0) {
+      try {
+        const dbQuestions = await prisma.question.findMany({
+          where: {
+            id: {
+              in: Array.from(questionIds)
+            }
+          },
+          select: {
+            id: true,
+            difficultyDetail: true
+          }
+        });
+
+        dbQuestions.forEach(q => {
+          if (q.difficultyDetail) {
+            questionDetailsMap.set(q.id, q.difficultyDetail);
+          }
+        });
+      } catch (error) {
+        console.error("Error fetching question details:", error);
+      }
+    }
+
 
 
     // Process submissions to include evaluation data
@@ -376,7 +410,7 @@ export async function GET(
           options: q.options,
           subQuestions: parsedSubQuestions,
           modelAnswer: q.modelAnswer || null,
-          explanation: q.difficultyDetail || null
+          explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || null
         };
       }),
       submissions: processedSubmissions
