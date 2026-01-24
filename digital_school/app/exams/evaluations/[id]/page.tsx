@@ -1733,15 +1733,25 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
 
                                             return (
-                                              <div key={idx} className={`p-3 rounded border ${bgClass} flex items-center justify-between`}>
-                                                <div className="flex items-center gap-2">
-                                                  <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
-                                                  <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                    <MathJax inline dynamic>{optText}</MathJax>
-                                                  </span>
+                                              <div key={idx} className={`p-3 rounded border ${bgClass} flex flex-col gap-2`}>
+                                                <div className="flex items-center justify-between w-full">
+                                                  <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
+                                                    <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
+                                                      <MathJax inline dynamic>{optText}</MathJax>
+                                                    </span>
+                                                  </div>
+                                                  {isCorrect && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
+                                                  {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
                                                 </div>
-                                                {isCorrect && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                                {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600" />}
+
+                                                {/* Option Specific Explanation */}
+                                                {opt.explanation && (
+                                                  <div className="text-xs text-gray-600 pl-8 border-t border-gray-200 pt-1 mt-1">
+                                                    <span className="font-semibold text-gray-700">ব্যাখ্যা: </span>
+                                                    <MathJax inline dynamic>{opt.explanation}</MathJax>
+                                                  </div>
+                                                )}
                                               </div>
                                             );
                                           })}
