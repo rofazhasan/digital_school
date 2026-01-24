@@ -93,7 +93,6 @@ export default function ExamsPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
-    date: '',
     startTime: '',
     endTime: '',
     duration: 0,
@@ -165,15 +164,16 @@ export default function ExamsPage() {
     const startDate = exam.startTime ? new Date(exam.startTime) : dateObj;
     const endDate = exam.endTime ? new Date(exam.endTime) : dateObj;
 
-    const formatDate = (d: Date) => d.toISOString().split('T')[0];
-    const formatTime = (d: Date) => d.toTimeString().substring(0, 5); // HH:mm
+    const formatDateTime = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
     setEditForm({
       name: exam.name,
       description: exam.description || '',
-      date: formatDate(dateObj),
-      startTime: formatTime(startDate),
-      endTime: formatTime(endDate),
+      startTime: formatDateTime(startDate),
+      endTime: formatDateTime(endDate),
       duration: exam.duration || 0,
       allowRetake: exam.allowRetake || false
     });
@@ -187,18 +187,17 @@ export default function ExamsPage() {
     setLoading(true);
     try {
       // Reconstruct ISO strings
-      const baseDate = new Date(editForm.date);
-      const [startH, startM] = editForm.startTime.split(':').map(Number);
-      const [endH, endM] = editForm.endTime.split(':').map(Number);
+      const startDateTime = new Date(editForm.startTime);
+      const endDateTime = new Date(editForm.endTime);
 
-      const startDateTime = new Date(baseDate);
-      startDateTime.setHours(startH, startM, 0);
-
-      const endDateTime = new Date(baseDate);
-      endDateTime.setHours(endH, endM, 0);
-
-      // Adjust for duration automatically if needed? No, let user set it or just trust inputs.
-      // Actually typically duration is derived or vice versa. We send all.
+      // Calculate duration if it's 0 or invalid, otherwise use user input
+      let duration = Number(editForm.duration);
+      if (!duration || duration <= 0) {
+        const diffMs = endDateTime.getTime() - startDateTime.getTime();
+        if (diffMs > 0) {
+          duration = Math.round(diffMs / 60000); // Convert to minutes
+        }
+      }
 
       const res = await fetch(`/api/exams?id=${editingExam.id}`, {
         method: 'PATCH',
@@ -206,10 +205,10 @@ export default function ExamsPage() {
         body: JSON.stringify({
           name: editForm.name,
           description: editForm.description,
-          date: baseDate.toISOString(),
+          date: startDateTime.toISOString(), // Use start time as the main date
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
-          duration: Number(editForm.duration),
+          duration: duration,
           allowRetake: editForm.allowRetake
         }),
       });
@@ -1026,24 +1025,12 @@ export default function ExamsPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">
-                  Date
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={editForm.date}
-                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="startTime" className="text-right">
                   Start Time
                 </Label>
                 <Input
                   id="startTime"
-                  type="time"
+                  type="datetime-local"
                   value={editForm.startTime}
                   onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
                   className="col-span-3"
@@ -1055,7 +1042,7 @@ export default function ExamsPage() {
                 </Label>
                 <Input
                   id="endTime"
-                  type="time"
+                  type="datetime-local"
                   value={editForm.endTime}
                   onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
                   className="col-span-3"

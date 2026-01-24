@@ -306,7 +306,10 @@ export default function ExamBuilderPage() {
   };
 
   useEffect(() => {
-    fetchExamData(filters, dateRange);
+    // Only fetch if not searching by subject (subject search is handled by debouncedFetch)
+    if (!filters.subject) {
+      fetchExamData(filters, dateRange);
+    }
   }, [fetchExamData, filters, dateRange]);
 
   useEffect(() => {
@@ -416,9 +419,7 @@ export default function ExamBuilderPage() {
   const handleFilterChange = (key: 'type' | 'difficulty' | 'subject' | 'topic', value: string) => {
     const v = value === 'all' ? '' : value;
     setFilters(prev => ({ ...prev, [key]: v, page: 1 }));
-    if (key !== 'subject') {
-      fetchExamData({ ...filters, [key]: v, page: 1 });
-    }
+    // fetchExamData is handled by useEffect
   };
 
   const handlePageChange = (newPage: number) => {
@@ -643,16 +644,20 @@ export default function ExamBuilderPage() {
                 <CardContent>
                   <ScrollArea className="h-[60vh] pr-4">
                     {isLoading && <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin" /></div>}
-                    {!isLoading && questionsData?.data.map(q => (
-                      <QuestionCard
-                        key={q.id}
-                        question={q}
-                        onAdd={handleAddQuestion}
-                        isAdded={selectedQuestionIds.has(q.id)}
-                        isSelectable={canAddQuestion(q)}
-                        selectionReason={getSelectionReason(q)}
-                      />
-                    ))}
+                    {!isLoading && questionsData?.data.map(q => {
+                      const isAdded = selectedQuestionIds.has(q.id);
+                      return (
+                        <QuestionCard
+                          key={q.id}
+                          question={q}
+                          onAdd={!isAdded ? handleAddQuestion : undefined}
+                          onRemove={isAdded ? handleRemoveQuestion : undefined}
+                          isAdded={isAdded}
+                          isSelectable={canAddQuestion(q)}
+                          selectionReason={getSelectionReason(q)}
+                        />
+                      );
+                    })}
                     {!isLoading && questionsData?.data.length === 0 && <p className="text-center text-muted-foreground py-10">No questions match the current filters.</p>}
                   </ScrollArea>
                   {/* Pagination Controls */}
