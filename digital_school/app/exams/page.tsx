@@ -913,6 +913,18 @@ export default function ExamsPage() {
 
                             <div>
                               <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
+                                <Clock className="w-3 h-3" />
+                                Time
+                              </div>
+                              <p className="font-medium text-gray-900 dark:text-white text-xs">
+                                {exam.startTime ? new Date(exam.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                                {' - '}
+                                {exam.endTime ? new Date(exam.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+                              </p>
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
                                 <Users className="w-3 h-3" />
                                 Created By
                               </div>
