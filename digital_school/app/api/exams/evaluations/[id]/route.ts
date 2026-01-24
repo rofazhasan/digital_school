@@ -401,6 +401,16 @@ export async function GET(
           }
         }
 
+        // Extract explanation: DB > Question Level > Option Level
+        let explanation = questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation;
+
+        if (!explanation && Array.isArray(q.options)) {
+          const correctOpt = q.options.find((opt: any) => opt.isCorrect);
+          if (correctOpt && correctOpt.explanation) {
+            explanation = correctOpt.explanation;
+          }
+        }
+
         return {
           id: q.id,
           type: q.type.toLowerCase(),
@@ -410,7 +420,7 @@ export async function GET(
           options: q.options,
           subQuestions: parsedSubQuestions,
           modelAnswer: q.modelAnswer || null,
-          explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation || null
+          explanation: explanation || null
         };
       }),
       submissions: processedSubmissions

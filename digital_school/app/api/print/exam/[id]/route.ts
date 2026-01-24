@@ -164,12 +164,22 @@ export async function GET(request: NextRequest, context: { params: { id: string 
         }
       }
 
+      // Extract explanation from correct option if not found at top level
+      let explanation = questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation;
+
+      if (!explanation && Array.isArray(q.options)) {
+        const correctOpt = q.options.find((opt: any) => opt.isCorrect);
+        if (correctOpt && correctOpt.explanation) {
+          explanation = correctOpt.explanation;
+        }
+      }
+
       return {
         q: q.questionText,
         options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
         marks: q.marks,
         correctAnswer: correctAnswer,
-        explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation, // Prefer fresh from DB, then JSON fallback
+        explanation: explanation, // Prefer fresh from DB, then JSON fallback, then Option fallback
       };
     });
     // Process CQ questions with subsection-aware shuffling
