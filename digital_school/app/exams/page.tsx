@@ -93,6 +93,7 @@ export default function ExamsPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     description: '',
+    date: '',
     startTime: '',
     endTime: '',
     duration: 0,
@@ -169,9 +170,15 @@ export default function ExamsPage() {
       return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
     };
 
+    const formatDate = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
     setEditForm({
       name: exam.name,
       description: exam.description || '',
+      date: formatDate(dateObj),
       startTime: formatDateTime(startDate),
       endTime: formatDateTime(endDate),
       duration: exam.duration || 0,
@@ -205,7 +212,7 @@ export default function ExamsPage() {
         body: JSON.stringify({
           name: editForm.name,
           description: editForm.description,
-          date: startDateTime.toISOString(), // Use start time as the main date
+          date: new Date(editForm.date).toISOString(),
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           duration: duration,
@@ -1021,6 +1028,18 @@ export default function ExamsPage() {
                   id="description"
                   value={editForm.description}
                   onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editForm.date}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
                   className="col-span-3"
                 />
               </div>
