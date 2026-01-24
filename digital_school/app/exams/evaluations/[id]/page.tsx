@@ -1769,7 +1769,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
                                           Explanation:
                                         </h5>
-                                        <div className="text-blue-900 text-sm">
+                                        <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
                                           <MathJax key={currentQuestion.id} dynamic>{currentQuestion.explanation}</MathJax>
                                         </div>
                                       </div>

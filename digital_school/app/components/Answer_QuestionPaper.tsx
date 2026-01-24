@@ -51,7 +51,7 @@ const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', '�
 
 // Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
-  <MathJax>{children}</MathJax>
+  <MathJax dynamic>{children}</MathJax>
 );
 
 // Main AnswerQuestionPaper component (forwardRef for printing)

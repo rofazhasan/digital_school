@@ -410,7 +410,7 @@ export async function GET(
           options: q.options,
           subQuestions: parsedSubQuestions,
           modelAnswer: q.modelAnswer || null,
-          explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || null
+          explanation: questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation || null
         };
       }),
       submissions: processedSubmissions
