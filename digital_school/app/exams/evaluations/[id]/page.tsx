@@ -1745,8 +1745,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
                                                 </div>
 
-                                                {/* Option Specific Explanation */}
-                                                {opt.explanation && (
+                                                {/* Option Specific Explanation - Only for Correct Option */}
+                                                {opt.explanation && isCorrect && (
                                                   <div className="text-xs text-gray-600 pl-8 border-t border-gray-200 pt-1 mt-1">
                                                     <span className="font-semibold text-gray-700">ব্যাখ্যা: </span>
                                                     <MathJax inline dynamic>

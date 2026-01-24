@@ -9,6 +9,7 @@ interface MCQ {
   marks?: number;
   correctAnswer?: string; // The correct option (A, B, C, D or ক, খ, গ, ঘ)
   explanation?: string;
+  questionText?: string;
 }
 interface CQ {
   questionText: string;
@@ -166,6 +167,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
+                                  <div className="mb-1 text-black">
+                                    <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                                    <Text>{q.q || q.questionText || ''}</Text>
+                                  </div>
                                   <div className="mb-1">
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
@@ -174,7 +179,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   </span>
                                   {q.explanation && (
                                     <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</span>
+                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
                                     </div>
                                   )}
                                 </div>
@@ -193,6 +198,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
+                                  <div className="mb-1 text-black">
+                                    <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                                    <Text>{q.q || q.questionText || ''}</Text>
+                                  </div>
                                   <div className="mb-1">
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
@@ -201,7 +210,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   </span>
                                   {q.explanation && (
                                     <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</span>
+                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
                                     </div>
                                   )}
                                 </div>
@@ -219,6 +228,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
+                              <div className="mb-1 text-black">
+                                <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                                <Text>{q.q || q.questionText || ''}</Text>
+                              </div>
                               <div className="mb-1">
                                 <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                               </div>
@@ -227,7 +240,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               </span>
                               {q.explanation && (
                                 <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                  <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</span>
+                                  <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
                                 </div>
                               )}
                             </div>
