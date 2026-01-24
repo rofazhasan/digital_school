@@ -172,11 +172,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   <span className="text-red-600 font-bold">
                                     উত্তর: {q.correctAnswer || 'ক'}
                                   </span>
-                                  {q.explanation && (
-                                    <div className="mt-1 text-gray-700 text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation}</Text>
-                                    </div>
-                                  )}
+                                  <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
+                                    <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -199,11 +197,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   <span className="text-red-600 font-bold">
                                     উত্তর: {q.correctAnswer || 'ক'}
                                   </span>
-                                  {q.explanation && (
-                                    <div className="mt-1 text-gray-700 text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation}</Text>
-                                    </div>
-                                  )}
+                                  <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
+                                    <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation}</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -225,11 +221,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <span className="text-red-600 font-bold">
                                 উত্তর: {q.correctAnswer || 'ক'}
                               </span>
-                              {q.explanation && (
-                                <div className="mt-1 text-gray-700 text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                  <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation}</Text>
-                                </div>
-                              )}
+                              <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
+                                <span className="font-bold">ব্যাখ্যা:</span> <span>{q.explanation}</span>
+                              </div>
                             </div>
                           </div>
                         </div>
