@@ -1749,7 +1749,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 {opt.explanation && (
                                                   <div className="text-xs text-gray-600 pl-8 border-t border-gray-200 pt-1 mt-1">
                                                     <span className="font-semibold text-gray-700">ব্যাখ্যা: </span>
-                                                    <MathJax inline dynamic>{opt.explanation}</MathJax>
+                                                    <MathJax inline dynamic>
+                                                      {opt.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
+                                                    </MathJax>
                                                   </div>
                                                 )}
                                               </div>
@@ -1780,7 +1782,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           Explanation:
                                         </h5>
                                         <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
-                                          <MathJax key={currentQuestion.id} dynamic>{currentQuestion.explanation}</MathJax>
+                                          <MathJax key={currentQuestion.id} dynamic>
+                                            {currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
+                                          </MathJax>
                                         </div>
                                       </div>
                                     )}
