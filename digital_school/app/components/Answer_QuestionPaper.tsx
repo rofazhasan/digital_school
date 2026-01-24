@@ -171,6 +171,14 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     <span className="font-bold text-gray-800">প্রশ্ন: </span>
                                     <Text>{q.q || q.questionText || ''}</Text>
                                   </div>
+                                  <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
+                                    {q.options && q.options.map((opt, optIdx) => (
+                                      <div key={optIdx} className="text-xs text-gray-700 flex items-start">
+                                        <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
+                                        <Text>{opt.text || String(opt)}</Text>
+                                      </div>
+                                    ))}
+                                  </div>
                                   <div className="mb-1">
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
@@ -202,6 +210,14 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     <span className="font-bold text-gray-800">প্রশ্ন: </span>
                                     <Text>{q.q || q.questionText || ''}</Text>
                                   </div>
+                                  <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
+                                    {q.options && q.options.map((opt, optIdx) => (
+                                      <div key={optIdx} className="text-xs text-gray-700 flex items-start">
+                                        <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
+                                        <Text>{opt.text || String(opt)}</Text>
+                                      </div>
+                                    ))}
+                                  </div>
                                   <div className="mb-1">
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
@@ -231,6 +247,14 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <div className="mb-1 text-black">
                                 <span className="font-bold text-gray-800">প্রশ্ন: </span>
                                 <Text>{q.q || q.questionText || ''}</Text>
+                              </div>
+                              <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
+                                {q.options && q.options.map((opt, optIdx) => (
+                                  <div key={optIdx} className="text-xs text-gray-700 flex items-start">
+                                    <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
+                                    <Text>{opt.text || String(opt)}</Text>
+                                  </div>
+                                ))}
                               </div>
                               <div className="mb-1">
                                 <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
