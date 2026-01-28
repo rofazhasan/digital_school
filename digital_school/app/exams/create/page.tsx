@@ -211,12 +211,23 @@ export default function CreateExamPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error("Failed to create exam");
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.message || result.error || "Failed to create exam");
+      }
+
       setSuccess(true);
-      toast({ title: "Exam created!", description: "Exam is pending approval.", variant: "default" });
-      setTimeout(() => router.push("/exams"), 1200);
-    } catch {
-      toast({ title: "Error", description: "Failed to create exam.", variant: "destructive" });
+      toast({ title: "Success", description: "Exam created successfully!", variant: "default" });
+      setTimeout(() => router.push("/exams"), 1500);
+    } catch (error: any) {
+      console.error("Bulk create error:", error);
+      toast({
+        title: "Creation Failed",
+        description: error.message || "Failed to create exams. Please check your data.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
