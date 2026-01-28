@@ -275,11 +275,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       schoolAddress: settings?.address || "Dhaka, Bangladesh",
       logoUrl: settings?.logoUrl,
       title: result.exam.name,
-      subject: "General", // The API result doesn't explicitly have subject, might need fallback or extraction
-      class: result.student.class,
+      subject: result.exam.subject || "General",
+      class: result.exam.class || result.student.class || "N/A",
       date: result.exam.startTime,
+      set: result.exam.set || "A",
       totalMarks: result.exam.totalMarks.toString(),
-      highestMark: result.statistics.highestScore
+      highestMark: result.statistics.highestScore,
+      mcqNegativeMarking: result.exam.mcqNegativeMarking || 0,
+      cqRequiredQuestions: result.exam.cqRequiredQuestions,
+      sqRequiredQuestions: result.exam.sqRequiredQuestions
     };
 
     return { questions, submission, examInfo };
