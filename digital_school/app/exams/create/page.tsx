@@ -443,7 +443,7 @@ export default function CreateExamPage() {
         method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(validExams)
       });
       const result = await res.json();
-      if (!res.ok) throw new Error(result.message || "Bulk import failed");
+      if (!res.ok) throw new Error(result.error || result.message || "Bulk import failed");
       toast({ title: "Success", description: `Imported ${result.data?.count || validExams.length} exams.`, variant: "default" });
       setTimeout(() => router.push("/exams"), 1200);
     } catch (err: any) {
