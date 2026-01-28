@@ -76,7 +76,9 @@ const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
 const Text = ({ children }: { children: string }) => (
-    <Latex>{children}</Latex>
+    <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper">
+        <MathJax inline dynamic>{children}</MathJax>
+    </div>
 );
 
 const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>(
@@ -173,7 +175,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         <div className="text-right space-y-1">
                             <p>
                                 <strong>Score:</strong> {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')} / {examInfo.totalMarks}
-                                {totalDeducted > 0 && <span className="text-red-600 block text-xs">(Deducted: {totalDeducted.toFixed(2)})</span>}
+                                {totalDeducted > 0 && <span className="text-red-600 font-bold ml-1">(Deducted: {totalDeducted.toFixed(2)})</span>}
                             </p>
                             <p><strong>Highest:</strong> {examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
                             <p><strong>Rank:</strong> {rank ? `${rank}${getOrdinal(rank)}` : 'N/A'}</p>
@@ -205,6 +207,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                     const ans = submission.answers[q.id || ''];
                                     const status = getMCQStatus(q, ans);
                                     const mark = getObtainedMarkRaw(q, status, q.marks || 1);
+                                    const totalMark = q.marks || 1;
 
                                     return (
                                         <div key={idx} className={`mb-2 p-2 rounded border ${status === 'correct' ? 'bg-green-50 border-green-200' :
@@ -214,7 +217,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 <div className="flex items-start flex-1 min-w-0">
                                                     <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                                                     <div className="flex-1 text-sm overflow-hidden">
-                                                        <div className="inline-block"><Text>{`${q.q}`}</Text></div>
+                                                        <Text>{`${q.q}`}</Text>
                                                         <div className="mt-1 flex flex-wrap gap-2">
                                                             {(q.options || []).map((opt, oidx) => {
                                                                 const isSelected = ans === opt.text;
@@ -239,8 +242,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className={`font-bold text-sm ml-2 whitespace-nowrap min-w-[2rem] text-right ${mark > 0 ? 'text-green-600' : mark < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                                                    {mark > 0 ? `+${mark}` : mark < 0 ? `${mark}` : '0'}
+                                                <div className={`font-bold text-sm ml-2 whitespace-nowrap min-w-[3rem] text-right ${mark > 0 ? 'text-green-600' : mark < 0 ? 'text-red-600' : 'text-gray-400'}`}>
+                                                    {mark > 0 ? `${mark}/${totalMark}` : mark < 0 ? `${mark}/${totalMark}` : `0/${totalMark}`}
                                                 </div>
                                             </div>
                                         </div>
