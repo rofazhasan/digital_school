@@ -176,7 +176,10 @@ export default function OnlineExamsPage() {
           </div>
           <div className="flex gap-3">
             <Button asChild variant="secondary" className="shadow-lg hover:shadow-xl transition-all">
-              <Link href="/student/dashboard">Back to Dashboard</Link>
+              <Link href="/student/dashboard">Dashboard</Link>
+            </Button>
+            <Button asChild variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 shadow-lg hover:shadow-xl transition-all backdrop-blur-md">
+              <Link href="/exams/results">Results</Link>
             </Button>
             <DarkModeToggle />
           </div>
