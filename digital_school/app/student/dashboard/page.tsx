@@ -127,18 +127,37 @@ export default function StudentDashboardPage() {
         if (data.user && data.user.role === 'STUDENT') {
           if (isMounted) setUser(data.user);
           // Fetch exams after user is loaded
+          // Fetch exams after user is loaded
           fetch('/api/exams')
             .then(res => res.json())
-            .then(examData => {
-              let filtered = examData;
-              // Fix filtering logic: Check if exam classId matches user classId relative to subject
-              // Actually, simply check if the exam is assigned to the student's class
-              if (data.user.studentProfile?.classId && Array.isArray(examData)) {
-                filtered = examData.filter((exam: any) => exam.classId === data.user.studentProfile.classId);
+            .then(resData => {
+              // Handle both array and { data: [] } format
+              const examData = Array.isArray(resData) ? resData : (resData.data || []);
+
+              let filtered = [];
+              const userClassId = data.user.studentProfile?.classId;
+
+              if (userClassId && Array.isArray(examData)) {
+                const now = new Date();
+                const cutoffDate = new Date();
+                cutoffDate.setDate(now.getDate() + 3);
+                cutoffDate.setHours(0, 0, 0, 0);
+
+                filtered = examData.filter((exam: any) => {
+                  // Class Filter
+                  if (exam.classId !== userClassId) return false;
+
+                  // Date Filter (Past + Next 2 days)
+                  const examDate = new Date(exam.date);
+                  if (examDate >= cutoffDate) return false;
+
+                  return true;
+                });
               }
               if (isMounted) setExams(filtered);
             })
-            .catch(() => {
+            .catch((err) => {
+              console.error("Failed to fetch exams", err);
               if (isMounted) setExams([]);
             });
 

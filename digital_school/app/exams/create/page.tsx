@@ -291,21 +291,40 @@ export default function CreateExamPage() {
   };
 
   const parseExcelDate = (dateVal: any): string => {
+    if (!dateVal) return "";
+
+    // 1. Handle Excel Serial Date
     if (typeof dateVal === 'number') {
       const d = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
       if (isNaN(d.getTime())) return "";
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
+      return d.toISOString().split('T')[0];
     }
+
+    // 2. Handle Strings
     if (typeof dateVal === 'string') {
-      const parts = dateVal.trim().split(/[\/\-]/);
-      if (parts.length === 3) {
-        // rough heuristic: if first part > 31 (like 2026), it's YYYY-MM-DD
-        if (parseInt(parts[0]) > 31) return `${parts[0]}-${parts[1]}-${parts[2]}`;
-        // else assume DD/MM/YYYY
-        return `${parts[2]}-${parts[1]}-${parts[0]}`;
+      const str = dateVal.trim();
+
+      // Try strictly parsing ISO date (YYYY-MM-DD)
+      // If it contains time (T or space), split it
+      if (str.includes('T')) return str.split('T')[0];
+
+      // Split by common separators
+      const parts = str.split(/[\/\-\s]+/); // added \s to handle space separator if any
+
+      if (parts.length >= 3) {
+        // Check for YYYY-MM-DD (first part > 31)
+        if (parseInt(parts[0]) > 31) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+        }
+        // Check for DD/MM/YYYY
+        // This is ambiguous: 01/02/2026. Assuming DD/MM/YYYY based on common usage in this context
+        return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+      }
+
+      // Fallback: Date.parse
+      const parsed = Date.parse(str);
+      if (!isNaN(parsed)) {
+        return new Date(parsed).toISOString().split('T')[0];
       }
     }
     return "";
