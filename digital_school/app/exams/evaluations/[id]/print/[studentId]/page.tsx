@@ -22,10 +22,17 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     const [isMathJaxReady, setIsMathJaxReady] = useState(false);
     const printRef = useRef<HTMLDivElement>(null);
 
+    const [settings, setSettings] = useState<any>(null);
+
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
             try {
+                // Fetch settings
+                const settingsRes = await fetch('/api/settings');
+                const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+                setSettings(settingsData);
+
                 // Fetch full exam evaluation data which includes all submissions
                 const response = await fetch(`/api/exams/evaluations/${examId}`);
                 if (!response.ok) throw new Error("Failed to fetch exam data");
@@ -39,7 +46,7 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
                     throw new Error("Student submission not found");
                 }
 
-                // Calculate Rank
+                // Calculate Rank and Highest Mark
                 // Sort submissions by total marks (descending)
                 const sortedSubmissions = [...data.submissions].sort((a: any, b: any) => {
                     const marksA = a.result?.total || 0;
@@ -82,7 +89,7 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
             setIsPrinting(false);
             (window as any).__IS_MATHJAX_READY = false;
         }
-    });
+    } as any);
 
     const mathJaxConfig = {
         loader: { load: ["[tex]/ams"] },
@@ -112,12 +119,8 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
         );
     }
 
-    if (!examData || !submission) return null;
 
-    // Prepare questions structure for MarkedQuestionPaper
-    // The API likely returns flat questions or clustered. 
-    // Based on EvaluationPage.tsx: `exam.questions` is an array of Question. 
-    // We need to group them into mcq, cq, sq for the component.
+    // ... (questions mapping)
 
     const questions = {
         mcq: examData.questions.filter((q: any) => q.type === 'mcq').map((q: any) => ({
@@ -134,18 +137,22 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
         }))
     };
 
+    const highestMark = examData.submissions.reduce((max: number, s: any) => Math.max(max, s.result?.total || 0), 0);
+
     const examInfo = {
-        schoolName: "Digital School", // Or fetch from somewhere if available
-        schoolAddress: "Dhaka, Bangladesh",
+        schoolName: settings?.instituteName || "Digital School",
+        schoolAddress: settings?.address || "Dhaka, Bangladesh",
+        logoUrl: settings?.logoUrl,
         title: examData.name,
-        subject: "General", // The API response didn't explicitly show subject in the evaluation view, might need to extract or fallback
-        class: submission.student.className || examData.class?.name || "N/A",
+        subject: examData.subject || "General",
+        class: examData.class?.name || submission.student.className || "N/A",
         date: new Date(examData.date).toLocaleDateString(),
-        set: examData.set || "A", // If applicable
+        set: examData.set || "A",
         totalMarks: String(examData.totalMarks),
         mcqNegativeMarking: examData.mcqNegativeMarking,
         cqRequiredQuestions: examData.cqRequiredQuestions,
-        sqRequiredQuestions: examData.sqRequiredQuestions
+        sqRequiredQuestions: examData.sqRequiredQuestions,
+        highestMark: highestMark
     };
 
     // Need to pass QR data.

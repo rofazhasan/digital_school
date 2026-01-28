@@ -53,6 +53,8 @@ interface MarkedQuestionPaperProps {
         date: string;
         set?: string;
         duration?: string;
+        logoUrl?: string;
+        highestMark?: number | string;
         totalMarks?: string;
         mcqNegativeMarking?: number;
         cqRequiredQuestions?: number;
@@ -113,10 +115,10 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             return isCorrect ? 'correct' : 'incorrect';
         };
 
-        const getObtainedMark = (q: MCQ, status: string, marks: number) => {
+        const getObtainedMarkRaw = (q: MCQ, status: string, marks: number) => {
             if (status === 'correct') return marks;
             if (status === 'incorrect') return -(marks * negativeRate);
-            return 0;
+            return 0; // Unanswered
         };
 
         // Calculate total deducted marks
@@ -129,6 +131,17 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             }
         });
 
+        // Safe Date Parsing
+        const formatDate = (dateStr: string) => {
+            try {
+                const date = new Date(dateStr);
+                if (isNaN(date.getTime())) return dateStr; // Return as is if invalid
+                return date.toLocaleDateString();
+            } catch (e) {
+                return dateStr;
+            }
+        };
+
         return (
             <div ref={ref} className="question-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
                 {/* Header */}
@@ -136,36 +149,42 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                     <div className="absolute top-0 right-0 hidden print:block">
                         <QRCode value={JSON.stringify(qrData)} size={64} />
                     </div>
+                    {/* Logo if available */}
+                    {examInfo.logoUrl && (
+                        <div className="flex justify-center mb-2">
+                            <img src={examInfo.logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
+                        </div>
+                    )}
                     <h1 className="text-2xl font-bold">{examInfo.schoolName}</h1>
                     <p className="text-sm">{examInfo.schoolAddress}</p>
                     <h2 className="mt-2 text-xl font-bold">{examInfo.title}</h2>
 
                     <div className="mt-4 border-2 border-gray-800 p-3 rounded-md bg-gray-50 print:bg-white flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="text-left">
+                        <div className="text-left space-y-1">
                             <p><strong>Name:</strong> {submission.student.name}</p>
                             <p><strong>ID/Roll:</strong> {submission.student.roll}</p>
                         </div>
                         <div className="text-center">
                             <div className="text-3xl font-bold border-2 border-black rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-1">
-                                {submission.result?.total || 0}
+                                {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}
                             </div>
                             <p className="text-sm font-bold">Total Score</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right space-y-1">
+                            <p>
+                                <strong>Score:</strong> {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')} / {examInfo.totalMarks}
+                                {totalDeducted > 0 && <span className="text-red-600 block text-xs">(Deducted: {totalDeducted.toFixed(2)})</span>}
+                            </p>
+                            <p><strong>Highest:</strong> {examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
                             <p><strong>Rank:</strong> {rank ? `${rank}${getOrdinal(rank)}` : 'N/A'}</p>
-                            {totalDeducted > 0 && (
-                                <p className="text-red-600 text-sm">
-                                    (-{totalDeducted.toFixed(2)} for negative marking)
-                                </p>
-                            )}
                         </div>
                     </div>
 
-                    <div className="text-sm flex flex-row justify-center gap-x-3 flex-wrap mt-2">
+                    <div className="text-sm flex flex-row justify-center gap-x-6 flex-wrap mt-2 bg-gray-100 p-1 rounded print:bg-transparent">
                         <span><strong>বিষয়:</strong> {examInfo.subject}</span>
                         <span><strong>শ্রেণি:</strong> {examInfo.class}</span>
                         {examInfo.set && <span><strong>সেট:</strong> {examInfo.set}</span>}
-                        <span><strong>তারিখ:</strong> {examInfo.date}</span>
+                        <span><strong>তারিখ:</strong> {formatDate(examInfo.date)}</span>
                     </div>
                 </header>
 
@@ -177,7 +196,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1">
                                 <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
                                 <div className="text-right">
-                                    <span>Marks: {submission.result?.mcqMarks || 0} / {mcqTotal}</span>
+                                    <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {mcqTotal}</span>
                                 </div>
                             </div>
 
@@ -185,31 +204,32 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 {mcqs.map((q, idx) => {
                                     const ans = submission.answers[q.id || ''];
                                     const status = getMCQStatus(q, ans);
-                                    const mark = getObtainedMark(q, status, q.marks || 1);
+                                    const mark = getObtainedMarkRaw(q, status, q.marks || 1);
 
                                     return (
                                         <div key={idx} className={`mb-2 p-2 rounded border ${status === 'correct' ? 'bg-green-50 border-green-200' :
-                                                status === 'incorrect' ? 'bg-red-50 border-red-200' : 'border-transparent'
-                                            } break-inside-avoid`}>
+                                            status === 'incorrect' ? 'bg-red-50 border-red-200' : 'border-dashed border-gray-300'
+                                            } break-inside-avoid relative`}>
                                             <div className="flex items-start justify-between">
-                                                <div className="flex items-start flex-1">
+                                                <div className="flex items-start flex-1 min-w-0">
                                                     <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
-                                                    <div className="flex-1 text-sm">
-                                                        <Text>{`${q.q}`}</Text>
+                                                    <div className="flex-1 text-sm overflow-hidden">
+                                                        <div className="inline-block"><Text>{`${q.q}`}</Text></div>
                                                         <div className="mt-1 flex flex-wrap gap-2">
                                                             {(q.options || []).map((opt, oidx) => {
                                                                 const isSelected = ans === opt.text;
                                                                 const isCorrectOption = opt.isCorrect;
 
-                                                                let optionClass = "";
+                                                                let optionClass = "bg-gray-50 border-gray-200 text-gray-700";
                                                                 if (isSelected) {
-                                                                    optionClass = isCorrectOption ? "bg-green-600 text-white" : "bg-red-600 text-white";
-                                                                } else if (isCorrectOption && status === 'incorrect') {
-                                                                    optionClass = "bg-green-100 text-green-800 border-green-300 border"; // Show correct answer if wrong
+                                                                    optionClass = isCorrectOption ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600";
+                                                                } else if (isCorrectOption && (status === 'incorrect' || status === 'unanswered')) {
+                                                                    // Highlight correct answer if user was wrong or unanswered
+                                                                    optionClass = "bg-green-100 text-green-900 border-green-300 ring-1 ring-green-400";
                                                                 }
 
                                                                 return (
-                                                                    <span key={oidx} className={`inline-block px-2 py-0.5 rounded text-xs ${optionClass}`}>
+                                                                    <span key={oidx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
                                                                         <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
                                                                         <Text>{opt.text}</Text>
                                                                         {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
@@ -219,7 +239,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="font-bold text-sm ml-2 whitespace-nowrap">
+                                                <div className={`font-bold text-sm ml-2 whitespace-nowrap min-w-[2rem] text-right ${mark > 0 ? 'text-green-600' : mark < 0 ? 'text-red-600' : 'text-gray-400'}`}>
                                                     {mark > 0 ? `+${mark}` : mark < 0 ? `${mark}` : '0'}
                                                 </div>
                                             </div>
@@ -242,8 +262,6 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                             <div>
                                 {cqs.map((q, idx) => {
-                                    // Logic to find obtained marks for this specific CQ question
-                                    // The submission.answers usually stores marks with key `${id}_marks`
                                     const obtainedMark = submission.answers[`${q.id}_marks`];
 
                                     return (
@@ -251,23 +269,19 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             <div className="flex justify-between items-start mb-2">
                                                 <div className="font-bold text-lg flex gap-2">
                                                     <span>{idx + 1}.</span>
-                                                    <Text>{q.questionText}</Text>
+                                                    <div className="inline-block"><Text>{q.questionText}</Text></div>
                                                 </div>
                                                 <div className="bg-gray-100 px-3 py-1 rounded text-sm font-bold whitespace-nowrap">
-                                                    {obtainedMark !== undefined ? obtainedMark : '-'} / {q.marks || 10}
+                                                    {obtainedMark !== undefined ? obtainedMark : 0} / {q.marks || 10}
                                                 </div>
                                             </div>
 
-                                            {/* Subquestions & Answers */}
                                             {q.subQuestions && q.subQuestions.map((sub: any, sidx: number) => {
-                                                const subAnswer = submission.answers[sub.id]; // Logic depends on how answers are stored
-                                                // Actually, for written exams, usually only the total mark for the CQ is stored, or sub-marks.
-                                                // Assuming we don't have granular sub-question answers/marks in this data structure easily without complex mapping.
-                                                // We'll just list subquestions.
+                                                const subId = sub.id || `sub_${q.id}_${sidx}`;
                                                 return (
                                                     <div key={sidx} className="ml-6 mt-2 text-sm text-gray-600">
                                                         <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
-                                                        <Text>{sub.questionText || sub.question || sub.text}</Text>
+                                                        <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
                                                     </div>
                                                 );
                                             })}
@@ -290,18 +304,18 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                             <div className="grid grid-cols-1 gap-4">
                                 {sqs.map((q, idx) => {
-                                    const obtainedMark = submission.answers[`${q.id}_marks`];
-                                    const answer = submission.answers[q.id];
+                                    const obtainedMark = submission.answers[`${q.id || ''}_marks`];
+                                    const answer = submission.answers[q.id || ''];
 
                                     return (
                                         <div key={idx} className="mb-4 p-3 border rounded bg-gray-50 break-inside-avoid">
                                             <div className="flex justify-between mb-2">
                                                 <div className="font-medium text-sm">
                                                     <span className="font-bold mr-2">{idx + 1}.</span>
-                                                    <Text>{q.questionText}</Text>
+                                                    <div className="inline-block"><Text>{q.questionText}</Text></div>
                                                 </div>
                                                 <div className="font-bold text-sm bg-white px-2 py-1 rounded border">
-                                                    {obtainedMark !== undefined ? obtainedMark : '-'} / {q.marks}
+                                                    {obtainedMark !== undefined ? obtainedMark : 0} / {q.marks}
                                                 </div>
                                             </div>
 
@@ -309,7 +323,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 <div className="ml-6 p-2 bg-white rounded border border-gray-200 text-sm">
                                                     <div className="text-xs text-gray-500 mb-1">Student Answer:</div>
                                                     <div className="font-medium text-blue-800">
-                                                        <Text>{String(answer)}</Text>
+                                                        <div className="inline-block"><Text>{String(answer)}</Text></div>
                                                     </div>
                                                 </div>
                                             )}
