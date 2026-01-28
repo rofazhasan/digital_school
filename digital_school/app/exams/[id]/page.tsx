@@ -302,7 +302,54 @@ export default function ExamBuilderPage() {
     }
 
     setSelectedQuestions(prev => [...prev, ...newQuestions]);
-    toast.success(`Added ${newQuestions.length} questions.`);
+    toast.success(`Added ${newQuestions.length} questions from this page.`);
+  };
+
+  const handleSelectAllFromDB = async () => {
+    setIsLoading(true);
+    try {
+      const queryParams: any = {
+        page: '1',
+        limit: '10000', // Fetch all matching
+        ...(filters.type && { type: filters.type }),
+        ...(filters.difficulty && { difficulty: filters.difficulty }),
+        ...(filters.subject && { subject: filters.subject }),
+        ...(filters.topic && { topic: filters.topic }),
+      };
+
+      if (dateRange?.from) {
+        queryParams.startDate = startOfDay(dateRange.from).toISOString();
+        if (dateRange.to) {
+          queryParams.endDate = endOfDay(dateRange.to).toISOString();
+        } else {
+          queryParams.endDate = endOfDay(dateRange.from).toISOString();
+        }
+      }
+
+      const query = new URLSearchParams(queryParams).toString();
+      const response = await fetch(`/api/exams/${examId}?${query}`);
+      if (!response.ok) throw new Error('Failed to fetch questions');
+      const data = await response.json();
+
+      const allMatchingQuestions: Question[] = data.questions.data;
+
+      const newQuestions = allMatchingQuestions.filter(q =>
+        !selectedQuestionIds.has(q.id) && canAddQuestion(q)
+      );
+
+      if (newQuestions.length === 0) {
+        toast.info("No new valid questions found in database matching criteria.");
+      } else {
+        setSelectedQuestions(prev => [...prev, ...newQuestions]);
+        toast.success(`Added ${newQuestions.length} questions from database.`);
+      }
+
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to select all questions from database.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {

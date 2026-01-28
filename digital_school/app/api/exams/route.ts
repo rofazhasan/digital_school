@@ -313,29 +313,50 @@ export async function DELETE(request: NextRequest) {
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
 
-    if (!id) {
-      return createApiResponse(null, 'Exam ID is required', 400);
+    // Check for bulk delete in body
+    let idsToDelete: string[] = [];
+    if (id) {
+      idsToDelete = [id];
+    } else {
+      try {
+        const body = await request.json();
+        if (body.ids && Array.isArray(body.ids)) {
+          idsToDelete = body.ids;
+        }
+      } catch (e) {
+        // Body might be empty if just checking params
+      }
+    }
+
+    if (idsToDelete.length === 0) {
+      return createApiResponse(null, 'Exam ID or IDs are required', 400);
     }
 
     await safeDatabaseOperation(
       async () => {
         const db = await DatabaseClient.getInstance();
-        return await db.exam.delete({
-          where: { id },
+        return await db.exam.deleteMany({
+          where: {
+            id: {
+              in: idsToDelete
+            }
+          },
         });
       },
-      'Delete exam'
+      `Delete ${idsToDelete.length} exams`
     );
 
     // Invalidate caches
     DatabaseCache.invalidate('exams');
-    DatabaseCache.invalidate(`exam:${id}`);
+    idsToDelete.forEach(examId => {
+      DatabaseCache.invalidate(`exam:${examId}`);
+    });
 
     return createApiResponse({
-      message: 'Exam deleted successfully',
+      message: `${idsToDelete.length} exam(s) deleted successfully`,
     });
   } catch (error) {
-    console.error('Failed to delete exam:', error);
-    return createApiResponse(null, 'Failed to delete exam', 500);
+    console.error('Failed to delete exam(s):', error);
+    return createApiResponse(null, 'Failed to delete exam(s)', 500);
   }
 } 

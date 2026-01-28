@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search,
   Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
@@ -85,6 +87,8 @@ export default function ExamsPage() {
   });
   const [activeTab, setActiveTab] = useState('all');
   const [userRole, setUserRole] = useState<string>("");
+  const [selectedExams, setSelectedExams] = useState<string[]>([]);
+
 
   // Edit Modal State
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -253,6 +257,10 @@ export default function ExamsPage() {
         description: 'Exam and all related data deleted permanently.'
       });
       await fetchExams();
+      // Remove from selection if selected
+      if (selectedExams.includes(id)) {
+        setSelectedExams(prev => prev.filter(examId => examId !== id));
+      }
     } catch (error) {
       toast({
         title: 'Error',
@@ -261,6 +269,62 @@ export default function ExamsPage() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedExams.length === 0) return;
+
+    if (!confirm(`⚠️ BULK PERMANENT DELETION WARNING ⚠️\n\nAre you sure you want to delete ${selectedExams.length} exams?\n\nThis will permanently delete:\n• All student submissions\n• All uploaded answer images\n• All evaluation data and results\n• All exam sets and questions\n• All related records\n\nThis action CANNOT be undone!`)) {
+      return;
+    }
+
+    const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
+    if (confirmation !== 'DELETE') return;
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/exams`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: selectedExams })
+      });
+
+      if (!res.ok) throw new Error('Failed to delete exams');
+
+      const data = await res.json();
+      toast({
+        title: 'Success',
+        description: data.message || 'Exams deleted successfully.'
+      });
+
+      setSelectedExams([]);
+      await fetchExams();
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete exams.',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = filteredAndSortedExams.map(e => e.id);
+      setSelectedExams(allIds);
+    } else {
+      setSelectedExams([]);
+    }
+  };
+
+  const handleSelectExam = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedExams(prev => [...prev, id]);
+    } else {
+      setSelectedExams(prev => prev.filter(examId => examId !== id));
     }
   };
 
@@ -457,6 +521,15 @@ export default function ExamsPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  onClick={() => router.push('/question-bank')}
+                  className="flex items-center gap-2"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  Question Bank
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => router.push('/exams/evaluations')}
                   className="flex items-center gap-2"
                 >
@@ -596,6 +669,31 @@ export default function ExamsPage() {
                           />
                         </div>
                       </div>
+
+                      <div className="flex items-end pb-2">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="select-all"
+                            checked={filteredAndSortedExams.length > 0 && selectedExams.length === filteredAndSortedExams.length}
+                            onCheckedChange={handleSelectAll}
+                          />
+                          <Label htmlFor="select-all" className="cursor-pointer">Select All</Label>
+                        </div>
+                      </div>
+
+                      {selectedExams.length > 0 && (
+                        <div className="flex items-end pb-0">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleBulkDelete}
+                            className="flex items-center gap-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            Delete Selected ({selectedExams.length})
+                          </Button>
+                        </div>
+                      )}
 
                       <div>
                         <Label htmlFor="status-filter">Status</Label>
@@ -781,14 +879,23 @@ export default function ExamsPage() {
                       <Card className="h-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden">
                         <CardHeader className="pb-4">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                {exam.name}
-                              </CardTitle>
-                              <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                {exam.description || 'No description provided'}
-                              </CardDescription>
-                              <div className="hidden">{/* Debug hidden element */}{userRole}</div>
+                            <div className="flex-1 min-w-0 flex gap-3">
+                              <div className="pt-1">
+                                <Checkbox
+                                  checked={selectedExams.includes(exam.id)}
+                                  onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
+                                  onClick={(e) => e.stopPropagation()}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                                  {exam.name}
+                                </CardTitle>
+                                <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                                  {exam.description || 'No description provided'}
+                                </CardDescription>
+                                <div className="hidden">{/* Debug hidden element */}{userRole}</div>
+                              </div>
                             </div>
 
                             <DropdownMenu>

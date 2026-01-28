@@ -24,7 +24,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download, AlertTriangle, ArrowRight } from "lucide-react";
+import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download, AlertTriangle, ArrowRight, FileText } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
@@ -507,10 +507,12 @@ export default function QuestionBankPage() {
                         <Label>Date Range</Label>
                         <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
                       </div>
-                      <div className="flex items-end gap-2 lg:col-span-5">
-                        <Button onClick={resetFilters} variant="outline" className="w-full"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
-                        <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
-                        <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="w-full bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Go to Dashboard</Button>
+                      <div className="flex items-end gap-2 lg:col-span-5 flex-wrap">
+                        <Button onClick={resetFilters} variant="ghost" size="sm" className="whitespace-nowrap"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
+                        <div className="flex-grow"></div>
+                        <Button onClick={() => window.location.href = '/exams'} variant="outline" className="whitespace-nowrap"><FileText className="mr-2 h-4 w-4" /> Go to Exams</Button>
+                        <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100 whitespace-nowrap"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
+                        <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="whitespace-nowrap"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
                       </div>
                     </div>
                   </Card>
