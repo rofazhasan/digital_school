@@ -229,9 +229,9 @@ export default function CreateExamPage() {
       "Exam Name",
       "Select Class",
       "Description",
-      "Date (DD/MM/YYYY)",
-      "Start Time (HH:mm)",
-      "End Time (HH:mm)",
+      "Date (e.g. 2026-01-29)",
+      "Start Time (e.g. 10:00)",
+      "End Time (e.g. 13:00)",
       "Duration (mins)",
       "Type",
       "Total Marks",
@@ -258,7 +258,7 @@ export default function CreateExamPage() {
       "Mid Term Math",
       classes[0]?.name || "Class 9",
       "Mid term examination for mathematics",
-      "15/10/2026",
+      "2026-10-15",
       "10:00",
       "13:00",
       180,
@@ -312,24 +312,44 @@ export default function CreateExamPage() {
   };
 
   const parseTime = (dateStr: string, timeStr: any): string => {
-    if (!dateStr) return "";
-    let time = "";
+    if (!dateStr && !timeStr) return "";
+
+    let hours = 0;
+    let minutes = 0;
+    let isValid = false;
+
     if (typeof timeStr === 'number') {
       const totalSeconds = Math.round(timeStr * 86400);
-      const hours = Math.floor(totalSeconds / 3600) % 24;
-      const minutes = Math.floor((totalSeconds % 3600) / 60);
-      time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-    } else if (typeof timeStr === 'string') {
-      time = timeStr.trim();
-      if (time.includes("--")) return "";
-      // If user provided simple string like "10:00"
-      if (time.match(/^\d{1,2}:\d{2}$/)) {
-        const parts = time.split(':');
-        time = `${parts[0].padStart(2, '0')}:${parts[1]}`;
+      hours = Math.floor(totalSeconds / 3600) % 24;
+      minutes = Math.floor((totalSeconds % 3600) / 60);
+      isValid = true;
+    } else if (timeStr) {
+      const str = String(timeStr).trim();
+      if (!str || str.includes("--")) return "";
+
+      const simpleMatch = str.match(/^(\d{1,2}):(\d{2})/);
+      if (simpleMatch) {
+        hours = parseInt(simpleMatch[1]);
+        minutes = parseInt(simpleMatch[2]);
+        isValid = true;
+      } else {
+        const parsed = Date.parse(str);
+        if (!isNaN(parsed)) {
+          const d = new Date(parsed);
+          hours = d.getHours();
+          minutes = d.getMinutes();
+          isValid = true;
+        }
       }
     }
-    if (time) return `${dateStr}T${time}:00`;
-    return "";
+
+    if (!isValid) return "";
+
+    const hh = String(hours).padStart(2, '0');
+    const mm = String(minutes).padStart(2, '0');
+
+    if (!dateStr) return "";
+    return `${dateStr}T${hh}:${mm}:00`;
   };
 
   // Helper to validate and reconstruct a bulk exam object
