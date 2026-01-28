@@ -682,7 +682,38 @@ export default function ExamsPage() {
                       </div>
 
                       {selectedExams.length > 0 && (
-                        <div className="flex items-end pb-0">
+                        <div className="flex items-end pb-0 gap-2">
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={async () => {
+                              if (!confirm(`Are you sure you want to activate ${selectedExams.length} exams?`)) return;
+                              setLoading(true);
+                              try {
+                                // We can reuse the loop or make a bulk API. For now, looping is safer/easier without API changes.
+                                // Or simpler: just notify user we need a bulk activate API? 
+                                // Let's loop for now as it's client side.
+                                for (const id of selectedExams) {
+                                  await fetch(`/api/exams?id=${id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ isActive: true }),
+                                  });
+                                }
+                                toast({ title: "Success", description: "Exams activated successfully" });
+                                await fetchExams();
+                                setSelectedExams([]);
+                              } catch (e) {
+                                toast({ title: "Error", description: "Failed to activate exams", variant: "destructive" });
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            className="flex items-center gap-2 bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-100"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Activate ({selectedExams.length})
+                          </Button>
                           <Button
                             variant="destructive"
                             size="sm"
@@ -690,7 +721,7 @@ export default function ExamsPage() {
                             className="flex items-center gap-2"
                           >
                             <Trash2 className="w-4 h-4" />
-                            Delete Selected ({selectedExams.length})
+                            Delete ({selectedExams.length})
                           </Button>
                         </div>
                       )}
