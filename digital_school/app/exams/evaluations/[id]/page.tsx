@@ -37,7 +37,8 @@ import {
   Activity,
   Video,
   MonitorPlay,
-  Maximize2
+  Maximize2,
+  Printer
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
@@ -1220,6 +1221,16 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   </div>
 
                   <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => currentStudent && window.open(`/exams/evaluations/${id}/print/${currentStudent.student.id}`, '_blank')}
+                      disabled={!currentStudent}
+                      title="Print student script with marks"
+                    >
+                      <Printer className="h-4 w-4 mr-2" />
+                      Print Script
+                    </Button>
+
                     <Button
                       onClick={submitStudentEvaluation}
                       disabled={saving || !canSubmitStudent()}
