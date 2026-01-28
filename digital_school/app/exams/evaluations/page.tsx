@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 
 interface Exam {
@@ -59,6 +60,7 @@ interface Evaluator {
 }
 
 export default function EvaluationsPage() {
+  const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [evaluators, setEvaluators] = useState<Evaluator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -241,15 +243,24 @@ export default function EvaluationsPage() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Exam Evaluations</h1>
-        <p className="text-gray-600">
-          {isSuperUser 
-            ? "Manage exam evaluations and assign evaluators" 
-            : "View your assigned exam evaluations"
-          }
-        </p>
-
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Exam Evaluations</h1>
+          <p className="text-gray-600">
+            {isSuperUser
+              ? "Manage exam evaluations and assign evaluators"
+              : "View your assigned exam evaluations"
+            }
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push('/dashboard')}>
+            <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+          </Button>
+          <Button variant="outline" onClick={() => router.push('/exams')}>
+            <FileText className="mr-2 h-4 w-4" /> Exams
+          </Button>
+        </div>
       </div>
 
       <div className="mb-6 flex gap-4">
@@ -267,7 +278,7 @@ export default function EvaluationsPage() {
             <SelectItem value="REJECTED">Rejected</SelectItem>
           </SelectContent>
         </Select>
-        
+
         {isSuperUser && (
           <div className="text-sm text-gray-600 flex items-center gap-2">
             <span>Showing:</span>
@@ -352,18 +363,18 @@ export default function EvaluationsPage() {
               )}
 
               <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="sm"
                   onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   View Evaluation
                 </Button>
-                
+
                 {isSuperUser && !exam.evaluationAssignment && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => {
                       setSelectedExam(exam);
@@ -375,10 +386,10 @@ export default function EvaluationsPage() {
                   </Button>
                 )}
 
-                    
+
                 {isSuperUser && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
                     onClick={() => releaseResults(exam.id)}
                   >
@@ -397,7 +408,7 @@ export default function EvaluationsPage() {
           <div className="text-gray-500 text-lg">No exams found</div>
           <p className="text-gray-400 mt-2">
             {selectedStatus && selectedStatus !== "ALL"
-              ? `No exams with status "${selectedStatus}"` 
+              ? `No exams with status "${selectedStatus}"`
               : "No exams available for evaluation"
             }
           </p>
