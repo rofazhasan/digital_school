@@ -424,51 +424,70 @@ export default function CreateExamPage() {
       const ws = wb.Sheets[wsname];
       const data = XLSX.utils.sheet_to_json(ws);
 
+      // Helper to find value by possible headers (case-insensitive fuzzy match)
+      const getValue = (row: any, keywords: string[]): any => {
+        const keys = Object.keys(row);
+        for (const k of keys) {
+          const lowerK = k.toLowerCase();
+          // Check exact matches or startsWith for robust handling
+          if (keywords.some(kw => lowerK === kw.toLowerCase() || lowerK.startsWith(kw.toLowerCase()))) {
+            return row[k];
+          }
+        }
+        return null;
+      };
+
       const parsedExams: BulkExam[] = data.map((row: any, index: number) => {
-        const className = row["Select Class"] || row["Class"] || "";
-        const dateStr = parseExcelDate(row["Date (DD/MM/YYYY)"] || row["Date"]);
-        const startTimeStr = parseTime(dateStr, row["Start Time (HH:mm)"] || row["Start Time"]);
-        const endTimeStr = parseTime(dateStr, row["End Time (HH:mm)"] || row["End Time"]);
+        const className = getValue(row, ["Select Class", "Class"]) || "";
+
+        // Flexible Date/Time matching
+        const rawDate = getValue(row, ["Date"]); // Matches "Date", "Date (e.g...)"
+        const rawStart = getValue(row, ["Start Time"]);
+        const rawEnd = getValue(row, ["End Time"]);
+
+        const dateStr = parseExcelDate(rawDate);
+        const startTimeStr = parseTime(dateStr, rawStart);
+        const endTimeStr = parseTime(dateStr, rawEnd);
 
         // Parse subsections
         const subsections: any[] = [];
         // Sub 1
-        if (row["Sub 1 Name"]) {
+        if (getValue(row, ["Sub 1 Name"])) {
           subsections.push({
-            name: row["Sub 1 Name"],
-            startIndex: Number(row["Sub 1 Start"] || 1),
-            endIndex: Number(row["Sub 1 End"] || 1),
-            requiredQuestions: Number(row["Sub 1 Required"] || 1)
+            name: getValue(row, ["Sub 1 Name"]),
+            startIndex: Number(getValue(row, ["Sub 1 Start"]) || 1),
+            endIndex: Number(getValue(row, ["Sub 1 End"]) || 1),
+            requiredQuestions: Number(getValue(row, ["Sub 1 Required"]) || 1)
           });
         }
         // Sub 2
-        if (row["Sub 2 Name"]) {
+        if (getValue(row, ["Sub 2 Name"])) {
           subsections.push({
-            name: row["Sub 2 Name"],
-            startIndex: Number(row["Sub 2 Start"] || 1),
-            endIndex: Number(row["Sub 2 End"] || 1),
-            requiredQuestions: Number(row["Sub 2 Required"] || 1)
+            name: getValue(row, ["Sub 2 Name"]),
+            startIndex: Number(getValue(row, ["Sub 2 Start"]) || 1),
+            endIndex: Number(getValue(row, ["Sub 2 End"]) || 1),
+            requiredQuestions: Number(getValue(row, ["Sub 2 Required"]) || 1)
           });
         }
 
         const exam: any = {
-          name: row["Exam Name"] || `Exam ${index + 1}`,
-          description: row["Description"] || "",
+          name: getValue(row, ["Exam Name"]) || `Exam ${index + 1}`,
+          description: getValue(row, ["Description"]) || "",
           date: dateStr,
           startTime: startTimeStr,
           endTime: endTimeStr,
-          duration: Number(row["Duration (mins)"] || row["Duration"] || 60),
-          type: (row["Type"] || "OFFLINE").toUpperCase(), // Normalized
-          totalMarks: Number(row["Total Marks"] || 100),
-          passMarks: Number(row["Pass Marks"] || 33),
+          duration: Number(getValue(row, ["Duration"]) || 60),
+          type: (getValue(row, ["Type"]) || "OFFLINE").toUpperCase(), // Normalized
+          totalMarks: Number(getValue(row, ["Total Marks"]) || 100),
+          passMarks: Number(getValue(row, ["Pass Marks"]) || 33),
           classId: "", // Will be resolved in validation
           allowRetake: false,
-          instructions: row["Instructions"] || "",
-          mcqNegativeMarking: Number(row["MCQ Negative Marking (%)"] || 0),
-          cqTotalQuestions: Number(row["CQ Total"] || 8),
-          cqRequiredQuestions: Number(row["CQ Required"] || 5),
-          sqTotalQuestions: Number(row["SQ Total"] || 15),
-          sqRequiredQuestions: Number(row["SQ Required"] || 5),
+          instructions: getValue(row, ["Instructions"]) || "",
+          mcqNegativeMarking: Number(getValue(row, ["MCQ Negative Marking"]) || 0),
+          cqTotalQuestions: Number(getValue(row, ["CQ Total"]) || 8),
+          cqRequiredQuestions: Number(getValue(row, ["CQ Required"]) || 5),
+          sqTotalQuestions: Number(getValue(row, ["SQ Total"]) || 15),
+          sqRequiredQuestions: Number(getValue(row, ["SQ Required"]) || 5),
           cqSubsections: subsections
         };
 
