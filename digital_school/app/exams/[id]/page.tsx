@@ -680,11 +680,16 @@ export default function ExamBuilderPage() {
                         <SelectItem value="HARD">Hard</SelectItem>
                       </SelectContent>
                     </Select>
-                    <div className="sm:col-span-3 flex items-center gap-2">
+                    <div className="sm:col-span-3 flex items-center gap-2 flex-wrap">
                       <DatePickerWithRange date={dateRange} setDate={setDateRange} className="flex-grow" />
-                      <Button variant="outline" onClick={handleSelectAll} title="Select all valid questions on this page">
-                        <CheckSquare className="mr-2 h-4 w-4" /> Select All
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={handleSelectAll} title="Select all valid questions on this page">
+                          <CheckSquare className="mr-2 h-4 w-4" /> Select Page
+                        </Button>
+                        <Button variant="outline" onClick={handleSelectAllFromDB} title="Select ALL matching questions from database">
+                          <CheckSquare className="mr-2 h-4 w-4" /> Select All from DB
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
