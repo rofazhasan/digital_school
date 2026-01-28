@@ -69,6 +69,8 @@ export async function GET(request: NextRequest) {
         name: exam.name,
         description: exam.description,
         date: exam.date,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
         subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
         totalMarks: exam.totalMarks,
         isActive: exam.isActive,
@@ -153,6 +155,8 @@ export async function GET(request: NextRequest) {
         name: exam.name,
         description: exam.description,
         date: exam.date,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
         subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
         totalMarks: exam.totalMarks,
         isActive: exam.isActive,
