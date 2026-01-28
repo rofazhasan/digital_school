@@ -261,6 +261,11 @@ export default function ExamLayout() {
               <li>নির্দিষ্ট সময়ের মধ্যে উত্তর জমা না দিলে স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
               <li>প্রতিটি প্রশ্নের জন্য সঠিক উত্তর নির্বাচন করুন বা লিখুন।</li>
               <li>ইন্টারনেট সংযোগ বিচ্ছিন্ন হলে পুনরায় সংযোগের চেষ্টা করুন, আপনার উত্তর সংরক্ষিত থাকবে।</li>
+              {exam.mcqNegativeMarking > 0 && (
+                <li className="font-bold text-red-600 dark:text-red-400 mt-2">
+                  সতর্কতা: প্রতিটি ভুল উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কর্তন করা হবে।
+                </li>
+              )}
               <li className="font-bold text-red-600 dark:text-red-400 mt-2">সতর্কতা: ফুলস্ক্রিন মোড চালু থাকবে।</li>
             </ul>
           </div>

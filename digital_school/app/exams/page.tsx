@@ -1253,6 +1253,6 @@ export default function ExamsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
+    </div >
   );
 }
