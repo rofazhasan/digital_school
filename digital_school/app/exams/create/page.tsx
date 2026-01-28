@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle, Plus, Trash2, LayoutDashboard, FileSpreadsheet, Upload, Download, AlertTriangle } from "lucide-react";
+import { CheckCircle, Plus, Trash2, LayoutDashboard, FileSpreadsheet, Upload, Download, AlertTriangle, ArrowRight, ArrowLeft, BookOpen } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import * as XLSX from 'xlsx';
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const examTypes = ["ONLINE", "OFFLINE", "MIXED"];
 
@@ -41,18 +42,13 @@ const schema = z.object({
   classId: z.string().min(1, "Class is required"),
   allowRetake: z.boolean().optional(),
   instructions: z.string().optional(),
-  // Negative marking for MCQs (percentage)
   mcqNegativeMarking: z.coerce.number().min(0).max(100).optional(),
-  // Question selection settings
   cqTotalQuestions: z.coerce.number().min(0).optional(),
   cqRequiredQuestions: z.coerce.number().min(0).optional(),
   sqTotalQuestions: z.coerce.number().min(0).optional(),
   sqRequiredQuestions: z.coerce.number().min(0).optional(),
-  // CQ Subsection settings
   cqSubsections: z.array(cqSubsectionSchema).optional(),
 }).refine((data) => {
-  // Validate that required questions don't exceed total questions
-  // Allow both to be 0 (no questions of this type)
   if (data.cqRequiredQuestions !== undefined && data.cqTotalQuestions !== undefined) {
     if (data.cqRequiredQuestions > data.cqTotalQuestions) {
       return false;
@@ -63,42 +59,21 @@ const schema = z.object({
       return false;
     }
   }
-
-  // Validate CQ subsections if they exist AND CQ questions are > 0
   if (data.cqTotalQuestions && data.cqTotalQuestions > 0 && data.cqSubsections && data.cqSubsections.length > 0) {
-    // Check that subsection ranges don't overlap and cover all questions
     const sortedSubsections = [...data.cqSubsections].sort((a, b) => a.startIndex - b.startIndex);
-
     for (let i = 0; i < sortedSubsections.length; i++) {
       const current = sortedSubsections[i];
-
-      // Check if start index is less than or equal to end index
-      if (current.startIndex > current.endIndex) {
-        return false;
-      }
-
-      // Check if required questions don't exceed available questions in this subsection
+      if (current.startIndex > current.endIndex) return false;
       const availableQuestions = current.endIndex - current.startIndex + 1;
-      if (current.requiredQuestions > availableQuestions) {
-        return false;
-      }
-
-      // Check for overlaps with next subsection
+      if (current.requiredQuestions > availableQuestions) return false;
       if (i < sortedSubsections.length - 1) {
         const next = sortedSubsections[i + 1];
-        if (current.endIndex >= next.startIndex) {
-          return false;
-        }
+        if (current.endIndex >= next.startIndex) return false;
       }
     }
-
-    // Check if subsections cover the total CQ questions
     const totalCovered = sortedSubsections.reduce((sum, sub) => sum + (sub.endIndex - sub.startIndex + 1), 0);
-    if (data.cqTotalQuestions !== undefined && totalCovered !== data.cqTotalQuestions) {
-      return false;
-    }
+    if (data.cqTotalQuestions !== undefined && totalCovered !== data.cqTotalQuestions) return false;
   }
-
   return true;
 }, {
   message: "Invalid question configuration. Check question counts and subsection ranges.",
@@ -107,7 +82,6 @@ const schema = z.object({
 
 type ExamForm = z.infer<typeof schema>;
 type CQSubsection = z.infer<typeof cqSubsectionSchema>;
-
 type ClassOption = { id: string; name: string };
 type BulkExam = ExamForm & { validationError?: string; rowIndex: number; rawClassName?: string };
 
@@ -144,15 +118,12 @@ export default function CreateExamPage() {
     },
   });
 
-  // Watch CQ total questions to update subsections
   const cqTotalQuestions = form.watch("cqTotalQuestions");
   const cqSubsections = form.watch("cqSubsections");
 
-  // Update subsections when CQ total questions change
   useEffect(() => {
     if (cqTotalQuestions !== undefined) {
       const currentSubsections = form.getValues("cqSubsections") || [];
-
       if (cqTotalQuestions > 0) {
         if (currentSubsections.length === 0) {
           form.setValue("cqSubsections", [{
@@ -169,9 +140,7 @@ export default function CreateExamPage() {
           }
         }
       } else {
-        if (currentSubsections.length > 0) {
-          form.setValue("cqSubsections", []);
-        }
+        if (currentSubsections.length > 0) form.setValue("cqSubsections", []);
       }
     }
   }, [cqTotalQuestions, form]);
@@ -179,7 +148,6 @@ export default function CreateExamPage() {
   const addSubsection = () => {
     const currentSubsections = form.getValues("cqSubsections") || [];
     const lastSubsection = currentSubsections[currentSubsections.length - 1];
-
     if (lastSubsection && lastSubsection.endIndex < (cqTotalQuestions || 0)) {
       const newSubsection: CQSubsection = {
         name: "",
@@ -187,7 +155,6 @@ export default function CreateExamPage() {
         endIndex: Math.min(lastSubsection.endIndex + 3, cqTotalQuestions || 0),
         requiredQuestions: 1,
       };
-
       form.setValue("cqSubsections", [...currentSubsections, newSubsection]);
     }
   };
@@ -203,19 +170,13 @@ export default function CreateExamPage() {
   const updateSubsectionRanges = (index: number, field: 'startIndex' | 'endIndex', value: number) => {
     const currentSubsections = form.getValues("cqSubsections") || [];
     const updatedSubsections = [...currentSubsections];
-
     if (field === 'startIndex') {
       updatedSubsections[index].startIndex = value;
-      if (index > 0) {
-        updatedSubsections[index - 1].endIndex = value - 1;
-      }
+      if (index > 0) updatedSubsections[index - 1].endIndex = value - 1;
     } else if (field === 'endIndex') {
       updatedSubsections[index].endIndex = value;
-      if (index < updatedSubsections.length - 1) {
-        updatedSubsections[index + 1].startIndex = value + 1;
-      }
+      if (index < updatedSubsections.length - 1) updatedSubsections[index + 1].startIndex = value + 1;
     }
-
     form.setValue("cqSubsections", updatedSubsections);
   };
 
@@ -227,36 +188,22 @@ export default function CreateExamPage() {
         return res.json();
       })
       .then((data) => {
-        if (data && Array.isArray(data.classes)) {
-          setClasses(data.classes);
-        } else {
-          setClasses([]);
-        }
+        if (data && Array.isArray(data.classes)) setClasses(data.classes);
+        else setClasses([]);
       })
       .catch((error) => {
         console.error('Error fetching classes:', error);
         setClasses([]);
-        toast({
-          title: "Error",
-          description: "Failed to load classes.",
-          variant: "destructive"
-        });
+        toast({ title: "Error", description: "Failed to load classes.", variant: "destructive" });
       })
-      .finally(() => {
-        setClassesLoading(false);
-      });
+      .finally(() => setClassesLoading(false));
   }, [toast]);
 
   const onSubmit = async (data: ExamForm) => {
     if (classes.length === 0) {
-      toast({
-        title: "Error",
-        description: "No classes available.",
-        variant: "destructive"
-      });
+      toast({ title: "Error", description: "No classes available.", variant: "destructive" });
       return;
     }
-
     setLoading(true);
     try {
       const res = await fetch("/api/exams", {
@@ -280,13 +227,13 @@ export default function CreateExamPage() {
   const downloadSample = () => {
     const headers = [
       "Exam Name",
-      "Select Class", // Matches UI label
+      "Select Class",
       "Description",
       "Date (DD/MM/YYYY)",
       "Start Time (HH:mm)",
       "End Time (HH:mm)",
       "Duration (mins)",
-      "Type", // ONLINE, OFFLINE, MIXED
+      "Type",
       "Total Marks",
       "Pass Marks",
       "Instructions",
@@ -299,7 +246,7 @@ export default function CreateExamPage() {
 
     const sampleData = [
       "Mid Term Math",
-      "Class 9", // Example class name
+      classes[0]?.name || "Class 9",
       "Mid term examination for mathematics",
       "15/10/2026",
       "10:00",
@@ -316,27 +263,36 @@ export default function CreateExamPage() {
       10
     ];
 
-    const ws = XLSX.utils.aoa_to_sheet([headers, sampleData]);
     const wb = XLSX.utils.book_new();
+
+    // Template Sheet
+    const ws = XLSX.utils.aoa_to_sheet([headers, sampleData]);
     XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "exam_import_template.xlsx");
+
+    // Valid Classes Reference Sheet
+    const classHeaders = ["Available Classes", "ID (System Use)"];
+    const classRows = classes.map(c => [c.name, c.id]);
+    const wsClasses = XLSX.utils.aoa_to_sheet([classHeaders, ...classRows]);
+    XLSX.utils.book_append_sheet(wb, wsClasses, "Classes (Reference)");
+
+    XLSX.writeFile(wb, "exam_import_template_v2.xlsx");
   };
 
   const parseExcelDate = (dateVal: any): string => {
-    // Excel date serial number handling or string
     if (typeof dateVal === 'number') {
       const d = new Date(Math.round((dateVal - 25569) * 86400 * 1000));
+      if (isNaN(d.getTime())) return "";
       const year = d.getFullYear();
       const month = String(d.getMonth() + 1).padStart(2, '0');
       const day = String(d.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     }
-
     if (typeof dateVal === 'string') {
-      // Expect DD/MM/YYYY
-      const parts = dateVal.split(/[\/\-]/);
+      const parts = dateVal.trim().split(/[\/\-]/);
       if (parts.length === 3) {
-        // Assume DD/MM/YYYY
+        // rough heuristic: if first part > 31 (like 2026), it's YYYY-MM-DD
+        if (parseInt(parts[0]) > 31) return `${parts[0]}-${parts[1]}-${parts[2]}`;
+        // else assume DD/MM/YYYY
         return `${parts[2]}-${parts[1]}-${parts[0]}`;
       }
     }
@@ -345,24 +301,53 @@ export default function CreateExamPage() {
 
   const parseTime = (dateStr: string, timeStr: any): string => {
     if (!dateStr) return "";
-
     let time = "";
     if (typeof timeStr === 'number') {
-      // Fraction of day
       const totalSeconds = Math.round(timeStr * 86400);
-      const hours = Math.floor(totalSeconds / 3600);
+      const hours = Math.floor(totalSeconds / 3600) % 24;
       const minutes = Math.floor((totalSeconds % 3600) / 60);
       time = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
     } else if (typeof timeStr === 'string') {
       time = timeStr.trim();
-      // Handle --:-- -- if present in sample request
       if (time.includes("--")) return "";
+      // If user provided simple string like "10:00"
+      if (time.match(/^\d{1,2}:\d{2}$/)) {
+        const parts = time.split(':');
+        time = `${parts[0].padStart(2, '0')}:${parts[1]}`;
+      }
+    }
+    if (time) return `${dateStr}T${time}:00`;
+    return "";
+  };
+
+  // Helper to validate and reconstruct a bulk exam object
+  const validateBulkExam = (exam: any, index: number, rawClassName: string): BulkExam => {
+    let error = "";
+
+    // Match class
+    let matchedClass = classes.find(c => c.id === exam.classId);
+    if (!matchedClass && rawClassName) {
+      matchedClass = classes.find(c => c.name.toLowerCase() === String(rawClassName).toLowerCase() || c.id === rawClassName);
+      if (matchedClass) {
+        exam.classId = matchedClass.id;
+      }
     }
 
-    if (time) {
-      return `${dateStr}T${time}:00`;
-    }
-    return "";
+    if (!matchedClass) error = `Class '${rawClassName}' not found.`;
+
+    // Date validations
+    const dateValid = !isNaN(Date.parse(exam.date));
+    if (!dateValid || !exam.date) error += (error ? " " : "") + "Invalid Date.";
+
+    const startValid = !isNaN(Date.parse(exam.startTime));
+    if (!startValid || !exam.startTime) error += (error ? " " : "") + "Invalid Start Time.";
+
+    const endValid = !isNaN(Date.parse(exam.endTime));
+    if (!endValid || !exam.endTime) error += (error ? " " : "") + "Invalid End Time.";
+
+    if (exam.duration <= 0) error += (error ? " " : "") + "Invalid Duration.";
+
+    return { ...exam, validationError: error, rowIndex: index, rawClassName: rawClassName };
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -379,9 +364,6 @@ export default function CreateExamPage() {
 
       const parsedExams: BulkExam[] = data.map((row: any, index: number) => {
         const className = row["Select Class"] || row["Class"] || "";
-        // Find class ID
-        const matchedClass = classes.find(c => c.name.toLowerCase() === String(className).toLowerCase() || c.id === className);
-
         const dateStr = parseExcelDate(row["Date (DD/MM/YYYY)"] || row["Date"]);
         const startTimeStr = parseTime(dateStr, row["Start Time (HH:mm)"] || row["Start Time"]);
         const endTimeStr = parseTime(dateStr, row["End Time (HH:mm)"] || row["End Time"]);
@@ -393,10 +375,10 @@ export default function CreateExamPage() {
           startTime: startTimeStr,
           endTime: endTimeStr,
           duration: Number(row["Duration (mins)"] || row["Duration"] || 60),
-          type: row["Type"] || "OFFLINE",
+          type: (row["Type"] || "OFFLINE").toUpperCase(), // Normalized
           totalMarks: Number(row["Total Marks"] || 100),
           passMarks: Number(row["Pass Marks"] || 33),
-          classId: matchedClass ? matchedClass.id : "",
+          classId: "", // Will be resolved in validation
           allowRetake: false,
           instructions: row["Instructions"] || "",
           mcqNegativeMarking: Number(row["MCQ Negative Marking (%)"] || 0),
@@ -407,17 +389,46 @@ export default function CreateExamPage() {
           cqSubsections: []
         };
 
-        let error = "";
-        if (!matchedClass) error = `Class '${className}' not found.`;
-        if (!dateStr) error = error ? error + " Invalid Date." : "Invalid Date.";
-        if (exam.duration <= 0) error = error ? error + " Invalid Duration." : "Invalid Duration.";
-
-        return { ...exam, validationError: error, rowIndex: index, rawClassName: className };
+        return validateBulkExam(exam, index, className);
       });
 
       setBulkExams(parsedExams);
     };
     reader.readAsBinaryString(file);
+    // Reset input
+    e.target.value = '';
+  };
+
+  const handleCellChange = (index: number, field: keyof ExamForm | 'rawClassName', value: any) => {
+    const updatedExams = [...bulkExams];
+    const currentExam = { ...updatedExams[index] };
+
+    // Handle specific field logic
+    if (field === 'rawClassName') {
+      currentExam.rawClassName = value;
+      // Try to re-match class ID immediately
+      const matched = classes.find(c => c.name === value || c.id === value);
+      if (matched) currentExam.classId = matched.id;
+      else currentExam.classId = "";
+    } else if (field === "date") {
+      // If date changes, we must try to repair start/end time dates too if they existed
+      currentExam[field] = value;
+      // Extract time component from existing start/end and re-attach new date
+      if (currentExam.startTime && currentExam.startTime.includes('T')) {
+        const timePart = currentExam.startTime.split('T')[1];
+        currentExam.startTime = `${value}T${timePart}`;
+      }
+      if (currentExam.endTime && currentExam.endTime.includes('T')) {
+        const timePart = currentExam.endTime.split('T')[1];
+        currentExam.endTime = `${value}T${timePart}`;
+      }
+    } else {
+      (currentExam as any)[field] = value;
+    }
+
+    // Re-validate
+    updatedExams[index] = validateBulkExam(currentExam, index, currentExam.rawClassName || "");
+    setBulkExams(updatedExams);
   };
 
   const submitBulk = async () => {
@@ -426,19 +437,14 @@ export default function CreateExamPage() {
       toast({ title: "Error", description: "No valid exams to import.", variant: "destructive" });
       return;
     }
-
     setLoading(true);
     try {
       const res = await fetch("/api/exams/bulk", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(validExams)
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(validExams)
       });
-
       const result = await res.json();
       if (!res.ok) throw new Error(result.message || "Bulk import failed");
-
-      toast({ title: "Success", description: `Imported ${result.data?.count || validExams.length} exams successfully.`, variant: "default" });
+      toast({ title: "Success", description: `Imported ${result.data?.count || validExams.length} exams.`, variant: "default" });
       setTimeout(() => router.push("/exams"), 1200);
     } catch (err: any) {
       toast({ title: "Import Failed", description: err.message, variant: "destructive" });
@@ -447,22 +453,24 @@ export default function CreateExamPage() {
     }
   };
 
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-100 dark:from-gray-900 dark:via-gray-950 dark:to-gray-900 py-10 px-2 relative">
-      <Button
-        variant="ghost"
-        className="absolute top-4 left-4 gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-        onClick={() => router.push("/dashboard")}
-      >
-        <LayoutDashboard className="w-4 h-4" /> Dashboard
-      </Button>
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, type: "spring" }}
-        className="w-full max-w-4xl"
-      >
+      <div className="absolute top-4 left-4 flex gap-2">
+        <Button variant="ghost" className="gap-2 text-gray-600" onClick={() => router.push("/dashboard")}>
+          <LayoutDashboard className="w-4 h-4" /> Dashboard
+        </Button>
+        <Button variant="ghost" className="gap-2 text-gray-600" onClick={() => router.push("/exams")}>
+          <ArrowLeft className="w-4 h-4" /> Go to Exams
+        </Button>
+      </div>
+
+      <div className="absolute top-4 right-4">
+        <Button variant="outline" className="gap-2" onClick={() => router.push("/question-bank")}>
+          <BookOpen className="w-4 h-4" /> Question Bank <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, type: "spring" }} className="w-full max-w-5xl">
         <div className="rounded-2xl shadow-2xl border border-border bg-white/90 dark:bg-gray-900/90 backdrop-blur-md overflow-hidden">
           <div className="bg-gradient-to-r from-primary to-blue-500 p-6 text-white text-center">
             <h1 className="text-3xl font-bold tracking-tight">Create New Exam</h1>
@@ -478,254 +486,127 @@ export default function CreateExamPage() {
               <TabsContent value="single">
                 <AnimatePresence>
                   {success ? (
-                    <motion.div
-                      key="success"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="flex flex-col items-center justify-center py-12"
-                    >
+                    <motion.div key="success" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-col items-center justify-center py-12">
                       <CheckCircle className="w-16 h-16 text-green-500 mb-4 animate-bounce" />
                       <div className="text-xl font-semibold mb-2">Exam Created!</div>
-                      <div className="text-gray-500 dark:text-gray-400">Redirecting...</div>
+                      <div className="text-gray-500">Redirecting...</div>
                     </motion.div>
                   ) : (
                     <FormProvider {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Existing Fields ... Keeping same structure */}
                           <FormField name="name" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Exam Name</FormLabel>
-                              <FormControl><Input placeholder="Exam name" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Exam Name</FormLabel><FormControl><Input placeholder="Exam name" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField name="classId" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Class</FormLabel>
+                            <FormItem><FormLabel>Class</FormLabel>
                               <Select value={field.value} onValueChange={field.onChange} disabled={classesLoading}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder={classesLoading ? "Loading classes..." : "Select class"} />
-                                </SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder={classesLoading ? "Loading..." : "Select class"} /></SelectTrigger>
                                 <SelectContent>
-                                  {classesLoading ? (
-                                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                                  ) : classes.length === 0 ? (
-                                    <SelectItem value="no-classes" disabled>No classes available</SelectItem>
-                                  ) : (
-                                    classes.map((c) => (
-                                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                                    ))
-                                  )}
+                                  {classes.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
                           )} />
                         </div>
-                        {/* Repeat other fields - simplified for brevity of prompt but I must include ALL original fields */}
                         <FormField name="description" control={form.control} render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Description</FormLabel>
-                            <FormControl><Textarea placeholder="Description (optional)" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
+                          <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="Optional" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
+                        {/* Time & Date */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="date" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Date</FormLabel>
-                              <FormControl><Input type="date" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField name="duration" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Duration (minutes)</FormLabel>
-                              <FormControl><Input type="number" min={1} {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Duration (mins)</FormLabel><FormControl><Input type="number" min={1} {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="startTime" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Start Time</FormLabel>
-                              <FormControl><Input type="datetime-local" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Start Time</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField name="endTime" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>End Time</FormLabel>
-                              <FormControl><Input type="datetime-local" {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>End Time</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="type" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Exam Type</FormLabel>
+                            <FormItem><FormLabel>Type</FormLabel>
                               <Select value={field.value} onValueChange={field.onChange}>
-                                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                                <SelectContent>
-                                  {examTypes.map((t) => (
-                                    <SelectItem key={t} value={t}>{t}</SelectItem>
-                                  ))}
-                                </SelectContent>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>{examTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                               </Select>
-                              <FormMessage />
-                            </FormItem>
+                              <FormMessage /></FormItem>
                           )} />
                           <FormField name="totalMarks" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Total Marks</FormLabel>
-                              <FormControl><Input type="number" min={1} {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Total Marks</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                           <FormField name="passMarks" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Pass Marks</FormLabel>
-                              <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                              <FormMessage />
-                            </FormItem>
+                            <FormItem><FormLabel>Pass Marks</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                           <FormField name="allowRetake" control={form.control} render={({ field }) => (
-                            <FormItem className="flex flex-row items-center space-x-3 space-y-0 mt-6">
-                              <FormControl>
-                                <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-                              </FormControl>
-                              <FormLabel className="mb-0">Allow Retake</FormLabel>
-                            </FormItem>
+                            <FormItem className="flex flex-row items-center space-x-3 mt-6"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><FormLabel className="mb-0">Allow Retake</FormLabel></FormItem>
                           )} />
                         </div>
                         <FormField name="instructions" control={form.control} render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Instructions</FormLabel>
-                            <FormControl><Textarea placeholder="Instructions (optional)" {...field} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
+                          <FormItem><FormLabel>Instructions</FormLabel><FormControl><Textarea placeholder="Instructions" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
-                        {/* Negative Marking & Question Settings */}
-                        <div className="space-y-4">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Negative Marking Settings</h3>
+
+                        {/* Settings */}
+                        <div className="space-y-4 border-t pt-4">
+                          <h3 className="font-semibold">Negative Marking</h3>
                           <FormField name="mcqNegativeMarking" control={form.control} render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>MCQ Negative Marking (%)</FormLabel>
-                              <FormControl>
-                                <Input type="number" min={0} max={100} step={0.25} placeholder="0" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                              <p className="text-sm text-gray-500 dark:text-gray-400">
-                                Percentage of marks to deduct for wrong MCQ answers
-                              </p>
-                            </FormItem>
+                            <FormItem><FormLabel>MCQ % Deducted</FormLabel><FormControl><Input type="number" step={0.25} {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
-                        <div className="space-y-4">
-                          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Question Selection Settings</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                              <h4 className="font-medium text-gray-800 dark:text-gray-200">Creative Questions (CQ)</h4>
-                              <FormField name="cqTotalQuestions" control={form.control} render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Total Questions Available</FormLabel>
-                                  <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormField name="cqRequiredQuestions" control={form.control} render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Questions to Answer</FormLabel>
-                                  <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
+
+                        <div className="space-y-4 border-t pt-4">
+                          <h3 className="font-semibold">Questions</h3>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium">Creative (CQ)</h4>
+                              <div className="flex gap-2">
+                                <FormField name="cqTotalQuestions" control={form.control} render={({ field }) => (
+                                  <FormItem className="flex-1"><FormLabel>Total</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )} />
+                                <FormField name="cqRequiredQuestions" control={form.control} render={({ field }) => (
+                                  <FormItem className="flex-1"><FormLabel>Required</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )} />
+                              </div>
                             </div>
-                            <div className="space-y-4">
-                              <h4 className="font-medium text-gray-800 dark:text-gray-200">Short Questions (SQ)</h4>
-                              <FormField name="sqTotalQuestions" control={form.control} render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Total Questions Available</FormLabel>
-                                  <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
-                              <FormField name="sqRequiredQuestions" control={form.control} render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Questions to Answer</FormLabel>
-                                  <FormControl><Input type="number" min={0} {...field} /></FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )} />
+                            <div className="space-y-2">
+                              <h4 className="text-sm font-medium">Short (SQ)</h4>
+                              <div className="flex gap-2">
+                                <FormField name="sqTotalQuestions" control={form.control} render={({ field }) => (
+                                  <FormItem className="flex-1"><FormLabel>Total</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )} />
+                                <FormField name="sqRequiredQuestions" control={form.control} render={({ field }) => (
+                                  <FormItem className="flex-1"><FormLabel>Required</FormLabel><FormControl><Input type="number" {...field} /></FormControl></FormItem>
+                                )} />
+                              </div>
                             </div>
                           </div>
                         </div>
 
-                        {/* CQ Subsections - simplified view for this rewrite to avoid super huge file content, assuming logic is same */}
                         {cqTotalQuestions && cqTotalQuestions > 0 && (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">CQ Subsection Settings</h3>
-                              <Button type="button" onClick={addSubsection}
-                                disabled={cqSubsections && cqSubsections.length > 0 && cqSubsections[cqSubsections.length - 1]?.endIndex >= cqTotalQuestions}
-                                className="flex items-center gap-2" variant="outline">
-                                <Plus className="w-4 h-4" /> Add Subsection
-                              </Button>
-                            </div>
-                            <div className="space-y-4">
-                              {cqSubsections && cqSubsections.map((subsection, index) => (
-                                <div key={index} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
-                                  <div className="flex items-center justify-between mb-3">
-                                    <h4 className="font-medium">Subsection {index + 1}</h4>
-                                    {cqSubsections.length > 1 && (
-                                      <Button type="button" onClick={() => removeSubsection(index)} variant="ghost" size="sm" className="text-red-600">
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                    <FormField name={`cqSubsections.${index}.name`} control={form.control} render={({ field }) => (
-                                      <FormItem><FormLabel>Name</FormLabel><FormControl><Input {...field} /></FormControl></FormItem>
-                                    )} />
-                                    <FormField name={`cqSubsections.${index}.startIndex`} control={form.control} render={({ field }) => (
-                                      <FormItem><FormLabel>Start</FormLabel><FormControl>
-                                        <Input type="number" min={1} {...field} onChange={e => {
-                                          const val = parseInt(e.target.value);
-                                          field.onChange(val);
-                                          updateSubsectionRanges(index, 'startIndex', val);
-                                        }} />
-                                      </FormControl></FormItem>
-                                    )} />
-                                    <FormField name={`cqSubsections.${index}.endIndex`} control={form.control} render={({ field }) => (
-                                      <FormItem><FormLabel>End</FormLabel><FormControl>
-                                        <Input type="number" min={1} {...field} onChange={e => {
-                                          const val = parseInt(e.target.value);
-                                          field.onChange(val);
-                                          updateSubsectionRanges(index, 'endIndex', val);
-                                        }} />
-                                      </FormControl></FormItem>
-                                    )} />
-                                    <FormField name={`cqSubsections.${index}.requiredQuestions`} control={form.control} render={({ field }) => (
-                                      <FormItem><FormLabel>Required</FormLabel><FormControl><Input type="number" min={1} {...field} /></FormControl></FormItem>
-                                    )} />
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                          <div className="space-y-4 border-t pt-4">
+                            <div className="flex justify-between items-center"><h3 className="font-semibold">CQ Subsections</h3><Button type="button" size="sm" variant="outline" onClick={addSubsection}><Plus className="w-4 h-4" /> Add</Button></div>
+                            {cqSubsections?.map((sub, i) => (
+                              <div key={i} className="p-3 bg-gray-50 dark:bg-gray-800 rounded border grid grid-cols-4 gap-2 text-sm relative">
+                                <Button type="button" size="sm" variant="ghost" className="absolute right-1 top-1 h-6 w-6 p-0 text-red-500" onClick={() => removeSubsection(i)}><Trash2 className="w-3 h-3" /></Button>
+                                <FormField name={`cqSubsections.${i}.name`} control={form.control} render={({ field }) => <FormItem><FormLabel>Name</FormLabel><FormControl><Input className="h-8" {...field} /></FormControl></FormItem>} />
+                                <FormField name={`cqSubsections.${i}.startIndex`} control={form.control} render={({ field }) => <FormItem><FormLabel>Start</FormLabel><FormControl><Input className="h-8" type="number" {...field} onChange={e => { field.onChange(parseInt(e.target.value)); updateSubsectionRanges(i, 'startIndex', parseInt(e.target.value)) }} /></FormControl></FormItem>} />
+                                <FormField name={`cqSubsections.${i}.endIndex`} control={form.control} render={({ field }) => <FormItem><FormLabel>End</FormLabel><FormControl><Input className="h-8" type="number" {...field} onChange={e => { field.onChange(parseInt(e.target.value)); updateSubsectionRanges(i, 'endIndex', parseInt(e.target.value)) }} /></FormControl></FormItem>} />
+                                <FormField name={`cqSubsections.${i}.requiredQuestions`} control={form.control} render={({ field }) => <FormItem><FormLabel>Req</FormLabel><FormControl><Input className="h-8" type="number" {...field} /></FormControl></FormItem>} />
+                              </div>
+                            ))}
                           </div>
                         )}
 
-                        <motion.div whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.98 }}>
-                          <Button type="submit" className="w-full mt-4 bg-gradient-to-r from-primary to-blue-500 text-white shadow-lg border-0" disabled={loading || classesLoading || classes.length === 0}>
-                            {loading ? "Creating..." : "Create Exam"}
-                          </Button>
-                        </motion.div>
+                        <Button type="submit" className="w-full bg-primary" disabled={loading}>{loading ? "Creating..." : "Create Exam"}</Button>
                       </form>
                     </FormProvider>
                   )}
@@ -738,66 +619,83 @@ export default function CreateExamPage() {
                     <FileSpreadsheet className="w-5 h-5" /> Bulk Import Instructions
                   </h3>
                   <p className="text-sm mt-2 text-blue-700 dark:text-blue-400">
-                    1. Download the sample Excel file.<br />
-                    2. Fill in the exam details. Ensure "Select Class" matches an existing class name exactly.<br />
-                    3. Upload the filled Excel file below.<br />
-                    4. Review the preview and fix any errors before submitting.
+                    1. Download Sample. 2. Fill Data (Use "Classes" sheet for reference). 3. Upload. 4. <strong>Edit errors directly in table below.</strong>
                   </p>
                   <Button variant="outline" size="sm" className="mt-4 gap-2 border-blue-200" onClick={downloadSample}>
                     <Download className="w-4 h-4" /> Download Sample
                   </Button>
                 </div>
 
-                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-12 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-8 text-center hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                   <Input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" id="file-upload" />
                   <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center">
-                    <Upload className="w-12 h-12 text-gray-400 mb-4" />
-                    <span className="text-lg font-medium text-gray-700 dark:text-gray-300">Click to Upload Excel File</span>
-                    <span className="text-sm text-gray-500 mt-1">Supports .xlsx and .xls</span>
+                    <Upload className="w-8 h-8 text-gray-400 mb-2" />
+                    <span className="text-base font-medium text-gray-700 dark:text-gray-300">Upload Filled Excel File</span>
                   </label>
                 </div>
 
                 {bulkExams.length > 0 && (
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h3 className="font-semibold text-lg">Preview ({bulkExams.length} Exams)</h3>
+                      <h3 className="font-semibold text-lg">Preview & Edit ({bulkExams.length})</h3>
                       {bulkExams.some(e => e.validationError) ? (
-                        <Badge variant="destructive" className="gap-1">
-                          <AlertTriangle className="w-3 h-3" /> Some rows have errors
-                        </Badge>
-                      ) : (
-                        <Badge variant="default" className="bg-green-500 hover:bg-green-600 gap-1">
-                          <CheckCircle className="w-3 h-3 text-white" /> Ready to Import
-                        </Badge>
-                      )}
+                        <Badge variant="destructive" className="gap-1 animate-pulse"><AlertTriangle className="w-3 h-3" /> Errors Found</Badge>
+                      ) : <Badge variant="default" className="bg-green-500 gap-1"><CheckCircle className="w-3 h-3" /> Ready</Badge>}
                     </div>
 
-                    <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
-                      <Table>
+                    <div className="border rounded-lg overflow-x-auto max-h-[500px]">
+                      <Table className="min-w-[1000px]">
                         <TableHeader>
                           <TableRow>
-                            <TableHead>Row</TableHead>
-                            <TableHead>Exam Name</TableHead>
-                            <TableHead>Class</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Duration</TableHead>
-                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[50px]">#</TableHead>
+                            <TableHead className="w-[180px]">Exam Name</TableHead>
+                            <TableHead className="w-[150px]">Class</TableHead>
+                            <TableHead className="w-[140px]">Date</TableHead>
+                            <TableHead className="w-[100px]">Dur.(m)</TableHead>
+                            <TableHead className="w-[120px]">Type</TableHead>
+                            <TableHead className="min-w-[200px]">Status</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {bulkExams.map((exam, i) => (
                             <TableRow key={i} className={exam.validationError ? "bg-red-50 dark:bg-red-900/10" : ""}>
                               <TableCell>{i + 1}</TableCell>
-                              <TableCell>{exam.name}</TableCell>
-                              <TableCell>{exam.classId ? classes.find(c => c.id === exam.classId)?.name : <span className="text-red-500 font-bold">{exam.rawClassName}</span>}</TableCell>
-                              <TableCell>{exam.date}</TableCell>
-                              <TableCell>{exam.duration}m</TableCell>
+                              <TableCell>
+                                <Input className="h-8" value={exam.name} onChange={(e) => handleCellChange(i, 'name', e.target.value)} />
+                              </TableCell>
+                              <TableCell>
+                                <Select value={exam.rawClassName} onValueChange={(val) => handleCellChange(i, 'rawClassName', val)}>
+                                  <SelectTrigger className="h-8 w-full"><SelectValue placeholder="Class" /></SelectTrigger>
+                                  <SelectContent>
+                                    {classes.map(c => <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>
+                                <Input className="h-8" type="date" value={exam.date} onChange={(e) => handleCellChange(i, 'date', e.target.value)} />
+                              </TableCell>
+                              <TableCell>
+                                <Input className="h-8 w-16" type="number" value={exam.duration} onChange={(e) => handleCellChange(i, 'duration', parseInt(e.target.value) || 0)} />
+                              </TableCell>
+                              <TableCell>
+                                <Select value={exam.type} onValueChange={(val) => handleCellChange(i, 'type', val as any)}>
+                                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                  <SelectContent>{examTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+                                </Select>
+                              </TableCell>
                               <TableCell>
                                 {exam.validationError ? (
-                                  <span className="text-red-500 text-xs font-medium">{exam.validationError}</span>
-                                ) : (
-                                  <span className="text-green-600 text-xs font-medium">Valid</span>
-                                )}
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger className="text-left text-xs text-red-600 font-medium truncate max-w-[200px] block cursor-help">
+                                        {exam.validationError}
+                                      </TooltipTrigger>
+                                      <TooltipContent className="bg-red-600 text-white border-red-700">
+                                        {exam.validationError}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                ) : <span className="text-xs text-green-600 font-bold flex items-center gap-1"><CheckCircle className="w-3 h-3" /> Valid</span>}
                               </TableCell>
                             </TableRow>
                           ))}
@@ -805,12 +703,9 @@ export default function CreateExamPage() {
                       </Table>
                     </div>
 
-                    <Button
-                      className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg border-0"
-                      disabled={loading || bulkExams.some(e => !!e.validationError)}
-                      onClick={submitBulk}
-                    >
-                      {loading ? "Importing..." : `Import ${bulkExams.length} Exams`}
+                    <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0 py-6 text-lg shadow-lg hover:shadow-xl transition-all"
+                      disabled={loading || bulkExams.some(e => !!e.validationError)} onClick={submitBulk}>
+                      {loading ? "Importing..." : `Create ${bulkExams.length} Exams Now`}
                     </Button>
                   </div>
                 )}
