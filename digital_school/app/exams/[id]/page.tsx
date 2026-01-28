@@ -634,6 +634,7 @@ export default function ExamBuilderPage() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" size="sm" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
+                  <Button variant="secondary" size="sm" onClick={() => router.push('/question-bank')} className="bg-purple-100 hover:bg-purple-200 text-purple-800 dark:bg-purple-900 dark:hover:bg-purple-800 dark:text-purple-100"><BookOpen className="mr-2 h-4 w-4" /> Question Bank</Button>
                   <Button variant="outline" onClick={() => router.push(`/exams/${examId}/print`)}><Printer className="mr-2 h-4 w-4" />Print Sets ({exam.examSets.length})</Button>
                   <Dialog>
                     <DialogTrigger asChild><Button><Eye className="mr-2 h-4 w-4" />Preview Current Set</Button></DialogTrigger>
