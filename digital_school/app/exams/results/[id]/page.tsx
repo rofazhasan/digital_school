@@ -43,6 +43,10 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { useRef } from 'react';
+import { useReactToPrint } from 'react-to-print';
+import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
+import QRCode from "react-qr-code";
 
 interface StudentResult {
   id: string;
@@ -173,6 +177,109 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [annotatedImageFailed, setAnnotatedImageFailed] = useState(false);
   const [originalImageFallback, setOriginalImageFallback] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
+  const [settings, setSettings] = useState<any>(null);
+  const [isPrinting, setIsPrinting] = useState(false);
+  const printRef = useRef<HTMLDivElement>(null);
+
+  // Print Handler
+  // @ts-ignore
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: result ? `${result.student.name}_${result.exam.name}_Result` : 'Exam_Result',
+    onBeforeGetContent: async () => {
+      setIsPrinting(true);
+      // Wait for MathJax if needed (similar to the other page)
+      return new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 500);
+      });
+    },
+    onAfterPrint: () => {
+      setIsPrinting(false);
+    }
+  } as any);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (res.ok) {
+          const data = await res.json();
+          setSettings(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch settings", e);
+      }
+    };
+    fetchSettings();
+  }, []);
+
+  // Data preparation for MarkedQuestionPaper
+  const getPrintData = () => {
+    if (!result) return null;
+
+    const questions = {
+      mcq: result.questions.filter(q => q.type === 'MCQ').map(q => ({
+        id: q.id,
+        q: q.questionText,
+        options: q.options || [],
+        marks: q.marks,
+        correct: q.options?.find((o: any) => o.isCorrect)?.text
+      })),
+      cq: result.questions.filter(q => q.type === 'CQ').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks,
+        subQuestions: q.subQuestions || []
+      })),
+      sq: result.questions.filter(q => q.type === 'SQ').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks
+      }))
+    };
+
+    const answers: Record<string, any> = {};
+    result.questions.forEach(q => {
+      if (q.studentAnswer) {
+        answers[q.id] = q.studentAnswer;
+      }
+      if (q.type === 'CQ' || q.type === 'SQ') {
+        answers[`${q.id}_marks`] = q.awardedMarks;
+      }
+    });
+
+    const submission = {
+      id: result.submission.id,
+      student: {
+        name: result.student.name,
+        roll: result.student.roll,
+        class: result.student.class
+      },
+      answers: answers,
+      result: {
+        total: result.submission.score,
+        mcqMarks: result.result?.mcqMarks || 0,
+        cqMarks: result.result?.cqMarks || 0,
+        sqMarks: result.result?.sqMarks || 0
+      }
+    };
+
+    const examInfo = {
+      schoolName: settings?.instituteName || "Digital School",
+      schoolAddress: settings?.address || "Dhaka, Bangladesh",
+      logoUrl: settings?.logoUrl,
+      title: result.exam.name,
+      subject: "General", // The API result doesn't explicitly have subject, might need fallback or extraction
+      class: result.student.class,
+      date: result.exam.startTime,
+      totalMarks: result.exam.totalMarks.toString(),
+      highestMark: result.statistics.highestScore
+    };
+
+    return { questions, submission, examInfo };
+  };
+
+  const printData = getPrintData();
 
   useEffect(() => {
     // Check user role and redirect if admin/teacher
@@ -610,18 +717,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={downloadResult}
-                  disabled={downloading}
+                  onClick={handlePrint}
+                  disabled={isPrinting}
                 >
-                  {downloading ? (
+                  {isPrinting ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                      Downloading...
+                      Printing...
                     </>
                   ) : (
                     <>
                       <Download className="h-4 w-4 mr-2" />
-                      Download
+                      Print Script
                     </>
                   )}
                 </Button>
@@ -1971,6 +2078,25 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </div>
             </DialogContent>
           </Dialog>
+        </div>
+        {/* Hidden Print Component */}
+        <div style={{ display: 'none' }}>
+          {printData && (
+            <MarkedQuestionPaper
+              ref={printRef}
+              examInfo={printData.examInfo}
+              questions={printData.questions}
+              submission={printData.submission}
+              rank={result.result?.rank}
+              totalStudents={result.statistics.totalStudents}
+              qrData={{
+                id: result.submission.id,
+                student: result.student.name,
+                exam: result.exam.name,
+                score: result.submission.score
+              }}
+            />
+          )}
         </div>
       </div>
     </MathJaxContext>
