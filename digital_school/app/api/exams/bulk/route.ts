@@ -52,15 +52,27 @@ export async function POST(request: NextRequest) {
         const examsData = validation.data;
 
         const createdExams = await prismadb.$transaction(
-            examsData.map((exam) =>
-                prismadb.exam.create({
+            examsData.map((exam) => {
+                // Ensure dates are valid Date objects for Prisma
+                const dateObj = new Date(exam.date);
+                const startObj = new Date(exam.startTime);
+                const endObj = new Date(exam.endTime);
+
+                if (isNaN(dateObj.getTime()) || isNaN(startObj.getTime()) || isNaN(endObj.getTime())) {
+                    throw new Error(`Invalid date format for exam: ${exam.name}`);
+                }
+
+                return prismadb.exam.create({
                     data: {
                         ...exam,
+                        date: dateObj,
+                        startTime: startObj,
+                        endTime: endObj,
                         createdById: auth.user.id,
-                        isActive: false, // Default to inactive
+                        isActive: false,
                     },
-                })
-            )
+                });
+            })
         );
 
         // Invalidate cache

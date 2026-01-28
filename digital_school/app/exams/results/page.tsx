@@ -452,27 +452,30 @@ export default function ExamResultsPage() {
           </p>
         </div>
 
-        {isStudent && (
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push('/exams/online')}
-              className="mr-2 gap-2"
-            >
-              <ArrowRight className="w-4 h-4 rotate-180" />
-              Back to Online Exams
-            </Button>
-            <Badge variant="outline">
-              <Users className="w-3 h-3 mr-1" />
-              {user.studentProfile?.class.name} {user.studentProfile?.class.section}
-            </Badge>
-            <Badge variant="outline">
-              <FileText className="w-3 h-3 mr-1" />
-              Roll: {user.studentProfile?.roll}
-            </Badge>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/exams/online')}
+            className="mr-2 gap-2"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+            Back to Online Exams
+          </Button>
+
+          {isStudent && (
+            <>
+              <Badge variant="outline">
+                <Users className="w-3 h-3 mr-1" />
+                {user.studentProfile?.class.name} {user.studentProfile?.class.section}
+              </Badge>
+              <Badge variant="outline">
+                <FileText className="w-3 h-3 mr-1" />
+                Roll: {user.studentProfile?.roll}
+              </Badge>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search - Only for non-students */}
