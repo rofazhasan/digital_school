@@ -387,6 +387,14 @@ export async function GET(
       name: exam.name,
       description: exam.description || '',
       totalMarks: exam.totalMarks,
+      class: exam.class,
+      subject: (exam as any).subject || null,
+      startTime: exam.startTime,
+      endTime: exam.endTime,
+      duration: exam.duration,
+      mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
+      cqRequiredQuestions: (exam as any).cqRequiredQuestions,
+      sqRequiredQuestions: (exam as any).sqRequiredQuestions,
       questions: baseQuestions.map((q: any) => {
         // Parse subQuestions if it's a JSON string
         let parsedSubQuestions = null;

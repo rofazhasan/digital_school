@@ -23,6 +23,7 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     const printRef = useRef<HTMLDivElement>(null);
 
     const [settings, setSettings] = useState<any>(null);
+    const [examSetName, setExamSetName] = useState<string>("A");
 
     useEffect(() => {
         const fetchData = async () => {
@@ -55,6 +56,17 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
                 });
 
                 const studentRank = sortedSubmissions.findIndex((s: any) => s.student.id === studentId) + 1;
+
+                // Fetch student's exam set name
+                try {
+                    const examSetResponse = await fetch(`/api/exams/${examId}/student-set/${studentId}`);
+                    if (examSetResponse.ok) {
+                        const examSetData = await examSetResponse.json();
+                        setExamSetName(examSetData.setName || "A");
+                    }
+                } catch (error) {
+                    console.error("Error fetching exam set:", error);
+                }
 
                 setExamData(data);
                 setSubmission(studentSub);
@@ -146,10 +158,10 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
         title: examData.name,
         subject: examData.subject || "General",
         class: examData.class?.name || submission.student.className || "N/A",
-        date: new Date(examData.date).toLocaleDateString(),
-        set: examData.set || "A",
+        date: examData.startTime ? new Date(examData.startTime).toLocaleDateString() : new Date().toLocaleDateString(),
+        set: examSetName,
         totalMarks: String(examData.totalMarks),
-        mcqNegativeMarking: examData.mcqNegativeMarking,
+        mcqNegativeMarking: examData.mcqNegativeMarking || 0,
         cqRequiredQuestions: examData.cqRequiredQuestions,
         sqRequiredQuestions: examData.sqRequiredQuestions,
         highestMark: highestMark
