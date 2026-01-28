@@ -75,6 +75,12 @@ interface ExamInfo {
   duration: number;
   isActive: boolean;
   createdAt: string;
+  subject?: string;
+  class?: string;
+  set?: string;
+  mcqNegativeMarking?: number;
+  cqRequiredQuestions?: number;
+  sqRequiredQuestions?: number;
 }
 
 interface StudentInfo {
@@ -714,24 +720,26 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </Link>
               </Button>
               <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  disabled={isPrinting}
-                >
-                  {isPrinting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                      Printing...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Print Script
-                    </>
-                  )}
-                </Button>
+                {result.result?.isPublished && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handlePrint}
+                    disabled={isPrinting}
+                  >
+                    {isPrinting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                        Printing...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Print Script
+                      </>
+                    )}
+                  </Button>
+                )}
                 <Button variant="outline" size="sm">
                   <Share2 className="h-4 w-4 mr-2" />
                   Share

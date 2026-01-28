@@ -175,7 +175,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         <div className="text-right space-y-1">
                             <p>
                                 <strong>Score:</strong> {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')} / {examInfo.totalMarks}
-                                {totalDeducted > 0 && <span className="text-red-600 font-bold ml-1">(Deducted: {totalDeducted.toFixed(2)})</span>}
+                                {totalDeducted > 0 && <span className="text-red-600 font-bold ml-1">(Deducted: -{totalDeducted.toFixed(2).replace(/\.00$/, '')})</span>}
                             </p>
                             <p><strong>Highest:</strong> {examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
                             <p><strong>Rank:</strong> {rank ? `${rank}${getOrdinal(rank)}` : 'N/A'}</p>
