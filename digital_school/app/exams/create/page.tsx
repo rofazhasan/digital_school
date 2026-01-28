@@ -242,6 +242,16 @@ export default function CreateExamPage() {
       "CQ Required",
       "SQ Total",
       "SQ Required",
+      // Subsection 1
+      "Sub 1 Name",
+      "Sub 1 Start",
+      "Sub 1 End",
+      "Sub 1 Required",
+      // Subsection 2
+      "Sub 2 Name",
+      "Sub 2 Start",
+      "Sub 2 End",
+      "Sub 2 Required"
     ];
 
     const sampleData = [
@@ -260,7 +270,9 @@ export default function CreateExamPage() {
       8,
       5,
       15,
-      10
+      10,
+      "Algebra", 1, 3, 2, // Sub 1
+      "Geometry", 4, 8, 3 // Sub 2
     ];
 
     const wb = XLSX.utils.book_new();
@@ -275,7 +287,7 @@ export default function CreateExamPage() {
     const wsClasses = XLSX.utils.aoa_to_sheet([classHeaders, ...classRows]);
     XLSX.utils.book_append_sheet(wb, wsClasses, "Classes (Reference)");
 
-    XLSX.writeFile(wb, "exam_import_template_v2.xlsx");
+    XLSX.writeFile(wb, "exam_import_template_v3.xlsx");
   };
 
   const parseExcelDate = (dateVal: any): string => {
@@ -368,6 +380,27 @@ export default function CreateExamPage() {
         const startTimeStr = parseTime(dateStr, row["Start Time (HH:mm)"] || row["Start Time"]);
         const endTimeStr = parseTime(dateStr, row["End Time (HH:mm)"] || row["End Time"]);
 
+        // Parse subsections
+        const subsections: any[] = [];
+        // Sub 1
+        if (row["Sub 1 Name"]) {
+          subsections.push({
+            name: row["Sub 1 Name"],
+            startIndex: Number(row["Sub 1 Start"] || 1),
+            endIndex: Number(row["Sub 1 End"] || 1),
+            requiredQuestions: Number(row["Sub 1 Required"] || 1)
+          });
+        }
+        // Sub 2
+        if (row["Sub 2 Name"]) {
+          subsections.push({
+            name: row["Sub 2 Name"],
+            startIndex: Number(row["Sub 2 Start"] || 1),
+            endIndex: Number(row["Sub 2 End"] || 1),
+            requiredQuestions: Number(row["Sub 2 Required"] || 1)
+          });
+        }
+
         const exam: any = {
           name: row["Exam Name"] || `Exam ${index + 1}`,
           description: row["Description"] || "",
@@ -386,7 +419,7 @@ export default function CreateExamPage() {
           cqRequiredQuestions: Number(row["CQ Required"] || 5),
           sqTotalQuestions: Number(row["SQ Total"] || 15),
           sqRequiredQuestions: Number(row["SQ Required"] || 5),
-          cqSubsections: []
+          cqSubsections: subsections
         };
 
         return validateBulkExam(exam, index, className);
