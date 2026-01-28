@@ -12,15 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Download, 
-  Search, 
-  Filter, 
-  Trophy, 
-  Award, 
-  TrendingUp, 
-  Users, 
-  Calendar, 
+import {
+  Download,
+  Search,
+  Filter,
+  Trophy,
+  Award,
+  TrendingUp,
+  Users,
+  Calendar,
   FileText,
   Target,
   BarChart3,
@@ -174,15 +174,15 @@ export default function ExamResultsPage() {
   const fetchUserAndResults = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch current user
       const userResponse = await fetch('/api/user', {
         credentials: 'include'
       });
       if (!userResponse.ok) {
         if (userResponse.status === 401) {
-        router.push('/login');
-        return;
+          router.push('/login');
+          return;
         }
         throw new Error(`Failed to fetch user: ${userResponse.status}`);
       }
@@ -223,10 +223,10 @@ export default function ExamResultsPage() {
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(result => 
+      filtered = filtered.filter(result =>
         result.exam?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.exam?.class?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        result.results?.some(r => 
+        result.results?.some(r =>
           r.student?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.student?.roll?.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -236,7 +236,7 @@ export default function ExamResultsPage() {
     // Sort results
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortBy) {
         case 'date':
           comparison = new Date(a.exam?.date || 0).getTime() - new Date(b.exam?.date || 0).getTime();
@@ -257,7 +257,7 @@ export default function ExamResultsPage() {
 
   const downloadResultsSheet = async (examId: string, format: 'pdf' | 'csv' = 'pdf') => {
     const downloadKey = `${examId}-${format}`;
-    
+
     if (downloading.has(downloadKey)) {
       return; // Prevent multiple downloads
     }
@@ -265,13 +265,13 @@ export default function ExamResultsPage() {
     try {
       setDownloading(prev => new Set(prev).add(downloadKey));
       const loadingToast = toast.loading(`Generating ${format.toUpperCase()} results sheet...`);
-      
-      const endpoint = format === 'pdf' 
+
+      const endpoint = format === 'pdf'
         ? `/api/exams/results/${examId}/download`
         : `/api/exams/results/${examId}/download-simple`;
-      
+
       console.log('🔍 Download request:', { endpoint, format, examId });
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -279,11 +279,11 @@ export default function ExamResultsPage() {
         },
         credentials: 'include',
       });
-      
-      console.log('🔍 Download response:', { 
-        status: response.status, 
+
+      console.log('🔍 Download response:', {
+        status: response.status,
         statusText: response.statusText,
-        ok: response.ok 
+        ok: response.ok
       });
 
       if (response.ok) {
@@ -291,7 +291,7 @@ export default function ExamResultsPage() {
         if (blob.size === 0) {
           throw new Error('Generated file is empty');
         }
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -300,7 +300,7 @@ export default function ExamResultsPage() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
+
         toast.dismiss(loadingToast);
         toast.success(`${format.toUpperCase()} results sheet downloaded successfully`);
       } else {
@@ -321,7 +321,7 @@ export default function ExamResultsPage() {
 
   const getGradeColor = (grade?: string) => {
     if (!grade) return 'bg-gray-100 text-gray-800';
-    
+
     switch (grade.toUpperCase()) {
       case 'A+':
       case 'A':
@@ -342,7 +342,7 @@ export default function ExamResultsPage() {
 
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
-    
+
     if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
     if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
     if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
@@ -352,7 +352,7 @@ export default function ExamResultsPage() {
   const getPerformanceAnalysis = (result: Result) => {
     const totalPossible = result.exam.totalMarks;
     const percentage = result.percentage || 0;
-    
+
     let strength = '';
     let weakness = '';
     let recommendation = '';
@@ -408,9 +408,9 @@ export default function ExamResultsPage() {
         <Alert>
           <AlertDescription>
             Error: {error}
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="ml-2"
               onClick={() => {
                 setError(null);
@@ -445,15 +445,24 @@ export default function ExamResultsPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Exam Results</h1>
           <p className="text-muted-foreground">
-            {isStudent 
+            {isStudent
               ? 'View your exam results and performance analysis'
               : 'Manage and view all exam results'
             }
           </p>
         </div>
-        
+
         {isStudent && (
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push('/exams/online')}
+              className="mr-2 gap-2"
+            >
+              <ArrowRight className="w-4 h-4 rotate-180" />
+              Back to Online Exams
+            </Button>
             <Badge variant="outline">
               <Users className="w-3 h-3 mr-1" />
               {user.studentProfile?.class.name} {user.studentProfile?.class.section}
@@ -486,7 +495,7 @@ export default function ExamResultsPage() {
                   className="pl-10"
                 />
               </div>
-              
+
               <Select value={selectedExam} onValueChange={setSelectedExam}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select Exam" />
@@ -555,7 +564,7 @@ export default function ExamResultsPage() {
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
                         <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
+                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} •
                           {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}
                         </CardDescription>
                       </div>
@@ -573,7 +582,7 @@ export default function ExamResultsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  
+
                   {/* Summary Cards */}
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -618,24 +627,24 @@ export default function ExamResultsPage() {
                           <div className="text-xl font-semibold">
                             {studentResult.mcqMarks || 0}
                           </div>
-                          <Progress 
-                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
                         <div className="p-4 border rounded-lg">
                           <div className="text-sm text-muted-foreground">CQ Marks</div>
                           <div className="text-xl font-semibold">{studentResult.cqMarks || 0}</div>
-                          <Progress 
-                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
                         <div className="p-4 border rounded-lg">
                           <div className="text-sm text-muted-foreground">SQ Marks</div>
                           <div className="text-xl font-semibold">{studentResult.sqMarks || 0}</div>
-                          <Progress 
-                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
@@ -646,7 +655,7 @@ export default function ExamResultsPage() {
                     {isExpanded && (
                       <div className="mt-6 space-y-6">
                         <Separator />
-                        
+
                         {/* Performance Analysis */}
                         <div className="space-y-4">
                           <h4 className="font-semibold flex items-center gap-2">
@@ -777,7 +786,7 @@ export default function ExamResultsPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Avg. Pass Rate</p>
                       <p className="text-2xl font-bold">
-                        {filteredResults.length > 0 
+                        {filteredResults.length > 0
                           ? (filteredResults.reduce((sum, result) => sum + (result.passRate || 0), 0) / filteredResults.length).toFixed(1)
                           : 0
                         }%
@@ -794,7 +803,7 @@ export default function ExamResultsPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Avg. Score</p>
                       <p className="text-2xl font-bold">
-                        {filteredResults.length > 0 
+                        {filteredResults.length > 0
                           ? (filteredResults.reduce((sum, result) => sum + (result.averageScore || 0), 0) / filteredResults.length).toFixed(1)
                           : 0
                         }
@@ -817,8 +826,8 @@ export default function ExamResultsPage() {
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
                         <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
-                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} • 
+                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} •
+                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} •
                           {examResult.totalStudents || 0} students
                         </CardDescription>
                       </div>
@@ -885,7 +894,7 @@ export default function ExamResultsPage() {
                     <div>
                       <CardTitle>{examResult.exam.name}</CardTitle>
                       <CardDescription>
-                        {examResult.exam.class.name} {examResult.exam.class.section} • 
+                        {examResult.exam.class.name} {examResult.exam.class.section} •
                         {new Date(examResult.exam.date).toLocaleDateString()}
                       </CardDescription>
                     </div>
@@ -952,12 +961,12 @@ export default function ExamResultsPage() {
                           </TableCell>
                         </TableRow>
                       )) || (
-                        <TableRow>
-                          <TableCell colSpan={9} className="text-center text-muted-foreground">
-                            No results available
-                          </TableCell>
-                        </TableRow>
-                      )}
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center text-muted-foreground">
+                              No results available
+                            </TableCell>
+                          </TableRow>
+                        )}
                     </TableBody>
                   </Table>
                 </CardContent>
