@@ -1758,82 +1758,105 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 </div>
 
                                 {question.type === 'CQ' && question.subQuestions ? (
-                                  <div className="space-y-6 mt-4">
-                                    <h4 className="font-medium text-gray-800 border-b pb-2">Detailed Answer Breakdown:</h4>
+                                  <div className="space-y-8 mt-6">
+                                    <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
                                     {question.subQuestions.map((subQ: any, idx: number) => (
-                                      <div key={idx} className="border-l-4 border-indigo-100 pl-4 py-2 bg-gray-50/50 rounded-r-lg">
-
-                                        {/* Sub-question Text (if available) - usually CQ sub-questions are fixed but we display them if present */}
-                                        <div className="mb-2">
-                                          <span className="font-semibold text-indigo-700">Sub-question {idx + 1}</span>
-                                          {subQ.text && <span className="mx-2 text-gray-400">|</span>}
-                                          {subQ.text && (
-                                            <span className="text-gray-700"><MathJax inline dynamic>{subQ.text}</MathJax></span>
-                                          )}
-                                        </div>
-
-                                        {/* Model Answer */}
-                                        {subQ.modelAnswer && (
-                                          <div className="mb-3 p-2 bg-green-50 rounded border border-green-100">
-                                            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Model Answer</div>
-                                            <div className="text-gray-800 text-sm"><MathJax dynamic>{subQ.modelAnswer}</MathJax></div>
+                                      <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                        {/* Sub-question Header */}
+                                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
+                                          <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
+                                            {idx + 1}
+                                          </span>
+                                          <div className="flex-grow pt-1">
+                                            {subQ.text ? (
+                                              <div className="text-gray-800 font-medium leading-relaxed">
+                                                <MathJax inline dynamic>{subQ.text}</MathJax>
+                                              </div>
+                                            ) : (
+                                              <span className="text-gray-500 italic">Sub-question {idx + 1}</span>
+                                            )}
                                           </div>
-                                        )}
-
-                                        {/* Student Answer */}
-                                        <div className="mb-3">
-                                          <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1">Your Answer</div>
-                                          {subQ.studentAnswer ? (
-                                            <div className="text-gray-800"><MathJax dynamic>{subQ.studentAnswer}</MathJax></div>
-                                          ) : (
-                                            <p className="text-gray-400 italic text-sm">No text answer provided</p>
-                                          )}
                                         </div>
 
-                                        {/* Student Images & Feedback */}
-                                        {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
-                                          <div className="mt-3">
-                                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Attachments & Feedback</div>
-                                            <div className="flex flex-wrap gap-3">
-                                              {(() => {
-                                                const images = subQ.studentImages || [];
-                                                return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
-                                                  const globalIdx = idx * 100 + imgK;
-                                                  const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
-                                                  const displayUrl = drawing ? drawing.imageData : imgUrl;
-                                                  const isAnnotated = !!drawing;
-
-                                                  return (
-                                                    <div
-                                                      key={imgK}
-                                                      className="relative group cursor-pointer"
-                                                      onClick={() => {
-                                                        setZoomedImage(displayUrl);
-                                                        setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
-                                                        setShowZoomModal(true);
-                                                      }}
-                                                    >
-                                                      <img
-                                                        src={displayUrl}
-                                                        alt={`Sub ${idx + 1} Img ${imgK + 1}`}
-                                                        className={`w-24 h-24 object-cover rounded-lg border-2 transition-transform hover:scale-105 ${isAnnotated ? 'border-orange-400 ring-2 ring-orange-200' : 'border-gray-200'}`}
-                                                      />
-                                                      {isAnnotated && (
-                                                        <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg font-medium shadow-sm">
-                                                          Feedback
-                                                        </div>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                }) : (
-                                                  // If there are drawings but no matching student images (rare edge case, or specific feedback image)
-                                                  // We can list orphan drawings here if needed, but usually drawings are attached to images.
-                                                  null
-                                                );
-                                              })()}
+                                        <div className="p-4 space-y-4">
+                                          {/* Model Answer (Prominent) */}
+                                          {(subQ.modelAnswer || subQ.answer) && (
+                                            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                                              <div className="flex items-center gap-2 mb-2 text-green-800 font-semibold text-sm uppercase tracking-wide">
+                                                <CheckCircle className="w-4 h-4" />
+                                                Model Answer
+                                              </div>
+                                              <div className="text-gray-800 leading-relaxed font-sans">
+                                                <MathJax dynamic>{subQ.modelAnswer || subQ.answer}</MathJax>
+                                              </div>
                                             </div>
+                                          )}
+
+                                          {/* Student Answer */}
+                                          <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
+                                            <div className="text-blue-800 font-semibold text-sm uppercase tracking-wide mb-2">
+                                              Your Answer
+                                            </div>
+                                            {subQ.studentAnswer ? (
+                                              <div className="text-gray-800 leading-relaxed font-sans">
+                                                <MathJax dynamic>{subQ.studentAnswer}</MathJax>
+                                              </div>
+                                            ) : (
+                                              <p className="text-gray-400 italic text-sm">No text answer provided</p>
+                                            )}
                                           </div>
-                                        )}
+
+                                          {/* Attachments & Feedback */}
+                                          {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100">
+                                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                <Camera className="w-4 h-4" />
+                                                Attachments & Feedback
+                                              </div>
+                                              <div className="flex flex-wrap gap-4">
+                                                {(() => {
+                                                  const images = subQ.studentImages || [];
+                                                  return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
+                                                    const globalIdx = idx * 100 + imgK;
+                                                    const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
+                                                    const displayUrl = drawing ? drawing.imageData : imgUrl;
+                                                    const isAnnotated = !!drawing;
+
+                                                    return (
+                                                      <div
+                                                        key={imgK}
+                                                        className="relative group cursor-pointer perspective-1000"
+                                                        onClick={() => {
+                                                          setZoomedImage(displayUrl);
+                                                          setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
+                                                          setShowZoomModal(true);
+                                                        }}
+                                                      >
+                                                        <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
+                                                          <img
+                                                            src={displayUrl}
+                                                            alt={`Sub ${idx + 1} Img ${imgK + 1}`}
+                                                            className="w-32 h-32 object-cover bg-gray-50"
+                                                            loading="lazy"
+                                                          />
+                                                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                            <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+                                                          </div>
+                                                          {isAnnotated && (
+                                                            <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
+                                                              <MessageSquare className="w-3 h-3" />
+                                                              Feedback
+                                                            </div>
+                                                          )}
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  }) : null;
+                                                })()}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
