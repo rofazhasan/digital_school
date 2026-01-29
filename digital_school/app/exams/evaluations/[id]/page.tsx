@@ -1735,27 +1735,42 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         </div>
                                       )}
 
-                                      {/* Main Image (SQ) */}
-                                      {currentStudent?.answers[`${currentQuestion.id}_image`] && (
-                                        <div>
-                                          <div className="text-xs font-semibold text-gray-500 mb-1">Attachment:</div>
-                                          <div className="relative inline-block group">
-                                            <img
-                                              src={currentStudent.answers[`${currentQuestion.id}_image`]}
-                                              alt="Answer Attachment"
-                                              crossOrigin="anonymous"
-                                              className="h-48 rounded border bg-white object-contain cursor-pointer transition-transform hover:scale-105"
-                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0, currentStudent.student.id)}
-                                            />
-                                            <button
-                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0, currentStudent.student.id)}
-                                              className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
-                                            >
-                                              <PenTool className="w-4 h-4" />
-                                            </button>
+                                      {/* Main Images (SQ) - Support both single and multiple */}
+                                      {(() => {
+                                        const singleImage = currentStudent?.answers[`${currentQuestion.id}_image`];
+                                        const multipleImages = currentStudent?.answers[`${currentQuestion.id}_images`] || [];
+                                        const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                                        return allImages.length > 0 ? (
+                                          <div>
+                                            <div className="text-xs font-semibold text-gray-500 mb-1">
+                                              Attachments ({allImages.length}):
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                              {allImages.map((imgUrl: string, imgIdx: number) => (
+                                                <div key={imgIdx} className="relative inline-block group">
+                                                  <img
+                                                    src={imgUrl}
+                                                    alt={`Answer Attachment ${imgIdx + 1}`}
+                                                    crossOrigin="anonymous"
+                                                    className="h-32 w-32 rounded border bg-white object-cover cursor-pointer transition-transform hover:scale-105"
+                                                    onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
+                                                  />
+                                                  <button
+                                                    onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
+                                                    className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                  >
+                                                    <PenTool className="w-4 h-4" />
+                                                  </button>
+                                                  <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                                                    {imgIdx + 1}/{allImages.length}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
-                                        </div>
-                                      )}
+                                        ) : null;
+                                      })()}
 
                                       {/* CQ Sub-question Answers */}
                                       {currentQuestion.type === 'cq' && currentQuestion.subQuestions && (
@@ -1778,23 +1793,36 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 {subText && (
                                                   <div className="mb-2 text-gray-800"><MathJax>{subText}</MathJax></div>
                                                 )}
-                                                {subImg && (
-                                                  <div className="relative inline-block group">
-                                                    <img
-                                                      src={subImg}
-                                                      alt={`Sub ${idx + 1}`}
-                                                      crossOrigin="anonymous"
-                                                      className="h-40 rounded border bg-white object-contain cursor-pointer hover:scale-105 transition-transform"
-                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx, currentStudent.student.id)}
-                                                    />
-                                                    <button
-                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx, currentStudent.student.id)}
-                                                      className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
-                                                    >
-                                                      <PenTool className="w-4 h-4" />
-                                                    </button>
-                                                  </div>
-                                                )}
+                                                {(() => {
+                                                  const singleImg = currentStudent?.answers?.[`${subKey}_image`];
+                                                  const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
+                                                  const allSubImages = singleImg ? [singleImg, ...multipleImgs] : multipleImgs;
+
+                                                  return allSubImages.length > 0 ? (
+                                                    <div className="flex flex-wrap gap-2 mt-2">
+                                                      {allSubImages.map((imgUrl: string, imgIdx: number) => (
+                                                        <div key={imgIdx} className="relative inline-block group">
+                                                          <img
+                                                            src={imgUrl}
+                                                            alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
+                                                            crossOrigin="anonymous"
+                                                            className="h-24 w-24 rounded border bg-white object-cover cursor-pointer hover:scale-105 transition-transform"
+                                                            onClick={() => openAnnotation(imgUrl, currentQuestion.id, idx * 100 + imgIdx, currentStudent.student.id)}
+                                                          />
+                                                          <button
+                                                            onClick={() => openAnnotation(imgUrl, currentQuestion.id, idx * 100 + imgIdx, currentStudent.student.id)}
+                                                            className="absolute top-1 right-1 bg-white/90 p-1 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                          >
+                                                            <PenTool className="w-3 h-3" />
+                                                          </button>
+                                                          <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 py-0.5 rounded">
+                                                            {imgIdx + 1}/{allSubImages.length}
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : null;
+                                                })()}
                                               </div>
                                             );
                                           })}
