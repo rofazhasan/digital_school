@@ -167,6 +167,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [activeAnnotationImage, setActiveAnnotationImage] = useState<string | null>(null);
   const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number; studentId: string } | null>(null);
 
+  // Store all annotations for the current student: key = "questionId_imageIndex", value = annotated image URL
+  const [annotations, setAnnotations] = useState<Record<string, string>>({});
+
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string) => {
     console.log("Opening annotation for:", { questionId, index, studentId });
     setActiveAnnotationImage(imageUrl);
@@ -208,14 +211,46 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
       if (!saveRes.ok) throw new Error("Failed to save record");
 
+      // Update local state instead of reloading
+      const key = `${activeAnnotationMeta.questionId}_${activeAnnotationMeta.index}`;
+      setAnnotations(prev => ({
+        ...prev,
+        [key]: url
+      }));
+
       toast.success("Annotation saved!");
       setIsAnnotationOpen(false);
-
-      // Reload the page to show the new annotation
-      window.location.reload();
     } catch (e) {
       console.error(e);
       toast.error("Failed to save annotation");
+    }
+  };
+
+  // Fetch all annotations for the current student
+  const fetchAnnotations = async (studentId: string) => {
+    try {
+      const response = await fetch(
+        `/api/exams/evaluations/${id}/get-drawing?studentId=${studentId}`,
+        { credentials: 'include' }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        // data.drawings is an array of { questionId, imageIndex, imageData }
+        const annotationMap: Record<string, string> = {};
+
+        if (data.drawings && Array.isArray(data.drawings)) {
+          data.drawings.forEach((drawing: any) => {
+            const key = `${drawing.questionId}_${drawing.imageIndex}`;
+            annotationMap[key] = drawing.imageData;
+          });
+        }
+
+        setAnnotations(annotationMap);
+        console.log(`[Annotations] Loaded ${Object.keys(annotationMap).length} annotations for student ${studentId}`);
+      }
+    } catch (error) {
+      console.error('Error fetching annotations:', error);
     }
   };
 
@@ -644,6 +679,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const currentStudent = exam?.submissions[currentStudentIndex];
   const currentQuestion = filteredQuestions[currentQuestionIndex];
 
+  // Fetch annotations when student changes
+  useEffect(() => {
+    if (currentStudent?.student.id) {
+      fetchAnnotations(currentStudent.student.id);
+    }
+  }, [currentStudent?.student.id]);
+
+  // Helper function to get the correct image URL (annotated if exists, original otherwise)
+  const getImageUrl = (originalUrl: string, questionId: string, imageIndex: number) => {
+    const key = `${questionId}_${imageIndex}`;
+    return annotations[key] || originalUrl;
+  };
+
   // Use exam's total marks from the database
   const totalMarks = exam?.totalMarks || 0;
 
@@ -937,7 +985,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     if (!canvasRef.current || !imageRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     canvas.width = imageRef.current.width;
@@ -975,7 +1023,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -1003,7 +1051,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     if (!isDrawing || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
@@ -1027,7 +1075,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -1747,26 +1795,35 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               Attachments ({allImages.length}):
                                             </div>
                                             <div className="flex flex-wrap gap-2">
-                                              {allImages.map((imgUrl: string, imgIdx: number) => (
-                                                <div key={imgIdx} className="relative inline-block group">
-                                                  <img
-                                                    src={imgUrl}
-                                                    alt={`Answer Attachment ${imgIdx + 1}`}
-                                                    crossOrigin="anonymous"
-                                                    className="h-32 w-32 rounded border bg-white object-cover cursor-pointer transition-transform hover:scale-105"
-                                                    onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
-                                                  />
-                                                  <button
-                                                    onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
-                                                    className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
-                                                  >
-                                                    <PenTool className="w-4 h-4" />
-                                                  </button>
-                                                  <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
-                                                    {imgIdx + 1}/{allImages.length}
+                                              {allImages.map((imgUrl: string, imgIdx: number) => {
+                                                const displayUrl = getImageUrl(imgUrl, currentQuestion.id, imgIdx);
+                                                const hasAnnotation = displayUrl !== imgUrl;
+                                                return (
+                                                  <div key={imgIdx} className="relative inline-block group">
+                                                    <img
+                                                      src={displayUrl}
+                                                      alt={`Answer Attachment ${imgIdx + 1}`}
+                                                      crossOrigin="anonymous"
+                                                      className="h-32 w-32 rounded border bg-white object-cover cursor-pointer transition-transform hover:scale-105"
+                                                      onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
+                                                    />
+                                                    <button
+                                                      onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
+                                                      className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                    >
+                                                      <PenTool className="w-4 h-4" />
+                                                    </button>
+                                                    <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                                                      {imgIdx + 1}/{allImages.length}
+                                                    </div>
+                                                    {hasAnnotation && (
+                                                      <div className="absolute top-1 left-1 bg-green-500 text-white text-xs px-1.5 py-0.5 rounded font-semibold shadow-sm z-10 pointer-events-none">
+                                                        ✓
+                                                      </div>
+                                                    )}
                                                   </div>
-                                                </div>
-                                              ))}
+                                                );
+                                              })}
                                             </div>
                                           </div>
                                         ) : null;
@@ -1800,26 +1857,37 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                                   return allSubImages.length > 0 ? (
                                                     <div className="flex flex-wrap gap-2 mt-2">
-                                                      {allSubImages.map((imgUrl: string, imgIdx: number) => (
-                                                        <div key={imgIdx} className="relative inline-block group">
-                                                          <img
-                                                            src={imgUrl}
-                                                            alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
-                                                            crossOrigin="anonymous"
-                                                            className="h-24 w-24 rounded border bg-white object-cover cursor-pointer hover:scale-105 transition-transform"
-                                                            onClick={() => openAnnotation(imgUrl, currentQuestion.id, idx * 100 + imgIdx, currentStudent.student.id)}
-                                                          />
-                                                          <button
-                                                            onClick={() => openAnnotation(imgUrl, currentQuestion.id, idx * 100 + imgIdx, currentStudent.student.id)}
-                                                            className="absolute top-1 right-1 bg-white/90 p-1 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
-                                                          >
-                                                            <PenTool className="w-3 h-3" />
-                                                          </button>
-                                                          <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 py-0.5 rounded">
-                                                            {imgIdx + 1}/{allSubImages.length}
+                                                      {allSubImages.map((imgUrl: string, imgIdx: number) => {
+                                                        const questionIndex = idx * 100 + imgIdx;
+                                                        const displayUrl = getImageUrl(imgUrl, currentQuestion.id, questionIndex);
+                                                        const hasAnnotation = displayUrl !== imgUrl;
+
+                                                        return (
+                                                          <div key={imgIdx} className="relative inline-block group">
+                                                            <img
+                                                              src={displayUrl}
+                                                              alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
+                                                              crossOrigin="anonymous"
+                                                              className="h-24 w-24 rounded border bg-white object-cover cursor-pointer hover:scale-105 transition-transform"
+                                                              onClick={() => openAnnotation(imgUrl, currentQuestion.id, questionIndex, currentStudent.student.id)}
+                                                            />
+                                                            <button
+                                                              onClick={() => openAnnotation(imgUrl, currentQuestion.id, questionIndex, currentStudent.student.id)}
+                                                              className="absolute top-1 right-1 bg-white/90 p-1 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                            >
+                                                              <PenTool className="w-3 h-3" />
+                                                            </button>
+                                                            <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 py-0.5 rounded">
+                                                              {imgIdx + 1}/{allSubImages.length}
+                                                            </div>
+                                                            {hasAnnotation && (
+                                                              <div className="absolute top-0 left-0 bg-green-500 text-white text-[10px] px-1 py-0.5 rounded-br font-semibold shadow-sm z-10 pointer-events-none">
+                                                                ✓
+                                                              </div>
+                                                            )}
                                                           </div>
-                                                        </div>
-                                                      ))}
+                                                        );
+                                                      })}
                                                     </div>
                                                   ) : null;
                                                 })()}
