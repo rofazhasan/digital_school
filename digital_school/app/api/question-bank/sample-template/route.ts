@@ -73,6 +73,7 @@ export async function GET() {
             { header: "Option B", key: "optionB", width: 20 },
             { header: "Option C", key: "optionC", width: 20 },
             { header: "Option D", key: "optionD", width: 20 },
+            { header: "Option E", key: "optionE", width: 20 },
             { header: "Correct Option", key: "correctOption", width: 15 },
             { header: "Explanation", key: "explanation", width: 30 },
             { header: "Model Answer", key: "modelAnswer", width: 30 },
@@ -146,14 +147,14 @@ export async function GET() {
                 error: 'Select EASY, MEDIUM, or HARD'
             };
 
-            // Correct Option Dropdown (Col 12)
-            row.getCell(12).dataValidation = {
+            // Correct Option Dropdown (Col 13 - Shifted by 1 due to Option E)
+            row.getCell(13).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"A,B,C,D"'],
+                formulae: ['"A,B,C,D,E"'],
                 showErrorMessage: true,
                 errorTitle: 'Invalid Option',
-                error: 'Select A, B, C, or D'
+                error: 'Select A, B, C, D, or E'
             };
         }
 
