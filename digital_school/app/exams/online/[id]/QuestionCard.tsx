@@ -85,6 +85,13 @@ const MCQOption = memo(({
       {/* Option Text */}
       <div className="flex-1 pt-1.5 text-sm md:text-base leading-relaxed break-words font-medium">
         <MathJax dynamic>{label || ""}</MathJax>
+        {/* @ts-ignore */}
+        {option?.image && (
+          <div className="mt-2">
+            {/* @ts-ignore */}
+            <img src={option.image} alt="Option" className="max-h-32 rounded border bg-white object-contain" />
+          </div>
+        )}
       </div>
 
       {/* Result Icons */}
@@ -215,7 +222,14 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                 />
                 {subQuestions.map((subQ: any, idx: number) => (
                   <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
-                    <div className="text-sm font-medium text-gray-700 mb-2">{idx + 1}. {subQ.text || subQ.question || subQ}</div>
+                    <div className="text-sm font-medium text-gray-700 mb-2">
+                      {idx + 1}. {subQ.text || subQ.question || subQ}
+                      {subQ.image && (
+                        <div className="mt-2">
+                          <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
+                        </div>
+                      )}
+                    </div>
                     <Input
                       value={answers[`${question.id}_sub_${idx}`] || ""}
                       onChange={(e) => setAnswers({ ...answers, [`${question.id}_sub_${idx}`]: e.target.value })}

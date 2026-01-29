@@ -27,15 +27,18 @@ const questionSchema = z.object({
     options: z.array(z.object({
         text: z.string().min(1, "Option text is required"),
         isCorrect: z.boolean(),
-        explanation: z.string().optional().nullable()
+        explanation: z.string().optional().nullable(),
+        image: z.string().optional().nullable()
     })).nullable().default(null),
     subQuestions: z.array(z.object({
         question: z.string().min(1, "Sub-question text is required"),
         marks: z.number().int().min(1, "Sub-question marks must be at least 1"),
-        modelAnswer: z.string().optional().nullable()
+        modelAnswer: z.string().optional().nullable(),
+        image: z.string().optional().nullable()
     })).nullable().default(null),
     modelAnswer: z.string().optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
+    images: z.array(z.string()).optional().nullable(),
 });
 
 const aiGenerationSchema = z.object({

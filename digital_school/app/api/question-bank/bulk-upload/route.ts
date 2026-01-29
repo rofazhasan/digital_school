@@ -111,12 +111,25 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         } else if (data.type === 'CQ') {
             const sq1Text = s(getValue(row, ["Sub-Question 1 Text", "SQ1"]));
             const sq1Marks = n(getValue(row, ["Sub-Question 1 Marks", "SQ1 Marks"]));
+            const sq1Ans = s(getValue(row, ["Sub-Question 1 Model Answer", "SQ1 Answer", "SQ1 Ans"]));
+
             const sq2Text = s(getValue(row, ["Sub-Question 2 Text", "SQ2"]));
             const sq2Marks = n(getValue(row, ["Sub-Question 2 Marks", "SQ2 Marks"]));
+            const sq2Ans = s(getValue(row, ["Sub-Question 2 Model Answer", "SQ2 Answer", "SQ2 Ans"]));
+
+            const sq3Text = s(getValue(row, ["Sub-Question 3 Text", "SQ3"]));
+            const sq3Marks = n(getValue(row, ["Sub-Question 3 Marks", "SQ3 Marks"]));
+            const sq3Ans = s(getValue(row, ["Sub-Question 3 Model Answer", "SQ3 Answer", "SQ3 Ans"]));
+
+            const sq4Text = s(getValue(row, ["Sub-Question 4 Text", "SQ4"]));
+            const sq4Marks = n(getValue(row, ["Sub-Question 4 Marks", "SQ4 Marks"]));
+            const sq4Ans = s(getValue(row, ["Sub-Question 4 Model Answer", "SQ4 Answer", "SQ4 Ans"]));
 
             data.subQuestions = [];
-            if (sq1Text) data.subQuestions.push({ question: sq1Text, marks: sq1Marks });
-            if (sq2Text) data.subQuestions.push({ question: sq2Text, marks: sq2Marks });
+            if (sq1Text) data.subQuestions.push({ question: sq1Text, marks: sq1Marks, modelAnswer: sq1Ans });
+            if (sq2Text) data.subQuestions.push({ question: sq2Text, marks: sq2Marks, modelAnswer: sq2Ans });
+            if (sq3Text) data.subQuestions.push({ question: sq3Text, marks: sq3Marks, modelAnswer: sq3Ans });
+            if (sq4Text) data.subQuestions.push({ question: sq4Text, marks: sq4Marks, modelAnswer: sq4Ans });
 
             if (data.subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
         }

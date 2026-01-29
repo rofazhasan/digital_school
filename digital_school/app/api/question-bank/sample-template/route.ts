@@ -41,7 +41,7 @@ export async function GET() {
         infoSheet.eachRow((row, rowNumber) => {
             if (rowNumber > 1) {
                 row.getCell(1).font = { bold: true };
-                row.alignments = { vertical: 'middle', wrapText: true };
+                row.alignment = { vertical: 'middle', wrapText: true };
             }
         });
 
@@ -78,8 +78,16 @@ export async function GET() {
             { header: "Model Answer", key: "modelAnswer", width: 30 },
             { header: "Sub-Question 1 Text", key: "sq1Text", width: 30 },
             { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 15 },
+            { header: "Sub-Question 1 Model Answer", key: "sq1ModelAnswer", width: 30 },
             { header: "Sub-Question 2 Text", key: "sq2Text", width: 30 },
             { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 15 },
+            { header: "Sub-Question 2 Model Answer", key: "sq2ModelAnswer", width: 30 },
+            { header: "Sub-Question 3 Text", key: "sq3Text", width: 30 },
+            { header: "Sub-Question 3 Marks", key: "sq3Marks", width: 15 },
+            { header: "Sub-Question 3 Model Answer", key: "sq3ModelAnswer", width: 30 },
+            { header: "Sub-Question 4 Text", key: "sq4Text", width: 30 },
+            { header: "Sub-Question 4 Marks", key: "sq4Marks", width: 15 },
+            { header: "Sub-Question 4 Model Answer", key: "sq4ModelAnswer", width: 30 },
         ];
         templateSheet.columns = columns;
 

@@ -33,9 +33,12 @@ type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
   id: string; type: QuestionType; subject: string; topic?: string | null; marks: number; difficulty: Difficulty;
-  questionText: string; questionLatex?: string | null; hasMath: boolean; options?: any; subQuestions?: any;
+  questionText: string; questionLatex?: string | null; hasMath: boolean;
+  options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
+  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
   modelAnswer?: string | null; class: { id: string; name: string }; createdBy: { id: string; name: string };
   questionBanks: QuestionBank[]; createdAt: string; isAiGenerated?: boolean;
+  images?: string[];
 };
 
 // Enhanced types for AI generated questions
@@ -43,8 +46,8 @@ type GeneratedQuestion = {
   id: string;
   type: QuestionType;
   questionText: string;
-  options?: Array<{ text: string; isCorrect: boolean; explanation?: string }>;
-  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string }>;
+  options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
+  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
   modelAnswer?: string;
   marks: number;
   difficulty: Difficulty;
@@ -640,6 +643,11 @@ const QuestionCard: React.FC<{
               {((question.options || []) || []).map((opt: any, i: number) => (
                 <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
                   <MathJax inline>{opt.text || ''}</MathJax>
+                  {opt.image && (
+                    <div className="my-2">
+                      <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
+                    </div>
+                  )}
                   {opt.isCorrect && opt.explanation && (
                     <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
                       <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
@@ -659,6 +667,12 @@ const QuestionCard: React.FC<{
                 <li key={i} className="space-y-2">
                   <div>
                     <MathJax>{sq.question || ''}</MathJax>
+
+                    {sq.image && (
+                      <div className="my-2">
+                        <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-32 rounded border" />
+                      </div>
+                    )}
                     <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                   </div>
                   {sq.modelAnswer && (
@@ -708,18 +722,20 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   const [difficulty, setDifficulty] = useState<Difficulty>(initialData?.difficulty || 'MEDIUM');
   const [classId, setClassId] = useState(initialData?.class?.id || (classes.length > 0 ? classes[0].id : ''));
   const [questionBankIds, setQuestionBankIds] = useState<string[]>((initialData?.questionBanks || []).map((qb: QuestionBank) => qb.id) || []);
-  const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string }[]>(
+  const [options, setOptions] = useState<{ text: string; isCorrect: boolean; explanation?: string; image?: string }[]>(
     initialData?.options || [
-      { text: 'Option A', isCorrect: true, explanation: '' },
-      { text: 'Option B', isCorrect: false, explanation: '' },
-      { text: 'Option C', isCorrect: false, explanation: '' },
-      { text: 'Option D', isCorrect: false, explanation: '' }
+      { text: 'Option A', isCorrect: true, explanation: '', image: '' },
+      { text: 'Option B', isCorrect: false, explanation: '', image: '' },
+      { text: 'Option C', isCorrect: false, explanation: '', image: '' },
+      { text: 'Option D', isCorrect: false, explanation: '', image: '' }
     ]
   );
-  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string }[]>(
-    initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '' }]
+  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string; image?: string }[]>(
+    initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '', image: '' }]
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
+  const [images, setImages] = useState<string[]>(initialData?.images || []);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTextarea, setActiveTextarea] = useState<{ id: string; setter: (v: any) => void; index?: number;[key: string]: any }>({ id: 'qtext', setter: setQuestionText });
   const textareaRefs = useRef<{ [key: string]: HTMLTextAreaElement | null }>({});
@@ -745,9 +761,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       options,
       subQuestions,
       modelAnswer,
+      images,
       classes: classes.length
     });
-  }, [type, questionText, subject, topic, marks, difficulty, classId, questionBankIds, options, subQuestions, modelAnswer, classes.length]);
+  }, [type, questionText, subject, topic, marks, difficulty, classId, questionBankIds, options, subQuestions, modelAnswer, images, classes.length]);
 
   const handleInsertSymbol = useCallback((symbol: string) => {
     if (!activeTextarea || !activeTextarea.setter) return;
@@ -760,6 +777,52 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     activeTextarea.setter(newText);
     setTimeout(() => { ref.focus(); ref.selectionStart = ref.selectionEnd = start + symbol.length; }, 0);
   }, [activeTextarea]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    setIsUploading(true);
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Upload failed");
+      }
+      const data = await res.json();
+      setImages(prev => [...prev, data.url]);
+      toast({ title: "Success", description: "Image uploaded successfully" });
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Upload Error", description: error.message });
+    } finally {
+      setIsUploading(false);
+      // Reset input
+      e.target.value = '';
+    }
+  };
+
+  const handleFieldImageUpload = async (file: File, callback: (url: string) => void) => {
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const data = await res.json();
+      callback(data.url);
+      toast({ title: "Success", description: "Image attached" });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Error", description: "Upload failed" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   const makeFocusHandler = (id: string, setter: React.Dispatch<React.SetStateAction<any>>, index?: number) => () => setActiveTextarea({ id, setter, index });
 
@@ -845,12 +908,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       options: type === 'MCQ' ? options.filter(opt => opt.text.trim() !== '').map(opt => ({
         text: opt.text.trim(),
         isCorrect: opt.isCorrect,
-        explanation: opt.explanation?.trim() || undefined
+        explanation: opt.explanation?.trim() || undefined,
+        image: opt.image || undefined
       })) : null,
       subQuestions: type === 'CQ' ? subQuestions.filter(sq => sq.question.trim() !== '').map(sq => ({
         question: sq.question.trim(),
         marks: Number(sq.marks),
-        modelAnswer: sq.modelAnswer?.trim() || undefined
+        modelAnswer: sq.modelAnswer?.trim() || undefined,
+        image: sq.image || undefined
       })) : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() : null,
       hasMath: /\\/.test(questionText) ||
@@ -862,6 +927,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         )) ||
         (type === 'SQ' && /\\/.test(modelAnswer)),
       questionBankIds: questionBankIds.length > 0 ? questionBankIds : null,
+      images: images.length > 0 ? images : undefined,
     };
 
     console.log('Submitting payload:', payload);
@@ -945,6 +1011,35 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 </div>
               </div>
             )}
+
+            <div className="mt-4 space-y-2">
+              <Label>Attachments (Images/Diagrams)</Label>
+              <div className="flex flex-wrap gap-4">
+                {images.map((url, i) => (
+                  <div key={i} className="relative group w-24 h-24 border rounded-md overflow-hidden bg-gray-100 dark:bg-gray-800">
+                    <img src={url} alt={`Attachment ${i + 1}`} className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(i)}
+                      className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+                <div className="w-24 h-24 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors relative">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={isUploading}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                  />
+                  {isUploading ? <Loader2 className="w-6 h-6 animate-spin text-indigo-500" /> : <Upload className="w-6 h-6 text-gray-400" />}
+                  <span className="text-[10px] text-gray-500 mt-1">Upload</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div className="space-y-4">
@@ -954,7 +1049,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
               <div className="space-y-2">
                 <Label>Options</Label>
                 <MathToolbar onInsert={handleInsertSymbol} />
-                {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string; image?: string }, i: number) => (
                   <div key={i} className="space-y-2 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
                     <div className="flex items-center gap-2">
                       <Checkbox checked={opt.isCorrect} onCheckedChange={() => setOptions((options || []).map((o, idx) => ({ ...o, isCorrect: i === idx })))} />
@@ -967,10 +1062,45 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         rows={2}
                         className="h-auto flex-grow"
                       />
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              handleFieldImageUpload(e.target.files[0], (url) => {
+                                const newOpts = [...(options || [])];
+                                newOpts[i].image = url;
+                                setOptions(newOpts);
+                              });
+                              e.target.value = '';
+                            }
+                          }}
+                          className="hidden"
+                          id={`opt-img-${i}`}
+                        />
+                        <Label htmlFor={`opt-img-${i}`} className="cursor-pointer">
+                          <Button type="button" variant="ghost" size="icon" className="text-gray-500 hover:text-indigo-600" asChild>
+                            <span><Upload className="h-4 w-4" /></span>
+                          </Button>
+                        </Label>
+                      </div>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setOptions((options || []).filter((_, idx) => i !== idx))}>
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
+                    {opt.image && (
+                      <div className="ml-8 mb-2 relative w-20 h-20 group">
+                        <img src={opt.image} alt="Option attachment" className="w-full h-full object-cover rounded border" />
+                        <button type="button" onClick={() => {
+                          const newOpts = [...(options || [])];
+                          newOpts[i].image = undefined;
+                          setOptions(newOpts);
+                        }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                     {opt.isCorrect && (
                       <div className="ml-6 space-y-2">
                         <Label className="text-sm text-gray-600 dark:text-gray-400">Explanation (Optional)</Label>
@@ -1004,7 +1134,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     )}
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), { text: '', isCorrect: false, explanation: '' }])}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setOptions([...(options || []), { text: '', isCorrect: false, explanation: '', image: '' }])}>
                   <PlusCircle className="mr-2 h-4 w-4" />Add Option
                 </Button>
               </div>
@@ -1034,7 +1164,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             {type === 'CQ' && (
               <div className="space-y-2">
                 <Label>Sub-questions</Label>
-                {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
                   <div key={i} className="space-y-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
                     <div className="flex items-start gap-2">
                       <div className="flex-grow space-y-2">
@@ -1085,10 +1215,45 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           )}
                         </div>
                       </div>
+                      <div className="relative">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            if (e.target.files?.[0]) {
+                              handleFieldImageUpload(e.target.files[0], (url) => {
+                                const newSQs = [...(subQuestions || [])];
+                                newSQs[i].image = url;
+                                setSubQuestions(newSQs);
+                              });
+                              e.target.value = '';
+                            }
+                          }}
+                          className="hidden"
+                          id={`sq-img-${i}`}
+                        />
+                        <Label htmlFor={`sq-img-${i}`} className="cursor-pointer">
+                          <Button type="button" variant="ghost" size="icon" className="text-gray-500 hover:text-indigo-600" asChild>
+                            <span><Upload className="h-4 w-4" /></span>
+                          </Button>
+                        </Label>
+                      </div>
                       <Button type="button" variant="ghost" size="icon" onClick={() => setSubQuestions((subQuestions || []).filter((_, idx) => i !== idx))}>
                         <Trash2 className="h-4 w-4 text-red-500" />
                       </Button>
                     </div>
+                    {sq.image && (
+                      <div className="ml-8 mb-2 relative w-20 h-20 group">
+                        <img src={sq.image} alt="Sub-question attachment" className="w-full h-full object-cover rounded border" />
+                        <button type="button" onClick={() => {
+                          const newSQs = [...(subQuestions || [])];
+                          newSQs[i].image = undefined;
+                          setSubQuestions(newSQs);
+                        }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                     {(/\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))) && (
                       <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
                         <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
@@ -1099,7 +1264,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     )}
                   </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), { question: '', marks: 5, modelAnswer: '' }])}>
+                <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), { question: '', marks: 5, modelAnswer: '', image: '' }])}>
                   <PlusCircle className="mr-2 h-4 w-4" />Add Sub-question
                 </Button>
               </div>
@@ -1113,9 +1278,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
                   <ul className="list-disc pl-5 space-y-2">
-                    {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string }, i: number) => (
+                    {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string; image?: string }, i: number) => (
                       <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
                         <MathJax inline>{opt.text || `(Option ${i + 1})`}</MathJax>
+                        {opt.image && (
+                          <div className="my-2">
+                            <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
+                          </div>
+                        )}
                         {opt.isCorrect && opt.explanation && (
                           <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                             <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
@@ -1131,10 +1301,15 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
                   <ol className="list-decimal pl-5 space-y-3">
-                    {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string }, i: number) => (
+                    {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
                       <li key={i} className="space-y-2">
                         <div>
                           <MathJax>{sq.question || `(Sub-question ${i + 1})`}</MathJax>
+                          {sq.image && (
+                            <div className="my-2">
+                              <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-32 rounded border" />
+                            </div>
+                          )}
                           <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                         </div>
                         {sq.modelAnswer && (

@@ -387,23 +387,31 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               )}
 
                               {/* Show options if MCQ */}
-                              {q.type === 'mcq' && q.options && (
-                                <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
-                                  {q.options.map((opt: any, i: number) => {
-                                    const isSelected = hasAnswer && String(ans) === (opt.text || String(opt));
-                                    const isCorrect = opt.isCorrect;
-                                    return (
-                                      <div key={i} className={`text-xs p-2 rounded border ${isSelected ? 'bg-blue-100 border-blue-300' :
-                                        isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50'
-                                        }`}>
+                              {q.type === 'mcq' && q.options && <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {q.options.map((opt: any, i: number) => {
+                                  const isSelected = hasAnswer && String(ans) === (opt.text || String(opt));
+                                  const isCorrect = opt.isCorrect;
+                                  return (
+                                    <div key={i} className={`text-xs p-2 rounded border ${isSelected ? 'bg-blue-100 border-blue-300' :
+                                      isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50'
+                                      }`}>
+                                      <div className="flex items-start">
                                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                                        <MathJax inline>{opt.text || String(opt)}</MathJax>
-                                        {isCorrect && <CheckCircle className="inline w-3 h-3 ml-2 text-green-600" />}
+                                        <div className="flex-1">
+                                          <MathJax inline>{opt.text || String(opt)}</MathJax>
+                                          {opt.image && (
+                                            <div className="mt-1">
+                                              <img src={opt.image} alt="Option" className="max-h-20 rounded border bg-white object-contain" />
+                                            </div>
+                                          )}
+                                        </div>
+                                        {isCorrect && <CheckCircle className="inline w-3 h-3 ml-2 text-green-600 flex-shrink-0" />}
                                       </div>
-                                    )
-                                  })}
-                                </div>
-                              )}
+                                    </div>
+                                  )
+                                })}
+                              }
+                              </div>
                             </div>
                             <div className="flex-shrink-0 text-right">
                               <span className="text-xs font-bold text-gray-500">{q.marks} Marks</span>
@@ -1620,6 +1628,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         <div className="flex items-center justify-between mb-1">
                                           <span className="text-sm font-medium text-gray-600">
                                             (a{String.fromCharCode(97 + idx)}) {subQ.questionText || subQ.text || subQ.question || ''}
+                                            {subQ.image && (
+                                              <div className="mt-1 block">
+                                                <img src={subQ.image} alt="Sub-question" className="max-h-24 rounded border bg-white object-contain" />
+                                              </div>
+                                            )}
                                           </span>
                                           <span className="text-xs text-gray-500">
                                             {subQ.marks || 1} mark{subQ.marks > 1 ? 's' : ''}
@@ -1748,9 +1761,16 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 <div className="flex items-center justify-between w-full">
                                                   <div className="flex items-center gap-2">
                                                     <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
-                                                    <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                      <MathJax inline dynamic>{optText}</MathJax>
-                                                    </span>
+                                                    <div className="flex-1">
+                                                      <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
+                                                        <MathJax inline dynamic>{optText}</MathJax>
+                                                      </span>
+                                                      {opt.image && (
+                                                        <div className="mt-1">
+                                                          <img src={opt.image} alt="Option" className="max-h-24 rounded border bg-white object-contain" />
+                                                        </div>
+                                                      )}
+                                                    </div>
                                                   </div>
                                                   {isCorrect && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
                                                   {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}

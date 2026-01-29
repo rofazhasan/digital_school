@@ -232,11 +232,18 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 }
 
                                                                 return (
-                                                                    <span key={oidx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
-                                                                        <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
-                                                                        <Text>{opt.text}</Text>
-                                                                        {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
-                                                                    </span>
+                                                                    <div key={oidx} className="flex flex-col">
+                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
+                                                                            <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
+                                                                            <Text>{opt.text}</Text>
+                                                                            {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
+                                                                        </span>
+                                                                        {/* @ts-ignore */}
+                                                                        {opt.image && (
+                                                                            // @ts-ignore
+                                                                            <img src={opt.image} alt="Option" className="mt-1 h-32 w-auto object-contain border rounded bg-white" />
+                                                                        )}
+                                                                    </div>
                                                                 );
                                                             })}
                                                         </div>
@@ -285,6 +292,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                     <div key={sidx} className="ml-6 mt-2 text-sm text-gray-600">
                                                         <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
                                                         <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
+                                                        {sub.image && <img src={sub.image} alt="Sub-question" className="mt-1 h-32 w-auto object-contain border rounded bg-white" />}
                                                     </div>
                                                 );
                                             })}
