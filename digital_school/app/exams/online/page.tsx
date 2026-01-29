@@ -328,7 +328,7 @@ function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress
                         </div>
                         {exam.allowRetake && status === 'active' && (
                           <Button asChild className="w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-lg h-11 text-base font-semibold">
-                            <a href={`/exams/online/${exam.id}`}>🔄 Retake Exam</a>
+                            <a href={`/exams/online/${exam.id}?action=start`}>🔄 Retake Exam</a>
                           </Button>
                         )}
                       </div>
