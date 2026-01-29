@@ -410,8 +410,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   )
                                 })}
-                              }
-                              </div>
+                              </div>}
                             </div>
                             <div className="flex-shrink-0 text-right">
                               <span className="text-xs font-bold text-gray-500">{q.marks} Marks</span>
