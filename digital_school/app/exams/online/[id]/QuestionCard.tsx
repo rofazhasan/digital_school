@@ -108,7 +108,7 @@ const MCQOption = memo(({
 MCQOption.displayName = 'MCQOption';
 
 export default function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
-  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion } = useExamContext();
+  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading } = useExamContext();
   const questions = exam.questions || [];
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
@@ -247,6 +247,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                             <input
                               type="file"
                               accept="image/*"
+                              onClick={() => setIsUploading && setIsUploading(true)} // Bylass proctoring
                               onChange={async (e) => {
                                 if (e.target.files?.[0]) {
                                   const file = e.target.files[0];
@@ -319,6 +320,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                                   <input
                                     type="file"
                                     accept="image/*"
+                                    onClick={() => setIsUploading && setIsUploading(true)} // Bypass proctoring
                                     onChange={async (e) => {
                                       if (e.target.files?.[0]) {
                                         const file = e.target.files[0];

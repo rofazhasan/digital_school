@@ -5,12 +5,14 @@ interface UseProctoringProps {
     onViolation?: (warningCount: number) => void;
     maxWarnings?: number;
     isExamActive: boolean;
+    isUploading?: boolean; // New prop
 }
 
 export const useProctoring = ({
     onViolation,
     maxWarnings = 3,
-    isExamActive
+    isExamActive,
+    isUploading = false // Default to false
 }: UseProctoringProps) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [warnings, setWarnings] = useState(0);
@@ -38,6 +40,10 @@ export const useProctoring = ({
         });
     }, [isExamActive, maxWarnings, onViolation]);
 
+    // We can auto-reset after a timeout just in case focus never returns properly,
+    // although the blur/focus events usually handle it.
+    // Logic moved to context consumption layer if needed.
+
     // Handle Visibility Change (Tab Switching)
     useEffect(() => {
         const handleVisibilityChange = () => {
@@ -58,14 +64,14 @@ export const useProctoring = ({
     // Handle Window Blur (Alt+Tab or clicking outside)
     useEffect(() => {
         const handleBlur = () => {
-            if (isExamActive) {
+            if (isExamActive && !isUploading) { // Check isUploading
                 triggerViolation('Focus lost. Please stay on the exam window.');
             }
         };
 
         window.addEventListener('blur', handleBlur);
         return () => window.removeEventListener('blur', handleBlur);
-    }, [isExamActive, triggerViolation]);
+    }, [isExamActive, triggerViolation, isUploading]);
 
     // Handle Fullscreen Change
     useEffect(() => {

@@ -25,6 +25,10 @@ export async function POST(req: NextRequest) {
                 {
                     folder: "question-bank", // Upload to this folder
                     resource_type: "auto",
+                    width: 1280,
+                    crop: "limit",
+                    quality: "auto:good", // Intelligent compression
+                    fetch_format: "auto", // WebP/AVIF automatically
                 },
                 (error, result) => {
                     if (error) {

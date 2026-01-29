@@ -36,13 +36,15 @@ export default function DrawingCanvas({ backgroundImage, onSave, onCancel }: Dra
         img.crossOrigin = "anonymous";
         img.src = backgroundImage;
         img.onload = () => {
-            // Fit to screen but keep aspect ratio
-            const maxWidth = window.innerWidth * 0.8;
-            const maxHeight = window.innerHeight * 0.7;
+            // Fit to screen but keep aspect ratio, and enforce max storage dimensions
+            const screenMaxWidth = window.innerWidth * 0.8;
+            const screenMaxHeight = window.innerHeight * 0.7;
+            const MAX_STORAGE_DIM = 1280; // Limit processing/storage size
+
             let w = img.width;
             let h = img.height;
 
-            const ratio = Math.min(maxWidth / w, maxHeight / h);
+            const ratio = Math.min(screenMaxWidth / w, screenMaxHeight / h, MAX_STORAGE_DIM / w, MAX_STORAGE_DIM / h);
             w = w * ratio;
             h = h * ratio;
 
@@ -156,7 +158,7 @@ export default function DrawingCanvas({ backgroundImage, onSave, onCancel }: Dra
                 onSave(blob);
             }
             setIsTrafficSaving(false);
-        }, 'image/jpeg', 0.85);
+        }, 'image/jpeg', 0.6); // Reduced quality for storage optimization
     };
 
     return (

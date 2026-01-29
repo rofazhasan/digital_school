@@ -66,7 +66,8 @@ export default function ExamLayout() {
     answers, // Use live answers state
     navigation,
     navigateToQuestion,
-    saveStatus
+    saveStatus,
+    isUploading // Get from context
   } = useExamContext();
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -136,7 +137,8 @@ export default function ExamLayout() {
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
     maxWarnings: 3,
-    isExamActive: isExamActive // Only act if exam is strictly active
+    isExamActive: isExamActive, // Only act if exam is strictly active
+    isUploading: isUploading // Pass context state
   });
 
   // Check initial start state

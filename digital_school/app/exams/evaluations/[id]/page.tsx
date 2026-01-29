@@ -165,17 +165,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   // Annotation State
   const [isAnnotationOpen, setIsAnnotationOpen] = useState(false);
   const [activeAnnotationImage, setActiveAnnotationImage] = useState<string | null>(null);
-  const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number } | null>(null);
+  const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number; studentId: string } | null>(null);
 
-  const openAnnotation = (imageUrl: string, questionId: string, index: number = 0) => {
+  const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string) => {
     setActiveAnnotationImage(imageUrl);
-    setActiveAnnotationMeta({ questionId, index });
+    setActiveAnnotationMeta({ questionId, index, studentId });
     setIsAnnotationOpen(true);
   };
 
   const handleSaveAnnotation = async (blob: Blob) => {
-    const currentStudent = exam?.submissions[currentStudentIndex];
-    if (!activeAnnotationImage || !activeAnnotationMeta || !currentStudent) return;
+    // const currentStudent = exam?.submissions[currentStudentIndex]; -- Removed dependency on current index
+    if (!activeAnnotationImage || !activeAnnotationMeta || !activeAnnotationMeta.studentId) return;
 
     const formData = new FormData();
     formData.append('file', blob, 'annotation.jpg');
@@ -191,7 +191,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: currentStudent.student.id,
+          studentId: activeAnnotationMeta.studentId, // Use from meta
           questionId: activeAnnotationMeta.questionId,
           imageIndex: activeAnnotationMeta.index,
           originalImagePath: activeAnnotationImage,
@@ -1734,10 +1734,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               src={currentStudent.answers[`${currentQuestion.id}_image`]}
                                               alt="Answer Attachment"
                                               className="h-48 rounded border bg-white object-contain cursor-pointer transition-transform hover:scale-105"
-                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0)}
+                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0, currentStudent.student.id)}
                                             />
                                             <button
-                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0)}
+                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0, currentStudent.student.id)}
                                               className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
                                             >
                                               <PenTool className="w-4 h-4" />
@@ -1773,10 +1773,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       src={subImg}
                                                       alt={`Sub ${idx + 1}`}
                                                       className="h-40 rounded border bg-white object-contain cursor-pointer hover:scale-105 transition-transform"
-                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx)}
+                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx, currentStudent.student.id)}
                                                     />
                                                     <button
-                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx)}
+                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx, currentStudent.student.id)}
                                                       className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
                                                     >
                                                       <PenTool className="w-4 h-4" />

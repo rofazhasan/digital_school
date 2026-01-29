@@ -48,6 +48,7 @@ export function ExamContextProvider({
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
   const [highContrast, setHighContrast] = useState(false);
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
+  const [isUploading, setIsUploading] = useState(false); // New Internal State
   const isOnline = useOnlineStatus();
 
   // Scope to specific submission to prevent retake bleed-over
@@ -175,7 +176,9 @@ export function ExamContextProvider({
     markQuestion,
     getQuestionsByType,
     saveAnswers,
-    isOnline
+    isOnline,
+    isUploading,
+    setIsUploading
   };
 
   return (
