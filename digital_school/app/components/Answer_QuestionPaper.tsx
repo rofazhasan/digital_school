@@ -50,13 +50,16 @@ interface AnswerQuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
-const normalizeAnswer = (ans: string | undefined) => {
-  if (!ans) return 'ক';
+const normalizeAnswer = (ans: string | undefined | number) => {
+  if (ans === undefined || ans === null) return 'ক';
+  const s = String(ans).trim();
   const map: Record<string, string> = {
     'A': 'ক', 'B': 'খ', 'C': 'গ', 'D': 'ঘ', 'E': 'ঙ', 'F': 'চ',
-    'a': 'ক', 'b': 'খ', 'c': 'গ', 'd': 'ঘ', 'e': 'ঙ', 'f': 'চ'
+    'a': 'ক', 'b': 'খ', 'c': 'গ', 'd': 'ঘ', 'e': 'ঙ', 'f': 'চ',
+    '1': 'ক', '2': 'খ', '3': 'গ', '4': 'ঘ', '5': 'ঙ', '6': 'চ',
+    '0': 'ক' // In case of 0-based index
   };
-  return map[ans] || ans;
+  return map[s] || s;
 };
 
 // Helper to render text with MathJax
