@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { X, Check, AlertCircle, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 interface QuestionCardProps {
   disabled?: boolean;
@@ -247,7 +248,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                             <input
                               type="file"
                               accept="image/*"
-                              onClick={() => setIsUploading && setIsUploading(true)} // Bylass proctoring
+                              onClick={() => setIsUploading && setIsUploading(true)} // Bypass proctoring
                               onChange={async (e) => {
                                 if (e.target.files?.[0]) {
                                   const file = e.target.files[0];
@@ -255,11 +256,21 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                                   formData.append('file', file);
                                   try {
                                     const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                    const data = await res.json();
+
                                     if (res.ok) {
-                                      const data = await res.json();
                                       setAnswers({ ...answers, [`${question.id}_image`]: data.url });
+                                      toast.success('Image uploaded successfully!');
+                                    } else {
+                                      console.error('Upload failed:', data);
+                                      toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
                                     }
-                                  } catch (err) { console.error(err); }
+                                  } catch (err) {
+                                    console.error('Upload error:', err);
+                                    toast.error('Failed to upload image. Please try again.');
+                                  } finally {
+                                    setIsUploading && setIsUploading(false);
+                                  }
                                 }
                               }}
                               className="hidden"
@@ -328,11 +339,21 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                                         formData.append('file', file);
                                         try {
                                           const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                          const data = await res.json();
+
                                           if (res.ok) {
-                                            const data = await res.json();
                                             setAnswers({ ...answers, [`${question.id}_sub_${idx}_image`]: data.url });
+                                            toast.success('Image uploaded successfully!');
+                                          } else {
+                                            console.error('Upload failed:', data);
+                                            toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
                                           }
-                                        } catch (err) { console.error(err); }
+                                        } catch (err) {
+                                          console.error('Upload error:', err);
+                                          toast.error('Failed to upload image. Please try again.');
+                                        } finally {
+                                          setIsUploading && setIsUploading(false);
+                                        }
                                       }
                                     }}
                                     className="hidden"
