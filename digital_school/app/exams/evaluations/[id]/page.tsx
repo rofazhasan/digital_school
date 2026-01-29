@@ -1743,7 +1743,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div key={idx} className="pl-4 border-l-2 border-gray-200">
                                         <div className="flex items-center justify-between mb-1">
                                           <span className="text-sm font-medium text-gray-600">
-                                            (a{String.fromCharCode(97 + idx)}) {subQ.questionText || subQ.text || subQ.question || ''}
+                                            (a{String.fromCharCode(97 + idx)}) <MathJax inline dynamic>{subQ.questionText || subQ.text || subQ.question || ''}</MathJax>
                                             {subQ.image && (
                                               <div className="mt-1 block">
                                                 <img src={subQ.image} alt="Sub-question" className="max-h-24 rounded border bg-white object-contain" />
@@ -1756,7 +1756,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         </div>
                                         {subQ.modelAnswer && (
                                           <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                            <strong>Model Answer:</strong> {subQ.modelAnswer}
+                                            <strong>Model Answer:</strong> <MathJax inline dynamic>{subQ.modelAnswer}</MathJax>
                                           </div>
                                         )}
                                       </div>
