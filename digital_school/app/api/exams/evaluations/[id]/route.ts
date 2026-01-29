@@ -203,6 +203,9 @@ export async function GET(
         let earnedMarks = 0;
 
 
+        // Use submission answers directly as Cloudinary URLs are now authoritative
+        const fixedAnswers = { ...submission.answers };
+
         for (const question of studentQuestions) {
           totalMarks += question.marks;
 
