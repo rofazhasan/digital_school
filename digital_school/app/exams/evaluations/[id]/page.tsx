@@ -1847,9 +1847,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             return (
                                               <div key={idx} className="pl-4 border-l-2 border-indigo-100">
                                                 <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
-                                                {subText && (
-                                                  <div className="mb-2 text-gray-800"><MathJax>{subText}</MathJax></div>
-                                                )}
+                                                <div className="mb-2 text-gray-800"><MathJax dynamic>{subText}</MathJax></div>
                                                 {(() => {
                                                   const singleImg = currentStudent?.answers?.[`${subKey}_image`];
                                                   const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
