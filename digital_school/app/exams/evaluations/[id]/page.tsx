@@ -168,6 +168,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number; studentId: string } | null>(null);
 
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string) => {
+    console.log("Opening annotation for:", { questionId, index, studentId });
     setActiveAnnotationImage(imageUrl);
     setActiveAnnotationMeta({ questionId, index, studentId });
     setIsAnnotationOpen(true);
@@ -175,7 +176,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const handleSaveAnnotation = async (blob: Blob) => {
     // const currentStudent = exam?.submissions[currentStudentIndex]; -- Removed dependency on current index
-    if (!activeAnnotationImage || !activeAnnotationMeta || !activeAnnotationMeta.studentId) return;
+    if (!activeAnnotationImage || !activeAnnotationMeta) return;
+
+    if (!activeAnnotationMeta.studentId) {
+      toast.error("Critical Error: Missing student ID. Annotation cannot be saved.");
+      console.error("Missing studentId in annotation meta:", activeAnnotationMeta);
+      return;
+    }
 
     const formData = new FormData();
     formData.append('file', blob, 'annotation.jpg');
@@ -1733,6 +1740,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             <img
                                               src={currentStudent.answers[`${currentQuestion.id}_image`]}
                                               alt="Answer Attachment"
+                                              crossOrigin="anonymous"
                                               className="h-48 rounded border bg-white object-contain cursor-pointer transition-transform hover:scale-105"
                                               onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0, currentStudent.student.id)}
                                             />
@@ -1772,6 +1780,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     <img
                                                       src={subImg}
                                                       alt={`Sub ${idx + 1}`}
+                                                      crossOrigin="anonymous"
                                                       className="h-40 rounded border bg-white object-contain cursor-pointer hover:scale-105 transition-transform"
                                                       onClick={() => openAnnotation(subImg, currentQuestion.id, idx, currentStudent.student.id)}
                                                     />
