@@ -47,8 +47,17 @@ interface AnswerQuestionPaperProps {
   qrData: any;
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
+
+const normalizeAnswer = (ans: string | undefined) => {
+  if (!ans) return 'ক';
+  const map: Record<string, string> = {
+    'A': 'ক', 'B': 'খ', 'C': 'গ', 'D': 'ঘ', 'E': 'ঙ', 'F': 'চ',
+    'a': 'ক', 'b': 'খ', 'c': 'গ', 'd': 'ঘ', 'e': 'ঙ', 'f': 'চ'
+  };
+  return map[ans] || ans;
+};
 
 // Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
@@ -183,7 +192,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
                                   <span className="text-red-600 font-bold">
-                                    উত্তর: {q.correctAnswer || 'ক'}
+                                    উত্তর: {normalizeAnswer(q.correctAnswer)}
                                   </span>
                                   {q.explanation && (
                                     <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
@@ -222,7 +231,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                                   </div>
                                   <span className="text-red-600 font-bold">
-                                    উত্তর: {q.correctAnswer || 'ক'}
+                                    উত্তর: {normalizeAnswer(q.correctAnswer)}
                                   </span>
                                   {q.explanation && (
                                     <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
@@ -260,7 +269,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                 <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
                               </div>
                               <span className="text-red-600 font-bold">
-                                উত্তর: {q.correctAnswer || 'ক'}
+                                উত্তর: {normalizeAnswer(q.correctAnswer)}
                               </span>
                               {q.explanation && (
                                 <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">

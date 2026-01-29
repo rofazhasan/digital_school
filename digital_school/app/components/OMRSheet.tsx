@@ -22,7 +22,7 @@ interface OMRSheetProps {
   uniqueCode?: string;
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const DIGITS = Array.from({ length: 10 }, (_, i) => i);
 
 const OMRSheet: React.FC<OMRSheetProps> = ({

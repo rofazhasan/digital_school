@@ -32,7 +32,7 @@ export default function PrintExamPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [language, setLanguage] = useState<'bn' | 'en'>('bn');
-  
+
   // Print-specific State
   const [isPrinting, setIsPrinting] = useState(false);
   const [isMathJaxReady, setIsMathJaxReady] = useState(false);
@@ -86,10 +86,10 @@ export default function PrintExamPage() {
     onBeforeGetContent: async () => {
       // This is the key! We wait until MathJax is ready.
       setIsPrinting(true);
-      
+
       // Force page breaks for SQ sections if CSS fails
       forcePageBreaks();
-      
+
       if (isMathJaxReady) {
         return; // Already ready, proceed to print
       }
@@ -113,7 +113,7 @@ export default function PrintExamPage() {
   // Function to force page breaks for SQ sections
   const forcePageBreaks = () => {
     if (!printRef.current) return;
-    
+
     // Find all SQ section headers
     const sqSections = printRef.current.querySelectorAll('.sq-section');
     sqSections.forEach((section) => {
@@ -122,7 +122,7 @@ export default function PrintExamPage() {
       (section as HTMLElement).style.breakBefore = 'page';
       (section as HTMLElement).style.marginTop = '0';
       (section as HTMLElement).style.paddingTop = '0';
-      
+
       // Create a page break element before the section
       const pageBreak = document.createElement('div');
       pageBreak.style.pageBreakBefore = 'always';
@@ -131,7 +131,7 @@ export default function PrintExamPage() {
       pageBreak.style.margin = '0';
       pageBreak.style.padding = '0';
       pageBreak.style.clear = 'both';
-      
+
       // Insert the page break before the section
       section.parentNode?.insertBefore(pageBreak, section);
     });
@@ -163,7 +163,7 @@ export default function PrintExamPage() {
   if (!examData) {
     return <Loader message="No exam data found." isError />;
   }
-  
+
   const t = LANGS[language];
   const { examInfo, sets } = examData;
   const nonEmptySets = sets.filter(
@@ -196,11 +196,10 @@ export default function PrintExamPage() {
           ) : (
             <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">Waiting for MathJax...</span>
           )}
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-            showAnswers 
-              ? 'bg-orange-100 text-orange-800' 
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${showAnswers
+              ? 'bg-orange-100 text-orange-800'
               : 'bg-blue-100 text-blue-800'
-          }`}>
+            }`}>
             {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
           </span>
           <button
@@ -226,7 +225,7 @@ export default function PrintExamPage() {
                   />
                 </div>
               ))}
-              
+
               {/* Render OMR Sheets only for question papers */}
               {nonEmptySets.map((set: any) => (
                 <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
@@ -268,7 +267,7 @@ const QuestionSetPages = ({ set, examInfo }: { set: any, examInfo: any }) => {
         const start = pageIdx * QUESTIONS_PER_PAGE;
         const end = start + QUESTIONS_PER_PAGE;
         const chunk = allQuestions.slice(start, end);
-        
+
         const questionsForPage = {
           mcq: chunk.filter((q) => q._type === 'mcq'),
           cq: chunk.filter((q) => q._type === 'cq'),
@@ -299,10 +298,10 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
         qrData={set.qrData}
         rollDigits={6}
         fontFamily={language === 'bn' ? 'SolaimanLipi, serif' : 'Times New Roman, serif'}
-        mcqOptionLabels={language === 'bn' ? ['ক','খ','গ','ঘ'] : ['A','B','C','D']}
+        mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
         setName={set.setName}
         bubbleSize={16}
-        instituteName={examInfo.schoolName }
+        instituteName={examInfo.schoolName}
         examTitle={examInfo.title}
         examDate={examInfo.date}
         subjectName={examInfo.subject}
@@ -326,11 +325,10 @@ const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxRe
       </button>
       <button
         onClick={() => setShowAnswers(!showAnswers)}
-        className={`px-4 py-2 rounded shadow-lg transition ${
-          showAnswers 
-            ? 'bg-green-600 text-white hover:bg-green-700' 
+        className={`px-4 py-2 rounded shadow-lg transition ${showAnswers
+            ? 'bg-green-600 text-white hover:bg-green-700'
             : 'bg-orange-600 text-white hover:bg-orange-700'
-        }`}
+          }`}
       >
         {showAnswers ? 'প্রশ্নপত্র দেখুন' : 'উত্তরপত্র দেখুন'}
       </button>

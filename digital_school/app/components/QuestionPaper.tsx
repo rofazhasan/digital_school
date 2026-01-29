@@ -44,7 +44,7 @@ interface QuestionPaperProps {
   qrData: any;
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
 // Helper to chunk an array into N-sized pieces
@@ -67,20 +67,20 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const mcqs = questions.mcq || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
-    
+
     // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
-    
+
     // Calculate highest possible marks for required questions
     const cqRequired = examInfo.cqRequiredQuestions || 0;
     const sqRequired = examInfo.sqRequiredQuestions || 0;
-    
+
     // Sort questions by marks (highest first) and calculate required marks
     const cqSorted = [...cqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
     const sqSorted = [...sqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
-    
+
     const cqRequiredMarks = cqSorted.slice(0, cqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqRequiredMarks = sqSorted.slice(0, sqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
 
@@ -93,7 +93,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         // Two columns, multiple pages - 9 questions per column (18 per page)
         const pages: Array<{ left: MCQ[]; right: MCQ[]; isTwoColumn: true }> = [];
         let remaining = [...mcqs];
-        
+
         while (remaining.length > 0) {
           if (remaining.length <= 18) {
             // Last page: distribute remaining questions
@@ -155,7 +155,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   )}
                 </div>
               </div>
-              
+
               {mcqPages.map((page, pageIdx) => (
                 <div key={pageIdx} className="mcq-page">
                   {page.isTwoColumn ? (
@@ -184,7 +184,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           );
                         })}
                       </div>
-                      
+
                       {/* Right Column */}
                       <div>
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).right.map((q: MCQ, idx: number) => {
@@ -239,10 +239,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* CQ Section - starts on new page after MCQ */}
           {cqs.length > 0 && (
             <>
-              <div 
+              <div
                 className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break"
-                style={{ 
-                  pageBreakBefore: 'always', 
+                style={{
+                  pageBreakBefore: 'always',
                   breakBefore: 'page',
                   marginTop: '0',
                   paddingTop: '0'
@@ -256,14 +256,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   )}
                 </div>
               </div>
-              
+
               {/* Render CQ questions with subsections if they exist */}
               {examInfo.cqSubsections && examInfo.cqSubsections.length > 1 ? (
                 // Multiple subsections - render with headers
                 examInfo.cqSubsections.map((subsection: any, subIdx: number) => {
                   const subsectionQuestions = cqs.slice(subsection.startIndex - 1, subsection.endIndex);
                   const subsectionRequired = subsection.requiredQuestions || 0;
-                  
+
                   return (
                     <div key={subIdx} className="mb-4">
                       {/* Subsection header */}
@@ -275,7 +275,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           </span>
                         )}
                       </div>
-                      
+
                       {/* Questions in this subsection */}
                       <div className="ml-4">
                         {subsectionQuestions.map((q, idx) => (
@@ -341,10 +341,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* SQ Section - starts on new page after CQ */}
           {sqs.length > 0 && (
             <>
-              <div 
+              <div
                 className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break"
-                style={{ 
-                  pageBreakBefore: 'always', 
+                style={{
+                  pageBreakBefore: 'always',
                   breakBefore: 'page',
                   marginTop: '0',
                   paddingTop: '0'
