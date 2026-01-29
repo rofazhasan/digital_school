@@ -40,6 +40,7 @@ interface Question {
   questionLatex?: string | null;
   negativeMarks?: number;
   topic?: string | null;
+  correctAnswer?: string; // Should store A, B, C, D...
 }
 
 interface ExamSet {
@@ -559,7 +560,18 @@ export default function ExamBuilderPage() {
 
           // Shuffle MCQ options if it's an MCQ question
           if (q.type === 'MCQ' && Array.isArray(q.options)) {
-            processedQuestion = { ...processedQuestion, options: shuffleArray(q.options) };
+            const shuffledOptions = shuffleArray(q.options); // Shuffle first
+            processedQuestion = { ...processedQuestion, options: shuffledOptions };
+
+            // Recalculate correctAnswer based on the new position of the correct option
+            const correctOptionIndex = shuffledOptions.findIndex((opt: any) => opt.isCorrect);
+            if (correctOptionIndex !== -1) {
+              // Convert index 0->A, 1->B, 2->C, 3->D, 4->E, 5->F ...
+              processedQuestion = {
+                ...processedQuestion,
+                correctAnswer: String.fromCharCode(65 + correctOptionIndex)
+              };
+            }
           }
 
           // Add negative marks for MCQ questions if exam has negative marking
