@@ -202,33 +202,6 @@ export async function GET(
         let totalMarks = 0;
         let earnedMarks = 0;
 
-        // Fix image answers by mapping blob URLs to actual file paths
-        const fixedAnswers = { ...submission.answers };
-        for (const [questionId, answer] of Object.entries(submission.answers)) {
-          if (questionId.endsWith('_images') && Array.isArray(answer)) {
-            const questionBaseId = questionId.replace('_images', '');
-            // Look for uploaded images for this question
-            const uploadDir = `public/uploads/exam-answers/${examId}/${submission.studentId}/${questionBaseId}`;
-            try {
-              const fs = require('fs');
-              const path = require('path');
-              if (fs.existsSync(uploadDir)) {
-                const files = fs.readdirSync(uploadDir);
-                const imageFiles = files.filter((file: string) =>
-                  file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                );
-                if (imageFiles.length > 0) {
-                  // Replace blob URLs with actual file paths
-                  fixedAnswers[questionId] = imageFiles.map((file: string) =>
-                    `/uploads/exam-answers/${examId}/${submission.studentId}/${questionBaseId}/${file}`
-                  );
-                }
-              }
-            } catch (error) {
-              console.error('Error fixing image paths:', error);
-            }
-          }
-        }
 
         for (const question of studentQuestions) {
           totalMarks += question.marks;
