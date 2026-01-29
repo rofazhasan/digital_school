@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 
 // Helper function to shuffle array (Fisher-Yates algorithm)
 function shuffleArray<T>(array: T[]): T[] {
