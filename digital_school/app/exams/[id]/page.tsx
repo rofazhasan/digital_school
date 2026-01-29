@@ -564,7 +564,7 @@ export default function ExamBuilderPage() {
             processedQuestion = { ...processedQuestion, options: shuffledOptions };
 
             // Recalculate correctAnswer based on the new position of the correct option
-            const correctOptionIndex = shuffledOptions.findIndex((opt: any) => opt.isCorrect);
+            const correctOptionIndex = shuffledOptions.findIndex((opt: any) => opt.isCorrect === true || String(opt.isCorrect) === 'true');
             if (correctOptionIndex !== -1) {
               // Convert index 0->A, 1->B, 2->C, 3->D, 4->E, 5->F ...
               processedQuestion = {
