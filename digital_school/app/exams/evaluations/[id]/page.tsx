@@ -165,6 +165,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   // Annotation State
   const [isAnnotationOpen, setIsAnnotationOpen] = useState(false);
   const [activeAnnotationImage, setActiveAnnotationImage] = useState<string | null>(null);
+  const [activeAnnotationOriginal, setActiveAnnotationOriginal] = useState<string | null>(null);
   const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number; studentId: string } | null>(null);
 
   // Store all annotations for the current student: key = "questionId_imageIndex", value = annotated image URL
@@ -172,7 +173,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string) => {
     console.log("Opening annotation for:", { questionId, index, studentId });
-    setActiveAnnotationImage(imageUrl);
+
+    // Check if there is an existing annotation for this image
+    const key = `${questionId}_${index}`;
+    const annotationUrl = annotations[key] || imageUrl;
+
+    // Use annotated image as background if available, otherwise original
+    setActiveAnnotationImage(annotationUrl);
+    // Store the true original image URL for reference when saving
+    setActiveAnnotationOriginal(imageUrl);
+
+    // Important: We still want to track which question/index this belongs to
     setActiveAnnotationMeta({ questionId, index, studentId });
     setIsAnnotationOpen(true);
   };
@@ -204,7 +215,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           studentId: activeAnnotationMeta.studentId, // Use from meta
           questionId: activeAnnotationMeta.questionId,
           imageIndex: activeAnnotationMeta.index,
-          originalImagePath: activeAnnotationImage,
+          originalImagePath: activeAnnotationOriginal || activeAnnotationImage, // Use true original if available
           imageData: url
         })
       });
