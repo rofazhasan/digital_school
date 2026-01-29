@@ -133,11 +133,17 @@ export default function ExamLayout() {
     }
   }, [handleSubmit]);
 
-  // Browser/Tab Proctoring
+  // Check if exam has CQ or SQ questions (disable proctoring for these)
+  const hasCQorSQ = questions.some((q: any) => {
+    const type = (q.type || q.questionType || '').toLowerCase();
+    return type === 'cq' || type === 'sq';
+  });
+
+  // Browser/Tab Proctoring - DISABLED for exams with CQ/SQ questions
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
     maxWarnings: 3,
-    isExamActive: isExamActive, // Only act if exam is strictly active
+    isExamActive: isExamActive && !hasCQorSQ, // Disable proctoring if exam has CQ/SQ
     isUploading: isUploading // Pass context state
   });
 
