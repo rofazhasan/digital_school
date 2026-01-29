@@ -154,6 +154,50 @@ export async function GET(
       }
     }
 
+    // Fix image answers by mapping blob URLs to actual file paths (mirrors logic from evaluations API)
+    // This is crucial because stored answers might be expired Blob URLs
+    Object.keys(studentAnswers).forEach(key => {
+      if (key.endsWith('_image') || key.endsWith('_images')) {
+        let questionBaseId = key;
+        if (key.endsWith('_images')) {
+          questionBaseId = key.substring(0, key.length - 7); // remove _images
+        } else {
+          questionBaseId = key.substring(0, key.length - 6); // remove _image
+        }
+
+        // Look for uploaded images on filesystem
+        try {
+          // Use absolute path for server-side file access if needed, or relative to process.cwd()
+          const uploadDir = `public/uploads/exam-answers/${examId}/${user.studentProfile!.id}/${questionBaseId}`;
+          const fs = require('fs');
+
+          if (fs.existsSync(uploadDir)) {
+            const files = fs.readdirSync(uploadDir);
+            const imageFiles = files.filter((file: string) =>
+              file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
+            );
+
+            if (imageFiles.length > 0) {
+              const fileUrls = imageFiles.map((file: string) =>
+                `/uploads/exam-answers/${examId}/${user.studentProfile!.id}/${questionBaseId}/${file}`
+              );
+
+              // Update the answer with valid URLs
+              if (key.endsWith('_images')) {
+                studentAnswers[key] = fileUrls;
+              } else if (fileUrls.length > 0) {
+                // For single image key, take the first one
+                studentAnswers[key] = fileUrls[0];
+              }
+              console.log(`[ResultAPI] Fixed image paths for ${key}:`, studentAnswers[key]);
+            }
+          }
+        } catch (error) {
+          console.error(`[ResultAPI] Error resolving image paths for ${questionBaseId}:`, error);
+        }
+      }
+    });
+
     // Process questions with student answers and marking details
     const processedQuestions = questions.map((question: any) => {
       const questionId = question.id;
