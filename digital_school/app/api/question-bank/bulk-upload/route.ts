@@ -83,19 +83,31 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         if (data.type === 'MCQ') {
             const optA = s(getValue(row, ["Option A", "A"]));
             const optB = s(getValue(row, ["Option B", "B"]));
+            const optC = s(getValue(row, ["Option C", "C"]));
+            const optD = s(getValue(row, ["Option D", "D"]));
+            const optE = s(getValue(row, ["Option E", "E"]));
+
             if (!optA || !optB) throw new Error("MCQ requires at least Option A and B");
 
-            const correctOpt = s(getValue(row, ["Correct Option (A/B/C/D)", "Correct Option", "Correct Answer", "Answer"])).toUpperCase();
-            if (!['A', 'B', 'C', 'D'].includes(correctOpt)) throw new Error(`Valid Correct Option (A/B/C/D) required. Found: ${correctOpt}`);
+            const correctOpt = s(getValue(row, ["Correct Option (A/B/C/D)", "Correct Option (A/B/C/D/E)", "Correct Option", "Correct Answer", "Answer"])).toUpperCase();
+
+            const validOptions = ['A', 'B', 'C', 'D'];
+            if (optE) validOptions.push('E');
+
+            if (!validOptions.includes(correctOpt)) throw new Error(`Valid Correct Option (${validOptions.join('/')}) required. Found: ${correctOpt}`);
 
             const explanation = s(getValue(row, ["Explanation", "Ans Explanation", "Solution"]));
 
-            data.options = [
+            const optionsList = [
                 { text: optA, isCorrect: correctOpt === 'A', explanation },
                 { text: optB, isCorrect: correctOpt === 'B', explanation },
-                { text: s(getValue(row, ["Option C", "C"])), isCorrect: correctOpt === 'C', explanation },
-                { text: s(getValue(row, ["Option D", "D"])), isCorrect: correctOpt === 'D', explanation },
-            ].filter((o: any) => o.text !== '');
+            ];
+
+            if (optC) optionsList.push({ text: optC, isCorrect: correctOpt === 'C', explanation });
+            if (optD) optionsList.push({ text: optD, isCorrect: correctOpt === 'D', explanation });
+            if (optE) optionsList.push({ text: optE, isCorrect: correctOpt === 'E', explanation });
+
+            data.options = optionsList.filter((o: any) => o.text !== '');
         } else if (data.type === 'CQ') {
             const sq1Text = s(getValue(row, ["Sub-Question 1 Text", "SQ1"]));
             const sq1Marks = n(getValue(row, ["Sub-Question 1 Marks", "SQ1 Marks"]));
