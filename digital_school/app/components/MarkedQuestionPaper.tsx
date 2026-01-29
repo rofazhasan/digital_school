@@ -17,13 +17,22 @@ interface CQ {
     questionText: string;
     marks?: number;
     modelAnswer?: string;
-    subQuestions?: any[];
+    subQuestions?: {
+        id?: string;
+        questionText?: string;
+        question?: string;
+        text?: string;
+        answer?: string;
+        modelAnswer?: string;
+        image?: string;
+    }[];
 }
 interface SQ {
     id?: string;
     questionText: string;
     marks?: number;
     modelAnswer?: string;
+    answer?: string;
 }
 
 interface StudentSubmission {
@@ -290,8 +299,20 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 const subId = sub.id || `sub_${q.id}_${sidx}`;
                                                 return (
                                                     <div key={sidx} className="ml-6 mt-2 text-sm text-gray-600">
-                                                        <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
-                                                        <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
+                                                        <div className="flex flex-col gap-1">
+                                                            <div className="flex gap-1">
+                                                                <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
+                                                                <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
+                                                            </div>
+
+                                                            {/* Model Answer for CQ Sub-question */}
+                                                            {(sub.modelAnswer || sub.answer) && (
+                                                                <div className="ml-6 p-1.5 bg-green-50 border border-green-100 rounded text-xs">
+                                                                    <span className="text-green-700 font-bold mr-1">Model Answer:</span>
+                                                                    <div className="inline-block text-gray-800"><Text>{sub.modelAnswer || sub.answer}</Text></div>
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                         {sub.image && <img src={sub.image} alt="Sub-question" className="mt-1 h-32 w-auto object-contain border rounded bg-white" />}
                                                     </div>
                                                 );
@@ -335,6 +356,16 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                     <div className="text-xs text-gray-500 mb-1">Student Answer:</div>
                                                     <div className="font-medium text-blue-800">
                                                         <div className="inline-block"><Text>{String(answer)}</Text></div>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Model Answer for SQ */}
+                                            {(q.modelAnswer || q.answer) && (
+                                                <div className="ml-6 mt-2 p-2 bg-green-50 rounded border border-green-100 text-sm">
+                                                    <div className="text-xs text-green-700 font-bold mb-1">Model Answer:</div>
+                                                    <div className="font-medium text-gray-800">
+                                                        <div className="inline-block"><Text>{q.modelAnswer || q.answer}</Text></div>
                                                     </div>
                                                 </div>
                                             )}

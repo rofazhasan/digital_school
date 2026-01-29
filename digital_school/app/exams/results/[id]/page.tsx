@@ -240,7 +240,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       sq: result.questions.filter(q => q.type === 'SQ').map(q => ({
         id: q.id,
         questionText: q.questionText,
-        marks: q.marks
+        marks: q.marks,
+        modelAnswer: q.modelAnswer || q.answer
       }))
     };
 
