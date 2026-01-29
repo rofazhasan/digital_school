@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
+import DrawingCanvas from "@/app/components/DrawingCanvas";
 
 interface LiveStudent {
   id: string;
@@ -160,6 +161,53 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [reviewResponse, setReviewResponse] = useState('');
   const [selectedReview, setSelectedReview] = useState<any>(null);
   const [showResponseDialog, setShowResponseDialog] = useState(false);
+
+  // Annotation State
+  const [isAnnotationOpen, setIsAnnotationOpen] = useState(false);
+  const [activeAnnotationImage, setActiveAnnotationImage] = useState<string | null>(null);
+  const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number } | null>(null);
+
+  const openAnnotation = (imageUrl: string, questionId: string, index: number = 0) => {
+    setActiveAnnotationImage(imageUrl);
+    setActiveAnnotationMeta({ questionId, index });
+    setIsAnnotationOpen(true);
+  };
+
+  const handleSaveAnnotation = async (blob: Blob) => {
+    const currentStudent = exam?.submissions[currentStudentIndex];
+    if (!activeAnnotationImage || !activeAnnotationMeta || !currentStudent) return;
+
+    const formData = new FormData();
+    formData.append('file', blob, 'annotation.jpg');
+
+    try {
+      // 1. Upload image
+      const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+      if (!uploadRes.ok) throw new Error("Upload failed");
+      const { url } = await uploadRes.json();
+
+      // 2. Save record to DB
+      const saveRes = await fetch(`/api/exams/evaluations/${id}/drawing`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: currentStudent.student.id,
+          questionId: activeAnnotationMeta.questionId,
+          imageIndex: activeAnnotationMeta.index,
+          originalImagePath: activeAnnotationImage,
+          imageData: url
+        })
+      });
+
+      if (!saveRes.ok) throw new Error("Failed to save record");
+
+      toast.success("Annotation saved!");
+      setIsAnnotationOpen(false);
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save annotation");
+    }
+  };
 
   useEffect(() => {
     // Get user role from custom JWT token
@@ -1668,151 +1716,159 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       )}
                                     </div>
                                   ) : (
-                                    <div>
-                                      {currentAnswer ? (
-                                        <div className="space-y-4">
-
-                                          {/* Text answer */}
-                                          {typeof currentAnswer === 'string' && (
-                                            <div className="whitespace-pre-wrap"><MathJax>{currentAnswer}</MathJax></div>
-                                          )}
-
-                                          {/* Image answers */}
-                                          {Array.isArray(currentAnswer) && currentAnswer.length > 0 && (
-                                            <div className="space-y-2">
-                                              <h5 className="font-medium">Uploaded Images:</h5>
-
-                                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {currentAnswer.map((imgObj, idx) => {
-                                                  // Handle both string URLs and object with preview
-                                                  const imgSrc = typeof imgObj === 'string' ? imgObj : imgObj.preview || imgObj.url || imgObj.src;
-
-                                                  // Check if it's a blob URL (which won't work)
-                                                  const isBlobUrl = imgSrc && imgSrc.startsWith('blob:');
-
-                                                  return (
-                                                    <div key={idx} className="relative">
-                                                      {isBlobUrl ? (
-                                                        <div className="w-full h-40 bg-gray-100 rounded border flex items-center justify-center">
-                                                          <div className="text-center text-gray-500">
-                                                            <div className="text-xs">Image not available</div>
-                                                            <div className="text-xs">(Blob URL expired)</div>
-                                                          </div>
-                                                        </div>
-                                                      ) : (
-                                                        <img
-                                                          src={imgSrc}
-                                                          alt={`Answer ${idx + 1}`}
-                                                          className="w-full h-40 object-cover rounded border hover:scale-105 transition-transform cursor-pointer"
-                                                          onError={(e) => {
-                                                            console.error('Image failed to load:', imgSrc);
-                                                            e.currentTarget.style.display = 'none';
-                                                          }}
-                                                        />
-                                                      )}
-                                                      {!isBlobUrl && (
-                                                        <Button
-                                                          size="sm"
-                                                          variant="outline"
-                                                          className="absolute top-1 right-1"
-                                                          onClick={() => {
-                                                            setCurrentImage(imgSrc);
-                                                            setCurrentImageIndex(idx);
-                                                            setShowDrawingTool(true);
-                                                          }}
-                                                        >
-                                                          <PenTool className="h-3 w-3" />
-                                                        </Button>
-                                                      )}
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            </div>
-                                          )}
+                                    <div className="space-y-6">
+                                      {/* Main Answer (SQ) or Intro (CQ) */}
+                                      {currentAnswer && typeof currentAnswer === 'string' && (
+                                        <div>
+                                          <div className="text-xs font-semibold text-gray-500 mb-1">Text Answer:</div>
+                                          <div className="whitespace-pre-wrap"><MathJax>{currentAnswer}</MathJax></div>
                                         </div>
-                                      ) : (
-                                        <span className="text-gray-500">No answer provided</span>
                                       )}
-                                    </div>
-                                  )}
 
-                                  {/* Explanation & Correct Answer */}
-                                  <div className="mt-4 pt-4 border-t border-gray-200">
-                                    {/* MCQ Options Display */}
-                                    {currentQuestion.type === 'mcq' && currentQuestion.options && (
-                                      <div className="mb-4">
-                                        <h5 className="font-semibold text-gray-700 mb-2">Options:</h5>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                          {currentQuestion.options.map((opt: any, idx: number) => {
-                                            const normalize = (s: string) => String(s).trim().toLowerCase();
-                                            const optText = opt.text || String(opt);
-                                            const isSelected = currentAnswer && normalize(currentAnswer) === normalize(optText);
-                                            const isCorrect = opt.isCorrect;
+                                      {/* Main Image (SQ) */}
+                                      {currentStudent?.answers[`${currentQuestion.id}_image`] && (
+                                        <div>
+                                          <div className="text-xs font-semibold text-gray-500 mb-1">Attachment:</div>
+                                          <div className="relative inline-block group">
+                                            <img
+                                              src={currentStudent.answers[`${currentQuestion.id}_image`]}
+                                              alt="Answer Attachment"
+                                              className="h-48 rounded border bg-white object-contain cursor-pointer transition-transform hover:scale-105"
+                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0)}
+                                            />
+                                            <button
+                                              onClick={() => openAnnotation(currentStudent.answers[`${currentQuestion.id}_image`], currentQuestion.id, 0)}
+                                              className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                            >
+                                              <PenTool className="w-4 h-4" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
 
-                                            let bgClass = "bg-white border-gray-200";
-                                            if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
-                                            if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
-                                            if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
+                                      {/* CQ Sub-question Answers */}
+                                      {currentQuestion.type === 'cq' && currentQuestion.subQuestions && (
+                                        <div className="space-y-4 border-t pt-4 mt-2">
+                                          <h5 className="font-medium text-gray-700">Sub-question Answers:</h5>
+                                          {currentQuestion.subQuestions.map((subQ: any, idx: number) => {
+                                            const subKey = `${currentQuestion.id}_sub_${idx}`;
+                                            const subText = currentStudent?.answers?.[subKey];
+                                            const subImg = currentStudent?.answers?.[`${subKey}_image`];
+
+                                            if (!subText && !subImg) return (
+                                              <div key={idx} className="text-sm text-gray-400 italic pl-2 border-l-2 border-transparent">
+                                                (Sub-question {idx + 1} not answered)
+                                              </div>
+                                            );
 
                                             return (
-                                              <div key={idx} className={`p-3 rounded border ${bgClass} flex flex-col gap-2`}>
-                                                <div className="flex items-center justify-between w-full">
-                                                  <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
-                                                    <div className="flex-1">
-                                                      <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                        <MathJax inline dynamic>{optText}</MathJax>
-                                                      </span>
-                                                      {opt.image && (
-                                                        <div className="mt-1">
-                                                          <img src={opt.image} alt="Option" className="max-h-24 rounded border bg-white object-contain" />
-                                                        </div>
-                                                      )}
-                                                    </div>
+                                              <div key={idx} className="pl-4 border-l-2 border-indigo-100">
+                                                <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
+                                                {subText && (
+                                                  <div className="mb-2 text-gray-800"><MathJax>{subText}</MathJax></div>
+                                                )}
+                                                {subImg && (
+                                                  <div className="relative inline-block group">
+                                                    <img
+                                                      src={subImg}
+                                                      alt={`Sub ${idx + 1}`}
+                                                      className="h-40 rounded border bg-white object-contain cursor-pointer hover:scale-105 transition-transform"
+                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx)}
+                                                    />
+                                                    <button
+                                                      onClick={() => openAnnotation(subImg, currentQuestion.id, idx)}
+                                                      className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                    >
+                                                      <PenTool className="w-4 h-4" />
+                                                    </button>
                                                   </div>
-                                                  {isCorrect && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
-                                                  {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
-                                                </div>
-
-                                                {/* Option Specific Explanation Removed as Redundant */}
+                                                )}
                                               </div>
                                             );
                                           })}
                                         </div>
-                                      </div>
-                                    )}
-
-                                    {/* Correct Answer (Non-MCQ or if options missing) */}
-                                    {(currentQuestion.type !== 'mcq' || !currentQuestion.options) && (currentQuestion.modelAnswer || currentQuestion.correct) && (
-                                      <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
-                                        <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
-                                          <CheckCircle className="h-4 w-4" />
-                                          Correct / Model Answer:
-                                        </h5>
-                                        <div className="text-green-900">
-                                          <MathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Explanation */}
-                                    {currentQuestion.explanation && (
-                                      <div className="p-3 bg-blue-50 border border-blue-200 rounded">
-                                        <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
-                                          <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
-                                          Explanation:
-                                        </h5>
-                                        <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
-                                          <MathJax key={currentQuestion.id} dynamic>
-                                            {currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
-                                          </MathJax>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
+
+                              {/* Explanation & Correct Answer */}
+                              <div className="mt-4 pt-4 border-t border-gray-200">
+                                {/* MCQ Options Display */}
+                                {currentQuestion.type === 'mcq' && currentQuestion.options && (
+                                  <div className="mb-4">
+                                    <h5 className="font-semibold text-gray-700 mb-2">Options:</h5>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                      {currentQuestion.options.map((opt: any, idx: number) => {
+                                        const normalize = (s: string) => String(s).trim().toLowerCase();
+                                        const optText = opt.text || String(opt);
+                                        const isSelected = currentAnswer && normalize(currentAnswer) === normalize(optText);
+                                        const isCorrect = opt.isCorrect;
+
+                                        let bgClass = "bg-white border-gray-200";
+                                        if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                        if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
+                                        if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
+
+                                        return (
+                                          <div key={idx} className={`p-3 rounded border ${bgClass} flex flex-col gap-2`}>
+                                            <div className="flex items-center justify-between w-full">
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
+                                                <div className="flex-1">
+                                                  <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
+                                                    <MathJax inline dynamic>{optText}</MathJax>
+                                                  </span>
+                                                  {opt.image && (
+                                                    <div className="mt-1">
+                                                      <img src={opt.image} alt="Option" className="max-h-24 rounded border bg-white object-contain" />
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              {isCorrect && <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />}
+                                              {isSelected && !isCorrect && <XCircle className="h-4 w-4 text-red-600 flex-shrink-0" />}
+                                            </div>
+
+                                            {/* Option Specific Explanation Removed as Redundant */}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Correct Answer (Non-MCQ or if options missing) */}
+                                {(currentQuestion.type !== 'mcq' || !currentQuestion.options) && (currentQuestion.modelAnswer || currentQuestion.correct) && (
+                                  <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded">
+                                    <h5 className="font-semibold text-green-800 mb-1 flex items-center gap-2">
+                                      <CheckCircle className="h-4 w-4" />
+                                      Correct / Model Answer:
+                                    </h5>
+                                    <div className="text-green-900">
+                                      <MathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Explanation */}
+                                {currentQuestion.explanation && (
+                                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                                    <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
+                                      <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
+                                      Explanation:
+                                    </h5>
+                                    <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                      <MathJax key={currentQuestion.id} dynamic>
+                                        {currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
+                                      </MathJax>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+
+
 
                               {/* Grading */}
                               <div>
@@ -2415,9 +2471,21 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 </DialogContent>
               </Dialog>
             </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </MathJaxContext>
+          </Tabs >
+        </div >
+      </div >
+
+      <Dialog open={isAnnotationOpen} onOpenChange={setIsAnnotationOpen}>
+        <DialogContent className="max-w-[95vw] w-full h-[95vh] p-0 border-none bg-transparent shadow-none">
+          {activeAnnotationImage && (
+            <DrawingCanvas
+              backgroundImage={activeAnnotationImage || ''}
+              onSave={handleSaveAnnotation}
+              onCancel={() => setIsAnnotationOpen(false)}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </MathJaxContext >
   );
 }

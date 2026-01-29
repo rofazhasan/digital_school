@@ -5,7 +5,7 @@ import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Check, AlertCircle } from "lucide-react";
+import { X, Check, AlertCircle, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface QuestionCardProps {
@@ -213,30 +213,141 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
             {(type === "cq" || type === "sq") && (
               <div className="space-y-4">
-                <textarea
-                  value={userAnswer || ""}
-                  onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
-                  disabled={disabled || submitted}
-                  className="w-full min-h-[200px] p-4 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y text-base"
-                  placeholder="Type your answer here..."
-                />
-                {subQuestions.map((subQ: any, idx: number) => (
-                  <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
-                    <div className="text-sm font-medium text-gray-700 mb-2">
-                      {idx + 1}. {subQ.text || subQ.question || subQ}
-                      {subQ.image && (
-                        <div className="mt-2">
-                          <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
+                {type === "sq" && (
+                  <div className="space-y-2">
+                    <textarea
+                      value={userAnswer || ""}
+                      onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+                      disabled={disabled || submitted}
+                      className="w-full min-h-[200px] p-4 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y text-base"
+                      placeholder="Type your answer here..."
+                    />
+                    <div className="flex items-center gap-2">
+                      {/* @ts-ignore */}
+                      {answers[`${question.id}_image`] ? (
+                        <div className="relative group">
+                          {/* @ts-ignore */}
+                          <img src={answers[`${question.id}_image`]} alt="Answer attachment" className="h-20 w-auto rounded border" />
+                          {!disabled && !submitted && (
+                            <button
+                              onClick={() => {
+                                const newAnswers = { ...answers };
+                                delete newAnswers[`${question.id}_image`];
+                                setAnswers(newAnswers);
+                              }}
+                              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
                         </div>
+                      ) : (
+                        !disabled && !submitted && (
+                          <div className="relative">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={async (e) => {
+                                if (e.target.files?.[0]) {
+                                  const file = e.target.files[0];
+                                  const formData = new FormData();
+                                  formData.append('file', file);
+                                  try {
+                                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                    if (res.ok) {
+                                      const data = await res.json();
+                                      setAnswers({ ...answers, [`${question.id}_image`]: data.url });
+                                    }
+                                  } catch (err) { console.error(err); }
+                                }
+                              }}
+                              className="hidden"
+                              id={`q-img-${question.id}`}
+                            />
+                            <label htmlFor={`q-img-${question.id}`} className="flex items-center gap-2 cursor-pointer text-sm text-indigo-600 hover:text-indigo-800">
+                              <Upload className="w-4 h-4" /> Upload Image Answer
+                            </label>
+                          </div>
+                        )
                       )}
                     </div>
-                    <Input
-                      value={answers[`${question.id}_sub_${idx}`] || ""}
-                      onChange={(e) => setAnswers({ ...answers, [`${question.id}_sub_${idx}`]: e.target.value })}
-                      className="bg-gray-50/50"
-                    />
                   </div>
-                ))}
+                )}
+
+                {type === "cq" && (
+                  <div className="space-y-6">
+                    {subQuestions.map((subQ: any, idx: number) => (
+                      <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
+                        <div className="text-sm font-medium text-gray-700 mb-2">
+                          {idx + 1}. {subQ.text || subQ.question || subQ}
+                          {subQ.image && (
+                            <div className="mt-2">
+                              <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <Input
+                            value={answers[`${question.id}_sub_${idx}`] || ""}
+                            onChange={(e) => setAnswers({ ...answers, [`${question.id}_sub_${idx}`]: e.target.value })}
+                            className="bg-gray-50/50"
+                            disabled={disabled || submitted}
+                            placeholder="Type answer..."
+                          />
+                          <div className="flex items-center gap-2">
+                            {/* @ts-ignore */}
+                            {answers[`${question.id}_sub_${idx}_image`] ? (
+                              <div className="relative group">
+                                {/* @ts-ignore */}
+                                <img src={answers[`${question.id}_sub_${idx}_image`]} alt="Answer attachment" className="h-20 w-auto rounded border" />
+                                {!disabled && !submitted && (
+                                  <button
+                                    onClick={() => {
+                                      const newAnswers = { ...answers };
+                                      delete newAnswers[`${question.id}_sub_${idx}_image`];
+                                      setAnswers(newAnswers);
+                                    }}
+                                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              !disabled && !submitted && (
+                                <div className="relative">
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={async (e) => {
+                                      if (e.target.files?.[0]) {
+                                        const file = e.target.files[0];
+                                        const formData = new FormData();
+                                        formData.append('file', file);
+                                        try {
+                                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                          if (res.ok) {
+                                            const data = await res.json();
+                                            setAnswers({ ...answers, [`${question.id}_sub_${idx}_image`]: data.url });
+                                          }
+                                        } catch (err) { console.error(err); }
+                                      }
+                                    }}
+                                    className="hidden"
+                                    id={`q-img-${question.id}-${idx}`}
+                                  />
+                                  <label htmlFor={`q-img-${question.id}-${idx}`} className="flex items-center gap-2 cursor-pointer text-xs text-indigo-600 hover:text-indigo-800">
+                                    <Upload className="w-3 h-3" /> Upload Image
+                                  </label>
+                                </div>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
