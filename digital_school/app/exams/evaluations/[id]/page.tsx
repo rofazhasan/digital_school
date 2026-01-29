@@ -211,8 +211,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       toast.success("Annotation saved!");
       setIsAnnotationOpen(false);
 
-      // Refresh exam data to show the new annotation
-      await fetchExamData(activeAnnotationMeta.studentId);
+      // Reload the page to show the new annotation
+      window.location.reload();
     } catch (e) {
       console.error(e);
       toast.error("Failed to save annotation");
