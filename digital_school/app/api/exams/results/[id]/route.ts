@@ -163,18 +163,32 @@ export async function GET(
       // Images can be stored as:
       // - ${questionId}_image (main SQ/CQ image)
       // - ${questionId}_sub_0_image, ${questionId}_sub_1_image, etc. (CQ sub-question images)
+      // - ${questionId}_images (NEW: array of multiple images for SQ)
+      // - ${questionId}_sub_0_images, ${questionId}_sub_1_images, etc. (NEW: arrays for CQ sub-questions)
       let processedImages: string[] = [];
 
-      // Check for main image
+      // Check for main image (old format - single image)
       if (studentAnswers[`${questionId}_image`]) {
         processedImages.push(studentAnswers[`${questionId}_image`]);
       }
 
+      // Check for main images (new format - multiple images)
+      if (studentAnswers[`${questionId}_images`] && Array.isArray(studentAnswers[`${questionId}_images`])) {
+        processedImages.push(...studentAnswers[`${questionId}_images`]);
+      }
+
       // Check for sub-question images (CQ type)
       for (let i = 0; i < 10; i++) { // Check up to 10 sub-questions
+        // Old format - single image per sub-question
         const subImageKey = `${questionId}_sub_${i}_image`;
         if (studentAnswers[subImageKey]) {
           processedImages.push(studentAnswers[subImageKey]);
+        }
+
+        // New format - multiple images per sub-question
+        const subImagesKey = `${questionId}_sub_${i}_images`;
+        if (studentAnswers[subImagesKey] && Array.isArray(studentAnswers[subImagesKey])) {
+          processedImages.push(...studentAnswers[subImagesKey]);
         }
       }
 
