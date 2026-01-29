@@ -287,12 +287,38 @@ export async function GET(
           explanation = question.explanation || question.reason || '';
         }
       } else if (question.type === 'CQ') {
-        // For CQ, get model answers for each sub-question
+        // For CQ, get model answers and student answers for each sub-question
         if (question.subQuestions && Array.isArray(question.subQuestions)) {
-          question.subQuestions = question.subQuestions.map((subQ: any) => ({
-            ...subQ,
-            modelAnswer: subQ.modelAnswer || subQ.answer || ''
-          }));
+          question.subQuestions = question.subQuestions.map((subQ: any, idx: number) => {
+            // Get student answer text for this sub-question
+            const subKey = `${questionId}_sub_${idx}`;
+            const subAnswerText = studentAnswers[subKey] || '';
+
+            // Get student images for this sub-question
+            const subImages: string[] = [];
+            const singleImg = studentAnswers[`${subKey}_image`];
+            const multipleImgs = studentAnswers[`${subKey}_images`];
+
+            if (singleImg) subImages.push(singleImg);
+            if (multipleImgs && Array.isArray(multipleImgs)) subImages.push(...multipleImgs);
+
+            // Get drawings for this sub-question (indices from idx*100 to idx*100+99)
+            const subDrawings = allDrawingsForQuestion.filter((d: any) =>
+              d.imageIndex >= idx * 100 && d.imageIndex < (idx + 1) * 100
+            ).map((d: any) => ({
+              imageIndex: d.imageIndex,
+              imageData: d.imageData,
+              originalImagePath: d.originalImagePath
+            }));
+
+            return {
+              ...subQ,
+              modelAnswer: subQ.modelAnswer || subQ.answer || '',
+              studentAnswer: subAnswerText,
+              studentImages: subImages,
+              drawings: subDrawings
+            };
+          });
         }
       } else if (question.type === 'SQ') {
         // For SQ, model answer is already in question.modelAnswer

@@ -1756,126 +1756,208 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   </div>
                                 </div>
 
-                                {/* Student Answer */}
-                                <div className="mb-4">
-                                  <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
-                                  {question.studentAnswer ? (
-                                    <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                      <p className="text-gray-700">{question.studentAnswer}</p>
-                                    </div>
-                                  ) : (
-                                    <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
-                                      <p className="text-gray-500 italic">No answer provided</p>
-                                    </div>
-                                  )}
-                                </div>
+                                {question.type === 'CQ' && question.subQuestions ? (
+                                  <div className="space-y-6 mt-4">
+                                    <h4 className="font-medium text-gray-800 border-b pb-2">Detailed Answer Breakdown:</h4>
+                                    {question.subQuestions.map((subQ: any, idx: number) => (
+                                      <div key={idx} className="border-l-4 border-indigo-100 pl-4 py-2 bg-gray-50/50 rounded-r-lg">
 
-                                {/* Student Answer Images */}
-                                {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Camera className="h-4 w-4 text-green-600" />
-                                        <span className="text-sm font-medium text-green-800">
-                                          Images you uploaded during the exam
-                                        </span>
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {question.studentAnswerImages.map((imageUrl: string, index: number) => (
-                                          <div
-                                            key={index}
-                                            className="relative group cursor-pointer"
-                                            onClick={() => {
-                                              setZoomedImage(imageUrl);
-                                              setZoomedImageTitle(`Your Answer Image ${index + 1}`);
-                                              setShowZoomModal(true);
-                                            }}
-                                          >
-                                            <img
-                                              src={imageUrl}
-                                              alt={`Your answer image ${index + 1}`}
-                                              className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
-                                              onError={(e) => {
-                                                console.error('Student answer image failed to load:', imageUrl);
-                                                // Show error placeholder
-                                                e.currentTarget.style.display = 'none';
-                                                const parent = e.currentTarget.parentElement;
-                                                if (parent) {
-                                                  const errorDiv = document.createElement('div');
-                                                  errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
-                                                  errorDiv.innerHTML = `
-                                                  <div class="text-center">
-                                                    <div class="mb-1">📷</div>
-                                                    <div>Image not available</div>
-                                                  </div>
-                                                `;
-                                                  parent.appendChild(errorDiv);
-                                                }
-                                              }}
-                                            />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        {/* Sub-question Text (if available) - usually CQ sub-questions are fixed but we display them if present */}
+                                        <div className="mb-2">
+                                          <span className="font-semibold text-indigo-700">Sub-question {idx + 1}</span>
+                                          {subQ.text && <span className="mx-2 text-gray-400">|</span>}
+                                          {subQ.text && (
+                                            <span className="text-gray-700"><MathJax inline dynamic>{subQ.text}</MathJax></span>
+                                          )}
+                                        </div>
+
+                                        {/* Model Answer */}
+                                        {subQ.modelAnswer && (
+                                          <div className="mb-3 p-2 bg-green-50 rounded border border-green-100">
+                                            <div className="text-xs font-semibold text-green-700 uppercase tracking-wider mb-1">Model Answer</div>
+                                            <div className="text-gray-800 text-sm"><MathJax dynamic>{subQ.modelAnswer}</MathJax></div>
+                                          </div>
+                                        )}
+
+                                        {/* Student Answer */}
+                                        <div className="mb-3">
+                                          <div className="text-xs font-semibold text-blue-700 uppercase tracking-wider mb-1">Your Answer</div>
+                                          {subQ.studentAnswer ? (
+                                            <div className="text-gray-800"><MathJax dynamic>{subQ.studentAnswer}</MathJax></div>
+                                          ) : (
+                                            <p className="text-gray-400 italic text-sm">No text answer provided</p>
+                                          )}
+                                        </div>
+
+                                        {/* Student Images & Feedback */}
+                                        {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
+                                          <div className="mt-3">
+                                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Attachments & Feedback</div>
+                                            <div className="flex flex-wrap gap-3">
+                                              {(() => {
+                                                const images = subQ.studentImages || [];
+                                                return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
+                                                  const globalIdx = idx * 100 + imgK;
+                                                  const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
+                                                  const displayUrl = drawing ? drawing.imageData : imgUrl;
+                                                  const isAnnotated = !!drawing;
+
+                                                  return (
+                                                    <div
+                                                      key={imgK}
+                                                      className="relative group cursor-pointer"
+                                                      onClick={() => {
+                                                        setZoomedImage(displayUrl);
+                                                        setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
+                                                        setShowZoomModal(true);
+                                                      }}
+                                                    >
+                                                      <img
+                                                        src={displayUrl}
+                                                        alt={`Sub ${idx + 1} Img ${imgK + 1}`}
+                                                        className={`w-24 h-24 object-cover rounded-lg border-2 transition-transform hover:scale-105 ${isAnnotated ? 'border-orange-400 ring-2 ring-orange-200' : 'border-gray-200'}`}
+                                                      />
+                                                      {isAnnotated && (
+                                                        <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-1.5 py-0.5 rounded-bl-lg rounded-tr-lg font-medium shadow-sm">
+                                                          Feedback
+                                                        </div>
+                                                      )}
+                                                    </div>
+                                                  );
+                                                }) : (
+                                                  // If there are drawings but no matching student images (rare edge case, or specific feedback image)
+                                                  // We can list orphan drawings here if needed, but usually drawings are attached to images.
+                                                  null
+                                                );
+                                              })()}
                                             </div>
                                           </div>
-                                        ))}
+                                        )}
                                       </div>
-                                    </div>
+                                    ))}
                                   </div>
-                                )}
+                                ) : (
+                                  <>
+                                    {/* Student Answer */}
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
+                                      {question.studentAnswer ? (
+                                        <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
+                                          <p className="text-gray-700">{question.studentAnswer}</p>
+                                        </div>
+                                      ) : (
+                                        <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
+                                          <p className="text-gray-500 italic">No answer provided</p>
+                                        </div>
+                                      )}
+                                    </div>
 
-                                {/* Evaluator's Drawing Feedback */}
-                                {question.allDrawings && question.allDrawings.length > 0 && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <MessageSquare className="h-4 w-4 text-orange-600" />
-                                        <span className="text-sm font-medium text-orange-800">
-                                          Teacher's annotations on your answer
-                                        </span>
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {question.allDrawings.map((drawing, index) => (
-                                          <div
-                                            key={index}
-                                            className="relative group cursor-pointer"
-                                            onClick={() => {
-                                              setZoomedImage(drawing.imageData);
-                                              setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
-                                              setShowZoomModal(true);
-                                            }}
-                                          >
-                                            <img
-                                              src={drawing.imageData}
-                                              alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                              className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
-                                              onError={(e) => {
-                                                console.error('Annotated image failed to load:', drawing.imageData);
-                                                // Show error placeholder
-                                                e.currentTarget.style.display = 'none';
-                                                const parent = e.currentTarget.parentElement;
-                                                if (parent) {
-                                                  const errorDiv = document.createElement('div');
-                                                  errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
-                                                  errorDiv.innerHTML = `
-                                                  <div class="text-center">
-                                                    <div class="mb-1">📷</div>
-                                                    <div>Annotated image not available</div>
-                                                  </div>
-                                                `;
-                                                  parent.appendChild(errorDiv);
-                                                }
-                                              }}
-                                            />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                            </div>
+                                    {/* Student Answer Images */}
+                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                      <div className="mb-4">
+                                        <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
+                                        <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <Camera className="h-4 w-4 text-green-600" />
+                                            <span className="text-sm font-medium text-green-800">
+                                              Images you uploaded during the exam
+                                            </span>
                                           </div>
-                                        ))}
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {question.studentAnswerImages.map((imageUrl: string, index: number) => (
+                                              <div
+                                                key={index}
+                                                className="relative group cursor-pointer"
+                                                onClick={() => {
+                                                  setZoomedImage(imageUrl);
+                                                  setZoomedImageTitle(`Your Answer Image ${index + 1}`);
+                                                  setShowZoomModal(true);
+                                                }}
+                                              >
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`Your answer image ${index + 1}`}
+                                                  className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                  onError={(e) => {
+                                                    console.error('Student answer image failed to load:', imageUrl);
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                      const errorDiv = document.createElement('div');
+                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
+                                                      errorDiv.innerHTML = `
+                                                      <div class="text-center">
+                                                        <div class="mb-1">📷</div>
+                                                        <div>Image not available</div>
+                                                      </div>
+                                                    `;
+                                                      parent.appendChild(errorDiv);
+                                                    }
+                                                  }}
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </div>
+                                    )}
+
+                                    {/* Evaluator's Drawing Feedback */}
+                                    {question.allDrawings && question.allDrawings.length > 0 && (
+                                      <div className="mb-4">
+                                        <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
+                                        <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
+                                          <div className="flex items-center gap-2 mb-2">
+                                            <MessageSquare className="h-4 w-4 text-orange-600" />
+                                            <span className="text-sm font-medium text-orange-800">
+                                              Teacher's annotations on your answer
+                                            </span>
+                                          </div>
+                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                            {question.allDrawings.map((drawing, index) => (
+                                              <div
+                                                key={index}
+                                                className="relative group cursor-pointer"
+                                                onClick={() => {
+                                                  setZoomedImage(drawing.imageData);
+                                                  setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
+                                                  setShowZoomModal(true);
+                                                }}
+                                              >
+                                                <img
+                                                  src={drawing.imageData}
+                                                  alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
+                                                  className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                  onError={(e) => {
+                                                    console.error('Annotated image failed to load:', drawing.imageData);
+                                                    e.currentTarget.style.display = 'none';
+                                                    const parent = e.currentTarget.parentElement;
+                                                    if (parent) {
+                                                      const errorDiv = document.createElement('div');
+                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
+                                                      errorDiv.innerHTML = `
+                                                      <div class="text-center">
+                                                        <div class="mb-1">📷</div>
+                                                        <div>Annotated image not available</div>
+                                                      </div>
+                                                    `;
+                                                      parent.appendChild(errorDiv);
+                                                    }
+                                                  }}
+                                                />
+                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </>
                                 )}
 
                                 {/* Model Answer */}
