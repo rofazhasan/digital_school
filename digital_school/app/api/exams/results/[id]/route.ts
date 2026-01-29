@@ -178,6 +178,11 @@ export async function GET(
         }
       }
 
+      // Debug logging
+      if (processedImages.length > 0) {
+        console.log(`[ResultAPI] Found ${processedImages.length} images for question ${questionId}:`, processedImages);
+      }
+
       // Get drawing data for this question (support multiple images)
       const drawingData = submission?.drawings?.find((d: any) => d.questionId === questionId && d.imageIndex === 0);
       const allDrawingsForQuestion = submission?.drawings?.filter((d: any) => d.questionId === questionId) || [];

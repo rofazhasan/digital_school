@@ -55,6 +55,11 @@ export default function DrawingCanvas({ backgroundImage, onSave, onCancel }: Dra
             ctx.drawImage(img, 0, 0, w, h);
             saveHistory(); // Save initial state
         };
+
+        img.onerror = (error) => {
+            console.error('Failed to load image for annotation:', backgroundImage, error);
+            alert('Failed to load image. Please check if the image URL is accessible.');
+        };
     }, [backgroundImage]);
 
     const saveHistory = () => {

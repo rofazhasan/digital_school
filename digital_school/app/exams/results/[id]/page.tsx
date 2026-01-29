@@ -1567,7 +1567,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <img
                                               src={imageUrl}
                                               alt={`Your answer image ${index + 1}`}
+                                              crossOrigin="anonymous"
                                               className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                              onLoad={() => {
+                                                console.log('Student answer image loaded successfully:', imageUrl);
+                                              }}
                                               onError={(e) => {
                                                 console.error('Student answer image failed to load:', imageUrl);
                                                 // Show error placeholder
@@ -1580,6 +1584,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   <div class="text-center">
                                                     <div class="mb-1">📷</div>
                                                     <div>Image not available</div>
+                                                    <div class="text-xs mt-1">URL: ${imageUrl.substring(0, 50)}...</div>
                                                   </div>
                                                 `;
                                                   parent.appendChild(errorDiv);
@@ -1621,6 +1626,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <img
                                               src={drawing.imageData}
                                               alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
+                                              crossOrigin="anonymous"
                                               className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
                                               onError={(e) => {
                                                 console.error('Annotated image failed to load:', drawing.imageData);
