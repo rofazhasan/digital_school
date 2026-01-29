@@ -316,14 +316,21 @@ function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress
 
                   <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                     {submitted ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-xl">
-                          <div className="text-xs text-slate-500">Score</div>
-                          <div className="font-bold text-slate-900 dark:text-white">{result?.total ?? '-'}</div>
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                            <div className="text-xs text-slate-500">Score</div>
+                            <div className="font-bold text-slate-900 dark:text-white">{result?.total ?? '-'}</div>
+                          </div>
+                          <Button asChild variant="outline" className="h-full rounded-xl border-slate-200">
+                            <a href={`/exams/results/${exam.id}`}>View Result</a>
+                          </Button>
                         </div>
-                        <Button asChild variant="outline" className="h-full rounded-xl border-slate-200">
-                          <a href={`/exams/results/${exam.id}`}>View Result</a>
-                        </Button>
+                        {exam.allowRetake && status === 'active' && (
+                          <Button asChild className="w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-lg h-11 text-base font-semibold">
+                            <a href={`/exams/online/${exam.id}`}>🔄 Retake Exam</a>
+                          </Button>
+                        )}
                       </div>
                     ) : (
                       status === 'active' || (inProgress && status !== 'finished') ? (
