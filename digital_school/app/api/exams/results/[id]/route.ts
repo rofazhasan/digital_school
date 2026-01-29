@@ -158,27 +158,24 @@ export async function GET(
     const processedQuestions = questions.map((question: any) => {
       const questionId = question.id;
       const studentAnswer = studentAnswers[questionId];
-      const studentAnswerImages = studentAnswers[`${questionId}_images`];
 
-      // Process student answer images - extract URLs from image objects
+      // Collect all image URLs for this question
+      // Images can be stored as:
+      // - ${questionId}_image (main SQ/CQ image)
+      // - ${questionId}_sub_0_image, ${questionId}_sub_1_image, etc. (CQ sub-question images)
       let processedImages: string[] = [];
-      if (studentAnswerImages && Array.isArray(studentAnswerImages)) {
-        processedImages = studentAnswerImages.map((img: any) => {
-          // Handle both old format (string URLs) and new format (image data objects)
-          if (typeof img === 'string') {
-            return img; // Already a URL
-          } else if (img && typeof img === 'object') {
-            // New format: extract the preview URL or file path
-            if (img.preview) {
-              return img.preview; // Use the preview URL
-            } else if (img.file && img.file.name) {
-              // If we have a file object, construct the path
-              // This would be the path where the file was uploaded
-              return `/uploads/exam-answers/${examId}/${user.studentProfile!.id}/${questionId}/${img.file.name}`;
-            }
-          }
-          return null;
-        }).filter(Boolean); // Remove null values
+
+      // Check for main image
+      if (studentAnswers[`${questionId}_image`]) {
+        processedImages.push(studentAnswers[`${questionId}_image`]);
+      }
+
+      // Check for sub-question images (CQ type)
+      for (let i = 0; i < 10; i++) { // Check up to 10 sub-questions
+        const subImageKey = `${questionId}_sub_${i}_image`;
+        if (studentAnswers[subImageKey]) {
+          processedImages.push(studentAnswers[subImageKey]);
+        }
       }
 
       // Get drawing data for this question (support multiple images)
