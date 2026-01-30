@@ -151,7 +151,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
-      <Card className="w-full max-w-3xl mx-auto shadow-sm border border-gray-100 bg-white rounded-2xl overflow-hidden">
+      <Card className="w-full max-w-3xl mx-auto shadow-sm border border-gray-100 bg-white rounded-2xl overflow-hidden font-exam-online">
         <CardContent className="p-6 md:p-8">
 
           {/* Header Meta */}

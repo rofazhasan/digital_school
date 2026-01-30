@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
@@ -9,6 +9,11 @@ import Script from "next/script";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
 
 const inter = Inter({ subsets: ["latin"] });
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: '--font-jetbrains-mono', // CSS variable for Tailwind
+});
+
 
 import db from "@/lib/db";
 
@@ -39,7 +44,7 @@ export default function RootLayout({
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.className} ${jetbrainsMono.variable}`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

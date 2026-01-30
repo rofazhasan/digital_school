@@ -240,3 +240,28 @@
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
+
+@font-face {
+  font-family: 'SabbirAshalota';
+  src: url('/fonts/SabbirAshalota.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-exam-online {
+  font-family: var(--font-jetbrains-mono), 'SabbirAshalota', monospace, sans-serif !important;
+}
+
+/* Attributes inside the exam card should inherit this font */
+.font-exam-online * {
+    font-family: inherit;
+}
+
+/* Force MathJax text to use these fonts */
+.font-exam-online .mjx-chtml,
+.font-exam-online .mjx-container,
+.font-exam-online .mjx-math,
+.font-exam-online .mjx-text {
+    font-family: var(--font-jetbrains-mono), 'SabbirAshalota', monospace !important;
+}
