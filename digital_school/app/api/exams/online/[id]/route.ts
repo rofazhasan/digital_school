@@ -251,9 +251,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
-      // Only return startedAt if the submission is actually in progress. 
-      // If it's finished (and we are here, meaning retake is allowed), we want to show instructions, not the old exam state.
-      startedAt: (existingSubmission && !isFinished) ? existingSubmission.startedAt : null,
+      // Only return startedAt if the submission is actually active/in-progress.
+      // We check the FRESH existingSubmission status here, not the stale 'isFinished' variable which refers to the PREVIOUS submission.
+      // @ts-ignore
+      startedAt: (existingSubmission && (existingSubmission.status === 'IN_PROGRESS' || !existingSubmission.submittedAt)) ? existingSubmission.startedAt : null,
       passMarks: exam.passMarks,
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
