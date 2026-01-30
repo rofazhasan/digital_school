@@ -252,16 +252,14 @@
 }
 
 /* Attributes inside the exam container should inherit this font */
-.font-exam-online * {
+/* Attributes inside the exam container should inherit this font, BUT exclude MathJax elements to prevent breaking math symbols */
+.font-exam-online *:not([class*="mjx-"]) {
   font-family: inherit !important;
 }
 
-/* Force MathJax text to use these fonts - stricter specificity */
-.font-exam-online .mjx-chtml,
-.font-exam-online .mjx-container,
-.font-exam-online .mjx-math,
+/* Only force specific text elements inside MathJax to use our fonts, leave math symbols to MathJax */
 .font-exam-online .mjx-text,
-.font-exam-online .mjx-char {
+.font-exam-online .mjx-mtext {
   font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace !important;
 }
 

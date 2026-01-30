@@ -251,7 +251,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
-      startedAt: existingSubmission?.startedAt || null,
+      // Only return startedAt if the submission is actually in progress. 
+      // If it's finished (and we are here, meaning retake is allowed), we want to show instructions, not the old exam state.
+      startedAt: (existingSubmission && !isFinished) ? existingSubmission.startedAt : null,
       passMarks: exam.passMarks,
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
