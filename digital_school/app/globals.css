@@ -254,12 +254,22 @@
 }
 
 /* Attributes inside the exam container should inherit this font */
-/* Attributes inside the exam container should inherit this font, BUT exclude MathJax elements to prevent breaking math symbols */
+/* Force MathJax to match the friendly Sans-Serif UI font (Inter) */
+.font-exam-online mjx-container,
+.font-exam-online .mjx-chtml,
+.font-exam-online .mjx-char,
+.font-exam-online .mjx-math {
+  /* Use Inter first, then system symbol fonts (Apple Symbols for Mac, Segoe UI Symbol for Windows) */
+  font-family: var(--font-inter), "Apple Symbols", "Segoe UI Symbol", sans-serif !important;
+  font-weight: 500 !important;
+  /* Make math symbols slightly bolder for readability */
+}
+
+/* Ensure no other overrides interfere */
 .font-exam-online *:not([class*="mjx-"]) {
   font-family: inherit !important;
 }
 
-/* Only force specific text elements inside MathJax to use our fonts, leave math symbols to MathJax */
 /* REMOVED: Let MathJax control ALL its internal fonts to match standard LaTeX/Overleaf look */
 /* .font-exam-online .mjx-text,
 .font-exam-online .mjx-mtext {
