@@ -3,6 +3,7 @@ import QRCode from "react-qr-code";
 import { MathJax } from 'better-react-mathjax';
 import Latex from 'react-latex';
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import { cleanupMath } from '@/lib/utils';
 
 // --- TYPES ---
 interface MCQ {
@@ -86,7 +87,7 @@ const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', '�
 
 const Text = ({ children }: { children: string }) => (
     <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper">
-        <MathJax inline dynamic>{children}</MathJax>
+        <MathJax inline dynamic>{cleanupMath(children)}</MathJax>
     </div>
 );
 

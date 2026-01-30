@@ -43,6 +43,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { cleanupMath } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -1391,7 +1392,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 <div className="mb-4">
                                   <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
                                   <div className="text-gray-700">
-                                    <MathJax dynamic>{question.questionText}</MathJax>
+                                    <MathJax inline dynamic>{cleanupMath(question.questionText)}</MathJax>
                                   </div>
                                   {question.awardedMarks < 0 && (
                                     <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
@@ -1432,8 +1433,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="flex items-center gap-2">
                                               <span className="font-medium">{String.fromCharCode(0x0995 + optIndex)}.</span>
                                               <span className={isCorrect && isUnanswered ? 'text-blue-700 font-medium' : ''}>
-                                                <MathJax>
-                                                  {option.text}
+                                                <MathJax inline dynamic>
+                                                  {cleanupMath(option.text)}
                                                 </MathJax>
                                               </span>
                                               {isCorrect && (
@@ -1461,7 +1462,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <h4 className="font-medium text-gray-800 mb-2">Explanation:</h4>
                                     <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
                                       <div className="text-gray-700">
-                                        <MathJax dynamic>{question.explanation}</MathJax>
+                                        <MathJax inline dynamic>{cleanupMath(question.explanation)}</MathJax>
                                       </div>
                                     </div>
                                   </div>
@@ -1525,7 +1526,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 <div className="mb-4">
                                   <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
                                   <div className="text-gray-700">
-                                    <MathJax dynamic>{question.questionText}</MathJax>
+                                    <MathJax inline dynamic>{cleanupMath(question.questionText)}</MathJax>
                                   </div>
                                 </div>
 
@@ -1663,7 +1664,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
                                     <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
                                       <div className="text-gray-700">
-                                        <MathJax dynamic>{question.modelAnswer}</MathJax>
+                                        <MathJax inline dynamic>{cleanupMath(question.modelAnswer)}</MathJax>
                                       </div>
                                     </div>
                                   </div>
@@ -1685,7 +1686,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
                                               <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
                                               <p className="text-gray-700">
-                                                <MathJax dynamic>{subQ.modelAnswer}</MathJax>
+                                                <MathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</MathJax>
                                               </p>
                                             </div>
                                           )}
@@ -1753,7 +1754,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 <div className="mb-4">
                                   <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
                                   <div className="text-gray-700">
-                                    <MathJax dynamic>{question.questionText}</MathJax>
+                                    <MathJax inline dynamic>{cleanupMath(question.questionText)}</MathJax>
                                   </div>
                                 </div>
 
@@ -1770,7 +1771,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           <div className="flex-grow pt-1">
                                             {subQ.text ? (
                                               <div className="text-gray-800 font-medium leading-relaxed">
-                                                <MathJax inline dynamic>{subQ.text}</MathJax>
+                                                <MathJax inline dynamic>{cleanupMath(subQ.text)}</MathJax>
                                               </div>
                                             ) : (
                                               <span className="text-gray-500 italic">Sub-question {idx + 1}</span>
@@ -1787,7 +1788,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 Model Answer
                                               </div>
                                               <div className="text-gray-800 leading-relaxed font-sans">
-                                                <MathJax dynamic>{subQ.modelAnswer || subQ.answer}</MathJax>
+                                                <MathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</MathJax>
                                               </div>
                                             </div>
                                           )}
@@ -1799,7 +1800,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             </div>
                                             {subQ.studentAnswer ? (
                                               <div className="text-gray-800 leading-relaxed font-sans">
-                                                <MathJax dynamic>{subQ.studentAnswer}</MathJax>
+                                                <MathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</MathJax>
                                               </div>
                                             ) : (
                                               <p className="text-gray-400 italic text-sm">No text answer provided</p>
@@ -1990,7 +1991,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
                                     <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
                                       <div className="text-gray-700">
-                                        <MathJax dynamic>{question.modelAnswer}</MathJax>
+                                        <MathJax inline dynamic>{cleanupMath(question.modelAnswer)}</MathJax>
                                       </div>
                                     </div>
                                   </div>
@@ -2012,7 +2013,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
                                               <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
                                               <p className="text-gray-700">
-                                                <MathJax dynamic>{subQ.modelAnswer}</MathJax>
+                                                <MathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</MathJax>
                                               </p>
                                             </div>
                                           )}

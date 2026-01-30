@@ -40,3 +40,23 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
   if (totalMarks === 0) return 0;
   return Math.round((earnedMarks / totalMarks) * 100);
 }
+
+/**
+ * Ensures text uses inline math delimiters to prevent unwanted new lines and centering.
+ * Replaces $$...$$ with $...$ and \[...\] with \(...\)
+ * @param text - The text containing math to clean up
+ * @returns Cleaned text with inline math delimiters
+ */
+export function cleanupMath(text: string | null | undefined): string {
+  if (!text) return "";
+  // First ensure we don't have double display delimiters if any
+  let cleaned = text;
+
+  // Replace $$ with $
+  cleaned = cleaned.replace(/\$\$/g, '$');
+
+  // Replace \[ with \( and \] with \)
+  cleaned = cleaned.replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)');
+
+  return cleaned;
+}

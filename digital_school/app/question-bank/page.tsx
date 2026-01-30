@@ -209,6 +209,7 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { addDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { cleanupMath } from "@/lib/utils";
 
 // --- Main Page Component ---
 export default function QuestionBankPage() {
@@ -1548,7 +1549,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       )}
                     </div>
                     <div className="whitespace-pre-wrap overflow-x-auto">
-                      <MathJax>{q.questionText || ''}</MathJax>
+                      <MathJax inline>{cleanupMath(q.questionText || '')}</MathJax>
                     </div>
 
                     {/* MCQ Options with Explanations */}
@@ -1558,11 +1559,11 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                         <ul className="list-disc pl-5 space-y-2">
                           {((q.options || []) || []).map((opt, i) => (
                             <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                              <MathJax inline>{opt.text || ''}</MathJax>
+                              <MathJax inline>{cleanupMath(opt.text || '')}</MathJax>
                               {opt.isCorrect && opt.explanation && (
                                 <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-green-700 dark:text-green-300">Why this is correct:</p>
-                                  <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{opt.explanation}</MathJax></p>
+                                  <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{cleanupMath(opt.explanation)}</MathJax></p>
                                 </div>
                               )}
                             </li>
@@ -1579,13 +1580,13 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                <MathJax>{sq.question || ''}</MathJax>
+                                <MathJax inline>{cleanupMath(sq.question || '')}</MathJax>
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (
                                 <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                                  <MathJax>{sq.modelAnswer}</MathJax>
+                                  <MathJax inline>{cleanupMath(sq.modelAnswer)}</MathJax>
                                 </div>
                               )}
                             </li>
@@ -1599,7 +1600,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                          <MathJax>{q.modelAnswer}</MathJax>
+                          <MathJax inline>{cleanupMath(q.modelAnswer)}</MathJax>
                         </div>
                       </div>
                     )}

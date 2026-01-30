@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { X, Check, AlertCircle, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { cleanupMath } from "@/lib/utils";
 
 interface QuestionCardProps {
   disabled?: boolean;
@@ -85,7 +86,7 @@ const MCQOption = memo(({
 
       {/* Option Text */}
       <div className="flex-1 pt-1.5 text-sm md:text-base leading-relaxed break-words font-medium">
-        <MathJax dynamic>{label || ""}</MathJax>
+        <MathJax dynamic inline>{cleanupMath(label || "")}</MathJax>
         {/* @ts-ignore */}
         {option?.image && (
           <div className="mt-2">
@@ -183,7 +184,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
           {/* Question Text */}
           <div className="prose prose-indigo max-w-none text-gray-800 text-lg md:text-xl font-medium leading-relaxed mb-8">
-            <MathJax dynamic>{text || ""}</MathJax>
+            <MathJax dynamic inline>{cleanupMath(text || "")}</MathJax>
           </div>
 
           {/* Inputs */}

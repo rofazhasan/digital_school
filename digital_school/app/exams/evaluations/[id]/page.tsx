@@ -42,6 +42,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 
 interface LiveStudent {
@@ -476,14 +477,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div className="flex-grow space-y-2">
                               <div className="prose prose-sm max-w-none">
-                                <MathJax>{q.text}</MathJax>
+                                <MathJax inline>{cleanupMath(q.text)}</MathJax>
                               </div>
 
                               {hasAnswer ? (
                                 <div className="mt-3 p-3 bg-white rounded border border-blue-100">
                                   <p className="text-xs font-semibold text-gray-500 mb-1">Student Answer:</p>
                                   <div className="text-sm font-medium text-blue-800">
-                                    <MathJax>{String(ans)}</MathJax>
+                                    <MathJax inline>{cleanupMath(String(ans))}</MathJax>
                                   </div>
                                 </div>
                               ) : (
@@ -502,7 +503,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="flex items-start">
                                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                         <div className="flex-1">
-                                          <MathJax inline>{opt.text || String(opt)}</MathJax>
+                                          <MathJax inline>{cleanupMath(opt.text || String(opt))}</MathJax>
                                           {opt.image && (
                                             <div className="mt-1">
                                               <img src={opt.image} alt="Option" className="max-h-20 rounded border bg-white object-contain" />

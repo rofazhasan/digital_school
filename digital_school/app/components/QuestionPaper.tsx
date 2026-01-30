@@ -2,6 +2,7 @@ import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
 import { MathJax, MathJaxContext } from 'better-react-mathjax';
 import Latex from 'react-latex';
+import { cleanupMath } from '@/lib/utils';
 
 // --- TYPES ---
 interface MCQ {
@@ -58,7 +59,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 // Helper to render text with react-latex
 const Text = ({ children }: { children: string }) => (
-  <Latex>{children}</Latex>
+  <MathJax inline dynamic>{cleanupMath(children)}</MathJax>
 );
 
 // Main QuestionPaper component (forwardRef for printing)
