@@ -64,7 +64,7 @@ const normalizeAnswer = (ans: string | undefined | number) => {
 
 // Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
-  <MathJax dynamic>{children}</MathJax>
+  <MathJax dynamic inline>{children}</MathJax>
 );
 
 // Main AnswerQuestionPaper component (forwardRef for printing)

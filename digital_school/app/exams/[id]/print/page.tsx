@@ -140,7 +140,11 @@ export default function PrintExamPage() {
   // --- MathJax Configuration ---
   const mathJaxConfig = {
     loader: { load: ["[tex]/ams"] },
-    tex: { packages: { '[+]': ['ams'] } },
+    tex: {
+      packages: { '[+]': ['ams'] },
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+    },
     startup: {
       // This function runs after MathJax has processed the page.
       pageReady: () => {
@@ -197,8 +201,8 @@ export default function PrintExamPage() {
             <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">Waiting for MathJax...</span>
           )}
           <span className={`px-3 py-1 rounded-full text-sm font-semibold ${showAnswers
-              ? 'bg-orange-100 text-orange-800'
-              : 'bg-blue-100 text-blue-800'
+            ? 'bg-orange-100 text-orange-800'
+            : 'bg-blue-100 text-blue-800'
             }`}>
             {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
           </span>
@@ -326,8 +330,8 @@ const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxRe
       <button
         onClick={() => setShowAnswers(!showAnswers)}
         className={`px-4 py-2 rounded shadow-lg transition ${showAnswers
-            ? 'bg-green-600 text-white hover:bg-green-700'
-            : 'bg-orange-600 text-white hover:bg-orange-700'
+          ? 'bg-green-600 text-white hover:bg-green-700'
+          : 'bg-orange-600 text-white hover:bg-orange-700'
           }`}
       >
         {showAnswers ? 'প্রশ্নপত্র দেখুন' : 'উত্তরপত্র দেখুন'}
