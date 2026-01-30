@@ -160,20 +160,17 @@ export default function ExamLayout() {
       await enterFullscreen();
 
       setIsStarting(true);
-      // Call API to explicitly start the exam
-      const res = await fetch(`/api/exams/online/${exam.id}?action=start`, {
-        method: 'GET',
-        headers: { 'Content-Type': 'application/json' }
-      });
 
-      if (!res.ok) throw new Error("Failed to start exam");
+      // 2. Add ?action=start to the URL
+      const currentUrl = new URL(window.location.href);
+      currentUrl.searchParams.set('action', 'start');
 
-      setIsExamActive(true);
-      // Reload to sync state (Timer, startedAt, etc.)
-      window.location.reload();
+      // 3. Force reload to trigger the server-side start logic
+      window.location.href = currentUrl.toString();
+
     } catch (error) {
       console.error("Error starting exam:", error);
-      alert("Failed to start exam. Please try again.");
+      toast.error("Failed to start exam. Please try again.");
       setIsStarting(false);
     }
   };
