@@ -8,15 +8,12 @@ import { NavigationWrapper } from "@/components/ui/navigation-wrapper";
 import Script from "next/script";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
 
-const inter = Inter({ subsets: ["latin"] });
-// Replaced JetBrains Mono with EB Garamond for "Overleaf" style
-import { EB_Garamond } from "next/font/google";
-const ebGaramond = EB_Garamond({
+const inter = Inter({
   subsets: ["latin"],
-  variable: '--font-jetbrains-mono', // Keep same variable name to minimize refactoring, but mapped to Serif
-  weight: ['400', '500', '600', '700', '800'],
-  display: 'swap',
+  variable: '--font-inter',
 });
+// Removed EB Garamond as per user request for better readability. Using Inter (standard sans-serif) instead.
+
 const tiroBangla = Tiro_Bangla({
   weight: '400',
   subsets: ['bengali'],
@@ -53,7 +50,7 @@ export default function RootLayout({
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
       </head>
-      <body className={`${inter.className} ${ebGaramond.variable} ${tiroBangla.variable}`}>
+      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable}`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

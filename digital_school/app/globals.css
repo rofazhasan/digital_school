@@ -248,13 +248,9 @@
 
 
 .font-exam-online {
-  font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace, sans-serif !important;
-  /* EB Garamond is naturally small/thin, so we boost it */
+  font-family: var(--font-inter), var(--font-tiro-bangla), sans-serif !important;
+  /* Inter is highly legible, keeping reading line-height */
   line-height: 1.6 !important;
-  font-size: 1.125rem !important;
-  /* Increase size (approx 18px) */
-  font-weight: 500 !important;
-  /* Make it bolder (Medium weight) */
 }
 
 /* Attributes inside the exam container should inherit this font */
