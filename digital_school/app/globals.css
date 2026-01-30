@@ -249,6 +249,13 @@
 
 .font-exam-online {
   font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace, sans-serif !important;
+  /* Improve readability for JetBrains Mono */
+  font-variant-ligatures: none !important;
+  /* Disable coding ligatures (e.g., != becoming ≠) for clarity */
+  letter-spacing: 0.02em !important;
+  /* Add slight breathing room between characters */
+  line-height: 1.7 !important;
+  /* Increase line height for better readability */
 }
 
 /* Attributes inside the exam container should inherit this font */
