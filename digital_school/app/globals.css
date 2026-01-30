@@ -51,7 +51,7 @@
   text-align: center;
 }
 
-.katex-display > .katex {
+.katex-display>.katex {
   display: inline-block;
   text-align: left;
 }
@@ -208,11 +208,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     font-family: 'Noto Serif Bengali', var(--font-sans), serif;
     @apply bg-background text-foreground;
   }
 }
+
 .animated-gradient-bg {
   background-size: 200% 200%;
   background-image: linear-gradient(to right, #0f172a, #1e293b, #334155, #475569);
@@ -221,13 +223,15 @@
 
 @keyframes gradient {
   0% {
-      background-position: 0% 50%;
+    background-position: 0% 50%;
   }
+
   50% {
-      background-position: 100% 50%;
+    background-position: 100% 50%;
   }
+
   100% {
-      background-position: 0% 50%;
+    background-position: 0% 50%;
   }
 }
 
@@ -242,26 +246,45 @@
 }
 
 @font-face {
-  font-family: 'SabbirAshalota';
-  src: url('/fonts/SabbirAshalota.ttf') format('truetype');
+  font-family: 'Purno';
+  src: url('/fonts/Purno.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
 }
 
 .font-exam-online {
-  font-family: var(--font-jetbrains-mono), 'SabbirAshalota', monospace, sans-serif !important;
+  font-family: var(--font-jetbrains-mono), 'Purno', monospace, sans-serif !important;
 }
 
-/* Attributes inside the exam card should inherit this font */
+/* Attributes inside the exam container should inherit this font */
 .font-exam-online * {
-    font-family: inherit;
+  font-family: inherit !important;
 }
 
-/* Force MathJax text to use these fonts */
+/* Force MathJax text to use these fonts - stricter specificity */
 .font-exam-online .mjx-chtml,
 .font-exam-online .mjx-container,
 .font-exam-online .mjx-math,
-.font-exam-online .mjx-text {
-    font-family: var(--font-jetbrains-mono), 'SabbirAshalota', monospace !important;
+.font-exam-online .mjx-text,
+.font-exam-online .mjx-char {
+  font-family: var(--font-jetbrains-mono), 'Purno', monospace !important;
+}
+
+/* Specific overrides for common components that might have their own fonts */
+.font-exam-online button,
+.font-exam-online input,
+.font-exam-online textarea,
+.font-exam-online .lucide,
+.font-exam-online [class*='lucide'],
+.font-exam-online span,
+.font-exam-online div,
+.font-exam-online p,
+.font-exam-online h1,
+.font-exam-online h2,
+.font-exam-online h3,
+.font-exam-online h4,
+.font-exam-online h5,
+.font-exam-online h6 {
+  font-family: inherit !important;
 }

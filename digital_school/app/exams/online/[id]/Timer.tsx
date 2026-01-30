@@ -96,7 +96,7 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
 
   return (
     <div className={`
-      flex items-center gap-2 px-4 py-2 rounded-full font-mono text-2xl font-bold transition-all shadow-sm
+      flex items-center gap-2 px-4 py-2 rounded-full text-2xl font-bold transition-all shadow-sm
       ${isLowTime ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-900 border border-gray-200'}
     `}>
       <Clock className={`w-5 h-5 ${isLowTime ? 'animate-pulse' : ''}`} />

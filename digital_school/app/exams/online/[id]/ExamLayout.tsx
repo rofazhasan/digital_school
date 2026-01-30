@@ -293,9 +293,10 @@ export default function ExamLayout() {
   if (!currentQuestion) return <div className="flex justify-center items-center h-screen text-muted-foreground">Loading exam...</div>;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Sticky Header */}
-      {/* Sticky Header */}
+    <div className={`
+      min-h-screen bg-gray-50 flex flex-col font-exam-online
+      ${isExamActive && (!isFullscreen || !isTabActive) ? 'select-none' : ''}
+    `}>  {/* Sticky Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
