@@ -258,10 +258,11 @@
 }
 
 /* Only force specific text elements inside MathJax to use our fonts, leave math symbols to MathJax */
-.font-exam-online .mjx-text,
+/* REMOVED: Let MathJax control ALL its internal fonts to match standard LaTeX/Overleaf look */
+/* .font-exam-online .mjx-text,
 .font-exam-online .mjx-mtext {
   font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace !important;
-}
+} */
 
 /* Specific overrides for common components that might have their own fonts */
 .font-exam-online button,
