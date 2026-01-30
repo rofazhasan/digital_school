@@ -54,18 +54,18 @@ const MCQOption = memo(({
 
   // State styles
   const getStyles = () => {
-    const base = "w-full text-left p-4 rounded-xl border flex items-start gap-3 transition-all duration-200 group relative overflow-hidden";
+    const base = "w-full text-left p-4 rounded-xl border-2 flex items-start gap-4 transition-all duration-200 group relative overflow-hidden";
 
     // Result mode
     if (showResult) {
-      if (isCorrect) return `${base} bg-green-50/50 border-green-500/30 text-green-900`;
-      if (isSelected && !isCorrect) return `${base} bg-red-50/50 border-red-500/30 text-red-900`;
-      return `${base} bg-gray-50 border-gray-100 text-gray-400 opacity-60`;
+      if (isCorrect) return `${base} bg-green-50/80 border-green-500 text-green-900 shadow-sm`;
+      if (isSelected && !isCorrect) return `${base} bg-red-50/80 border-red-500 text-red-900 shadow-sm`;
+      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-70 grayscale`;
     }
 
     // Interaction mode
-    if (isSelected) return `${base} bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500 shadow-sm z-10`;
-    return `${base} bg-white border-gray-200 hover:border-gray-300 hover:bg-gray-50/50`;
+    if (isSelected) return `${base} bg-indigo-50/90 border-indigo-600 shadow-md ring-1 ring-indigo-600 scale-[1.01] z-10`;
+    return `${base} bg-white border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/30 hover:shadow-md hover:-translate-y-0.5`;
   };
 
   return (
@@ -76,22 +76,25 @@ const MCQOption = memo(({
     >
       {/* Option Key Circle */}
       <div className={`
-        flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors
-        ${showResult && isCorrect ? 'bg-green-500 text-white' :
-          showResult && isSelected && !isCorrect ? 'bg-red-500 text-white' :
-            isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-gray-200'}
+        flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 shadow-sm
+        ${showResult && isCorrect ? 'bg-green-600 text-white shadow-green-200' :
+          showResult && isSelected && !isCorrect ? 'bg-red-600 text-white shadow-red-200' :
+            isSelected ? 'bg-indigo-600 text-white shadow-indigo-200 scale-110' :
+              'bg-gray-100 text-gray-500 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-md group-hover:scale-110'}
       `}>
         {String.fromCharCode(65 + index)}
       </div>
 
       {/* Option Text */}
-      <div className="flex-1 pt-1.5 text-sm md:text-base leading-relaxed break-words font-medium">
-        <MathJax dynamic inline>{cleanupMath(label || "")}</MathJax>
+      <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
+        <div className="min-w-0">
+          <MathJax inline dynamic>{cleanupMath(label || "")}</MathJax>
+        </div>
         {/* @ts-ignore */}
         {option?.image && (
-          <div className="mt-2">
+          <div className="mt-3">
             {/* @ts-ignore */}
-            <img src={option.image} alt="Option" className="max-h-32 rounded border bg-white object-contain" />
+            <img src={option.image} alt="Option" className="max-h-40 rounded-lg border bg-white object-contain shadow-sm" />
           </div>
         )}
       </div>
