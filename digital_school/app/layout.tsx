@@ -9,9 +9,13 @@ import Script from "next/script";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
 
 const inter = Inter({ subsets: ["latin"] });
-const jetbrainsMono = JetBrains_Mono({
+// Replaced JetBrains Mono with EB Garamond for "Overleaf" style
+import { EB_Garamond } from "next/font/google";
+const ebGaramond = EB_Garamond({
   subsets: ["latin"],
-  variable: '--font-jetbrains-mono', // CSS variable for Tailwind
+  variable: '--font-jetbrains-mono', // Keep same variable name to minimize refactoring, but mapped to Serif
+  weight: ['400', '500', '600', '700', '800'],
+  display: 'swap',
 });
 const tiroBangla = Tiro_Bangla({
   weight: '400',
@@ -49,7 +53,7 @@ export default function RootLayout({
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
       </head>
-      <body className={`${inter.className} ${jetbrainsMono.variable} ${tiroBangla.variable}`}>
+      <body className={`${inter.className} ${ebGaramond.variable} ${tiroBangla.variable}`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

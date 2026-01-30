@@ -321,7 +321,8 @@ export default function ExamLayout() {
             </div>
           </div>
 
-          <div className="absolute left-1/2 transform -translate-x-1/2">
+          {/* Timer: Stacked on mobile, Absolute centered on desktop */}
+          <div className="relative mt-2 sm:mt-0 sm:absolute sm:left-1/2 sm:transform sm:-translate-x-1/2 flex justify-center order-last sm:order-none w-full sm:w-auto">
             <Timer onTimeUp={() => handleSubmit(true)} />
           </div>
 

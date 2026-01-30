@@ -47,11 +47,12 @@ export const useProctoring = ({
     // Handle Visibility Change (Tab Switching)
     useEffect(() => {
         const handleVisibilityChange = () => {
+            // IGNORE warnings if exam is not fully active or during init
+            if (!isExamActive) return;
+
             if (document.hidden) {
                 setIsTabActive(false);
-                if (isExamActive) {
-                    triggerViolation('You left the exam tab. This has been recorded.');
-                }
+                triggerViolation('You left the exam tab. This has been recorded.');
             } else {
                 setIsTabActive(true);
             }
@@ -64,7 +65,9 @@ export const useProctoring = ({
     // Handle Window Blur (Alt+Tab or clicking outside)
     useEffect(() => {
         const handleBlur = () => {
-            if (isExamActive && !isUploading) { // Check isUploading
+            // IGNORE warnings if isUploading is true (system dialogs)
+            // AND ensure isExamActive is true before warning
+            if (isExamActive && !isUploading) {
                 triggerViolation('Focus lost. Please stay on the exam window.');
             }
         };
