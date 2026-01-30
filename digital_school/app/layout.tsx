@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Tiro_Bangla } from "next/font/google"; // Import Tiro_Bangla
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
@@ -12,6 +12,11 @@ const inter = Inter({ subsets: ["latin"] });
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: '--font-jetbrains-mono', // CSS variable for Tailwind
+});
+const tiroBangla = Tiro_Bangla({
+  weight: '400',
+  subsets: ['bengali'],
+  variable: '--font-tiro-bangla',
 });
 
 
@@ -44,7 +49,7 @@ export default function RootLayout({
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
       </head>
-      <body className={`${inter.className} ${jetbrainsMono.variable}`}>
+      <body className={`${inter.className} ${jetbrainsMono.variable} ${tiroBangla.variable}`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

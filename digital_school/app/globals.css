@@ -245,16 +245,10 @@
   border: 1px solid rgba(255, 255, 255, 0.18);
 }
 
-@font-face {
-  font-family: 'Purno';
-  src: url('/fonts/Purno.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
+
 
 .font-exam-online {
-  font-family: var(--font-jetbrains-mono), 'Purno', monospace, sans-serif !important;
+  font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace, sans-serif !important;
 }
 
 /* Attributes inside the exam container should inherit this font */
@@ -268,7 +262,7 @@
 .font-exam-online .mjx-math,
 .font-exam-online .mjx-text,
 .font-exam-online .mjx-char {
-  font-family: var(--font-jetbrains-mono), 'Purno', monospace !important;
+  font-family: var(--font-jetbrains-mono), var(--font-tiro-bangla), monospace !important;
 }
 
 /* Specific overrides for common components that might have their own fonts */
