@@ -431,7 +431,11 @@ export default function CreateExamPage() {
           const lowerK = k.toLowerCase();
           // Check exact matches or startsWith for robust handling
           if (keywords.some(kw => lowerK === kw.toLowerCase() || lowerK.startsWith(kw.toLowerCase()))) {
-            return row[k];
+            const val = row[k];
+            // Treat empty string or undefined as null to trigger defaults later if needed, 
+            // BUT preserve 0.
+            if (val === undefined || val === null || val === "") return null;
+            return val;
           }
         }
         return null;
@@ -483,11 +487,11 @@ export default function CreateExamPage() {
           classId: "", // Will be resolved in validation
           allowRetake: false,
           instructions: getValue(row, ["Instructions"]) || "",
-          mcqNegativeMarking: Number(getValue(row, ["MCQ Negative Marking"]) || 0),
-          cqTotalQuestions: Number(getValue(row, ["CQ Total"]) || 8),
-          cqRequiredQuestions: Number(getValue(row, ["CQ Required"]) || 5),
-          sqTotalQuestions: Number(getValue(row, ["SQ Total"]) || 15),
-          sqRequiredQuestions: Number(getValue(row, ["SQ Required"]) || 5),
+          mcqNegativeMarking: parseFloat(getValue(row, ["MCQ Negative Marking"]) ?? 0),
+          cqTotalQuestions: parseInt(getValue(row, ["CQ Total"]) ?? 8),
+          cqRequiredQuestions: parseInt(getValue(row, ["CQ Required"]) ?? 5),
+          sqTotalQuestions: parseInt(getValue(row, ["SQ Total"]) ?? 15),
+          sqRequiredQuestions: parseInt(getValue(row, ["SQ Required"]) ?? 5),
           cqSubsections: subsections
         };
 

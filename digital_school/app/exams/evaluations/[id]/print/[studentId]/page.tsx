@@ -104,12 +104,17 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     } as any);
 
     const mathJaxConfig = {
-        loader: { load: ["[tex]/ams"] },
-        tex: { packages: { '[+]': ['ams'] } },
+        loader: { load: ["input/tex", "output/chtml"] },
+        tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            packages: { '[+]': ['ams'] }
+        },
         startup: {
             pageReady: () => {
                 setIsMathJaxReady(true);
                 (window as any).__IS_MATHJAX_READY = true;
+                return (window as any).MathJax.startup.defaultPageReady();
             }
         }
     };

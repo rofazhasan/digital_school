@@ -1685,8 +1685,12 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       "difficulty": "EASY",
       "subject": "Geography",
       "className": "Class 9",
-      "options": ["Paris", "London", "Berlin", "Madrid"],
-      "correctAnswer": "Paris"
+      "options": [
+        { "text": "Paris", "isCorrect": true, "explanation": "Paris is the capital and most populous city of France." },
+        { "text": "London", "isCorrect": false },
+        { "text": "Berlin", "isCorrect": false },
+        { "text": "Madrid", "isCorrect": false }
+      ]
     },
     {
       "questionText": "Explain Newton's Second Law.",
