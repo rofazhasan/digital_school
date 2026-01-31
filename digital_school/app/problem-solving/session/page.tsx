@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import {
     ChevronLeft, ChevronRight, PenTool, Eraser, Move,
     RotateCcw, Undo, Redo, Share, Printer, Eye, Lock, Unlock,
-    CheckCircle, XCircle
+    CheckCircle, XCircle, MoreVertical, Settings, LogOut, Maximize2, Minimize2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +15,7 @@ import { MathJaxContext, MathJax } from "better-react-mathjax";
 import SmartBoard, { SmartBoardRef } from "@/app/components/SmartBoard";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 // Types
 interface Question {
@@ -42,6 +43,7 @@ export default function ProblemSolvingSession() {
     const [boardTool, setBoardTool] = useState<'pen' | 'eraser' | 'move'>('pen');
     const [boardColor, setBoardColor] = useState('#000000');
     const [boardSize, setBoardSize] = useState(2);
+    const [isFullscreen, setIsFullscreen] = useState(false);
 
     // Interaction State
     const [showAnswer, setShowAnswer] = useState(false);
@@ -74,8 +76,6 @@ export default function ProblemSolvingSession() {
                 }
 
                 const ids = JSON.parse(storedIds);
-
-                // Fetch all questions
                 const res = await fetch('/api/questions');
                 const data = await res.json();
 
@@ -104,8 +104,7 @@ export default function ProblemSolvingSession() {
 
                 setQuestions(sessionQuestions);
             } catch (err) {
-                console.error(err);
-                toast.error("Failed to load session data");
+                toast.error("Failed to load session");
             } finally {
                 setLoading(false);
             }
@@ -113,8 +112,7 @@ export default function ProblemSolvingSession() {
         initSession();
     }, []);
 
-    // Board persistence per question (Simple in-memory map for MVP)
-    // Real implementation: Store DataURL strings in a state map.
+    // Board persistence per question
     const [boardSavedStates, setBoardSavedStates] = useState<Record<string, string>>({});
 
     const saveCurrentBoard = () => {
@@ -128,17 +126,15 @@ export default function ProblemSolvingSession() {
     };
 
     const restoreBoard = (idx: number) => {
-        // Requires SmartBoard to accept initialData or loadFromURL
-        // For MVP phase 3 task: We'll implement this properly later. 
-        // Just clearing for now to simulate fresh page.
         boardRef.current?.clear();
+        // Logic to restore 'dataUrl' would go here if SmartBoard supported 'loadFromURL'
+        // For now, we clear to simulate fresh page or "infinite" scroll effect
     };
 
     const handleNext = () => {
         saveCurrentBoard();
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(prev => prev + 1);
-            // Reset interaction states
             setShowAnswer(false);
             setSelectedOption(null);
             setIsAnswerChecked(false);
@@ -150,7 +146,6 @@ export default function ProblemSolvingSession() {
         saveCurrentBoard();
         if (currentIndex > 0) {
             setCurrentIndex(prev => prev - 1);
-            // Reset interaction states
             setShowAnswer(false);
             setSelectedOption(null);
             setIsAnswerChecked(false);
@@ -158,231 +153,286 @@ export default function ProblemSolvingSession() {
         }
     };
 
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+            setIsFullscreen(true);
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+                setIsFullscreen(false);
+            }
+        }
+    };
+
     const currentQ = questions[currentIndex];
 
     if (loading || !currentQ) {
-        return <div className="h-screen flex items-center justify-center">Loading Session...</div>;
+        return (
+            <div className="h-screen flex flex-col items-center justify-center bg-white">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                <p className="text-gray-500 font-medium">Preparing Studio...</p>
+            </div>
+        );
     }
 
     return (
         <MathJaxContext>
-            <div className="h-screen w-full flex flex-col bg-gray-100 overflow-hidden">
+            <div className="h-screen w-full flex flex-col bg-white overflow-hidden relative font-sans">
 
-                {/* TOP TOOLBAR */}
-                <div className="h-14 bg-white border-b flex items-center justify-between px-4 shrink-0 z-20 shadow-sm">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" onClick={() => router.push('/problem-solving')}>
-                            <ChevronLeft className="w-4 h-4 mr-1" /> Exit
+                {/* 1. TOP BAR - Minimalist */}
+                <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-20 pointer-events-none">
+                    {/* Left: Back & Info */}
+                    <div className="flex items-center gap-4 pointer-events-auto">
+                        <Button
+                            variant="secondary" size="sm"
+                            onClick={() => router.push('/problem-solving')}
+                            className="bg-white/90 backdrop-blur shadow-sm hover:bg-white border border-gray-100 rounded-full pl-3 pr-4"
+                        >
+                            <LogOut className="w-4 h-4 mr-2 text-gray-500" />
+                            <span className="text-gray-700">Exit</span>
                         </Button>
-                        <div className="h-6 w-px bg-gray-200" />
-                        <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
-                            <Button
-                                size="icon" variant={boardTool === 'pen' ? 'secondary' : 'ghost'} className="h-8 w-8"
-                                onClick={() => { setBoardTool('pen'); boardRef.current?.setTool('pen'); }}
-                            >
-                                <PenTool className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                size="icon" variant={boardTool === 'eraser' ? 'secondary' : 'ghost'} className="h-8 w-8"
-                                onClick={() => { setBoardTool('eraser'); boardRef.current?.setTool('eraser'); }}
-                            >
-                                <Eraser className="w-4 h-4" />
-                            </Button>
-                            <Button
-                                size="icon" variant={boardTool === 'move' ? 'secondary' : 'ghost'} className="h-8 w-8"
-                                onClick={() => { setBoardTool('move'); boardRef.current?.setTool('move'); }}
-                            >
-                                <Move className="w-4 h-4" />
-                            </Button>
-                        </div>
-
-                        {/* Color Picker */}
-                        <div className="flex items-center gap-2 ml-2">
-                            {['#000000', '#ef4444', '#22c55e', '#3b82f6'].map(c => (
-                                <button
-                                    key={c}
-                                    className={`w-6 h-6 rounded-full border-2 ${boardColor === c ? 'border-gray-900 scale-110' : 'border-transparent'}`}
-                                    style={{ backgroundColor: c }}
-                                    onClick={() => { setBoardColor(c); boardRef.current?.setColor(c); }}
-                                />
-                            ))}
-                        </div>
-
-                        {/* Size Slider */}
-                        <div className="w-24 ml-2">
-                            <Slider
-                                value={[boardSize]}
-                                min={1} max={10} step={1}
-                                onValueChange={(v) => { setBoardSize(v[0]); boardRef.current?.setLineWidth(v[0]); }}
-                            />
+                        <div className="bg-white/90 backdrop-blur shadow-sm border border-gray-100 px-4 py-1.5 rounded-full flex items-center gap-3">
+                            <span className="text-sm font-semibold text-gray-800">Question {currentIndex + 1}</span>
+                            <span className="text-xs text-gray-400">/ {questions.length}</span>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium mr-4 text-gray-500">
-                            Question {currentIndex + 1} / {questions.length}
-                        </span>
-                        <Button size="icon" variant="ghost" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>
-                        <Button size="icon" variant="ghost" onClick={() => boardRef.current?.redo()}><Redo className="w-4 h-4" /></Button>
-                        <div className="h-6 w-px bg-gray-200 mx-2" />
-                        <Button size="icon" variant="ghost" onClick={() => setShowOverlay(!showOverlay)}>
-                            {showOverlay ? <Eye className="w-4 h-4 text-indigo-600" /> : <Eye className="w-4 h-4 text-gray-400" />}
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                        <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
+                            {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
                         </Button>
-                        <Button size="sm" className="bg-indigo-600 hover:bg-indigo-700">
-                            Next <ChevronRight className="w-4 h-4 ml-1" />
+                        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-white/80 hover:bg-white rounded-full">
+                            {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
                         </Button>
                     </div>
                 </div>
 
-                {/* MAIN WORKSPACE */}
-                <div className="flex-1 relative overflow-hidden">
-                    {/* Smart Board Background */}
-                    <div className="absolute inset-0 z-0">
-                        <SmartBoard ref={boardRef} className="bg-white" />
-                    </div>
+                {/* 2. MAIN CANVAS */}
+                <div className="absolute inset-0 z-0">
+                    <SmartBoard ref={boardRef} className="bg-white cursor-crosshair" />
+                </div>
 
-                    {/* Question Overlay (Draggable/Fixed) */}
+                {/* 3. QUESTION OVERLAY - Glassmorphic Drawer */}
+                <AnimatePresence>
                     {showOverlay && (
-                        <div className="absolute top-4 left-4 w-[450px] max-h-[calc(100vh-100px)] z-10 flex flex-col">
-                            <Card className="shadow-xl bg-white/95 backdrop-blur border-indigo-100 overflow-hidden flex flex-col">
-                                <CardContent className="p-0 flex flex-col">
-                                    {/* Header */}
-                                    <div className="p-4 bg-indigo-50/50 border-b flex justify-between items-start cursor-move">
-                                        <div>
-                                            <Badge variant="outline" className="bg-white mb-2">{currentQ.type} • {currentQ.marks} Marks</Badge>
-                                            <h3 className="text-sm font-medium text-gray-500">{currentQ.subject}</h3>
+                        <motion.div
+                            initial={{ x: -400, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -400, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            className="absolute top-20 left-6 w-[480px] z-10 pointer-events-auto flex flex-col max-h-[calc(100vh-140px)]"
+                        >
+                            <Card className="shadow-2xl shadow-indigo-900/10 border-white/40 bg-white/90 backdrop-blur-xl overflow-hidden flex flex-col rounded-2xl ring-1 ring-gray-900/5">
+                                <div className="px-6 py-4 border-b border-gray-100/50 flex justify-between items-start bg-white/50">
+                                    <div>
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <Badge className="bg-indigo-600 hover:bg-indigo-700">{currentQ.type}</Badge>
+                                            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">{currentQ.subject}</span>
                                         </div>
-                                        <Badge variant={currentQ.difficulty === 'HARD' ? 'destructive' : 'secondary'}>
-                                            {currentQ.difficulty}
-                                        </Badge>
+                                    </div>
+                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                        {currentQ.difficulty}
+                                    </Badge>
+                                </div>
+
+                                <div className="p-6 overflow-y-auto custom-scrollbar">
+                                    {/* Question Text */}
+                                    <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-serif">
+                                        <MathJax>{cleanupMath(currentQ.questionText)}</MathJax>
                                     </div>
 
-                                    {/* Question Body - Scrollable */}
-                                    <div className="p-5 overflow-y-auto max-h-[400px]">
-                                        <div className="prose prose-sm max-w-none text-gray-800 text-lg">
-                                            <MathJax>{cleanupMath(currentQ.questionText)}</MathJax>
-                                        </div>
-
-                                        {/* MCQ Options */}
+                                    {/* Options or Answer Area */}
+                                    <div className="mt-8 space-y-4">
                                         {currentQ.type === 'MCQ' && currentQ.options && (
-                                            <div className="mt-6 space-y-2">
+                                            <div className="grid gap-3">
                                                 {currentQ.options.map((opt, idx) => {
                                                     const isSelected = selectedOption === idx;
                                                     const isCorrect = opt.isCorrect;
 
-                                                    let style = "border-gray-200 hover:bg-gray-50";
+                                                    let statusClass = "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
                                                     if (isAnswerChecked) {
-                                                        if (isCorrect) style = "bg-green-50 border-green-500 text-green-900";
-                                                        else if (isSelected) style = "bg-red-50 border-red-500 text-red-900";
-                                                        else style = "border-gray-200 opacity-60";
+                                                        if (isCorrect) statusClass = "bg-green-50 border-green-200 ring-1 ring-green-200";
+                                                        else if (isSelected) statusClass = "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
+                                                        else statusClass = "bg-gray-50 opacity-50";
                                                     } else if (isSelected) {
-                                                        style = "bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500";
+                                                        statusClass = "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
                                                     }
 
                                                     return (
                                                         <div
                                                             key={idx}
                                                             onClick={() => !isAnswerChecked && setSelectedOption(idx)}
-                                                            className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex items-start gap-3 ${style}`}
+                                                            className={`
+                                                  p-4 rounded-xl border-2 cursor-pointer transition-all duration-200 flex items-start gap-4 group
+                                                  ${statusClass}
+                                              `}
                                                         >
-                                                            <div className="shrink-0 w-6 h-6 rounded-full bg-white border flex items-center justify-center text-xs font-bold">
+                                                            <div className={`
+                                                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                                                  ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'}
+                                                  ${isAnswerChecked && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                              `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <div className="text-sm pt-0.5">
+                                                            <div className={`text-base pt-1 ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>
                                                                 <MathJax inline>{cleanupMath(opt.text)}</MathJax>
                                                             </div>
-                                                            {isAnswerChecked && isCorrect && <CheckCircle className="w-5 h-5 text-green-600 ml-auto" />}
-                                                            {isAnswerChecked && isSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-600 ml-auto" />}
                                                         </div>
                                                     );
                                                 })}
                                             </div>
                                         )}
 
-                                        {/* SubQuestions (CQ) */}
+                                        {/* SubQuestions */}
                                         {currentQ.type === 'CQ' && currentQ.subQuestions && (
-                                            <div className="mt-6 space-y-4">
+                                            <div className="space-y-4">
                                                 {currentQ.subQuestions.map((sq: any, i: number) => (
-                                                    <div key={i} className="bg-gray-50 p-3 rounded-lg border border-gray-100">
-                                                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                                    <div key={i} className="bg-gray-50/80 p-4 rounded-xl border border-gray-100">
+                                                        <div className="flex justify-between text-xs font-bold text-gray-400 uppercase mb-2">
                                                             <span>Part {String.fromCharCode(97 + i)}</span>
-                                                            <span>{sq.marks} marks</span>
+                                                            <span>{sq.marks} MARKS</span>
                                                         </div>
-                                                        <div className="text-sm font-medium">
+                                                        <div className="text-gray-800 font-medium">
                                                             <MathJax inline>{cleanupMath(sq.question)}</MathJax>
                                                         </div>
                                                         {showAnswer && sq.modelAnswer && (
-                                                            <div className="mt-2 text-sm text-blue-700 bg-blue-50 p-2 rounded border-l-2 border-blue-400">
+                                                            <motion.div
+                                                                initial={{ opacity: 0, height: 0 }}
+                                                                animate={{ opacity: 1, height: "auto" }}
+                                                                className="mt-3 text-sm text-indigo-700 bg-indigo-50 p-3 rounded-lg border border-indigo-100"
+                                                            >
                                                                 {sq.modelAnswer}
-                                                            </div>
+                                                            </motion.div>
                                                         )}
                                                     </div>
                                                 ))}
                                             </div>
                                         )}
                                     </div>
+                                </div>
 
-                                    {/* Footer Actions */}
-                                    <div className="p-4 border-t bg-gray-50 flex gap-2">
-                                        {currentQ.type === 'MCQ' ? (
-                                            !isAnswerChecked ? (
-                                                <Button className="w-full" onClick={() => setIsAnswerChecked(true)} disabled={selectedOption === null}>
-                                                    Check Answer
-                                                </Button>
-                                            ) : (
-                                                <Button variant="outline" className="w-full" onClick={() => setShowAnswer(!showAnswer)}>
-                                                    {showAnswer ? 'Hide Explanation' : 'Show Explanation'}
-                                                </Button>
-                                            )
-                                        ) : (
-                                            <Button variant="outline" className="w-full" onClick={() => setShowAnswer(!showAnswer)}>
-                                                {showAnswer ? 'Hide Solution' : 'Reveal Solution'}
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Explanation Reveal */}
+                                {/* Explanation Footer */}
+                                <AnimatePresence>
                                     {showAnswer && (
-                                        <div className="p-4 bg-yellow-50 border-t border-yellow-200 text-sm text-yellow-900 animate-in slide-in-from-bottom-5">
-                                            <div className="font-semibold mb-1 flex items-center gap-2">
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: 20 }}
+                                            className="bg-amber-50/80 backdrop-blur border-t border-amber-200/50 p-5"
+                                        >
+                                            <div className="flex items-center gap-2 text-amber-700 font-bold text-sm mb-2 uppercase tracking-wide">
                                                 <Lock className="w-3 h-3" /> Teacher's Explanation
                                             </div>
-                                            <div>
+                                            <div className="text-amber-900 text-sm leading-relaxed">
                                                 {currentQ.type === 'MCQ' && currentQ.options?.find(o => o.isCorrect)?.explanation}
                                                 {currentQ.type === 'SQ' && currentQ.modelAnswer}
-                                                {currentQ.type === 'CQ' && "See detailed breakdown above."}
-                                                {!currentQ.options && !currentQ.modelAnswer && "No explanation provided."}
+                                                {(!currentQ.options && !currentQ.modelAnswer) && "No detailed explanation available."}
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     )}
+                                </AnimatePresence>
 
-                                </CardContent>
+                                {/* Actions */}
+                                <div className="p-4 bg-white/50 backdrop-blur border-t border-gray-100 flex gap-3">
+                                    {currentQ.type === 'MCQ' ? (
+                                        !isAnswerChecked ? (
+                                            <Button
+                                                className="w-full bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
+                                                onClick={() => setIsAnswerChecked(true)}
+                                                disabled={selectedOption === null}
+                                            >
+                                                Check Answer
+                                            </Button>
+                                        ) : (
+                                            <Button
+                                                className="w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                                                onClick={() => setShowAnswer(!showAnswer)}
+                                            >
+                                                {showAnswer ? 'Hide Details' : 'View Explanation'}
+                                            </Button>
+                                        )
+                                    ) : (
+                                        <Button
+                                            className="w-full bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200"
+                                            onClick={() => setShowAnswer(!showAnswer)}
+                                        >
+                                            {showAnswer ? 'Hide Solution' : 'Reveal Solution'}
+                                        </Button>
+                                    )}
+                                </div>
                             </Card>
 
-                            {/* Navigation Buttons (Overlay) */}
-                            <div className="flex justify-between mt-4">
+                            {/* Navigation Pills */}
+                            <div className="flex justify-between mt-4 px-2">
                                 <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className="shadow-md bg-white hover:bg-gray-100"
+                                    variant="ghost"
+                                    className="bg-white/80 hover:bg-white text-gray-600 shadow-sm backdrop-blur rounded-full px-6"
                                     onClick={handlePrev}
                                     disabled={currentIndex === 0}
                                 >
-                                    <ChevronLeft className="w-4 h-4 mr-1" /> Prev
+                                    <ChevronLeft className="w-4 h-4 mr-2" /> Previous
                                 </Button>
                                 <Button
-                                    size="sm"
-                                    className="shadow-md bg-indigo-600 hover:bg-indigo-700 text-white"
+                                    className="bg-slate-900 hover:bg-black text-white shadow-lg shadow-slate-900/20 rounded-full px-6"
                                     onClick={handleNext}
                                     disabled={currentIndex === questions.length - 1}
                                 >
-                                    Next <ChevronRight className="w-4 h-4 ml-1" />
+                                    Next <ChevronRight className="w-4 h-4 ml-2" />
                                 </Button>
                             </div>
-                        </div>
+                        </motion.div>
                     )}
+                </AnimatePresence>
 
+                {/* 4. FLOATING TOOLBAR - iOS Style */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
+                    <div className="bg-white/90 backdrop-blur-xl shadow-2xl shadow-slate-900/20 border border-white/50 p-2 rounded-full flex items-center gap-2 ring-1 ring-black/5 scale-110">
+                        {/* Undo/Redo Group */}
+                        <div className="flex items-center gap-1 pr-2 border-r border-gray-200">
+                            <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()} className="hover:bg-gray-100 rounded-full w-10 h-10">
+                                <Undo className="w-5 h-5 text-gray-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()} className="hover:bg-gray-100 rounded-full w-10 h-10">
+                                <Redo className="w-5 h-5 text-gray-600" />
+                            </Button>
+                        </div>
+
+                        {/* Tools Group */}
+                        <div className="flex items-center gap-1 px-2">
+                            <Button
+                                variant={boardTool === 'pen' ? 'default' : 'ghost'}
+                                size="icon"
+                                onClick={() => { setBoardTool('pen'); boardRef.current?.setTool('pen'); }}
+                                className={`w-12 h-12 rounded-full transition-all ${boardTool === 'pen' ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-lg scale-110' : 'text-gray-500 hover:bg-gray-100'}`}
+                            >
+                                <PenTool className="w-5 h-5" />
+                            </Button>
+                            <Button
+                                variant={boardTool === 'eraser' ? 'default' : 'ghost'}
+                                size="icon"
+                                onClick={() => { setBoardTool('eraser'); boardRef.current?.setTool('eraser'); }}
+                                className={`w-12 h-12 rounded-full transition-all ${boardTool === 'eraser' ? 'bg-slate-800 text-white shadow-lg scale-110' : 'text-gray-500 hover:bg-gray-100'}`}
+                            >
+                                <Eraser className="w-5 h-5" />
+                            </Button>
+                        </div>
+
+                        {/* Color Palette */}
+                        <div className="flex items-center gap-2 px-2 border-l border-gray-200">
+                            {['#000000', '#ef4444', '#22c55e', '#3b82f6'].map(c => (
+                                <button
+                                    key={c}
+                                    onClick={() => { setBoardColor(c); boardRef.current?.setColor(c); }}
+                                    className={`w-8 h-8 rounded-full border-2 transition-all ${boardColor === c ? 'border-gray-900 scale-125' : 'border-transparent hover:scale-110'}`}
+                                    style={{ backgroundColor: c }}
+                                />
+                            ))}
+                        </div>
+                    </div>
                 </div>
+
             </div>
         </MathJaxContext>
     );
