@@ -38,7 +38,9 @@ import {
   Video,
   MonitorPlay,
   Maximize2,
-  Printer
+  Printer,
+  Menu,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
@@ -136,6 +138,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [liveStats, setLiveStats] = useState<LiveExamStats | null>(null);
   const [selectedLiveStudent, setSelectedLiveStudent] = useState<LiveStudent | null>(null);
   const [isLiveModalOpen, setIsLiveModalOpen] = useState(false);
+
+  // Monitor View State
+  const [monitorSearch, setMonitorSearch] = useState("");
+  const [monitorFilter, setMonitorFilter] = useState<'all' | 'active' | 'submitted'>('all');
+  const [monitorSort, setMonitorSort] = useState<'progress' | 'score' | 'time'>('progress');
+  const [monitorViewMode, setMonitorViewMode] = useState<'grid' | 'list'>('grid');
 
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -325,111 +333,284 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   }, [activeTab, id]);
 
   const renderLiveMonitor = () => {
-    if (!liveStats) return <div className="p-8 text-center">Loading Live Data...</div>;
+    if (!liveStats) return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-gray-400">
+        <Loader2 className="w-10 h-10 animate-spin mb-4 text-blue-500" />
+        <p>Connecting to live exam feed...</p>
+      </div>
+    );
 
     const { liveData, activeStudents, submittedStudents, totalStudents } = liveStats;
 
+    // Filter and Sort Logic
+    let filteredData = liveData.filter(student => {
+      const matchesSearch = student.studentName.toLowerCase().includes(monitorSearch.toLowerCase()) ||
+        student.roll.includes(monitorSearch);
+      const matchesFilter = monitorFilter === 'all'
+        ? true
+        : monitorFilter === 'active'
+          ? student.status === 'IN_PROGRESS'
+          : student.status === 'COMPLETED';
+      return matchesSearch && matchesFilter;
+    });
+
+    filteredData = filteredData.sort((a, b) => {
+      if (monitorSort === 'progress') return b.progress - a.progress;
+      if (monitorSort === 'score') return b.score - a.score;
+      if (monitorSort === 'time') return new Date(b.lastActive).getTime() - new Date(a.lastActive).getTime();
+      return 0;
+    });
+
     return (
-      <div className="space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="bg-blue-50 border-blue-200">
-            <CardContent className="p-4 flex items-center justify-between">
+      <div className="space-y-6 animate-in fade-in duration-500">
+        {/* Modern Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-white border-none shadow-md shadow-blue-100/50 hover:shadow-lg transition-shadow">
+            <CardContent className="p-5 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-blue-800">Active Students</p>
-                <p className="text-2xl font-bold text-blue-900">{activeStudents}</p>
+                <p className="text-sm font-medium text-gray-500">Active Now</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-blue-600">{activeStudents}</p>
+                  <span className="text-xs text-blue-400 font-medium">students</span>
+                </div>
               </div>
-              <Activity className="h-8 w-8 text-blue-500 opacity-50" />
+              <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+                <Activity className="h-6 w-6 text-blue-600 animate-pulse" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="bg-green-50 border-green-200">
-            <CardContent className="p-4 flex items-center justify-between">
+
+          <Card className="bg-white border-none shadow-md shadow-green-100/50 hover:shadow-lg transition-shadow">
+            <CardContent className="p-5 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-green-800">Submitted</p>
-                <p className="text-2xl font-bold text-green-900">{submittedStudents}</p>
+                <p className="text-sm font-medium text-gray-500">Submitted</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-green-600">{submittedStudents}</p>
+                  <span className="text-xs text-green-400 font-medium">finished</span>
+                </div>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
+              <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+              </div>
             </CardContent>
           </Card>
-          <Card className="bg-purple-50 border-purple-200">
-            <CardContent className="p-4 flex items-center justify-between">
+
+          <Card className="bg-white border-none shadow-md shadow-purple-100/50 hover:shadow-lg transition-shadow">
+            <CardContent className="p-5 flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-purple-800">Total Enrolled</p>
-                <p className="text-2xl font-bold text-purple-900">{totalStudents}</p>
+                <p className="text-sm font-medium text-gray-500">Completion Rate</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-purple-600">
+                    {totalStudents > 0 ? Math.round((submittedStudents / totalStudents) * 100) : 0}%
+                  </p>
+                </div>
               </div>
-              <LayoutDashboard className="h-8 w-8 text-purple-500 opacity-50" />
+              <div className="h-12 w-12 rounded-full bg-purple-50 flex items-center justify-center">
+                <Trophy className="h-6 w-6 text-purple-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border-none shadow-md shadow-gray-100/50 hover:shadow-lg transition-shadow">
+            <CardContent className="p-5 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-500">Total Candidates</p>
+                <p className="text-3xl font-bold text-gray-700">{totalStudents}</p>
+              </div>
+              <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center">
+                <User className="h-6 w-6 text-gray-600" />
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Filters & Actions */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
-          <h3 className="text-lg font-semibold flex items-center gap-2">
-            <Video className="w-5 h-5 text-red-500 animate-pulse" />
-            Live Monitoring
-          </h3>
-          <Button variant="outline" size="sm" onClick={fetchLiveStats}>
-            <RotateCcw className="w-4 h-4 mr-2" />
-            Refresh Now
-          </Button>
+        {/* Action Bar */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Input
+                placeholder="Search student..."
+                value={monitorSearch}
+                onChange={(e) => setMonitorSearch(e.target.value)}
+                className="pl-9 h-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+              />
+              <ZoomIn className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
+            </div>
+
+            <Select value={monitorFilter} onValueChange={(v: any) => setMonitorFilter(v)}>
+              <SelectTrigger className="w-[140px] h-10 bg-gray-50 border-gray-200">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="active">Active Now</SelectItem>
+                <SelectItem value="submitted">Submitted</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={monitorSort} onValueChange={(v: any) => setMonitorSort(v)}>
+              <SelectTrigger className="w-[140px] h-10 bg-gray-50 border-gray-200">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="progress">Progress</SelectItem>
+                <SelectItem value="score">Score</SelectItem>
+                <SelectItem value="time">Recent Activity</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-8 px-2 ${monitorViewMode === 'grid' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                onClick={() => setMonitorViewMode('grid')}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={`h-8 px-2 ${monitorViewMode === 'list' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                onClick={() => setMonitorViewMode('list')}
+              >
+                <Menu className="w-4 h-4" />
+              </Button>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchLiveStats} className="h-10 border-blue-200 text-blue-700 hover:bg-blue-50">
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        {/* Student Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {liveData.map(student => (
-            <Card
-              key={student.id}
-              className={`cursor-pointer transition-all hover:shadow-lg hover:ring-2 hover:ring-primary/20 ${student.status === 'IN_PROGRESS' ? 'border-l-4 border-l-blue-500' : 'border-l-4 border-l-green-500'}`}
-              onClick={() => {
-                setSelectedLiveStudent(student);
-                setIsLiveModalOpen(true);
-              }}
-            >
-              <CardContent className="p-4 space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
-                    <p className="text-xs text-gray-500">Roll: {student.roll} • {student.className} {student.section}</p>
-                  </div>
-                  {student.status === 'IN_PROGRESS' ? (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 text-[10px] animate-pulse">Running</Badge>
-                  ) : (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-[10px]">Submitted</Badge>
-                  )}
+        {/* Content Area */}
+        {monitorViewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredData.map(student => (
+              <Card
+                key={student.id}
+                className={`cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 
+                  ${student.status === 'IN_PROGRESS'
+                    ? 'border-l-4 border-l-blue-500'
+                    : 'border-l-4 border-l-green-500 bg-green-50/10'}`}
+                onClick={() => {
+                  setSelectedLiveStudent(student);
+                  setIsLiveModalOpen(true);
+                }}
+              >
+                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                  <Maximize2 className="w-4 h-4 text-gray-400" />
                 </div>
 
-                {/* Progress Bar */}
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-600">
-                    <span>Progress</span>
-                    <span>{student.progress}%</span>
+                <CardContent className="p-5 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md
+                        ${student.status === 'IN_PROGRESS'
+                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                        : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
+                      {student.studentName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
+                      <p className="text-xs text-gray-500 font-mono">Roll: {student.roll}</p>
+                    </div>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-500"
-                      style={{ width: `${student.progress}%` }}
-                    />
-                  </div>
-                </div>
 
-                <div className="pt-2 border-t flex justify-between items-center text-xs">
-                  <div className="flex items-center gap-1 text-gray-600">
-                    <CheckSquare className="w-3 h-3" />
-                    {student.answered} / {student.totalQuestions}
+                  {/* Stats Grid inside Card */}
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                      <span className="text-gray-400 block mb-1">Answered</span>
+                      <span className="font-semibold text-gray-700">{student.answered} / {student.totalQuestions}</span>
+                    </div>
+                    <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                      <span className="text-gray-400 block mb-1">Score</span>
+                      <span className="font-semibold text-primary">{student.score}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1 font-semibold text-primary">
-                    <Trophy className="w-3 h-3" />
-                    Score: {student.score}
-                  </div>
-                </div>
 
-                <div className="text-[10px] text-right text-gray-400">
-                  Active: {new Date(student.lastActive).toLocaleTimeString()}
+                  {/* Progress Bar */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs font-medium">
+                      <span className="text-gray-500">Progress</span>
+                      <span className={student.progress === 100 ? "text-green-600" : "text-blue-600"}>{student.progress}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                      <div
+                        className={`h-full rounded-full transition-all duration-700 ease-out flex items-center justify-end
+                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}
+                        style={{ width: `${student.progress}%` }}
+                      >
+                        {/* Shimmer effect */}
+                        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t flex justify-between items-center text-[11px]">
+                    <Badge variant="outline" className={`border-none ${student.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                      {student.status === 'IN_PROGRESS' ? '● In Progress' : '✓ Client-Submitted'}
+                    </Badge>
+                    <span className="text-gray-400">
+                      {new Date(student.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          /* List View */
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="col-span-4">Student</div>
+              <div className="col-span-2 text-center">Status</div>
+              <div className="col-span-3">Progress</div>
+              <div className="col-span-2 text-center">Score</div>
+              <div className="col-span-1">Action</div>
+            </div>
+            <div className="divide-y divide-gray-100">
+              {filteredData.map(student => (
+                <div key={student.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 transition-colors">
+                  <div className="col-span-4 flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
+                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}>
+                      {student.studentName.substring(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm text-gray-900">{student.studentName}</p>
+                      <p className="text-xs text-gray-500">Roll: {student.roll} • {student.className}</p>
+                    </div>
+                  </div>
+                  <div className="col-span-2 flex justify-center">
+                    <Badge variant="secondary" className={`${student.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                      {student.status === 'IN_PROGRESS' ? 'Working' : 'Submitted'}
+                    </Badge>
+                  </div>
+                  <div className="col-span-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${student.progress}%` }} />
+                      </div>
+                      <span className="text-xs font-medium w-8 text-right">{student.progress}%</span>
+                    </div>
+                  </div>
+                  <div className="col-span-2 text-center text-sm font-medium">
+                    {student.score}
+                  </div>
+                  <div className="col-span-1">
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }}>
+                      <Maximize2 className="w-4 h-4 text-gray-400" />
+                    </Button>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+              ))}
+            </div>
+          </div>
+        )}
+
 
         {/* Detailed View Modal */}
         <Dialog open={isLiveModalOpen} onOpenChange={setIsLiveModalOpen}>

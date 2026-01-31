@@ -514,6 +514,7 @@ export default function QuestionBankPage() {
                       <div className="flex items-end gap-2 lg:col-span-5 flex-wrap">
                         <Button onClick={resetFilters} variant="ghost" size="sm" className="whitespace-nowrap"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
                         <div className="flex-grow"></div>
+                        <Button onClick={() => window.location.href = '/problem-solving'} variant="outline" className="whitespace-nowrap bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800"><BrainCircuit className="mr-2 h-4 w-4" /> Live Problem Solving</Button>
                         <Button onClick={() => window.location.href = '/exams'} variant="outline" className="whitespace-nowrap"><FileText className="mr-2 h-4 w-4" /> Go to Exams</Button>
                         <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100 whitespace-nowrap"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
                         <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="whitespace-nowrap"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
