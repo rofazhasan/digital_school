@@ -265,7 +265,7 @@ export default function ProblemSolvingSession() {
     }
 
     return (
-        <MathJaxContext config={MATHJAX_CONFIG}>
+        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
             <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
 
                 {/* 1. TOP BAR */}
@@ -356,9 +356,9 @@ export default function ProblemSolvingSession() {
                                 </div>
 
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    <div className={`prose max-w-none leading-relaxed font-serif select-text ${isDark ? 'prose-invert text-slate-200' : 'text-gray-800'}`}>
-                                        <MathJax>{cleanupMath(currentQ.questionText)}</MathJax>
-                                    </div>
+                                    <h2 className="text-xl md:text-2xl font-bold text-foreground leading-relaxed">
+                                        <MathJax dynamic inline>{cleanupMath(currentQ.questionText)}</MathJax>
+                                    </h2>
 
                                     <div className="mt-8 space-y-4">
                                         {currentQ.type === 'MCQ' && currentQ.options && (
@@ -403,9 +403,9 @@ export default function ProblemSolvingSession() {
                                               `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <div className={`text-base pt-1 ${isSelected ? 'text-indigo-400' : (isDark ? 'text-slate-300' : 'text-gray-700')}`}>
-                                                                <MathJax inline>{cleanupMath(opt.text)}</MathJax>
-                                                            </div>
+                                                            <span className="font-medium text-foreground text-lg w-full">
+                                                                <MathJax dynamic inline>{cleanupMath(opt.text)}</MathJax>
+                                                            </span>
                                                         </div>
                                                     );
                                                 })}
@@ -423,8 +423,8 @@ export default function ProblemSolvingSession() {
                                             <h4 className="font-bold text-indigo-500 flex items-center gap-2">
                                                 <CheckCircle className="w-4 h-4" /> Explanation
                                             </h4>
-                                            <div className={`mt-2 ${isDark ? 'text-slate-300' : 'text-indigo-800'}`}>
-                                                <MathJax>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
+                                            <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
+                                                <MathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
                                             </div>
                                         </div>
                                     )}
