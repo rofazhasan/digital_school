@@ -1686,20 +1686,33 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       "subject": "Geography",
       "className": "Class 9",
       "options": [
-        { "text": "Paris", "isCorrect": true, "explanation": "Paris is the capital and most populous city of France." },
+        { "text": "Paris", "isCorrect": true, "explanation": "Paris is the capital city." },
         { "text": "London", "isCorrect": false },
         { "text": "Berlin", "isCorrect": false },
         { "text": "Madrid", "isCorrect": false }
       ]
     },
     {
-      "questionText": "Explain Newton's Second Law.",
+      "questionText": "Explain the laws of motion.",
       "type": "CQ",
-      "marks": 5,
-      "difficulty": "MEDIUM",
+      "marks": 10,
+      "difficulty": "HARD",
       "subject": "Physics",
       "className": "Class 10",
-      "modelAnswer": "Newton's second law states that the rate of change of momentum..."
+      "subQuestions": [
+        { "question": "Define inertia.", "marks": 2, "modelAnswer": "Inertia is the tendency of an object to resist changes in its state of motion." },
+        { "question": "State Newton's Second Law of Motion and provide its mathematical formula.", "marks": 4, "modelAnswer": "Newton's Second Law states that the acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass. The formula is $F = ma$, where F is force, m is mass, and a is acceleration." },
+        { "question": "Describe Newton's Third Law of Motion with an example.", "marks": 4, "modelAnswer": "Newton's Third Law states that for every action, there is an equal and opposite reaction. For example, when you push against a wall, the wall pushes back on you with an equal and opposite force." }
+      ]
+    },
+    {
+      "questionText": "What is the powerhouse of the cell?",
+      "type": "SQ",
+      "marks": 2,
+      "difficulty": "EASY",
+      "subject": "Biology",
+      "className": "Class 9",
+      "modelAnswer": "Mitochondria"
     }
   ];
 
