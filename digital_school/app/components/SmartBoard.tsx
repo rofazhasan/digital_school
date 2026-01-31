@@ -208,8 +208,8 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         // 6. Draw Laser Trail
         const now = Date.now();
         if (laserTrailRef.current.length > 0) {
-            // Remove points older than 1s
-            laserTrailRef.current = laserTrailRef.current.filter(p => now - p.time < 800);
+            // Remove points older than 2s
+            laserTrailRef.current = laserTrailRef.current.filter(p => now - p.time < 2000);
 
             if (laserTrailRef.current.length > 1) {
                 ctx.lineCap = 'round';
@@ -219,7 +219,8 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                     const p1 = laserTrailRef.current[i - 1];
                     const p2 = laserTrailRef.current[i];
                     const age = now - p2.time;
-                    const opacity = Math.max(0, 1 - age / 800);
+                    const opacity = Math.max(0, 1 - age / 2000); // 2 seconds fade
+
 
                     ctx.beginPath();
                     ctx.moveTo(p1.x, p1.y);

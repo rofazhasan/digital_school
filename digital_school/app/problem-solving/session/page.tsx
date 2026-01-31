@@ -27,7 +27,7 @@ interface Question {
     questionText: string;
     type: 'MCQ' | 'CQ' | 'SQ';
     subject: string;
-    topic?: string; // Added if available
+    topic?: string;
     difficulty: string;
     marks: number;
     options?: { text: string; isCorrect: boolean; explanation?: string }[];
@@ -41,6 +41,9 @@ const MATHJAX_CONFIG = {
         inlineMath: [["$", "$"], ["\\(", "\\)"]],
         displayMath: [["$$", "$$"], ["\\[", "\\]"]],
         packages: { "[+]": ["noerrors", "noundefined"] }
+    },
+    startup: {
+        typeset: true
     }
 };
 
@@ -103,30 +106,17 @@ export default function ProblemSolvingSession() {
             try {
                 setLoading(true);
                 const storedIds = localStorage.getItem("problem-solving-session");
-                if (!storedIds) {
-                    toast.error("No active session found"); // router push handled in finally or strict mode
-                    // But here we need to return
-                    // router.push("/problem-solving"); // Commented out to allow debug if needed
-                }
-
-                const ids = storedIds ? JSON.parse(storedIds) : [];
-                // If ids is empty, fetch all? No, that's dangerous.
 
                 const res = await fetch('/api/questions');
                 const data = await res.json();
 
-                // Filter selected questions if IDs present, else take all?
-                // Logic: If IDs present, filter. If not (or empty), maybe show error or demo?
-                // User requirement: "selection cart".
-
                 let sessionQuestions: Question[] = [];
+                // If ids exist, can filter. For now just load all or check logic.
+                const ids = storedIds ? JSON.parse(storedIds) : [];
                 if (ids.length > 0) {
                     sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
                 } else {
-                    // Fallback or Error?
-                    // Let's load ALL questions if no session, or just sample?
-                    // Better to just load all for testing if cart failed.
-                    sessionQuestions = data.questions;
+                    sessionQuestions = data.questions || [];
                 }
 
                 if (sessionQuestions.length === 0) {
@@ -186,13 +176,6 @@ export default function ProblemSolvingSession() {
             setShowAnswer(false);
             setSelectedOption(null);
             setIsAnswerChecked(false);
-            // Restore happens in useEffect or manually?
-            // React state update is async. We need to wait or use effect.
-            // But we can just call it? Question ID changes, so key changes?
-            // Actually, we need to wait for render?
-            // No, SmartBoard is imperative.
-            // BUT SmartBoard content is not tied to ID prop.
-            // We should call restore AFTER index updates.
             setTimeout(() => restoreBoardState(nextIndex), 0);
         }
     };
@@ -226,15 +209,24 @@ export default function ProblemSolvingSession() {
         boardRef.current?.setTool(t);
     };
 
+    const updateSize = (val: number) => {
+        setBoardSize(val);
+        boardRef.current?.setLineWidth(val);
+    };
+
     const toggleBackground = () => {
         const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
         setBoardBackground(next);
         if (next === 'black') {
             setBoardColor('#ffffff');
             boardRef.current?.setColor('#ffffff');
+            setBoardTool('pen');
+            boardRef.current?.setTool('pen');
         } else {
             setBoardColor('#000000');
             boardRef.current?.setColor('#000000');
+            setBoardTool('pen');
+            boardRef.current?.setTool('pen');
         }
     };
 
@@ -243,19 +235,17 @@ export default function ProblemSolvingSession() {
         if (input) {
             const toastId = toast.loading("Generating PDF...");
             try {
-                // Temporarily disable overlay transparency/blur for better capture if needed
-                // But html2canvas handles it okay mostly.
                 const canvas = await html2canvas(input, {
                     scale: 2,
                     useCORS: true,
                     logging: false,
-                    ignoreElements: (element) => element.classList.contains('no-print') // Add 'no-print' class to tools?
+                    ignoreElements: (element) => element.classList.contains('no-print')
                 });
 
                 const imgData = canvas.toDataURL('image/png');
                 const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
                 pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-                pdf.save(`LiveSession_Common.pdf`);
+                pdf.save(`LiveSession_${new Date().getTime()}.pdf`);
                 toast.dismiss(toastId);
                 toast.success("PDF Downloaded!");
             } catch (e) {
@@ -267,6 +257,7 @@ export default function ProblemSolvingSession() {
     };
 
     const currentQ = questions[currentIndex];
+    const isDark = boardBackground === 'black';
 
     if (loading || !currentQ) {
         return (
@@ -279,7 +270,7 @@ export default function ProblemSolvingSession() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG}>
-            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${boardBackground === 'black' ? 'bg-slate-900' : 'bg-gray-50'}`}>
+            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
 
                 {/* 1. TOP BAR */}
                 <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none bg-gradient-to-b from-black/10 to-transparent no-print">
@@ -334,7 +325,6 @@ export default function ProblemSolvingSession() {
                 </div>
 
                 {/* 2. MAIN CANVAS */}
-                {/* z-index toggle: If annotationMode is true, Canvas is z-30. Correct. */}
                 <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
                     <SmartBoard
                         ref={boardRef}
@@ -353,24 +343,24 @@ export default function ProblemSolvingSession() {
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                             className={`absolute top-24 left-6 w-[480px] pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
                         >
-                            <Card className="shadow-2xl shadow-indigo-900/10 border-white/40 bg-white/95 backdrop-blur-xl overflow-hidden flex flex-col rounded-2xl ring-1 ring-gray-900/5">
-                                <div className="px-6 py-4 border-b border-gray-100/50 flex justify-between items-start bg-gray-50/50">
+                            <Card className={`shadow-2xl shadow-black/20 overflow-hidden flex flex-col rounded-2xl ring-1 ring-white/10 backdrop-blur-xl ${isDark ? 'bg-slate-900/95 border-slate-700 text-slate-100' : 'bg-white/95 border-white/40 text-gray-900'}`}>
+                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-slate-800/50 border-b border-slate-700' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1">
                                             <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                                            <span className="text-xs font-bold text-indigo-600 uppercase tracking-wider">{currentQ.subject}</span>
+                                            <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
                                         </div>
                                         {currentQ.topic && (
-                                            <span className="text-xs text-gray-500 truncate max-w-[200px]">{currentQ.topic}</span>
+                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
                                         )}
                                     </div>
-                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
+                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
                                         {currentQ.difficulty}
                                     </Badge>
                                 </div>
 
-                                <div className="p-6 overflow-y-auto custom-scrollbar relative">
-                                    <div className="prose prose-slate prose-lg max-w-none text-gray-800 leading-relaxed font-serif select-text">
+                                <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                                    <div className={`prose max-w-none leading-relaxed font-serif select-text ${isDark ? 'prose-invert text-slate-200' : 'text-gray-800'}`}>
                                         <MathJax>{cleanupMath(currentQ.questionText)}</MathJax>
                                     </div>
 
@@ -381,13 +371,20 @@ export default function ProblemSolvingSession() {
                                                     const isSelected = selectedOption === idx;
                                                     const isCorrect = opt.isCorrect;
 
-                                                    let statusClass = "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
+                                                    let statusClass = isDark
+                                                        ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
+                                                        : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
+
+                                                    if (isSelected) {
+                                                        statusClass = isDark
+                                                            ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
+                                                            : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
+                                                    }
+
                                                     if (isAnswerChecked) {
-                                                        if (isCorrect) statusClass = "bg-green-50 border-green-200 ring-1 ring-green-200";
-                                                        else if (isSelected) statusClass = "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
-                                                        else statusClass = "bg-gray-50 opacity-50";
-                                                    } else if (isSelected) {
-                                                        statusClass = "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
+                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
+                                                        else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
+                                                        else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
                                                     }
 
                                                     return (
@@ -405,12 +402,12 @@ export default function ProblemSolvingSession() {
                                                         >
                                                             <div className={`
                                                   shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-500 group-hover:bg-indigo-100 group-hover:text-indigo-600'}
+                                                  ${isSelected ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
                                                   ${isAnswerChecked && isCorrect ? '!bg-green-500 !text-white' : ''}
                                               `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <div className={`text-base pt-1 ${isSelected ? 'text-indigo-900' : 'text-gray-700'}`}>
+                                                            <div className={`text-base pt-1 ${isSelected ? 'text-indigo-400' : (isDark ? 'text-slate-300' : 'text-gray-700')}`}>
                                                                 <MathJax inline>{cleanupMath(opt.text)}</MathJax>
                                                             </div>
                                                         </div>
@@ -426,11 +423,11 @@ export default function ProblemSolvingSession() {
                                         </Button>
                                     )}
                                     {isAnswerChecked && (
-                                        <div className="mt-6 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                                            <h4 className="font-bold text-indigo-900 flex items-center gap-2">
+                                        <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+                                            <h4 className="font-bold text-indigo-500 flex items-center gap-2">
                                                 <CheckCircle className="w-4 h-4" /> Explanation
                                             </h4>
-                                            <div className="mt-2 text-indigo-800">
+                                            <div className={`mt-2 ${isDark ? 'text-slate-300' : 'text-indigo-800'}`}>
                                                 <MathJax>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
                                             </div>
                                         </div>
@@ -443,7 +440,21 @@ export default function ProblemSolvingSession() {
 
                 {/* 4. FLOATING TOOLBAR */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 no-print">
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 mb-2 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
+
+                    {/* Size Slider Popover (Always visible if pen/eraser selected) */}
+                    {(boardTool === 'pen' || boardTool === 'eraser' || boardTool === 'highlighter') && (
+                        <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm border border-gray-100 mb-2 w-48 flex items-center gap-3">
+                            <div className={`w-2 h-2 rounded-full bg-black`} style={{ width: Math.max(2, boardSize / 2), height: Math.max(2, boardSize / 2), backgroundColor: boardTool === 'eraser' ? '#000' : boardColor }}></div>
+                            <Slider
+                                value={[boardSize]}
+                                min={1} max={20} step={1}
+                                onValueChange={(vals) => updateSize(vals[0])}
+                                className="flex-1"
+                            />
+                        </div>
+                    )}
+
+                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
                         <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>
                         <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()}><Redo className="w-4 h-4" /></Button>
                         <div className="w-px h-4 bg-gray-200 mx-1"></div>
@@ -470,7 +481,7 @@ export default function ProblemSolvingSession() {
                         <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
                         <div className="flex items-center gap-2 px-2">
-                            {['#000000', '#EF4444', '#3B82F6', '#10B981'].map(c => (
+                            {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
                                 <button
                                     key={c}
                                     onClick={() => {
@@ -479,7 +490,7 @@ export default function ProblemSolvingSession() {
                                         setBoardTool('pen');
                                         boardRef.current?.setTool('pen');
                                     }}
-                                    className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-transparent hover:scale-110'}`}
+                                    className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
                                     style={{ backgroundColor: c }}
                                 />
                             ))}
