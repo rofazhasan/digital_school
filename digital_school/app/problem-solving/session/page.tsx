@@ -14,7 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
-import SmartBoard, { SmartBoardRef, ToolType } from "@/app/components/SmartBoard";
+import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -60,6 +60,10 @@ export default function ProblemSolvingSession() {
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [annotationMode, setAnnotationMode] = useState(false);
+    const [showToolSize, setShowToolSize] = useState(false);
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    const lastToolClickTime = useRef<{ [key: string]: number }>({});
+    const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
     // Persistence
     const [boardHistories, setBoardHistories] = useState<Record<string, any[]>>({});
@@ -201,8 +205,21 @@ export default function ProblemSolvingSession() {
     };
 
     const toggleTool = (t: ToolType) => {
-        setBoardTool(t);
-        boardRef.current?.setTool(t);
+        const now = Date.now();
+        const lastClick = lastToolClickTime.current[t] || 0;
+
+        if (t === boardTool && (now - lastClick) < 300) {
+            // Double tap on same tool
+            if (['pen', 'eraser', 'highlighter'].includes(t)) {
+                setShowToolSize(prev => !prev);
+            }
+        } else {
+            // Single tap or switch
+            setBoardTool(t);
+            boardRef.current?.setTool(t);
+            if (t !== boardTool) setShowToolSize(false);
+        }
+        lastToolClickTime.current[t] = now;
     };
 
     const updateSize = (val: number) => {
@@ -249,6 +266,170 @@ export default function ProblemSolvingSession() {
                 toast.dismiss(toastId);
                 toast.error("Failed to generate PDF");
             }
+        }
+    };
+
+    // --- PDF Generation ---
+    const generateSessionReport = async () => {
+        if (!hiddenPDFContainerRef.current) return;
+
+        const toastId = toast.loading('Generating PDF Report...');
+
+        try {
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            let currentY = 10; // Top margin
+
+            // Title Page
+            pdf.setFontSize(24);
+            pdf.text("Problem Solving Session", pageWidth / 2, 40, { align: 'center' });
+            pdf.setFontSize(14);
+            pdf.text(new Date().toLocaleDateString(), pageWidth / 2, 50, { align: 'center' });
+            pdf.text(`Total Questions: ${questions.length}`, pageWidth / 2, 60, { align: 'center' });
+
+            pdf.addPage();
+            currentY = 10;
+
+            for (let i = 0; i < questions.length; i++) {
+                const q = questions[i];
+                const paths = boardHistories[q.id] || [];
+
+                // 1. Prepare DOM for Question Text & Options
+                const container = hiddenPDFContainerRef.current;
+                if (!container) continue;
+
+                container.innerHTML = '';
+                const wrapper = document.createElement('div');
+                wrapper.className = "p-8 bg-white text-black font-sans";
+                wrapper.style.width = "794px"; // A4 Pixel Width (approx at 96 DPI)
+
+                // Content
+                let htmlContent = `
+                    <div class="mb-6 border-b pb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-gray-400">Question ${i + 1}</span>
+                            <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${q.type} • ${q.marks} Marks</span>
+                        </div>
+                        <div class="text-xl font-bold text-gray-900 mb-4 leading-relaxed">${cleanupMath(q.questionText)}</div>
+                `;
+
+                // Options (if MCQ)
+                if (q.type === 'MCQ' && q.options) {
+                    htmlContent += `<div class="grid grid-cols-1 gap-2">`;
+                    q.options.forEach((opt, idx) => {
+                        const isCorrect = opt.isCorrect;
+                        // For PDF simplicity, we show Correct Answer in Green
+                        const bgClass = isCorrect ? 'bg-green-50 border-green-500 text-green-900' : 'bg-white border-gray-200 text-gray-600';
+                        const label = String.fromCharCode(65 + idx);
+                        htmlContent += `
+                            <div class="flex items-center p-3 rounded border ${bgClass}">
+                                <span class="font-bold mr-3">${label}</span>
+                                <span>${cleanupMath(opt.text)}</span>
+                            </div>
+                        `;
+                    });
+                    htmlContent += `</div>`;
+                }
+
+                // Explanation (Always included in report)
+                const correctOpt = q.options?.find(o => o.isCorrect);
+                if (correctOpt?.explanation) {
+                    htmlContent += `
+                        <div class="mt-4 p-4 bg-indigo-50 rounded-lg text-sm text-indigo-900">
+                            <strong>Explanation:</strong>
+                            <div class="mt-1">${cleanupMath(correctOpt.explanation)}</div>
+                        </div>
+                    `;
+                }
+
+                htmlContent += `</div>`; // Close Wrapper
+                wrapper.innerHTML = htmlContent;
+                container.appendChild(wrapper);
+
+                // 2. Render MathJax in Hidden DOM
+                if ((window as any).MathJax) {
+                    await (window as any).MathJax.typesetPromise([wrapper]);
+                }
+
+                // 3. Capture Question Image
+                const qCanvas = await html2canvas(wrapper, { scale: 2, useCORS: true });
+                const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
+                const qImgProps = pdf.getImageProperties(qImgData);
+                const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;
+
+                // Check Page Break
+                if (currentY + qImgHeight > pageHeight - 10) {
+                    pdf.addPage();
+                    currentY = 10;
+                }
+
+                // Add Question Image
+                pdf.addImage(qImgData, 'JPEG', 0, currentY, pageWidth, qImgHeight);
+                currentY += qImgHeight + 5;
+
+                // 4. Capture Drawing (Space Optimized)
+                // Use imported helper from SmartBoard
+                const drawingImgData = await exportPathsToImage(paths, 20);
+
+                if (drawingImgData) {
+                    const dImgProps = pdf.getImageProperties(drawingImgData);
+                    // Constraint drawing width to page width but maintain aspect ratio
+                    let dWidth = pageWidth - 20; // 10mm margin
+                    let dHeight = (dImgProps.height * dWidth) / dImgProps.width;
+
+                    // If drawing is larger than remaining space, add page
+                    if (currentY + 50 > pageHeight) {
+                        pdf.addPage();
+                        currentY = 10;
+                    }
+
+                    if (currentY + dHeight > pageHeight - 10) {
+                        // If it fits on a new page completely
+                        if (dHeight < pageHeight - 20) {
+                            pdf.addPage();
+                            currentY = 10;
+                        } else {
+                            // Too big for one page, let it scale down to fit max height?
+                            // Or just print what fits.
+                            // For now, scale to fit remaining page usage is complex.
+                            // Just force new page and scale to fit height if needed.
+                            pdf.addPage();
+                            currentY = 10;
+                            if (dHeight > pageHeight - 20) {
+                                // Scale to fit height
+                                const ratio = (pageHeight - 20) / dHeight;
+                                dWidth = dWidth * ratio;
+                                dHeight = pageHeight - 20;
+                            }
+                        }
+                    }
+
+                    pdf.setFontSize(10);
+                    pdf.setTextColor(150);
+                    pdf.text("Notes:", 10, currentY);
+                    currentY += 5;
+
+                    pdf.addImage(drawingImgData, 'PNG', 10, currentY, dWidth, dHeight);
+                    currentY += dHeight + 10;
+                } else {
+                    currentY += 10; // Spacing
+                }
+
+                // Separator
+                pdf.setDrawColor(200);
+                pdf.line(10, currentY, pageWidth - 10, currentY);
+                currentY += 10;
+            }
+
+            pdf.save(`Session_Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+            toast.dismiss(toastId);
+            toast.success("Report Generated Successfully!");
+
+        } catch (error) {
+            console.error(error);
+            toast.dismiss(toastId);
+            toast.error("Failed to generate report.");
         }
     };
 
@@ -459,53 +640,106 @@ export default function ProblemSolvingSession() {
                         <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomIn()}><ZoomIn className="w-4 h-4" /></Button>
                     </div>
 
-                    <div className="flex items-center gap-1 p-2 bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 rounded-full">
-                        <Button variant="ghost" size="icon" onClick={handlePrev} disabled={currentIndex === 0} className="rounded-full hover:bg-gray-100">
-                            <ChevronLeft className="w-5 h-5" />
-                        </Button>
+                    <div className={`transition-all duration-300 ${isToolbarCollapsed ? 'w-12 h-12 rounded-full p-0' : 'w-auto h-auto p-2 rounded-full'} flex items-center justify-center bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 overflow-hidden`}>
 
-                        <div className="w-px h-8 bg-gray-200 mx-2"></div>
+                        {isToolbarCollapsed ? (
+                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(false)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
+                                <Maximize2 className="w-5 h-5" />
+                            </Button>
+                        ) : (
+                            <div className="flex items-center gap-1">
+                                {/* Minimize */}
+                                <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 mr-2 -ml-1">
+                                    <Minimize2 className="w-4 h-4" />
+                                </Button>
 
-                        <div className="flex items-center gap-1">
-                            <ToolBtn active={boardTool === 'move'} onClick={() => toggleTool('move')} icon={<Move className="w-5 h-5" />} tooltip="Pan" />
-                            <ToolBtn active={boardTool === 'pen'} onClick={() => toggleTool('pen')} icon={<PenTool className="w-5 h-5" />} tooltip="Pen" />
-                            <ToolBtn active={boardTool === 'highlighter'} onClick={() => toggleTool('highlighter')} icon={<Highlighter className="w-5 h-5" />} tooltip="Highlighter" />
-                            <ToolBtn active={boardTool === 'eraser'} onClick={() => toggleTool('eraser')} icon={<Eraser className="w-5 h-5" />} tooltip="Eraser" />
-                            <ToolBtn active={boardTool === 'laser'} onClick={() => toggleTool('laser')} icon={<MousePointer2 className="w-5 h-5 text-red-500" />} tooltip="Laser Pointer" />
-                        </div>
+                                <Button variant="ghost" size="icon" onClick={handlePrev} disabled={currentIndex === 0} className="rounded-full hover:bg-gray-100">
+                                    <ChevronLeft className="w-5 h-5" />
+                                </Button>
 
-                        <div className="w-px h-8 bg-gray-200 mx-2"></div>
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
-                        <div className="flex items-center gap-2 px-2">
-                            {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
-                                <button
-                                    key={c}
-                                    onClick={() => {
-                                        setBoardColor(c);
-                                        boardRef.current?.setColor(c);
-                                        setBoardTool('pen');
-                                        boardRef.current?.setTool('pen');
-                                    }}
-                                    className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
-                                    style={{ backgroundColor: c }}
-                                />
-                            ))}
-                        </div>
+                                <div className="flex items-center gap-1">
+                                    <ToolBtn active={boardTool === 'move'} onClick={() => toggleTool('move')} icon={<Move className="w-5 h-5" />} tooltip="Pan" />
+                                    <ToolBtn active={boardTool === 'pen'} onClick={() => toggleTool('pen')} icon={<PenTool className="w-5 h-5" />} tooltip="Pen" />
+                                    <ToolBtn active={boardTool === 'highlighter'} onClick={() => toggleTool('highlighter')} icon={<Highlighter className="w-5 h-5" />} tooltip="Highlighter" />
+                                    <ToolBtn active={boardTool === 'eraser'} onClick={() => toggleTool('eraser')} icon={<Eraser className="w-5 h-5" />} tooltip="Eraser" />
+                                    <ToolBtn active={boardTool === 'laser'} onClick={() => toggleTool('laser')} icon={<MousePointer2 className="w-5 h-5 text-red-500" />} tooltip="Laser Pointer" />
+                                </div>
 
-                        <div className="w-px h-8 bg-gray-200 mx-2"></div>
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
-                        <Button variant="ghost" size="icon" onClick={toggleBackground} className="rounded-full hover:bg-gray-100">
-                            {boardBackground === 'white' && <Sun className="w-5 h-5 text-yellow-500" />}
-                            {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
-                            {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
-                        </Button>
+                                <div className="flex items-center gap-2 px-2">
+                                    {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => {
+                                                setBoardColor(c);
+                                                boardRef.current?.setColor(c);
+                                                setBoardTool('pen');
+                                                boardRef.current?.setTool('pen');
+                                            }}
+                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
+                                            style={{ backgroundColor: c }}
+                                        />
+                                    ))}
+                                </div>
 
-                        <div className="w-px h-8 bg-gray-200 mx-2"></div>
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
-                        <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
-                            <ChevronRight className="w-5 h-5" />
-                        </Button>
+                                <Button variant="ghost" size="icon" onClick={toggleBackground} className="rounded-full hover:bg-gray-100">
+                                    {boardBackground === 'white' && <Sun className="w-5 h-5 text-yellow-500" />}
+                                    {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
+                                    {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
+                                </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
+                                    <ChevronRight className="w-5 h-5" />
+                                </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                {/* Report Button */}
+                                <Button
+                                    className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 px-4"
+                                    onClick={generateSessionReport}
+                                    size="sm"
+                                >
+                                    <FileDown className="w-4 h-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        )}
                     </div>
+
+                    {/* Tool Size Slider (Conditional) */}
+                    <AnimatePresence>
+                        {showToolSize && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                className="absolute bottom-24 bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl p-4 w-64 z-50 flex items-center gap-3"
+                            >
+                                <div className={`w-8 h-8 rounded-full border flex items-center justify-center bg-white shadow-sm font-bold text-xs`} style={{ borderColor: boardColor }}>
+                                    {boardSize}
+                                </div>
+                                <Slider
+                                    value={[boardSize]}
+                                    min={1}
+                                    max={20}
+                                    step={1}
+                                    onValueChange={([val]) => updateSize(val)}
+                                    className="flex-1"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Hidden Container for PDF Generation */}
+                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-0 w-[794px] pointer-events-none opacity-0 invisible -z-50 bg-white"></div>
                 </div>
 
             </div>

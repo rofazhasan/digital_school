@@ -29,7 +29,7 @@ interface SmartBoardProps {
 type Point = { x: number; y: number };
 
 // A stroke is a collection of points with style
-interface Stroke {
+export interface Stroke {
     points: Point[];
     color: string;
     width: number;
@@ -405,5 +405,99 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 });
 
 SmartBoard.displayName = "SmartBoard";
+
+// --- Helper Functions for PDF Export ---
+
+/**
+ * Calculates the bounding box of a set of strokes.
+ * Returns null if no paths or valid points.
+ */
+export function getPathBoundingBox(paths: Stroke[]) {
+    if (!paths || paths.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    let hasPoints = false;
+
+    paths.forEach(p => {
+        if (p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
+        p.points.forEach(pt => {
+            if (pt.x < minX) minX = pt.x;
+            if (pt.y < minY) minY = pt.y;
+            if (pt.x > maxX) maxX = pt.x;
+            if (pt.y > maxY) maxY = pt.y;
+            hasPoints = true;
+        });
+    });
+
+    if (!hasPoints) return null;
+    return { minX, minY, maxX, maxY };
+}
+
+/**
+ * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
+ */
+export function exportPathsToImage(paths: Stroke[], padding = 20): string | null {
+    const bbox = getPathBoundingBox(paths);
+    if (!bbox) return null;
+
+    const width = bbox.maxX - bbox.minX + (padding * 2);
+    const height = bbox.maxY - bbox.minY + (padding * 2);
+
+    // Create off-screen canvas (not attached to DOM, purely for export)
+    // Note: In Next.js/React, document might not exist during SSR. But this function is called on client.
+    if (typeof document === 'undefined') return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    // Translate context to center the drawing in the cropped canvas
+    ctx.translate(-bbox.minX + padding, -bbox.minY + padding);
+
+    // Set consistent styling for export (e.g. rounded caps)
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    paths.forEach(stroke => {
+        if (stroke.tool === 'eraser' || stroke.tool === 'laser') return;
+
+        ctx.beginPath();
+        ctx.strokeStyle = stroke.color;
+
+        // Handle highlighter transparency
+        if (stroke.tool === 'highlighter') {
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = stroke.width * 2; // Highlighter is wider
+        } else {
+            ctx.globalAlpha = 1.0;
+            ctx.lineWidth = stroke.width;
+        }
+
+        if (stroke.points.length > 0) {
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < stroke.points.length; i++) {
+                // Use quadratic curves for smoothness (matching SmartBoard rendering)
+                const p1 = stroke.points[i - 1];
+                const p2 = stroke.points[i];
+                const midX = (p1.x + p2.x) / 2;
+                const midY = (p1.y + p2.y) / 2;
+                if (i === 1) { ctx.lineTo(p1.x, p1.y); }
+                ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+            }
+            if (stroke.points.length > 1) {
+                const last = stroke.points[stroke.points.length - 1];
+                ctx.lineTo(last.x, last.y);
+            }
+        }
+        ctx.stroke();
+    });
+
+    return canvas.toDataURL('image/png');
+}
 
 export default SmartBoard;
