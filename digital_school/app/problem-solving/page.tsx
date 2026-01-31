@@ -17,6 +17,15 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
+import { cleanupMath } from "@/lib/utils";
+
+const MATHJAX_CONFIG = {
+    loader: { load: ["input/tex", "output/chtml"] },
+    tex: {
+        inlineMath: [["$", "$"], ["\\(", "\\)"]],
+        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+    }
+};
 
 // Types
 interface Question {
@@ -253,8 +262,8 @@ export default function ProblemSolvingSelector() {
                                                 <div className="flex-1 space-y-3">
                                                     <div className="flex flex-wrap gap-2">
                                                         <Badge className={`${q.difficulty === 'HARD' ? 'bg-red-100 text-red-700 hover:bg-red-100' :
-                                                                q.difficulty === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' :
-                                                                    'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
+                                                            q.difficulty === 'MEDIUM' ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' :
+                                                                'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
                                                             } px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide border-0`}>
                                                             {q.difficulty}
                                                         </Badge>

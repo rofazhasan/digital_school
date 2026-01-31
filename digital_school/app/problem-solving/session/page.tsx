@@ -40,10 +40,6 @@ const MATHJAX_CONFIG = {
     tex: {
         inlineMath: [["$", "$"], ["\\(", "\\)"]],
         displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-        packages: { "[+]": ["noerrors", "noundefined"] }
-    },
-    startup: {
-        typeset: true
     }
 };
 
