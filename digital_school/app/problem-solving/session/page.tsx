@@ -51,6 +51,16 @@ export default function ProblemSolvingSession() {
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
+    // Shuffle helper
+    const shuffleArray = <T,>(array: T[]): T[] => {
+        const newArr = [...array];
+        for (let i = newArr.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [newArr[i], newArr[j]] = [newArr[j], newArr[i]];
+        }
+        return newArr;
+    };
+
     // Initialize
     useEffect(() => {
         const initSession = async () => {
@@ -64,20 +74,38 @@ export default function ProblemSolvingSession() {
                 }
 
                 const ids = JSON.parse(storedIds);
-                // In real app: fetch only these IDs via new API endpoint. 
-                // For MVP: fetch all and filter (inefficient but works with existing API)
+
+                // Fetch all questions
                 const res = await fetch('/api/questions');
                 const data = await res.json();
 
-                const sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
-                setQuestions(sessionQuestions);
+                // Filter selected questions
+                let sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
 
                 if (sessionQuestions.length === 0) {
                     toast.error("Questions not found");
                     router.push("/problem-solving");
+                    return;
                 }
+
+                // 1. Shuffle Questions Order
+                sessionQuestions = shuffleArray(sessionQuestions);
+
+                // 2. Shuffle Options for each MCQ
+                sessionQuestions = sessionQuestions.map((q: Question) => {
+                    if (q.type === 'MCQ' && q.options && q.options.length > 0) {
+                        return {
+                            ...q,
+                            options: shuffleArray(q.options)
+                        };
+                    }
+                    return q;
+                });
+
+                setQuestions(sessionQuestions);
             } catch (err) {
-                toast.error("Failed to load session");
+                console.error(err);
+                toast.error("Failed to load session data");
             } finally {
                 setLoading(false);
             }
