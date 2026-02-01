@@ -18,7 +18,6 @@ import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, export
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { motion, AnimatePresence } from "framer-motion";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Types
