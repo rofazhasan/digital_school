@@ -190,21 +190,39 @@ export default function ProblemSolvingSession() {
         if (currentIndex < questions.length - 1) {
             const nextIndex = currentIndex + 1;
             setCurrentIndex(nextIndex);
-            setShowAnswer(false);
-            setSelectedOption(null);
-            setIsAnswerChecked(false);
+
+            // State Sync happens in useEffect below now
             setTimeout(() => restoreBoardState(nextIndex), 0);
         }
     };
+
+    // Sync State with Question (Review Mode or Fresh)
+    useEffect(() => {
+        const q = questions[currentIndex];
+        if (!q) return;
+
+        if (q.status) {
+            // Review Mode
+            // Set user's selected option if it exists
+            setSelectedOption(typeof q.userAnswer === 'number' ? q.userAnswer : null);
+
+            // If they were correct, we auto-reveal (show Green).
+            // If wrong or unanswered, we keep it unchecked (hidden) until they click "Show Correct Answer"
+            setIsAnswerChecked(q.status === 'correct');
+        } else {
+            // Fresh Mode
+            setShowAnswer(false);
+            setSelectedOption(null);
+            setIsAnswerChecked(false);
+        }
+    }, [currentIndex, questions]);
 
     const handlePrev = () => {
         saveCurrentBoardState();
         if (currentIndex > 0) {
             const prevIndex = currentIndex - 1;
             setCurrentIndex(prevIndex);
-            setShowAnswer(false);
-            setSelectedOption(null);
-            setIsAnswerChecked(false);
+            // State Sync happens in useEffect
             setTimeout(() => restoreBoardState(prevIndex), 0);
         }
     };
@@ -580,48 +598,47 @@ export default function ProblemSolvingSession() {
 
                                                     // Review Mode Logic
                                                     const reviewStatus = currentQ.status; // 'correct' | 'wrong' | 'unanswered'
-                                                    const isUserSelected = currentQ.userAnswer === idx;
+                                                    const isUserSelected = currentQ.userAnswer === idx; // Use loose equality just in case string/number mixup, but strictly typed here
 
+                                                    // Base Style
                                                     let statusClass = isDark
                                                         ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
                                                         : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
-                                                    // Standard Interaction
+                                                    // Interaction State (Standard)
                                                     if (isSelected) {
                                                         statusClass = isDark
                                                             ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
                                                             : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
                                                     }
 
-                                                    // Answer Check Mode (Standard)
-                                                    if (isAnswerChecked) {
+                                                    // REVEAL LOGIC (Standard or Review)
+                                                    // Show solution if: 
+                                                    // 1. isAnswerChecked is true (User clicked Check Answer)
+                                                    // 2. OR Review Mode AND The *User's Choice* was Correct (Auto-reveal if they got it right)
+                                                    const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
+
+                                                    if (shouldReveal) {
                                                         if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
                                                         else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
                                                         else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
                                                     }
-
-                                                    // Review Export Mode (Override everything if status exists)
-                                                    if (reviewStatus) {
-                                                        if (isCorrect) {
-                                                            // Always show correct answer in Green
-                                                            statusClass = isDark ? "bg-green-900/40 border-green-500/50 ring-1 ring-green-500/50" : "bg-green-100 border-green-400 ring-1 ring-green-400";
-                                                        } else if (isUserSelected && !isCorrect) {
-                                                            // Wrong selection in Red
-                                                            statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
-                                                        } else {
-                                                            statusClass = isDark ? "opacity-40" : "opacity-40 grayscale";
-                                                        }
-
-                                                        // Violet for 'unanswered' global indicator is handled in Question Header usually, 
-                                                        // but here if unanswered, no option is red, only correct is green.
+                                                    // Review Mode: WRONG Answer State (Before Reveal)
+                                                    // If user got it wrong, show their WRONG selection in RED immediately, but keep Correct hidden.
+                                                    else if (reviewStatus === 'wrong' && isUserSelected) {
+                                                        statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
+                                                    }
+                                                    // Review Mode: Unselected or 'Hidden Correct' options
+                                                    else if (reviewStatus) {
+                                                        statusClass = isDark ? "opacity-60" : "opacity-60 grayscale";
                                                     }
 
                                                     return (
                                                         <div
                                                             key={idx}
                                                             onClick={(e) => {
-                                                                if (annotationMode || reviewStatus) return; // Disable interaction in review mode
-                                                                if (!isAnswerChecked) setSelectedOption(idx);
+                                                                if (annotationMode || reviewStatus) return; // Disable changing answer
+                                                                if (!shouldReveal) setSelectedOption(idx);
                                                             }}
                                                             className={`
                                                   p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
@@ -633,12 +650,13 @@ export default function ProblemSolvingSession() {
                                                             <div className={`
                                                   shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
                                                   ${isSelected || (reviewStatus && isUserSelected) ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
-                                                  ${(isAnswerChecked || reviewStatus) && isCorrect ? '!bg-green-500 !text-white' : ''}
-                                                  ${(isAnswerChecked || reviewStatus) && isUserSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
+                                                  ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
+                                                  ${(!shouldReveal && reviewStatus === 'wrong' && isUserSelected) ? '!bg-red-500 !text-white' : ''}
                                               `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <span className={`text-lg w-full text-foreground ${selectedOption === idx || (reviewStatus && isUserSelected) ? "font-medium" : ""}`}>
+                                                            <span className={`text-lg w-full text-foreground ${isSelected || (reviewStatus && isUserSelected) ? "font-medium" : ""}`}>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
                                                         </div>
@@ -648,12 +666,18 @@ export default function ProblemSolvingSession() {
                                         )}
                                     </div>
 
-                                    {!isAnswerChecked && currentQ.type === 'MCQ' && (
-                                        <Button onClick={() => setIsAnswerChecked(true)} disabled={selectedOption === null} className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700">
-                                            Check Answer
+                                    {/* Check Answer Button: Show if NOT revealed yet */}
+                                    {(!isAnswerChecked && currentQ.status !== 'correct') && currentQ.type === 'MCQ' && (
+                                        <Button
+                                            onClick={() => setIsAnswerChecked(true)}
+                                            disabled={selectedOption === null && !currentQ.status}
+                                            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700"
+                                        >
+                                            {currentQ.status ? "Show Correct Answer" : "Check Answer"}
                                         </Button>
                                     )}
-                                    {isAnswerChecked && (
+
+                                    {(isAnswerChecked || currentQ.status === 'correct') && (
                                         <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                                             <h4 className="font-bold text-indigo-500 flex items-center gap-2">
                                                 <CheckCircle className="w-4 h-4" /> Explanation
