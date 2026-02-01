@@ -20,6 +20,7 @@ import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
+
 // Types
 interface Question {
     id: string;
@@ -437,6 +438,12 @@ export default function ProblemSolvingSession() {
                             </span>
                         </div>
                         <div className="w-px h-4 bg-gray-300"></div>
+                        {/* Clock Component */}
+                        <div className="flex items-center gap-2 text-gray-600 font-medium font-mono text-sm bg-gray-50 px-2 py-1 rounded">
+                            <Clock className="w-3.5 h-3.5" />
+                            <LiveClock />
+                        </div>
+                        <div className="w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">
                                 Result: <span className={
@@ -466,8 +473,15 @@ export default function ProblemSolvingSession() {
                         <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
                             {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
                         </Button>
-                        <Button variant="ghost" size="icon" onClick={handleExportPDF} className="bg-white/80 hover:bg-white rounded-full">
-                            <FileDown className="w-5 h-5 text-gray-600" />
+                        {/* Merged Export Button */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={generateSessionReport}
+                            className="bg-white/80 hover:bg-white rounded-full text-xs font-semibold text-gray-700 border border-gray-200"
+                            title="Export PDF Report"
+                        >
+                            <Printer className="w-4 h-4 mr-2" /> Export
                         </Button>
                         <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-white/80 hover:bg-white rounded-full">
                             {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
@@ -530,7 +544,7 @@ export default function ProblemSolvingSession() {
                                 </div>
 
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    <h3 className="text-xl font-medium text-slate-800 leading-relaxed max-w-3xl">
+                                    <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
                                         <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
                                     </h3>
 
@@ -603,7 +617,7 @@ export default function ProblemSolvingSession() {
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
                                                             <div className="flex-1">
-                                                                <span className={`text-lg w-full text-foreground`}>
+                                                                <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
                                                                     <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                                 </span>
                                                                 {isUserSelected && (
@@ -725,24 +739,13 @@ export default function ProblemSolvingSession() {
                                     {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
                                     {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
                                 </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
                                 <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
                                     <ChevronRight className="w-5 h-5" />
                                 </Button>
 
                                 <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
-                                {/* Report Button */}
-                                <Button
-                                    className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 px-4"
-                                    onClick={generateSessionReport}
-                                    size="sm"
-                                >
-                                    <FileDown className="w-4 h-4 mr-2" />
-                                    Export
-                                </Button>
+                                {/* Export Button (Removed from bottom bar as it's now in top bar) */}
                             </div>
                         )}
                     </div>
