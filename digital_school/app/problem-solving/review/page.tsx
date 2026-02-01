@@ -492,8 +492,25 @@ export default function ProblemSolvingSession() {
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                                            {currentQ.difficulty}
+                                        {/* Review Status Badge replacing Difficulty */}
+                                        {currentQ.status === 'correct' && (
+                                            <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 px-3 py-1 font-bold">
+                                                <CheckCircle className="w-3 h-3 mr-1" /> Correct
+                                            </Badge>
+                                        )}
+                                        {currentQ.status === 'wrong' && (
+                                            <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 px-3 py-1 font-bold">
+                                                <XCircle className="w-3 h-3 mr-1" /> Wrong
+                                            </Badge>
+                                        )}
+                                        {currentQ.status === 'unanswered' && (
+                                            <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100 px-3 py-1 font-bold">
+                                                Not Answered
+                                            </Badge>
+                                        )}
+                                        {/* Optional: Keep Difficulty as tertiary info or remove if strictly replacing */}
+                                        <Badge variant="outline" className="text-xs text-gray-400 border-gray-100">
+                                            {currentQ.marks} Marks
                                         </Badge>
                                     </div>
                                 </div>
