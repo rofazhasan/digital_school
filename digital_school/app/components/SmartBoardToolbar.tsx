@@ -75,6 +75,8 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
     onPrev,
     onNext,
     onExport,
+    bgMode,
+    onNavigateBg,
     isAnnotationMode = false,
     onToggleAnnotation
 }) => {
