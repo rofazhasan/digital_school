@@ -511,7 +511,7 @@ export default function ReviewToSessionPort() {
                                     </Button>
                                 )}
 
-                                {(isAnswerChecked || currentQ.status === 'correct') && (
+                                {isAnswerChecked && (
                                     <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                                         <h4 className="font-bold text-indigo-500 flex items-center gap-2">
                                             <CheckCircle className="w-4 h-4" /> Explanation
