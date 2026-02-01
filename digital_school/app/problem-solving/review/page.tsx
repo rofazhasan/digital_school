@@ -523,13 +523,11 @@ export default function ProblemSolvingSession() {
                 {/* 3. QUESTION OVERLAY (Review Logic) */}
                 <AnimatePresence>
                     {showOverlay && (
-                        <motion.div
-                            initial={{ x: -400, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -400, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`absolute top-24 left-6 w-[480px] flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-10 pointer-events-none opacity-50' : 'z-20 pointer-events-auto'}`}
-                        >
+                        <div className={`absolute top-24 left-6 w-[480px] flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-10 pointer-events-none opacity-50' : 'z-20 pointer-events-auto'}`}>
+                            {/* DEBUG STATUS */}
+                            <div className="fixed bottom-4 right-4 z-[9999] bg-black/80 text-white p-2 rounded text-xs pointer-events-auto font-mono">
+                                {loading ? 'Loading...' : 'Ready'} | Err: {hasError ? 'YES' : 'NO'} | Qs: {questions.length} | Idx: {currentIndex}
+                            </div>
                             <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}>
                                 <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                     <div className="flex flex-col">
@@ -691,7 +689,7 @@ export default function ProblemSolvingSession() {
                                     </AnimatePresence>
                                 </div>
                             </Card>
-                        </motion.div>
+                        </div>
                     )}
                 </AnimatePresence>
 
