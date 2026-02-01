@@ -109,7 +109,9 @@ export default function ProblemSolvingSession() {
         const initSession = async () => {
             try {
                 setLoading(true);
-                const storedIds = localStorage.getItem("problem-solving-session");
+                const params = new URLSearchParams(window.location.search);
+                const isReview = params.get('mode') === 'review';
+                const storedIds = localStorage.getItem(isReview ? "review-session-data" : "problem-solving-session");
 
                 const res = await fetch('/api/questions');
                 const data = await res.json();
@@ -125,13 +127,13 @@ export default function ProblemSolvingSession() {
                         const ids = storedData as string[];
                         sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
 
-                        // Shuffle for fresh session
-                        sessionQuestions = shuffleArray(sessionQuestions);
+                        // Shuffle for fresh session (only if not review)
+                        if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
                         sessionQuestions = sessionQuestions.map((q: Question) => {
                             if (q.type === 'MCQ' && q.options && q.options.length > 0) {
                                 return {
                                     ...q,
-                                    options: shuffleArray(q.options)
+                                    options: isReview ? q.options : shuffleArray(q.options)
                                 };
                             }
                             return q;
@@ -145,7 +147,7 @@ export default function ProblemSolvingSession() {
                     }
                 } else {
                     sessionQuestions = data.questions || [];
-                    sessionQuestions = shuffleArray(sessionQuestions);
+                    if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
                 }
 
                 if (sessionQuestions.length === 0) {
