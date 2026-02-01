@@ -135,11 +135,255 @@ export default function ProblemSolvingSession() {
         // Note: We don't need 'setShowAnswer' logic here as 'isAnswerChecked' controls the reveal.
     }, [currentIndex, questions]);
 
-    // ... saveCurrentBoardState, restoreBoardState, handleNext, handlePrev unchanged ...
+    // Board Persistence
+    const saveCurrentBoardState = () => {
+        if (boardRef.current && questions[currentIndex]) {
+            const paths = boardRef.current.getPaths();
+            setBoardHistories(prev => ({
+                ...prev,
+                [questions[currentIndex].id]: paths
+            }));
+        }
+    };
 
-    // ... toggleFullscreen, toggleTool, updateSize, toggleBackground, handleExportPDF unchanged ...
+    const restoreBoardState = (index: number) => {
+        if (boardRef.current && questions[index]) {
+            const savedPaths = boardHistories[questions[index].id];
+            boardRef.current.loadPaths(savedPaths || []);
+        }
+    };
 
-    // ... generateSessionReport unchanged ...
+    const handleNext = () => {
+        saveCurrentBoardState();
+        if (currentIndex < questions.length - 1) {
+            const nextIndex = currentIndex + 1;
+            setCurrentIndex(nextIndex);
+            setTimeout(() => restoreBoardState(nextIndex), 0);
+        }
+    };
+
+    const handlePrev = () => {
+        saveCurrentBoardState();
+        if (currentIndex > 0) {
+            const prevIndex = currentIndex - 1;
+            setCurrentIndex(prevIndex);
+            setTimeout(() => restoreBoardState(prevIndex), 0);
+        }
+    };
+
+    const toggleFullscreen = () => {
+        if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen();
+            setIsFullscreen(true);
+        } else {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+                setIsFullscreen(false);
+            }
+        }
+    };
+
+    const toggleTool = (t: ToolType) => {
+        const now = Date.now();
+        const lastClick = lastToolClickTime.current[t] || 0;
+
+        if (t === boardTool && (now - lastClick) < 300) {
+            // Double tap on same tool
+            if (['pen', 'eraser', 'highlighter'].includes(t)) {
+                setShowToolSize(prev => !prev);
+            }
+        } else {
+            // Single tap or switch
+            setBoardTool(t);
+            boardRef.current?.setTool(t);
+            if (t !== boardTool) setShowToolSize(false);
+        }
+        lastToolClickTime.current[t] = now;
+    };
+
+    const updateSize = (val: number) => {
+        setBoardSize(val);
+        boardRef.current?.setLineWidth(val);
+    };
+
+    const toggleBackground = () => {
+        const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
+        setBoardBackground(next);
+        if (next === 'black') {
+            setBoardColor('#ffffff');
+            boardRef.current?.setColor('#ffffff');
+            setBoardTool('pen');
+            boardRef.current?.setTool('pen');
+        } else {
+            setBoardColor('#000000');
+            boardRef.current?.setColor('#000000');
+            setBoardTool('pen');
+            boardRef.current?.setTool('pen');
+        }
+    };
+
+    const handleExportPDF = async () => {
+        const input = document.getElementById('session-workspace');
+        if (input) {
+            const toastId = toast.loading("Generating PDF...");
+            try {
+                // Dynamic import to avoid SSR crash
+                const html2canvas = (await import('html2canvas')).default;
+                const jsPDF = (await import('jspdf')).default;
+
+                const canvas = await html2canvas(input, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false,
+                    ignoreElements: (element) => element.classList.contains('no-print')
+                });
+
+                const imgData = canvas.toDataURL('image/png');
+                // Calculate dimensions (Landscape)
+                const imgWidth = canvas.width;
+                const imgHeight = canvas.height;
+
+                const pdf = new jsPDF('l', 'px', [imgWidth, imgHeight]);
+                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                pdf.save(`Review_Session_${new Date().getTime()}.pdf`);
+                toast.dismiss(toastId);
+                toast.success("PDF Downloaded!");
+            } catch (e) {
+                console.error(e);
+                toast.dismiss(toastId);
+                toast.error("Failed to generate PDF");
+            }
+        }
+    };
+
+    // --- PDF Generation ---
+    const generateSessionReport = async () => {
+        if (!hiddenPDFContainerRef.current) return;
+
+        const toastId = toast.loading('Generating PDF Report...');
+
+        try {
+            // Dynamic import to avoid SSR crash
+            const jsPDF = (await import('jspdf')).default;
+            const html2canvas = (await import('html2canvas')).default;
+
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = pdf.internal.pageSize.getWidth();
+            const pageHeight = pdf.internal.pageSize.getHeight();
+            let currentY = 10; // Top margin
+
+            // Title Page
+            pdf.setFontSize(24);
+            pdf.text("Review Session Report", pageWidth / 2, 40, { align: 'center' });
+            pdf.setFontSize(14);
+            pdf.text(new Date().toLocaleDateString(), pageWidth / 2, 50, { align: 'center' });
+            pdf.text(`Total Questions: ${questions.length}`, pageWidth / 2, 60, { align: 'center' });
+
+            pdf.addPage();
+            currentY = 10;
+
+            for (let i = 0; i < questions.length; i++) {
+                const q = questions[i];
+                const paths = boardHistories[q.id] || [];
+
+                // 1. Prepare DOM for Question Text & Options
+                const container = hiddenPDFContainerRef.current;
+                if (!container) continue;
+
+                container.innerHTML = '';
+                const wrapper = document.createElement('div');
+                wrapper.className = "p-8 bg-white text-black font-sans";
+                wrapper.style.width = "794px"; // A4 Pixel Width
+
+                let htmlContent = `
+                    <div class="mb-6 border-b pb-4">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs font-bold text-gray-400">Question ${i + 1}</span>
+                            <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${q.type} • ${q.marks} Marks</span>
+                        </div>
+                        <div class="text-xl font-bold text-gray-900 mb-4 leading-relaxed">${cleanupMath(q.questionText)}</div>
+                `;
+
+                // Options (if MCQ)
+                if (q.type === 'MCQ' && q.options) {
+                    htmlContent += `<div class="grid grid-cols-1 gap-2">`;
+                    q.options.forEach((opt, idx) => {
+                        const isCorrect = opt.isCorrect;
+                        const label = String.fromCharCode(65 + idx);
+                        const bgClass = isCorrect ? 'bg-green-50 border-green-500 text-green-900' : 'bg-white border-gray-200 text-gray-600';
+
+                        htmlContent += `
+                            <div class="flex items-center p-3 rounded border ${bgClass}">
+                                <span class="font-bold mr-3">${label}</span>
+                                <span>${cleanupMath(opt.text)}</span>
+                                ${isCorrect ? '<span class="ml-auto text-green-600 font-bold">✓</span>' : ''}
+                            </div>
+                        `;
+                    });
+                    htmlContent += `</div>`;
+                }
+
+                htmlContent += `</div>`; // Close Wrapper
+                wrapper.innerHTML = htmlContent;
+                container.appendChild(wrapper);
+
+                // 2. Render MathJax & TikZ
+                if ((window as any).MathJax) {
+                    try {
+                        await (window as any).MathJax.typesetPromise([wrapper]);
+                    } catch (e) { console.warn("MathJax typeset failed", e); }
+                }
+
+                // 3. Capture Question Image
+                const qCanvas = await html2canvas(wrapper, { scale: 2, useCORS: true, logging: false });
+                const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
+                const qImgProps = pdf.getImageProperties(qImgData);
+                const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;
+
+                if (currentY + qImgHeight > pageHeight - 10) {
+                    pdf.addPage();
+                    currentY = 10;
+                }
+
+                pdf.addImage(qImgData, 'JPEG', 0, currentY, pageWidth, qImgHeight);
+                currentY += qImgHeight + 5;
+
+                // 4. Capture Drawing
+                // Assuming exportPathsToImage is imported from SmartBoard
+                try {
+                    const drawingImgData = await exportPathsToImage(paths, 20, false); // Always white background for PDF
+                    if (drawingImgData) {
+                        const dImgProps = pdf.getImageProperties(drawingImgData);
+                        let dWidth = pageWidth - 20;
+                        let dHeight = (dImgProps.height * dWidth) / dImgProps.width;
+
+                        if (currentY + dHeight > pageHeight - 10) {
+                            pdf.addPage();
+                            currentY = 10;
+                        }
+                        pdf.text("Notes:", 10, currentY);
+                        currentY += 5;
+                        pdf.addImage(drawingImgData, 'PNG', 10, currentY, dWidth, dHeight);
+                        currentY += dHeight + 10;
+                    }
+                } catch (e) { console.warn("Drawing export failed", e); }
+
+                // Separator
+                pdf.setDrawColor(200);
+                pdf.line(10, currentY, pageWidth - 10, currentY);
+                currentY += 10;
+            }
+
+            pdf.save(`Report_${new Date().toISOString().slice(0, 10)}.pdf`);
+            toast.dismiss(toastId);
+            toast.success("Report Generated!");
+
+        } catch (error) {
+            console.error(error);
+            toast.dismiss(toastId);
+            toast.error("Failed to generate report.");
+        }
+    };
 
     const currentQ = questions[currentIndex];
     const isDark = boardBackground === 'black';
