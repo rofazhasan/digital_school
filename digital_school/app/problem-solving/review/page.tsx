@@ -387,6 +387,17 @@ export default function ReviewToSessionPort() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {/* Status Badge */}
+                                    {currentQ.status === 'correct' && (
+                                        <Badge className="bg-emerald-500/10 text-emerald-600 border-0 hover:bg-emerald-500/20">Correct</Badge>
+                                    )}
+                                    {currentQ.status === 'wrong' && (
+                                        <Badge className="bg-rose-500/10 text-rose-600 border-0 hover:bg-rose-500/20">Wrong</Badge>
+                                    )}
+                                    {currentQ.status === 'unanswered' && (
+                                        <Badge className="bg-slate-500/10 text-slate-500 border-0 hover:bg-slate-500/20">Unanswered</Badge>
+                                    )}
+
                                     <Badge variant="outline" className={`border-0 px-2.5 py-1 ${currentQ.difficulty === 'HARD' ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                                         {currentQ.difficulty}
                                     </Badge>
