@@ -19,34 +19,50 @@ export async function GET(
     // Check if user has access to this exam
     let exam;
 
-    // Dynamic filtering for submissions
+    // Fast-path: Define filters early
     const submissionWhere = studentId ? { studentId: studentId } : {};
+    const auxiliaryWhere = studentId ? { examId: examId, studentId: studentId } : { examId: examId };
 
-    // Optimization: Pre-fetch ExamStudentMap to identify the specific ExamSet needed
+    // PARALLELIZATION START ---------------------
+
+    // 1. Kick off Results fetch immediately (Independent query)
+    const resultsPromise = prisma.result.findMany({
+      where: auxiliaryWhere,
+      select: {
+        studentId: true,
+        mcqMarks: true,
+        cqMarks: true,
+        sqMarks: true,
+        total: true
+      }
+    });
+
+    // 2. Pre-fetch Map (Needed for Exam Set filtering)
+    // We selecting studentId too so we can reuse this record later
+    let preFetchedStudentMap: { studentId: string, examSetId: string | null } | null = null;
     let targetExamSetId: string | undefined = undefined;
-    let preFetchedTeacherMap = null; // To avoid re-fetching later if possible (though structure differs)
 
-    // We only optimize ExamSet fetching if a specific student is requested
     if (studentId) {
-      const studentMap = await prisma.examStudentMap.findUnique({
+      preFetchedStudentMap = await prisma.examStudentMap.findUnique({
         where: {
           studentId_examId: {
             studentId,
             examId
           }
         },
-        select: { examSetId: true }
+        select: {
+          studentId: true,
+          examSetId: true
+        }
       });
-      if (studentMap?.examSetId) {
-        targetExamSetId = studentMap.examSetId;
+      if (preFetchedStudentMap?.examSetId) {
+        targetExamSetId = preFetchedStudentMap.examSetId;
       }
     }
 
+    // -------------------------------------------
+
     // Dynamic ExamSet filtering
-    // If we know the target set, ONLY fetch that one.
-    // If targetSetId is explicitly found (string), filter by it.
-    // If studentId matches but no set (null), it means Generated Set, so fetch NO examSets.
-    // If no studentId (Teacher View), fetch ALL sets.
     const examSetWhere = studentId
       ? (targetExamSetId ? { id: targetExamSetId } : { id: 'none' })
       : {};
@@ -198,36 +214,35 @@ export async function GET(
       }
     }
 
-    // Optimization: Filter auxiliary data by studentId if provided
-    const auxiliaryWhere = studentId ? { examId: examId, studentId: studentId } : { examId: examId };
+    // RESULT & MAP PROCESSING ------------------
 
-    // Batch Fetch: Get all ExamStudentMaps for this exam at once
-    const examStudentMaps = await prisma.examStudentMap.findMany({
-      where: auxiliaryWhere,
-      // Optimize: Select only needed fields
-      select: {
-        studentId: true,
-        examSetId: true
-      }
-    });
+    // Reuse or Fetch Maps:
+    // If we have a preFetched map, use it. Otherwise fetch (Teacher View).
+    let examStudentMaps: { studentId: string, examSetId: string | null }[] = [];
+
+    if (preFetchedStudentMap) {
+      // Zero-Cost: Reuse the already fetched record
+      examStudentMaps = [preFetchedStudentMap];
+    } else {
+      // Teacher View: Fetch all maps
+      examStudentMaps = await prisma.examStudentMap.findMany({
+        where: auxiliaryWhere,
+        select: {
+          studentId: true,
+          examSetId: true
+        }
+      });
+    }
+
     // Create lookup map: studentId -> examSetId
     const studentExamSetMap = new Map<string, string>();
     examStudentMaps.forEach(map => {
       if (map.examSetId) studentExamSetMap.set(map.studentId, map.examSetId);
     });
 
-    // Batch Fetch: Get all Results for this exam at once
-    const examResults = await prisma.result.findMany({
-      where: auxiliaryWhere,
-      // Optimize: Select only needed fields
-      select: {
-        studentId: true,
-        mcqMarks: true,
-        cqMarks: true,
-        sqMarks: true,
-        total: true
-      }
-    });
+    // Await parallel results
+    const examResults = await resultsPromise;
+
     // Create lookup map: studentId -> Result
     const studentResultMap = new Map<string, any>();
     examResults.forEach(res => {
