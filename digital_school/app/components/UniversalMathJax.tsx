@@ -34,49 +34,19 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
 
     const parts = content.split(tikzRegex);
 
-    // Trigger TikZ rendering: dynamic parts need a nudge
-    useEffect(() => {
-        const triggerTikz = async () => {
-            if (typeof window !== 'undefined') {
-                // Short wait to ensure DOM elements are painted
-                await new Promise(r => setTimeout(r, 100));
 
-                const win = window as any;
-                if (win.tikzjax && typeof win.tikzjax.process === 'function') {
-                    try {
-                        win.tikzjax.process();
-                    } catch (e) {
-                        console.error("TikZ process error:", e);
-                    }
-                }
-            }
-        };
 
-        // Execute trigger if TikZ content is present
-        if (content.includes("\\begin{tikzpicture}")) {
-            triggerTikz();
-        }
-    }, [content]);
-
+    // TikZ rendering with manual DOM manipulation to avoid React reconciliation conflicts
+    // (TikZJax replaces the <script> tag with <svg>, which breaks React if we render <script> directly)
     return (
         <span>
             {parts.map((part, index) => {
-                // If this part is a TikZ block
                 if (part.startsWith("\\begin{tikzpicture}")) {
-                    return (
-                        <span key={index} className="tikz-wrapper block my-4 flex justify-center overflow-x-auto">
-                            <script
-                                type="text/tikz"
-                                dangerouslySetInnerHTML={{ __html: part }}
-                            />
-                        </span>
-                    );
+                    return <TikZBlock key={index} code={part} />;
                 }
 
-                // If it's pure whitespace (often happens around the split), skip rendering empty MathJax
                 if (!part.trim()) return null;
 
-                // Render regular content with MathJax
                 return (
                     <MathJax key={index} inline={inline} dynamic={dynamic}>
                         {part}
@@ -84,5 +54,63 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
                 );
             })}
         </span>
+    );
+};
+
+// Sub-component for individual TikZ blocks to handle lifecycle
+const TikZBlock = ({ code }: { code: string }) => {
+    const containerRef = React.useRef<HTMLSpanElement>(null);
+
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+
+        // 1. Clear previous content
+        container.innerHTML = '';
+
+        // 2. Create script tag manually
+        const script = document.createElement('script');
+        script.type = 'text/tikz';
+        script.textContent = code;
+
+        // 3. Append to container (React doesn't know about this node, so it won't complain when TikZJax eats it)
+        container.appendChild(script);
+
+        // 4. Trigger TikZJax
+        const trigger = async () => {
+            if (typeof window !== 'undefined') {
+                const win = window as any;
+                // Retry a few times if library is still loading
+                for (let i = 0; i < 10; i++) {
+                    if (win.tikzjax) {
+                        try {
+                            // If process() accepts an element, pass the script. 
+                            // Otherwise it usually scans the doc.
+                            // Some versions return a promise.
+                            if (typeof win.tikzjax.process === 'function') {
+                                await win.tikzjax.process(script);
+                            }
+                            return;
+                        } catch (e) {
+                            // process() might be global scan only?
+                            // Try global scan as fallback
+                            try { win.tikzjax.process(); } catch (e2) { }
+                            return;
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 500));
+                }
+            }
+        };
+
+        trigger();
+
+    }, [code]);
+
+    return (
+        <span
+            ref={containerRef}
+            className="tikz-wrapper block my-4 flex justify-center overflow-x-auto min-h-[50px]"
+        />
     );
 };
