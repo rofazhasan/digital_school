@@ -19,6 +19,9 @@ export async function GET(
     // Check if user has access to this exam
     let exam;
 
+    // Dynamic filtering for submissions
+    const submissionWhere = studentId ? { studentId: studentId } : {};
+
     // Common selection object for sub-relations to reuse
     const examInclude = {
       class: true,
@@ -36,6 +39,7 @@ export async function GET(
         }
       },
       examSubmissions: {
+        where: submissionWhere, // Filter by studentId if present
         select: {
           id: true,
           studentId: true,
@@ -163,11 +167,12 @@ export async function GET(
       }
     }
 
-
+    // Optimization: Filter auxiliary data by studentId if provided
+    const auxiliaryWhere = studentId ? { examId: examId, studentId: studentId } : { examId: examId };
 
     // Batch Fetch: Get all ExamStudentMaps for this exam at once
     const examStudentMaps = await prisma.examStudentMap.findMany({
-      where: { examId: examId },
+      where: auxiliaryWhere,
       // Optimize: Select only needed fields
       select: {
         studentId: true,
@@ -182,7 +187,7 @@ export async function GET(
 
     // Batch Fetch: Get all Results for this exam at once
     const examResults = await prisma.result.findMany({
-      where: { examId: examId },
+      where: auxiliaryWhere,
       // Optimize: Select only needed fields
       select: {
         studentId: true,
