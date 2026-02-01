@@ -49,14 +49,25 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
  */
 export function cleanupMath(text: string | null | undefined): string {
   if (!text) return "";
-  // First ensure we don't have double display delimiters if any
-  let cleaned = text;
 
-  // Replace $$ with $
-  cleaned = cleaned.replace(/\$\$/g, '$');
+  // 1. Strip $$ wrapping TikZ environments (user requirement: "tikz code will be in $$ $$")
+  // We use a regex that handles newlines and optional spaces
+  let cleaned = text.replace(/\$\$\s*(\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\})\s*\$\$/g, '$1');
 
-  // Replace \[ with \( and \] with \)
-  cleaned = cleaned.replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)');
+  // 2. Protect TikZ blocks from further processing
+  // We split by the TikZ block to separate "math text" from "tikz code"
+  const tikzRegex = /(\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\})/g;
+  const parts = cleaned.split(tikzRegex);
 
-  return cleaned;
+  return parts.map(part => {
+    if (part.startsWith("\\begin{tikzpicture}")) {
+      // Return TikZ code exactly as is (no replacement of internal symbols)
+      return part;
+    } else {
+      // Process standard text/math
+      return part
+        .replace(/\$\$/g, '$') // $$ -> $
+        .replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)'); // \[ -> \(
+    }
+  }).join(""); // Rejoin
 }

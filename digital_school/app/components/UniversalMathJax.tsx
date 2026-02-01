@@ -38,9 +38,10 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
                 if (part.startsWith("\\begin{tikzpicture}")) {
                     return (
                         <span key={index} className="tikz-wrapper block my-4 flex justify-center">
-                            <script type="text/tikz">
-                                {part}
-                            </script>
+                            <script
+                                type="text/tikz"
+                                dangerouslySetInnerHTML={{ __html: part }}
+                            />
                         </span>
                     );
                 }
