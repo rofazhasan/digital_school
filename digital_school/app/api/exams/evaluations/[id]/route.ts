@@ -178,148 +178,146 @@ export async function GET(
 
 
 
-    // Process submissions to include evaluation data
-    const processedSubmissions = await Promise.all(
-      (exam as any).examSubmissions.map(async (submission: any) => {
-        // Get questions for this specific student based on their exam set
-        let studentQuestions = allQuestions;
+    // Batch Fetch: Get all ExamStudentMaps for this exam at once
+    const examStudentMaps = await prisma.examStudentMap.findMany({
+      where: { examId: examId }
+    });
+    // Create lookup map: studentId -> examSetId
+    const studentExamSetMap = new Map<string, string>();
+    examStudentMaps.forEach(map => {
+      if (map.examSetId) studentExamSetMap.set(map.studentId, map.examSetId);
+    });
 
-        // Try to get student's specific exam set questions
-        const examStudentMap = await prisma.examStudentMap.findUnique({
-          where: {
-            studentId_examId: {
-              studentId: submission.studentId,
-              examId: examId
+    // Batch Fetch: Get all Results for this exam at once
+    const examResults = await prisma.result.findMany({
+      where: { examId: examId }
+    });
+    // Create lookup map: studentId -> Result
+    const studentResultMap = new Map<string, any>();
+    examResults.forEach(res => {
+      studentResultMap.set(res.studentId, res);
+    });
+
+    // Process submissions using in-memory lookups
+    const processedSubmissions = (exam as any).examSubmissions.map((submission: any) => {
+      // Get questions for this specific student based on their exam set
+      let studentQuestions = allQuestions;
+
+      // Efficient Lookup
+      const examSetId = studentExamSetMap.get(submission.studentId);
+      if (examSetId && studentQuestionsMap.has(examSetId)) {
+        studentQuestions = studentQuestionsMap.get(examSetId);
+      }
+
+      // Calculate total marks and earned marks
+      let totalMarks = 0;
+      let earnedMarks = 0;
+
+      // Use submission answers directly as Cloudinary URLs are now authoritative
+      const fixedAnswers = { ...submission.answers };
+
+      for (const question of studentQuestions) {
+        totalMarks += question.marks;
+
+        const answer = fixedAnswers[question.id];
+        if (question.type === 'MCQ') {
+          // Auto-grade MCQ
+          if (answer) {
+            const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+            const userAns = normalize(answer);
+            let isCorrect = false;
+
+            // Enhanced MCQ answer comparison logic
+            if (question.options && Array.isArray(question.options)) {
+              // Check if student answer matches any option marked as correct
+              const correctOption = question.options.find((opt: any) => opt.isCorrect);
+              if (correctOption) {
+                const correctOptionText = normalize(correctOption.text || String(correctOption));
+                isCorrect = userAns === correctOptionText;
+              }
             }
-          }
-        });
 
-        if (examStudentMap?.examSetId && studentQuestionsMap.has(examStudentMap.examSetId)) {
-          studentQuestions = studentQuestionsMap.get(examStudentMap.examSetId);
-        }
+            // Fallback: Check if there's a direct correctAnswer field
+            if (!isCorrect && question.correctAnswer) {
+              const correctAnswer = question.correctAnswer;
 
-        // Calculate total marks and earned marks
-        let totalMarks = 0;
-        let earnedMarks = 0;
-
-
-        // Use submission answers directly as Cloudinary URLs are now authoritative
-        const fixedAnswers = { ...submission.answers };
-
-        for (const question of studentQuestions) {
-          totalMarks += question.marks;
-
-          const answer = fixedAnswers[question.id];
-          if (question.type === 'MCQ') {
-            // Auto-grade MCQ
-            if (answer) {
-              const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
-              const userAns = normalize(answer);
-              let isCorrect = false;
-
-              // Enhanced MCQ answer comparison logic
-              if (question.options && Array.isArray(question.options)) {
-                // Check if student answer matches any option marked as correct
-                const correctOption = question.options.find((opt: any) => opt.isCorrect);
-                if (correctOption) {
-                  const correctOptionText = normalize(correctOption.text || String(correctOption));
-                  isCorrect = userAns === correctOptionText;
-                }
-              }
-
-              // Fallback: Check if there's a direct correctAnswer field
-              if (!isCorrect && question.correctAnswer) {
-                const correctAnswer = question.correctAnswer;
-
-                if (typeof correctAnswer === 'number') {
-                  isCorrect = userAns === normalize(String(correctAnswer));
-                } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-                  isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
-                } else if (Array.isArray(correctAnswer)) {
-                  // Handle array format (e.g., ["answer1", "answer2"])
-                  isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
-                } else {
-                  isCorrect = userAns === normalize(String(correctAnswer));
-                }
-              }
-
-              // Final fallback: use question.correct
-              if (!isCorrect && question.correct) {
-                const correctAns = normalize(String(question.correct));
-                isCorrect = userAns === correctAns;
-              }
-
-              if (isCorrect) {
-                earnedMarks += question.marks;
+              if (typeof correctAnswer === 'number') {
+                isCorrect = userAns === normalize(String(correctAnswer));
+              } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
+                isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
+              } else if (Array.isArray(correctAnswer)) {
+                // Handle array format (e.g., ["answer1", "answer2"])
+                isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
               } else {
-                // Apply negative marking for wrong answers
-                if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-                  const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
-                  earnedMarks -= negativeMarks;
-                }
+                isCorrect = userAns === normalize(String(correctAnswer));
               }
             }
-          } else {
-            // For CQ/SQ, get manually assigned marks
-            const manualMarks = submission.answers[`${question.id}_marks`] || 0;
-            earnedMarks += manualMarks;
+
+            // Final fallback: use question.correct
+            if (!isCorrect && question.correct) {
+              const correctAns = normalize(String(question.correct));
+              isCorrect = userAns === correctAns;
+            }
+
+            if (isCorrect) {
+              earnedMarks += question.marks;
+            } else {
+              // Apply negative marking for wrong answers
+              if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+                const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
+                earnedMarks -= negativeMarks;
+              }
+            }
           }
+        } else {
+          // For CQ/SQ, get manually assigned marks
+          const manualMarks = submission.answers[`${question.id}_marks`] || 0;
+          earnedMarks += manualMarks;
         }
+      }
 
-        // Get evaluation status - check if submission has evaluation data
-        let evaluationStatus = 'PENDING';
+      // Get evaluation status - check if submission has evaluation data
+      let evaluationStatus = 'PENDING';
 
-        // Check if any questions have been manually graded
-        const hasManualGrading = Object.keys(submission.answers).some(key =>
-          key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
-        );
+      // Check if any questions have been manually graded
+      const hasManualGrading = Object.keys(submission.answers).some(key =>
+        key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
+      );
 
-        if (submission.evaluatedAt) {
-          evaluationStatus = 'COMPLETED';
-        } else if (hasManualGrading || submission.evaluatorNotes) {
-          evaluationStatus = 'IN_PROGRESS';
-        }
+      if (submission.evaluatedAt) {
+        evaluationStatus = 'COMPLETED';
+      } else if (hasManualGrading || submission.evaluatorNotes) {
+        evaluationStatus = 'IN_PROGRESS';
+      }
 
-        // Get result data for this submission
-        const result = await prisma.result.findFirst({
-          where: {
-            studentId: submission.studentId,
-            examId: examId
-          }
-        });
+      // Efficient Result Lookup
+      const result = studentResultMap.get(submission.studentId);
 
-        const submissionData = {
-          id: submission.id,
-          student: {
-            id: submission.student.id,
-            name: submission.student.user.name,
-            roll: submission.student.roll,
-            registrationNo: submission.student.registrationNo
-          },
-          answers: fixedAnswers,
-          submittedAt: submission.submittedAt.toISOString(),
-          totalMarks,
-          earnedMarks: result ? result.total : earnedMarks, // Use result total if available
-          status: evaluationStatus,
-          evaluatorNotes: submission.evaluatorNotes || null,
-          result: result ? {
-            mcqMarks: result.mcqMarks,
-            cqMarks: result.cqMarks,
-            sqMarks: result.sqMarks,
-            total: result.total
-          } : null,
-          submissionStatus: submission.status // Expose raw submission status (IN_PROGRESS/SUBMITTED)
-        };
+      const submissionData = {
+        id: submission.id,
+        student: {
+          id: submission.student.id,
+          name: submission.student.user.name,
+          roll: submission.student.roll,
+          registrationNo: submission.student.registrationNo
+        },
+        answers: fixedAnswers,
+        submittedAt: submission.submittedAt.toISOString(),
+        totalMarks,
+        earnedMarks: result ? result.total : earnedMarks, // Use result total if available
+        status: evaluationStatus,
+        evaluatorNotes: submission.evaluatorNotes || null,
+        result: result ? {
+          mcqMarks: result.mcqMarks,
+          cqMarks: result.cqMarks,
+          sqMarks: result.sqMarks,
+          total: result.total
+        } : null,
+        submissionStatus: submission.status // Expose raw submission status (IN_PROGRESS/SUBMITTED)
+      };
 
-        console.log(`📊 Submission ${submission.id} result data:`, {
-          mcqMarks: result?.mcqMarks,
-          total: result?.total,
-          hasResult: !!result
-        });
-
-        return submissionData;
-      })
-    );
+      return submissionData;
+    });
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
