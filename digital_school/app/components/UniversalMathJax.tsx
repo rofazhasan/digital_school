@@ -4,6 +4,8 @@
 import { MathJax } from "better-react-mathjax";
 import React, { useEffect, useState } from "react";
 
+import { cleanupMath } from "@/lib/utils";
+
 interface UniversalMathJaxProps {
     children: React.ReactNode;
     inline?: boolean;
@@ -17,7 +19,8 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
         return <MathJax inline={inline} dynamic={dynamic}>{children}</MathJax>;
     }
 
-    const content = children;
+    // Pre-process the content to strip $$ around TikZ and normalize delimiters
+    const content = cleanupMath(children);
 
     // Quick check to avoid complex parsing if no TikZ is present
     if (!content.includes("\\begin{tikzpicture}")) {
