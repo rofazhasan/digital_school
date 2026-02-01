@@ -2,21 +2,25 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useReactToPrint } from "react-to-print";
+
 import { LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, Highlighter, Ruler, Box, BarChart2, CheckCircle, XCircle, Presentation, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
-import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { useReactToPrint } from "react-to-print";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { SmartBoardToolbar } from "@/app/components/SmartBoardToolbar";
 
+// Dynamic Imports to avoid Hydration Mismatch
+import { SmartBoardRef } from "@/app/components/SmartBoard";
+const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
+const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
 
 // Types
 interface Question {

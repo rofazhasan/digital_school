@@ -10,11 +10,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
-import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
-import { SmartBoardToolbar } from "@/app/components/SmartBoardToolbar";
+import dynamic from "next/dynamic";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+
+
+// Dynamic Imports
+import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
+const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
+const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
@@ -563,15 +568,7 @@ export default function ProblemSolvingSession() {
                         <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
                             {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
                         </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={handleExportPDF}
-                            className="bg-white/80 hover:bg-white rounded-full text-xs font-semibold text-gray-700 border border-gray-200"
-                            title="Export PDF Report"
-                        >
-                            <Printer className="w-4 h-4 mr-2" /> Export
-                        </Button>
+
                         <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-white/80 hover:bg-white rounded-full">
                             {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
                         </Button>
@@ -742,9 +739,11 @@ export default function ProblemSolvingSession() {
                     totalQuestions={questions.length}
                     onPrev={handlePrev}
                     onNext={handleNext}
-                    onExport={generateSessionReport}
+                    onExport={handleExportPDF}
                     bgMode={boardBackground}
                     onNavigateBg={handleToggleBackground}
+                    isAnnotationMode={annotationMode}
+                    onToggleAnnotation={() => setAnnotationMode(!annotationMode)}
                 />
 
                 {/* Hidden Container for PDF Generation */}
