@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 // --- Types ---
-export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'move' | 'line' | 'rect' | 'circle' | 'triangle' | 'right_triangle' | 'axis' | 'cube' | 'diamond';
+export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'select' | 'move' | 'line' | 'rect' | 'circle' | 'triangle' | 'right_triangle' | 'axis' | 'cube' | 'diamond';
 
 export interface SmartBoardRef {
     clear: () => void;
@@ -71,6 +71,12 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     // Laser State (Ref for performance)
     const laserTrailRef = useRef<LaserPoint[]>([]);
 
+    // Selection & Drag State
+    const [selectedStrokeId, setSelectedStrokeId] = useState<string | null>(null);
+    const [isDraggingStroke, setIsDraggingStroke] = useState(false);
+    const [dragStartPos, setDragStartPos] = useState<Point | null>(null); // World coordinates
+    const [dragOffset, setDragOffset] = useState<Point>({ x: 0, y: 0 }); // World delta
+
     // --- Helpers ---
     const getScreenPoint = (e: React.MouseEvent | React.TouchEvent): Point => {
         const canvas = canvasRef.current;
@@ -99,16 +105,63 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         return ['line', 'rect', 'circle', 'triangle', 'right_triangle', 'axis', 'cube', 'diamond'].includes(t);
     };
 
+    // --- Hit Testing ---
+    const hitTest = (point: Point, strokes: Stroke[]): string | null => {
+        // Reverse iterate to find top-most
+        for (let i = strokes.length - 1; i >= 0; i--) {
+            const stroke = strokes[i];
+            if (stroke.tool === 'laser' || stroke.tool === 'eraser') continue;
+
+            // Simple bounding box check first could optimize, but for now traverse points
+            // Check distance to any point in the stroke
+            // Threshold varies by stroke width
+            const threshold = Math.max(10, stroke.width * 2) / scale;
+
+            for (let j = 0; j < stroke.points.length; j += 2) { // Skip every other point for perf
+                const sp = stroke.points[j];
+                const dx = sp.x - point.x;
+                const dy = sp.y - point.y;
+                if (dx * dx + dy * dy < threshold * threshold) {
+                    return stroke.id;
+                }
+            }
+        }
+        return null;
+    };
+
+    // --- Cursors ---
+    const getCursor = () => {
+        if (tool === 'select') return isDraggingStroke ? 'grabbing' : 'default';
+        if (tool === 'move') return isPanning ? 'grabbing' : 'grab';
+
+        const scaleFactor = 1; // standard
+        // SVGs for Cursors
+        const penSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>`;
+        const eraserSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>`;
+        const highlighterSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h9l3-3"/><path d="m22 2-7 20-5-5-5-5 5-5 22 2z"/></svg>`; // Rotate or simplify?
+        const crosshairSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="red" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+
+        const encode = (svg: string) => `url('data:image/svg+xml;utf8,${encodeURIComponent(svg)}')`;
+
+        if (tool === 'pen') return `${encode(penSvg)} 0 24, crosshair`;
+        if (tool === 'highlighter') return `${encode(penSvg)} 0 24, crosshair`; // Reuse pen for now or distinctive
+        if (tool === 'eraser') return `${encode(eraserSvg)} 12 12, crosshair`;
+        if (tool === 'laser') return `${encode(crosshairSvg)} 12 12, crosshair`;
+
+        return 'crosshair';
+    };
+
     // --- Rendering ---
-    const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
+    const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke, offsetPos: Point = { x: 0, y: 0 }) => {
         if (stroke.points.length < 1) return;
 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.lineWidth = stroke.width;
 
-        const p1 = stroke.points[0];
-        const p2 = stroke.points[stroke.points.length - 1]; // Use last point for shapes
+        const p1 = { x: stroke.points[0].x + offsetPos.x, y: stroke.points[0].y + offsetPos.y };
+        const rawLast = stroke.points[stroke.points.length - 1];
+        const p2 = { x: rawLast.x + offsetPos.x, y: rawLast.y + offsetPos.y };
 
         // Highlighter Logic
         if (stroke.tool === 'highlighter') {
@@ -212,12 +265,15 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             ctx.moveTo(p1.x, p1.y);
 
             for (let i = 1; i < stroke.points.length - 1; i++) {
-                const pt1 = stroke.points[i];
-                const pt2 = stroke.points[i + 1];
+                const rawPt1 = stroke.points[i];
+                const rawPt2 = stroke.points[i + 1];
+                const pt1 = { x: rawPt1.x + offsetPos.x, y: rawPt1.y + offsetPos.y };
+                const pt2 = { x: rawPt2.x + offsetPos.x, y: rawPt2.y + offsetPos.y };
                 const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
                 ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
             }
-            ctx.lineTo(stroke.points[stroke.points.length - 1].x, stroke.points[stroke.points.length - 1].y);
+            const last = stroke.points[stroke.points.length - 1];
+            ctx.lineTo(last.x + offsetPos.x, last.y + offsetPos.y);
             ctx.stroke();
         }
 
@@ -279,9 +335,34 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
         // 4. Draw Paths
         const visiblePaths = paths.slice(0, historyStep);
-        visiblePaths.forEach(path => drawStroke(ctx, path));
+        visiblePaths.forEach(path => {
+            if (path.id === selectedStrokeId && isDraggingStroke) {
+                // Draw with offset
+                drawStroke(ctx, path, dragOffset);
+                // Draw highlight box
+                // (Optional: Implement bounding box highlight here)
+            } else {
+                drawStroke(ctx, path);
+            }
+        });
 
-        // 5. Draw Current Stroke
+        // 5. Highlight Selected Static
+        if (selectedStrokeId && !isDraggingStroke) {
+            const selected = visiblePaths.find(p => p.id === selectedStrokeId);
+            if (selected) {
+                // Glow effect for selection
+                ctx.save();
+                ctx.shadowColor = 'blue';
+                ctx.shadowBlur = 10;
+                ctx.strokeStyle = '#3b82f6';
+                ctx.lineWidth = selected.width + 2;
+                ctx.globalAlpha = 0.5;
+                drawStroke(ctx, selected); // overlay highlight
+                ctx.restore();
+            }
+        }
+
+        // 6. Draw Current Stroke
         if (currentStroke) {
             drawStroke(ctx, currentStroke);
         }
@@ -326,7 +407,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 ctx.fill();
             }
         }
-    }, [scale, offset, paths, historyStep, currentStroke, backgroundColor]);
+    }, [scale, offset, paths, historyStep, currentStroke, backgroundColor, selectedStrokeId, dragOffset, isDraggingStroke]);
 
     // Laser Animation Loop
     useEffect(() => {
@@ -381,6 +462,24 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         const screenPoint = getScreenPoint(e);
         const worldPoint = toWorldPoint(screenPoint);
 
+        // Select Tool Logic
+        if (tool === 'select') {
+            // 1. Check if we clicked on an already selected object to drag it
+            // OR 2. Try to hit test a new object
+
+            const hitId = hitTest(worldPoint, paths.slice(0, historyStep));
+
+            if (hitId) {
+                setSelectedStrokeId(hitId);
+                setIsDraggingStroke(true);
+                setDragStartPos(worldPoint);
+                setDragOffset({ x: 0, y: 0 });
+            } else {
+                setSelectedStrokeId(null);
+            }
+            return;
+        }
+
         if (tool === 'move' || ('button' in e && e.button === 1)) {
             setIsPanning(true);
             setLastPanPoint(screenPoint);
@@ -415,6 +514,13 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             return;
         }
 
+        if (isDraggingStroke && dragStartPos && selectedStrokeId) {
+            const dx = worldPoint.x - dragStartPos.x;
+            const dy = worldPoint.y - dragStartPos.y;
+            setDragOffset({ x: dx, y: dy });
+            return;
+        }
+
         if (tool === 'laser' && isDrawing) {
             laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
             return;
@@ -438,9 +544,29 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     };
 
     const handlePointerUp = () => {
+
+        if (isDraggingStroke && selectedStrokeId && dragOffset.x !== 0) {
+            // Commit Transform
+            const newPaths = paths.map(p => {
+                if (p.id === selectedStrokeId) {
+                    return {
+                        ...p,
+                        points: p.points.map(pt => ({ x: pt.x + dragOffset.x, y: pt.y + dragOffset.y }))
+                    };
+                }
+                return p;
+            });
+            setPaths(newPaths);
+            setDragOffset({ x: 0, y: 0 });
+            setDragStartPos(null);
+            setIsDraggingStroke(false);
+            if (onDrawEnd) onDrawEnd();
+        }
+
         setIsDrawing(false);
         setIsPanning(false);
         setLastPanPoint(null);
+        setIsDraggingStroke(false);
 
         if (tool === 'laser') {
             return;
@@ -513,7 +639,8 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 onTouchMove={handlePointerMove}
                 onTouchEnd={handlePointerUp}
                 onWheel={handleWheel}
-                className={`block ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+                className={`block`}
+                style={{ cursor: getCursor() }}
             />
         </div>
     );

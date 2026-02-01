@@ -119,6 +119,13 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
                         tooltip="Pan (Move Canvas)"
                     />
 
+                    <ToolButton
+                        isActive={activeTool === 'select'}
+                        onClick={() => setTool('select')}
+                        icon={<MousePointer2 className="w-5 h-5 rotate-[-45deg]" />}
+                        tooltip="Select & Move Object"
+                    />
+
                     {/* Pen with Size Popover */}
                     <Popover>
                         <PopoverTrigger asChild>
