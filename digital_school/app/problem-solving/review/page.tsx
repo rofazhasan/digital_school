@@ -2,13 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-    ChevronLeft, ChevronRight, PenTool, Eraser, Move,
-    RotateCcw, Undo, Redo, Share, Printer, Eye, Lock, Unlock,
-    CheckCircle, XCircle, MoreVertical, Settings, LogOut, Maximize2, Minimize2,
-    Highlighter, Minus, MousePointer2, ZoomIn, ZoomOut, Grid3X3, Sun, Moon,
-    Clock, User, Presentation, Layout, Download, FileDown
-} from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, Highlighter, Ruler, Box, BarChart2, CheckCircle, XCircle, Presentation, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -56,14 +50,16 @@ export default function ProblemSolvingSession() {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
-
-    // Board State
+    const [showOverlay, setShowOverlay] = useState(true);
+    const [annotationMode, setAnnotationMode] = useState(false);
     const [boardTool, setBoardTool] = useState<ToolType>('pen');
     const [boardColor, setBoardColor] = useState('#000000');
+    const [showShapesMenu, setShowShapesMenu] = useState(false);
+
+    // Board State
     const [boardSize, setBoardSize] = useState(2);
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [annotationMode, setAnnotationMode] = useState(false);
     const [showToolSize, setShowToolSize] = useState(false);
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
     const lastToolClickTime = useRef<{ [key: string]: number }>({});
@@ -74,7 +70,6 @@ export default function ProblemSolvingSession() {
 
     // Interaction State
     const [showAnswer, setShowAnswer] = useState(false);
-    const [showOverlay, setShowOverlay] = useState(true);
 
     // MCQ State
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
@@ -740,17 +735,20 @@ export default function ProblemSolvingSession() {
                                 <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
                                 <div className="flex items-center gap-2 px-2">
-                                    {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
+                                    {['#000000', '#FF0000', '#0000FF', '#008000', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'].map(c => (
                                         <button
                                             key={c}
                                             onClick={() => {
                                                 setBoardColor(c);
                                                 boardRef.current?.setColor(c);
-                                                setBoardTool('pen');
-                                                boardRef.current?.setTool('pen');
+                                                if (boardTool === 'eraser') {
+                                                    setBoardTool('pen');
+                                                    boardRef.current?.setTool('pen');
+                                                }
                                             }}
-                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
+                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
                                             style={{ backgroundColor: c }}
+                                            title={c}
                                         />
                                     ))}
                                 </div>
@@ -798,7 +796,7 @@ export default function ProblemSolvingSession() {
                     </AnimatePresence>
 
                     {/* Hidden Container for PDF Generation */}
-                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-0 w-[794px] pointer-events-none opacity-0 invisible -z-50 bg-white"></div>
+                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
                 </div>
 
             </div>

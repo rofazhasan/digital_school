@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter
+    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -62,6 +62,7 @@ export default function ProblemSolvingSession() {
     const [annotationMode, setAnnotationMode] = useState(false);
     const [showToolSize, setShowToolSize] = useState(false);
     const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    const [showShapesMenu, setShowShapesMenu] = useState(false); // New state for shapes menu
     const lastToolClickTime = useRef<{ [key: string]: number }>({});
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
@@ -716,7 +717,7 @@ export default function ProblemSolvingSession() {
                     <div className={`transition-all duration-300 ${isToolbarCollapsed ? 'w-12 h-12 rounded-full p-0' : 'w-auto h-auto p-2 rounded-full'} flex items-center justify-center bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 overflow-hidden`}>
 
                         {isToolbarCollapsed ? (
-                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(false)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
+                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
                                 <Maximize2 className="w-5 h-5" />
                             </Button>
                         ) : (
@@ -742,18 +743,22 @@ export default function ProblemSolvingSession() {
 
                                 <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
-                                <div className="flex items-center gap-2 px-2">
-                                    {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
+                                {/* Colors */}
+                                <div className="flex gap-2 flex-wrap max-w-[200px]">
+                                    {['#000000', '#FF0000', '#0000FF', '#008000', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'].map(c => (
                                         <button
                                             key={c}
                                             onClick={() => {
                                                 setBoardColor(c);
                                                 boardRef.current?.setColor(c);
-                                                setBoardTool('pen');
-                                                boardRef.current?.setTool('pen');
+                                                if (boardTool === 'eraser') {
+                                                    setBoardTool('pen');
+                                                    boardRef.current?.setTool('pen');
+                                                }
                                             }}
-                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
+                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
                                             style={{ backgroundColor: c }}
+                                            title={c}
                                         />
                                     ))}
                                 </div>
@@ -771,6 +776,32 @@ export default function ProblemSolvingSession() {
                                 <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
                                     <ChevronRight className="w-5 h-5" />
                                 </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                {/* Shape Tools */}
+                                <div className="relative">
+                                    <ToolBtn
+                                        active={['line', 'rect', 'circle', 'triangle', 'cube', 'axis'].includes(boardTool)}
+                                        onClick={() => setShowShapesMenu(!showShapesMenu)}
+                                        icon={<Box className="w-5 h-5 text-indigo-500" />}
+                                        tooltip="Shapes & Ruler"
+                                    />
+                                    {showShapesMenu && (
+                                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-100 p-2 flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200">
+                                            <div className="flex gap-2">
+                                                <ToolBtn active={boardTool === 'line'} onClick={() => { setBoardTool('line'); boardRef.current?.setTool('line'); setShowShapesMenu(false); }} icon={<Ruler className="w-4 h-4" />} tooltip="Ruler (Line)" />
+                                                <ToolBtn active={boardTool === 'rect'} onClick={() => { setBoardTool('rect'); boardRef.current?.setTool('rect'); setShowShapesMenu(false); }} icon={<Square className="w-4 h-4" />} tooltip="Rectangle" />
+                                                <ToolBtn active={boardTool === 'circle'} onClick={() => { setBoardTool('circle'); boardRef.current?.setTool('circle'); setShowShapesMenu(false); }} icon={<Circle className="w-4 h-4" />} tooltip="Circle" />
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <ToolBtn active={boardTool === 'triangle'} onClick={() => { setBoardTool('triangle'); boardRef.current?.setTool('triangle'); setShowShapesMenu(false); }} icon={<Triangle className="w-4 h-4" />} tooltip="Triangle" />
+                                                <ToolBtn active={boardTool === 'cube'} onClick={() => { setBoardTool('cube'); boardRef.current?.setTool('cube'); setShowShapesMenu(false); }} icon={<Box className="w-4 h-4" />} tooltip="Cube (3D)" />
+                                                <ToolBtn active={boardTool === 'axis'} onClick={() => { setBoardTool('axis'); boardRef.current?.setTool('axis'); setShowShapesMenu(false); }} icon={<BarChart2 className="w-4 h-4" />} tooltip="XY Axis" />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
 
                                 <div className="w-px h-8 bg-gray-200 mx-2"></div>
 
@@ -812,7 +843,7 @@ export default function ProblemSolvingSession() {
                     </AnimatePresence>
 
                     {/* Hidden Container for PDF Generation */}
-                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-0 w-[794px] pointer-events-none opacity-0 invisible -z-50 bg-white"></div>
+                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
                 </div>
 
             </div>

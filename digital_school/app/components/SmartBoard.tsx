@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
 
 // --- Types ---
-export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'move';
+export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'move' | 'line' | 'rect' | 'circle' | 'triangle' | 'right_triangle' | 'axis' | 'cube' | 'diamond';
 
 export interface SmartBoardRef {
     clear: () => void;
@@ -95,31 +95,45 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         };
     };
 
+    const isShapeTool = (t: ToolType) => {
+        return ['line', 'rect', 'circle', 'triangle', 'right_triangle', 'axis', 'cube', 'diamond'].includes(t);
+    };
+
     // --- Rendering ---
     const drawStroke = (ctx: CanvasRenderingContext2D, stroke: Stroke) => {
-        if (stroke.points.length < 2) return;
-
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-
-        for (let i = 1; i < stroke.points.length - 1; i++) {
-            const p1 = stroke.points[i];
-            const p2 = stroke.points[i + 1];
-            const midPoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-            ctx.quadraticCurveTo(p1.x, p1.y, midPoint.x, midPoint.y);
-        }
-        const last = stroke.points[stroke.points.length - 1];
-        ctx.lineTo(last.x, last.y);
+        if (stroke.points.length < 1) return;
 
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.lineWidth = stroke.width;
 
+        const p1 = stroke.points[0];
+        const p2 = stroke.points[stroke.points.length - 1]; // Use last point for shapes
+
+        // Highlighter Logic
         if (stroke.tool === 'highlighter') {
-            ctx.globalAlpha = 0.3;
-            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 0.4;
+            ctx.globalCompositeOperation = 'multiply'; // Better blending
             ctx.strokeStyle = stroke.color;
-        } else if (stroke.tool === 'eraser') {
+            // Draw regular stroke
+            if (stroke.points.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+            for (let i = 1; i < stroke.points.length - 1; i++) {
+                const pt1 = stroke.points[i];
+                const pt2 = stroke.points[i + 1];
+                const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
+                ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
+            }
+            ctx.lineTo(stroke.points[stroke.points.length - 1].x, stroke.points[stroke.points.length - 1].y);
+            ctx.stroke();
+
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = 1;
+            return;
+        }
+
+        if (stroke.tool === 'eraser') {
             ctx.globalAlpha = 1;
             ctx.globalCompositeOperation = 'destination-out';
             ctx.strokeStyle = '#000000';
@@ -129,7 +143,83 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             ctx.strokeStyle = stroke.color;
         }
 
-        ctx.stroke();
+        // Shape Logic
+        if (isShapeTool(stroke.tool)) {
+            const w = p2.x - p1.x;
+            const h = p2.y - p1.y;
+
+            ctx.beginPath();
+
+            if (stroke.tool === 'line') {
+                ctx.moveTo(p1.x, p1.y);
+                ctx.lineTo(p2.x, p2.y);
+            } else if (stroke.tool === 'rect') {
+                ctx.rect(p1.x, p1.y, w, h);
+            } else if (stroke.tool === 'circle') {
+                // Ellipse based on bounding box
+                const centerX = p1.x + w / 2;
+                const centerY = p1.y + h / 2;
+                ctx.ellipse(centerX, centerY, Math.abs(w / 2), Math.abs(h / 2), 0, 0, 2 * Math.PI);
+            } else if (stroke.tool === 'triangle') {
+                // Isosceles
+                ctx.moveTo(p1.x + w / 2, p1.y); // Top Middle
+                ctx.lineTo(p1.x, p1.y + h);     // Bottom Left
+                ctx.lineTo(p1.x + w, p1.y + h); // Bottom Right
+                ctx.closePath();
+            } else if (stroke.tool === 'right_triangle') {
+                ctx.moveTo(p1.x, p1.y);        // Top Left
+                ctx.lineTo(p1.x, p1.y + h);    // Bottom Left
+                ctx.lineTo(p1.x + w, p1.y + h);// Bottom Right
+                ctx.closePath();
+            } else if (stroke.tool === 'diamond') {
+                ctx.moveTo(p1.x + w / 2, p1.y);
+                ctx.lineTo(p1.x + w, p1.y + h / 2);
+                ctx.lineTo(p1.x + w / 2, p1.y + h);
+                ctx.lineTo(p1.x, p1.y + h / 2);
+                ctx.closePath();
+            } else if (stroke.tool === 'cube') {
+                // Simple 3D Cube
+                const d = w * 0.25; // depth offset
+                // Front face
+                ctx.rect(p1.x, p1.y + d, w - d, h - d);
+                // Back face (lines)
+                ctx.moveTo(p1.x, p1.y + d); ctx.lineTo(p1.x + d, p1.y);
+                ctx.moveTo(p1.x + w - d, p1.y + d); ctx.lineTo(p1.x + w, p1.y);
+                ctx.moveTo(p1.x + w - d, p1.y + h); ctx.lineTo(p1.x + w, p1.y + h - d);
+                ctx.moveTo(p1.x, p1.y + h); ctx.lineTo(p1.x + d, p1.y + h - d);
+                // Back face rect part
+                ctx.rect(p1.x + d, p1.y, w - d, h - d);
+            } else if (stroke.tool === 'axis') {
+                // Cartesian Plane Stencil (Always black/grey usually but uses color)
+                // Draw Axis Lines
+                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2, p1.y + h); // Y
+                ctx.moveTo(p1.x, p1.y + h / 2); ctx.lineTo(p1.x + w, p1.y + h / 2); // X
+                // Arrows (Simple)
+                // X Arrow
+                ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 - 5);
+                ctx.moveTo(p1.x + w, p1.y + h / 2); ctx.lineTo(p1.x + w - 10, p1.y + h / 2 + 5);
+                // Y Arrow
+                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 - 5, p1.y + 10);
+                ctx.moveTo(p1.x + w / 2, p1.y); ctx.lineTo(p1.x + w / 2 + 5, p1.y + 10);
+            }
+
+            ctx.stroke();
+
+        } else if (stroke.tool === 'pen' || stroke.tool === 'semigloss') {
+            // Standard Pen
+            if (stroke.points.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(p1.x, p1.y);
+
+            for (let i = 1; i < stroke.points.length - 1; i++) {
+                const pt1 = stroke.points[i];
+                const pt2 = stroke.points[i + 1];
+                const mid = { x: (pt1.x + pt2.x) / 2, y: (pt1.y + pt2.y) / 2 };
+                ctx.quadraticCurveTo(pt1.x, pt1.y, mid.x, mid.y);
+            }
+            ctx.lineTo(stroke.points[stroke.points.length - 1].x, stroke.points[stroke.points.length - 1].y);
+            ctx.stroke();
+        }
 
         ctx.globalCompositeOperation = 'source-over';
         ctx.globalAlpha = 1;
@@ -340,10 +430,19 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         }
 
         if (isDrawing && currentStroke) {
-            setCurrentStroke(prev => prev ? {
-                ...prev,
-                points: [...prev.points, worldPoint]
-            } : null);
+            if (isShapeTool(currentStroke.tool)) {
+                // For shapes, we just update the End Point (2nd point)
+                setCurrentStroke({
+                    ...currentStroke,
+                    points: [currentStroke.points[0], worldPoint]
+                });
+            } else {
+                // For freehand, we append
+                setCurrentStroke(prev => prev ? {
+                    ...prev,
+                    points: [...prev.points, worldPoint]
+                } : null);
+            }
         }
     };
 
