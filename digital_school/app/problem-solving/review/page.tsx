@@ -372,37 +372,36 @@ export default function ReviewToSessionPort() {
                 {/* 3. QUESTION OVERLAY */}
                 {/* REMOVED ANIMATEPRESENCE TO GUARANTEE VISIBILITY (Fix for blank screen) */}
                 {showOverlay && (
-                    <div className={`absolute top-24 left-6 w-[480px] flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-10 pointer-events-none opacity-50' : 'z-20 pointer-events-auto'}`}>
-                        <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}>
-                            <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
-                                <div className="flex flex-col">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                                        <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
+                    <div className={`absolute top-24 left-6 w-[520px] flex flex-col max-h-[calc(100vh-160px)] transition-all duration-300 ${annotationMode ? 'z-10 pointer-events-none opacity-40 translate-x-[-20px]' : 'z-20 pointer-events-auto'}`}>
+                        <Card className={`shadow-xl border-0 overflow-hidden flex flex-col rounded-3xl backdrop-blur-md ${isDark ? 'bg-slate-900/90 ring-1 ring-slate-700/50 text-white' : 'bg-white/95 ring-1 ring-black/5 text-gray-900'}`}>
+
+                            {/* Header / Meta */}
+                            <div className={`px-8 py-5 flex justify-between items-center ${isDark ? 'border-b border-slate-800' : 'border-b border-gray-100'}`}>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]"></div>
+                                        <span className="text-xs font-bold text-indigo-500 uppercase tracking-widest">{currentQ.subject}</span>
                                     </div>
                                     {currentQ.topic && (
-                                        <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
+                                        <span className={`text-xs truncate max-w-[200px] font-medium pl-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{currentQ.topic}</span>
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {currentQ.status === 'correct' && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Correct</Badge>}
-                                    {currentQ.status === 'wrong' && <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Wrong</Badge>}
-                                    {currentQ.status === 'unanswered' && <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100">Not Answered</Badge>}
-                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                    <Badge variant="outline" className={`border-0 px-2.5 py-1 ${currentQ.difficulty === 'HARD' ? 'bg-rose-500/10 text-rose-500' : 'bg-emerald-500/10 text-emerald-500'}`}>
                                         {currentQ.difficulty}
                                     </Badge>
                                 </div>
                             </div>
 
-                            <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
+                            {/* Content Area */}
+                            <div className={`p-8 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                                <h3 className={`text-2xl font-semibold leading-relaxed max-w-4xl tracking-tight ${isDark ? 'text-indigo-50' : 'text-slate-900'}`}>
                                     <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
                                 </h3>
 
-                                <div className="mt-8 space-y-4">
-                                    {/* Case Insensitive Check */}
+                                <div className="mt-10 space-y-4">
                                     {currentQ.type?.toUpperCase() === 'MCQ' && currentQ.options && (
-                                        <div className="grid gap-3">
+                                        <div className="grid gap-4">
                                             {currentQ.options.map((opt, idx) => {
                                                 const isSelected = selectedOption === idx;
                                                 const isCorrect = opt.isCorrect;
@@ -416,78 +415,76 @@ export default function ReviewToSessionPort() {
 
                                                 // Base Style
                                                 let statusClass = isDark
-                                                    ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
-                                                    : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
+                                                    ? "border-slate-800 bg-slate-800/30 hover:bg-slate-800/60"
+                                                    : "border-slate-100 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-slate-200";
 
                                                 // INTERACTION STATE: Highlight selected option (Blue border/bg) before reveal
                                                 if (isSelected) {
                                                     statusClass = isDark
-                                                        ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
-                                                        : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
+                                                        ? "bg-indigo-900/30 border-indigo-500/40 ring-1 ring-indigo-500/20"
+                                                        : "bg-indigo-50/50 border-indigo-200 ring-1 ring-indigo-100 shadow-sm";
                                                 }
 
                                                 // REVEAL STATE: Colors override selection styles
                                                 if (shouldReveal) {
                                                     if (isCorrect) {
                                                         // Always show CORRECT answer in GREEN
-                                                        statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
+                                                        statusClass = isDark ? "bg-emerald-950/30 border-emerald-500/40" : "bg-emerald-50 border-emerald-200 ring-1 ring-emerald-100";
                                                     }
                                                     else if (isSelected) {
                                                         // Show SELECTED WRONG answer in RED
-                                                        statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-80" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-80";
+                                                        statusClass = isDark ? "bg-rose-950/30 border-rose-500/40 opacity-90" : "bg-rose-50 border-rose-200 ring-1 ring-rose-100 opacity-90";
                                                     }
                                                     else {
                                                         // Dim others
-                                                        statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                        statusClass = isDark ? "bg-slate-800/20 opacity-40 grayscale" : "bg-slate-50 opacity-40 grayscale";
                                                     }
                                                 }
-                                                // Note: We deliberately do NOT color the "isStudentAnswer" red here if not selected.
-                                                // The requirement is "his choose is right or wrong seen". Only the current active selection gets graded red/green.
-                                                // But the Correct answer (green) is always shown on reveal.
 
                                                 return (
                                                     <div
                                                         key={idx}
                                                         onClick={(e) => {
                                                             if (annotationMode) return;
-                                                            // Teacher Interaction:
-                                                            // Always allow selecting. If already checked, uncheck to allow trying again?
-                                                            // User said "if he tap Check Answer... his choose is right or wrong seen".
-                                                            // Let's reset isAnswerChecked on new selection so they can click Check again.
+                                                            // Teacher Interaction
                                                             setSelectedOption(idx);
                                                             setIsAnswerChecked(false);
                                                         }}
                                                         className={`
-                                                  p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group cursor-pointer
+                                                  p-5 rounded-2xl border transition-all duration-300 flex items-start gap-5 group cursor-pointer relative overflow-hidden
                                                   ${annotationMode ? 'cursor-crosshair' : ''}
                                                   ${statusClass}
                                               `}
                                                     >
+                                                        {/* Option Label (A, B, C...) */}
                                                         <div className={`
-                                                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
-                                                  ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
-                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
+                                                  shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-300 border
+                                                  ${isSelected ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : (isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:bg-slate-50')}
+                                                  ${shouldReveal && isCorrect ? '!bg-emerald-500 !border-emerald-400 !text-white !shadow-emerald-500/30' : ''}
+                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-rose-500 !border-rose-400 !text-white !shadow-rose-500/30' : ''}
                                               `}>
                                                             {String.fromCharCode(65 + idx)}
                                                         </div>
-                                                        <div className="flex-1 flex flex-col">
-                                                            <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
+
+                                                        <div className="flex-1 flex flex-col z-10">
+                                                            <span className={`text-lg leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
 
-                                                            {/* Student Answer Indicator (ALWAYS VISIBLE) */}
+                                                            {/* Student Answer Indicator (Persistent) */}
                                                             {isStudentAnswer && (
-                                                                <div className="mt-2 flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
-                                                                    <User className="w-3 h-3 text-indigo-500" />
-                                                                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-wide">Student Answer</span>
+                                                                <div className="mt-3 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500">
+                                                                    <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${isDark ? 'bg-indigo-950/50 border-indigo-800 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
+                                                                        <User className="w-3 h-3" />
+                                                                        Student Pick
+                                                                    </div>
 
                                                                     {/* Status Badges (Only after Reveal) */}
                                                                     {shouldReveal && currentQ.status === 'correct' && (
-                                                                        <span className="text-xs text-green-600 font-bold ml-1 bg-green-100 px-1.5 py-0.5 rounded-full border border-green-200">Correct</span>
+                                                                        <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Correct</span>
                                                                     )}
                                                                     {shouldReveal && currentQ.status === 'wrong' && (
-                                                                        <span className="text-xs text-red-500 font-bold ml-1 bg-red-100 px-1.5 py-0.5 rounded-full border border-red-200">Wrong</span>
+                                                                        <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Wrong</span>
                                                                     )}
                                                                 </div>
                                                             )}
@@ -503,20 +500,20 @@ export default function ReviewToSessionPort() {
                                 {(!isAnswerChecked) && currentQ.type?.toUpperCase() === 'MCQ' && (
                                     <Button
                                         onClick={() => setIsAnswerChecked(true)}
-                                        // Allow checking even if nothing selected (to just see the answer)
-                                        // disabled={selectedOption === null} // REMOVED
-                                        className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all hover:scale-[1.01]"
+                                        // Disabled only if nothing selected, UNLESS we just want to see the answer
+                                        // disabled={selectedOption === null}
+                                        className="w-full mt-8 h-12 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:scale-[1.01] rounded-xl"
                                     >
                                         Check Answer & Explanation
                                     </Button>
                                 )}
 
                                 {isAnswerChecked && (
-                                    <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
-                                        <h4 className="font-bold text-indigo-500 flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4" /> Explanation
+                                    <div className={`mt-8 p-6 rounded-2xl border ${isDark ? 'bg-indigo-900/10 border-indigo-500/20' : 'bg-slate-50 border-slate-100'}`}>
+                                        <h4 className="font-bold text-indigo-600 flex items-center gap-2 mb-3">
+                                            <CheckCircle className="w-5 h-5" /> Explanation
                                         </h4>
-                                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
+                                        <div className="prose dark:prose-invert max-w-none text-slate-600 leading-relaxed">
                                             <MathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
                                         </div>
                                     </div>
