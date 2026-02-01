@@ -34,13 +34,37 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
 
     const parts = content.split(tikzRegex);
 
+    // Trigger TikZ rendering: dynamic parts need a nudge
+    useEffect(() => {
+        const triggerTikz = async () => {
+            if (typeof window !== 'undefined') {
+                // Short wait to ensure DOM elements are painted
+                await new Promise(r => setTimeout(r, 100));
+
+                const win = window as any;
+                if (win.tikzjax && typeof win.tikzjax.process === 'function') {
+                    try {
+                        win.tikzjax.process();
+                    } catch (e) {
+                        console.error("TikZ process error:", e);
+                    }
+                }
+            }
+        };
+
+        // Execute trigger if TikZ content is present
+        if (content.includes("\\begin{tikzpicture}")) {
+            triggerTikz();
+        }
+    }, [content]);
+
     return (
         <span>
             {parts.map((part, index) => {
                 // If this part is a TikZ block
                 if (part.startsWith("\\begin{tikzpicture}")) {
                     return (
-                        <span key={index} className="tikz-wrapper block my-4 flex justify-center">
+                        <span key={index} className="tikz-wrapper block my-4 flex justify-center overflow-x-auto">
                             <script
                                 type="text/tikz"
                                 dangerouslySetInnerHTML={{ __html: part }}
