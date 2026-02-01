@@ -6,7 +6,7 @@ import {
     Undo, Redo, ZoomIn, ZoomOut, Layout,
     Box, Circle, Triangle, Square, Minus, Ruler, BarChart2,
     Palette, ChevronLeft, ChevronRight, Maximize2, Minimize2,
-    Sun, Moon, Grid3X3, Check
+    Sun, Moon, Grid3X3, Check, Timer, Eye, EyeOff, Printer
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -23,14 +23,60 @@ interface SmartBoardToolbarProps {
     onExport?: () => void;
     bgMode: 'white' | 'black' | 'grid';
     onNavigateBg: () => void;
+    isAnnotationMode?: boolean;
+    onToggleAnnotation?: () => void;
 }
+
+// Define Stopwatch before usage
+const Stopwatch = () => {
+    const [time, setTime] = useState(0);
+    const [isRunning, setIsRunning] = useState(false);
+
+    useEffect(() => {
+        let interval: NodeJS.Timeout;
+        if (isRunning) {
+            interval = setInterval(() => setTime(t => t + 1), 1000);
+        }
+        return () => clearInterval(interval);
+    }, [isRunning]);
+
+    const formatTime = (t: number) => {
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    };
+
+    return (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button variant={isRunning ? "default" : "ghost"} size="icon" className={`w-8 h-8 rounded-full ${isRunning ? 'bg-amber-100 text-amber-700 border-amber-200' : 'text-gray-500'}`}>
+                    {isRunning ? <span className="text-[10px] font-mono font-bold">{formatTime(time)}</span> : <Timer className="w-4 h-4" />}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent side="top" className="w-32 p-2">
+                <div className="text-center font-mono text-xl font-bold mb-2">{formatTime(time)}</div>
+                <div className="flex justify-center gap-1">
+                    <Button size="sm" variant={isRunning ? "destructive" : "default"} onClick={() => setIsRunning(!isRunning)} className="h-7 text-xs">
+                        {isRunning ? "Stop" : "Start"}
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => { setIsRunning(false); setTime(0); }} className="h-7 text-xs">
+                        Reset
+                    </Button>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+};
 
 export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
     boardRef,
     currentIndex,
     totalQuestions,
     onPrev,
-    onNext
+    onNext,
+    onExport,
+    isAnnotationMode = false,
+    onToggleAnnotation
 }) => {
     // Local State to track Active Tool for UI highlighting
     // (Actual state is effectively in SmartBoard, but we mirror it here for UI)
@@ -41,6 +87,9 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
 
     // Collapse State
     const [isCollapsed, setIsCollapsed] = useState(false);
+
+    // Ref for hidden PDF container
+    const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
     // Helpers
     const setTool = (t: ToolType) => {
@@ -162,12 +211,32 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
                         tooltip="Highlighter"
                     />
 
-                    <ToolButton
-                        isActive={activeTool === 'eraser'}
-                        onClick={() => setTool('eraser')}
-                        icon={<Eraser className="w-5 h-5" />}
-                        tooltip="Eraser"
-                    />
+                    {/* Eraser with Size */}
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <div className="relative group">
+                                <ToolButton
+                                    isActive={activeTool === 'eraser'}
+                                    onClick={() => setTool('eraser')}
+                                    icon={<Eraser className="w-5 h-5" />}
+                                    tooltip="Eraser (Hold for Size)"
+                                />
+                            </div>
+                        </PopoverTrigger>
+                        <PopoverContent side="top" className="w-48 p-3 mb-2">
+                            <div className="space-y-2">
+                                <div className="flex justify-between text-xs text-gray-500">
+                                    <span>Eraser Width</span>
+                                    <span>{strokeWidth}px</span>
+                                </div>
+                                <Slider
+                                    value={[strokeWidth]}
+                                    min={5} max={50} step={5}
+                                    onValueChange={([v]) => { setStrokeWidth(v); boardRef.current?.setLineWidth(v); }}
+                                />
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                 </div>
 
                 <div className="w-px h-6 bg-gray-200 mx-1" />
@@ -221,6 +290,29 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
                     </Button>
                     <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100">
                         <Redo className="w-4 h-4" />
+                    </Button>
+
+                    <div className="w-px h-6 bg-gray-200 mx-1" />
+
+                    {/* Stopwatch */}
+                    <Stopwatch />
+
+                    {/* Annotation Toggle */}
+                    {onToggleAnnotation && (
+                        <Button
+                            variant={isAnnotationMode ? "default" : "ghost"}
+                            size="icon"
+                            onClick={onToggleAnnotation}
+                            className={`w-8 h-8 rounded-full ${isAnnotationMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                            title={isAnnotationMode ? "Exit Annotation Mode" : "Annotate Over Content"}
+                        >
+                            {isAnnotationMode ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                        </Button>
+                    )}
+
+                    {/* Printer / Export */}
+                    <Button variant="ghost" size="icon" onClick={onExport} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100" title="Export PDF">
+                        <Printer className="w-4 h-4" />
                     </Button>
 
                     <Button variant="ghost" size="icon" onClick={setBackground} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100">

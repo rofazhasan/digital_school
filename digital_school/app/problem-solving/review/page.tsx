@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useReactToPrint } from "react-to-print";
 import { LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, Highlighter, Ruler, Box, BarChart2, CheckCircle, XCircle, Presentation, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
 import { toast } from "sonner";
+
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
@@ -52,8 +54,18 @@ export default function ProblemSolvingSession() {
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [showOverlay, setShowOverlay] = useState(true);
-    const [annotationMode, setAnnotationMode] = useState(false);
-    // Board State
+    const [annotationMode, setAnnotationMode] = useState(false); // Controls z-index of board vs overlay
+
+    // --- Export Logic (react-to-print) ---
+    const printRef = useRef<HTMLDivElement>(null);
+    const handleExport = useReactToPrint({
+        content: () => printRef.current,
+        documentTitle: `Review_Session_${new Date().toISOString().slice(0, 10)}`,
+    });
+
+    const handleToggleAnnotation = () => {
+        setAnnotationMode(prev => !prev);
+    };
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
@@ -496,204 +508,209 @@ export default function ProblemSolvingSession() {
                 </div>
 
                 {/* 2. MAIN CANVAS (Unchanged) */}
-                <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
-                    <SmartBoard
-                        ref={boardRef}
-                        className=""
-                        backgroundColor={annotationMode ? 'transparent' : boardBackground}
-                    />
-                </div>
+                <div className="relative w-full h-full overflow-hidden" ref={printRef}>
+                    {/* 2. MAIN BOARD - Z-Index Flipped based on Annotation Mode */}
+                    <div className={`absolute inset-0 transition-all duration-300 ${annotationMode ? 'z-30 pointer-events-auto bg-transparent' : 'z-0'}`}>
+                        <SmartBoard
+                            ref={boardRef}
+                            className=""
+                            backgroundColor={annotationMode ? 'transparent' : boardBackground}
+                        />
+                    </div>
 
-                {/* 3. QUESTION OVERLAY (Review Logic) */}
-                <AnimatePresence>
-                    {showOverlay && (
-                        <motion.div
-                            initial={{ x: -400, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -400, opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`absolute top-24 left-6 w-[480px] pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
-                        >
-                            <Card className={`shadow-2xl shadow-black/20 overflow-hidden flex flex-col rounded-2xl ring-1 ring-white/10 backdrop-blur-xl ${isDark ? 'bg-slate-900/95 border-slate-700 text-slate-100' : 'bg-white/95 border-white/40 text-gray-900'}`}>
-                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-slate-800/50 border-b border-slate-700' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
-                                    <div className="flex flex-col">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
-                                            <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
+                    {/* 3. QUESTION OVERLAY (Review Logic) */}
+                    <AnimatePresence>
+                        {showOverlay && (
+                            <motion.div
+                                initial={{ x: -400, opacity: 0 }}
+                                animate={{ x: 0, opacity: 1 }}
+                                exit={{ x: -400, opacity: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                                className={`absolute top-24 left-6 w-[480px] flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-10 pointer-events-none opacity-50' : 'z-20 pointer-events-auto'}`}
+                            >
+                                <Card className={`shadow-2xl shadow-black/20 overflow-hidden flex flex-col rounded-2xl ring-1 ring-white/10 backdrop-blur-xl ${isDark ? 'bg-slate-900/95 border-slate-700 text-slate-100' : 'bg-white/95 border-white/40 text-gray-900'}`}>
+                                    <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-slate-800/50 border-b border-slate-700' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
+                                        <div className="flex flex-col">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                                <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
+                                            </div>
+                                            {currentQ.topic && (
+                                                <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
+                                            )}
                                         </div>
-                                        {currentQ.topic && (
-                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
-                                        )}
+                                        <div className="flex items-center gap-2">
+                                            {/* Review Status Badge replacing Difficulty */}
+                                            {currentQ.status === 'correct' && (
+                                                <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 px-3 py-1 font-bold">
+                                                    <CheckCircle className="w-3 h-3 mr-1" /> Correct
+                                                </Badge>
+                                            )}
+                                            {currentQ.status === 'wrong' && (
+                                                <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 px-3 py-1 font-bold">
+                                                    <XCircle className="w-3 h-3 mr-1" /> Wrong
+                                                </Badge>
+                                            )}
+                                            {currentQ.status === 'unanswered' && (
+                                                <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100 px-3 py-1 font-bold">
+                                                    Not Answered
+                                                </Badge>
+                                            )}
+                                            {/* Optional: Keep Difficulty as tertiary info or remove if strictly replacing */}
+                                            <Badge variant="outline" className="text-xs text-gray-400 border-gray-100">
+                                                {currentQ.marks} Marks
+                                            </Badge>
+                                        </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        {/* Review Status Badge replacing Difficulty */}
-                                        {currentQ.status === 'correct' && (
-                                            <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 px-3 py-1 font-bold">
-                                                <CheckCircle className="w-3 h-3 mr-1" /> Correct
-                                            </Badge>
-                                        )}
-                                        {currentQ.status === 'wrong' && (
-                                            <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 px-3 py-1 font-bold">
-                                                <XCircle className="w-3 h-3 mr-1" /> Wrong
-                                            </Badge>
-                                        )}
-                                        {currentQ.status === 'unanswered' && (
-                                            <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100 px-3 py-1 font-bold">
-                                                Not Answered
-                                            </Badge>
-                                        )}
-                                        {/* Optional: Keep Difficulty as tertiary info or remove if strictly replacing */}
-                                        <Badge variant="outline" className="text-xs text-gray-400 border-gray-100">
-                                            {currentQ.marks} Marks
-                                        </Badge>
-                                    </div>
-                                </div>
 
-                                <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
-                                        <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
-                                    </h3>
+                                    <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                                        <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
+                                        </h3>
 
-                                    <div className="mt-8 space-y-4">
-                                        {currentQ.type === 'MCQ' && currentQ.options && (
-                                            <div className="grid gap-3">
-                                                {currentQ.options.map((opt, idx) => {
-                                                    const isCorrect = opt.isCorrect;
-                                                    const isUserSelected = currentQ.userAnswer === idx;
-                                                    const isSelected = selectedOption === idx; // Define Teacher Selection
+                                        <div className="mt-8 space-y-4">
+                                            {currentQ.type === 'MCQ' && currentQ.options && (
+                                                <div className="grid gap-3">
+                                                    {currentQ.options.map((opt, idx) => {
+                                                        const isCorrect = opt.isCorrect;
+                                                        const isUserSelected = currentQ.userAnswer === idx;
+                                                        const isSelected = selectedOption === idx; // Define Teacher Selection
 
-                                                    // Visual State Logic for Review
-                                                    // 1. Base: Neutral
-                                                    // 2. UserSelected (Student): Blue Border "Your Answer"
-                                                    // 3. CurrentSelection (Teacher): Highlighted Background
+                                                        // Visual State Logic for Review
+                                                        // 1. Base: Neutral
+                                                        // 2. UserSelected (Student): Blue Border "Your Answer"
+                                                        // 3. CurrentSelection (Teacher): Highlighted Background
 
-                                                    let statusClass = isDark
-                                                        ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
-                                                        : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
+                                                        let statusClass = isDark
+                                                            ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
+                                                            : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
-                                                    // Student Answer Indication (Always visible)
-                                                    if (isUserSelected) {
-                                                        statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50/50";
-                                                    }
-
-                                                    // Teacher Selection Indication (Interactive)
-                                                    if (isSelected) {
-                                                        statusClass = isDark
-                                                            ? "bg-indigo-900/60 border-indigo-500"
-                                                            : "bg-indigo-50 border-indigo-300";
-                                                    }
-
-                                                    // REVEAL LOGIC
-                                                    // Show solution if "Check Answer" is clicked
-                                                    const shouldReveal = isAnswerChecked;
-
-                                                    if (shouldReveal) {
-                                                        // 1. Correct Answer: Always Green
-                                                        if (isCorrect) {
-                                                            statusClass = isDark ? "bg-green-900/30 border-green-500/50" : "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                                        // Student Answer Indication (Always visible)
+                                                        if (isUserSelected) {
+                                                            statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50/50";
                                                         }
-                                                        // 2. Wrong Selection (Teacher or Student): Red
-                                                        // Show Red if this specific option is selected AND wrong
-                                                        else if ((isSelected || isUserSelected) && !isCorrect) {
-                                                            statusClass = isDark ? "bg-red-900/30 border-red-500/50" : "bg-red-50 border-red-300 ring-1 ring-red-300 opacity-80";
-                                                        }
-                                                        else {
-                                                            statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
-                                                        }
-                                                    }
 
-                                                    return (
-                                                        <div
-                                                            key={idx}
-                                                            onClick={() => {
-                                                                if (annotationMode || isAnswerChecked) return; // Only lock after check
-                                                                setSelectedOption(idx); // Allow teacher to choose
-                                                            }}
-                                                            className={`
+                                                        // Teacher Selection Indication (Interactive)
+                                                        if (isSelected) {
+                                                            statusClass = isDark
+                                                                ? "bg-indigo-900/60 border-indigo-500"
+                                                                : "bg-indigo-50 border-indigo-300";
+                                                        }
+
+                                                        // REVEAL LOGIC
+                                                        // Show solution if "Check Answer" is clicked
+                                                        const shouldReveal = isAnswerChecked;
+
+                                                        if (shouldReveal) {
+                                                            // 1. Correct Answer: Always Green
+                                                            if (isCorrect) {
+                                                                statusClass = isDark ? "bg-green-900/30 border-green-500/50" : "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                                            }
+                                                            // 2. Wrong Selection (Teacher or Student): Red
+                                                            // Show Red if this specific option is selected AND wrong
+                                                            else if ((isSelected || isUserSelected) && !isCorrect) {
+                                                                statusClass = isDark ? "bg-red-900/30 border-red-500/50" : "bg-red-50 border-red-300 ring-1 ring-red-300 opacity-80";
+                                                            }
+                                                            else {
+                                                                statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                            }
+                                                        }
+
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    if (annotationMode || isAnswerChecked) return; // Only lock after check
+                                                                    setSelectedOption(idx); // Allow teacher to choose
+                                                                }}
+                                                                className={`
                                                                 p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group cursor-pointer
                                                                 ${statusClass}
                                                             `}
-                                                        >
-                                                            <div className={`
+                                                            >
+                                                                <div className={`
                                                                 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
                                                                 ${isSelected ? 'bg-indigo-600 text-white' : (isUserSelected ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 text-gray-500')}
                                                                 ${shouldReveal && isCorrect ? '!bg-green-600 !text-white !border-green-600' : ''}
                                                                 ${shouldReveal && (isSelected || isUserSelected) && !isCorrect ? '!bg-red-600 !text-white !border-red-600' : ''}
                                                             `}>
-                                                                {String.fromCharCode(65 + idx)}
+                                                                    {String.fromCharCode(65 + idx)}
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
+                                                                        <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                                                                    </span>
+                                                                    {isUserSelected && (
+                                                                        <div className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1">
+                                                                            <User className="w-3 h-3" /> Student Answer
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                {shouldReveal && isCorrect && <CheckCircle className="w-6 h-6 text-green-600 drop-shadow-sm" />}
+                                                                {shouldReveal && (isSelected || isUserSelected) && !isCorrect && <XCircle className="w-6 h-6 text-red-600 drop-shadow-sm" />}
                                                             </div>
-                                                            <div className="flex-1">
-                                                                <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
-                                                                    <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
-                                                                </span>
-                                                                {isUserSelected && (
-                                                                    <div className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1">
-                                                                        <User className="w-3 h-3" /> Student Answer
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            {shouldReveal && isCorrect && <CheckCircle className="w-6 h-6 text-green-600 drop-shadow-sm" />}
-                                                            {shouldReveal && (isSelected || isUserSelected) && !isCorrect && <XCircle className="w-6 h-6 text-red-600 drop-shadow-sm" />}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Action Buttons: Always allow check if not checked */}
-                                    <div className="mt-6 flex gap-3 relative z-10">
-                                        {!isAnswerChecked && currentQ.type === 'MCQ' && (
-                                            <Button
-                                                onClick={() => setIsAnswerChecked(true)}
-                                                // Enable even if nothing selected (just to see answer)
-                                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg tracking-wide font-semibold transform active:scale-95 transition-all"
-                                            >
-                                                {selectedOption !== null ? "Check My Selection" : "Show Correct Answer"}
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Explanation */}
-                                    <AnimatePresence>
-                                        {isAnswerChecked && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: "auto", opacity: 1 }}
-                                                className={`mt-4 overflow-hidden rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}
-                                            >
-                                                <div className="p-4">
-                                                    <h4 className="font-bold text-indigo-500 flex items-center gap-2 mb-2">
-                                                        <Presentation className="w-4 h-4" /> Explanation
-                                                    </h4>
-                                                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm leading-relaxed">
-                                                        <UniversalMathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</UniversalMathJax>
-                                                    </div>
+                                                        );
+                                                    })}
                                                 </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            </Card>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                                            )}
+                                        </div>
 
-                {/* 4. FLOATING TOOLBAR */}
-                <SmartBoardToolbar
-                    boardRef={boardRef}
-                    currentIndex={currentIndex}
-                    totalQuestions={questions.length}
-                    onPrev={handlePrev}
-                    onNext={handleNext}
-                    onExport={generateSessionReport}
-                    bgMode={boardBackground}
-                    onNavigateBg={handleToggleBackground}
-                />
+                                        {/* Action Buttons: Always allow check if not checked */}
+                                        <div className="mt-6 flex gap-3 relative z-10">
+                                            {!isAnswerChecked && currentQ.type === 'MCQ' && (
+                                                <Button
+                                                    onClick={() => setIsAnswerChecked(true)}
+                                                    // Enable even if nothing selected (just to see answer)
+                                                    className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg tracking-wide font-semibold transform active:scale-95 transition-all"
+                                                >
+                                                    {selectedOption !== null ? "Check My Selection" : "Show Correct Answer"}
+                                                </Button>
+                                            )}
+                                        </div>
+
+                                        {/* Explanation */}
+                                        <AnimatePresence>
+                                            {isAnswerChecked && (
+                                                <motion.div
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: "auto", opacity: 1 }}
+                                                    className={`mt-4 overflow-hidden rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}
+                                                >
+                                                    <div className="p-4">
+                                                        <h4 className="font-bold text-indigo-500 flex items-center gap-2 mb-2">
+                                                            <Presentation className="w-4 h-4" /> Explanation
+                                                        </h4>
+                                                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm leading-relaxed">
+                                                            <UniversalMathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</UniversalMathJax>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </Card>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* 4. FLOATING TOOLBAR */}
+                    <SmartBoardToolbar
+                        boardRef={boardRef}
+                        currentIndex={currentIndex}
+                        totalQuestions={questions.length}
+                        onPrev={handlePrev}
+                        onNext={handleNext}
+                        bgMode={boardBackground}
+                        onNavigateBg={handleToggleBackground}
+                        isAnnotationMode={annotationMode}
+                        onToggleAnnotation={handleToggleAnnotation}
+                        onExport={() => handleExport()}
+                    />
 
 
-                {/* Hidden Container for PDF Generation */}
-                <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
+                    {/* Hidden Container for PDF Generation */}
+                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
+                </div>
             </div>
 
         </MathJaxContext>
