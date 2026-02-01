@@ -1609,6 +1609,46 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     </Button>
 
                     <Button
+                      variant="outline"
+                      onClick={() => {
+                        if (!currentStudent || !exam) return;
+
+                        const questions = exam.questions || [];
+                        if (!questions.length) return toast.error("No questions found");
+
+                        const sessionData = questions.map((q) => {
+                          const ans = currentStudent.answers ? currentStudent.answers[q.id] : null;
+                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                          let userIdx = null;
+
+                          if (ans !== undefined && ans !== null) {
+                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                            const isCorrect = correctOpt && (
+                              (typeof ans === 'number' && q.options?.[ans]?.text === correctOpt.text) ||
+                              (ans === correctOpt.text)
+                            );
+                            status = isCorrect ? 'correct' : 'wrong';
+
+                            if (q.type === 'mcq' && q.options) {
+                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                            }
+                          }
+                          return { ...q, status, userAnswer: userIdx, type: q.type.toUpperCase() === 'MCQ' ? 'MCQ' : q.type };
+                        });
+
+                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        toast.success("Opening Review Session...");
+                        window.open('/problem-solving/session?mode=review', '_blank');
+                      }}
+                      disabled={!currentStudent}
+                      title="Open in interactive Problem Solving Session"
+                      className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                    >
+                      <MonitorPlay className="h-4 w-4 mr-2" />
+                      Review in Session
+                    </Button>
+
+                    <Button
                       onClick={submitStudentEvaluation}
                       disabled={saving || !canSubmitStudent()}
                       className={`${canSubmitStudent()
