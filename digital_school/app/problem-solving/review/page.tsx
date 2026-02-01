@@ -540,6 +540,7 @@ export default function ProblemSolvingSession() {
                                                 {currentQ.options.map((opt, idx) => {
                                                     const isCorrect = opt.isCorrect;
                                                     const isUserSelected = currentQ.userAnswer === idx;
+                                                    const isSelected = selectedOption === idx; // Define Teacher Selection
 
                                                     // Visual State Logic for Review
                                                     // 1. Base: Neutral
