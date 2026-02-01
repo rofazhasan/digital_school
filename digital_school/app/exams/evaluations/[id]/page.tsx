@@ -1646,7 +1646,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           };
                         });
 
-                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        // Store as object with Metadata
+                        const payload = {
+                          examName: exam.title || "Exam Review",
+                          questions: sessionData
+                        };
+
+                        localStorage.setItem("review-session-data", JSON.stringify(payload));
                         toast.success("Opening Review Session...");
                         window.open('/problem-solving/review', '_blank'); // Targeted dedicated page
                       }}

@@ -246,279 +246,304 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             }
         }
 
-    }, [scale, offset, paths, historyStep, currentStroke, backgroundColor]);
+        // Laser Animation Loop
+        useEffect(() => {
+            let animationFrameId: number;
 
-    // Animation Loop
-    useEffect(() => {
-        let animationFrameId: number;
-        const renderLoop = () => {
+            const animate = () => {
+                const hasLaserTrail = laserTrailRef.current.length > 0;
+                if (tool === 'laser' || hasLaserTrail) {
+                    redraw();
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+            };
+
+            if (tool === 'laser') {
+                animationFrameId = requestAnimationFrame(animate);
+            } else if (laserTrailRef.current.length > 0) {
+                // Finish fading out existing trail
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+            return () => cancelAnimationFrame(animationFrameId);
+        }, [tool, redraw]);
+
+        // Draw on mount/update
+        useEffect(() => {
             redraw();
-            animationFrameId = requestAnimationFrame(renderLoop);
-        };
-        renderLoop();
-        return () => cancelAnimationFrame(animationFrameId);
-    }, [redraw]);
+        }, [redraw]);
 
-    // Handle Resize
-    useEffect(() => {
-        const resize = () => {
-            const canvas = canvasRef.current;
-            const parent = containerRef.current;
-            if (canvas && parent) {
-                const rect = parent.getBoundingClientRect();
-                const dpr = window.devicePixelRatio || 1;
-                canvas.width = rect.width * dpr;
-                canvas.height = rect.height * dpr;
-                canvas.style.width = `${rect.width}px`;
-                canvas.style.height = `${rect.height}px`;
+        // Animation Loop
+        useEffect(() => {
+            let animationFrameId: number;
+            const renderLoop = () => {
+                redraw();
+                animationFrameId = requestAnimationFrame(renderLoop);
+            };
+            renderLoop();
+            return () => cancelAnimationFrame(animationFrameId);
+        }, [redraw]);
+
+        // Handle Resize
+        useEffect(() => {
+            const resize = () => {
+                const canvas = canvasRef.current;
+                const parent = containerRef.current;
+                if (canvas && parent) {
+                    const rect = parent.getBoundingClientRect();
+                    const dpr = window.devicePixelRatio || 1;
+                    canvas.width = rect.width * dpr;
+                    canvas.height = rect.height * dpr;
+                    canvas.style.width = `${rect.width}px`;
+                    canvas.style.height = `${rect.height}px`;
+                }
+            };
+            window.addEventListener('resize', resize);
+            resize();
+            return () => window.removeEventListener('resize', resize);
+        }, []);
+
+        // --- Inputs ---
+        const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
+            const screenPoint = getScreenPoint(e);
+            const worldPoint = toWorldPoint(screenPoint);
+
+            if (tool === 'move' || ('button' in e && e.button === 1)) {
+                setIsPanning(true);
+                setLastPanPoint(screenPoint);
+                return;
+            }
+
+            if (tool === 'laser') {
+                setIsDrawing(true);
+                laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
+                return;
+            }
+
+            setIsDrawing(true);
+            setCurrentStroke({
+                points: [worldPoint],
+                color: tool === 'eraser' ? '#000000' : color,
+                width: lineWidth * (tool === 'highlighter' ? 10 : tool === 'eraser' ? 20 : 1),
+                tool: tool === 'semigloss' ? 'pen' : tool,
+                id: Date.now().toString()
+            });
+        };
+
+        const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
+            const screenPoint = getScreenPoint(e);
+            const worldPoint = toWorldPoint(screenPoint);
+
+            if (isPanning && lastPanPoint) {
+                const dx = screenPoint.x - lastPanPoint.x;
+                const dy = screenPoint.y - lastPanPoint.y;
+                setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                setLastPanPoint(screenPoint);
+                return;
+            }
+
+            if (tool === 'laser' && isDrawing) {
+                laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
+                return;
+            }
+
+            if (isDrawing && currentStroke) {
+                setCurrentStroke(prev => prev ? {
+                    ...prev,
+                    points: [...prev.points, worldPoint]
+                } : null);
             }
         };
-        window.addEventListener('resize', resize);
-        resize();
-        return () => window.removeEventListener('resize', resize);
-    }, []);
 
-    // --- Inputs ---
-    const handlePointerDown = (e: React.MouseEvent | React.TouchEvent) => {
-        const screenPoint = getScreenPoint(e);
-        const worldPoint = toWorldPoint(screenPoint);
+        const handlePointerUp = () => {
+            setIsDrawing(false);
+            setIsPanning(false);
+            setLastPanPoint(null);
 
-        if (tool === 'move' || ('button' in e && e.button === 1)) {
-            setIsPanning(true);
-            setLastPanPoint(screenPoint);
-            return;
-        }
+            if (tool === 'laser') {
+                return;
+            }
 
-        if (tool === 'laser') {
-            setIsDrawing(true);
-            laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
-            return;
-        }
+            if (currentStroke) {
+                const newPaths = paths.slice(0, historyStep);
+                newPaths.push(currentStroke);
+                setPaths(newPaths);
+                setHistoryStep(newPaths.length);
+                setCurrentStroke(null);
 
-        setIsDrawing(true);
-        setCurrentStroke({
-            points: [worldPoint],
-            color: tool === 'eraser' ? '#000000' : color,
-            width: lineWidth * (tool === 'highlighter' ? 10 : tool === 'eraser' ? 20 : 1),
-            tool: tool === 'semigloss' ? 'pen' : tool,
-            id: Date.now().toString()
-        });
-    };
+                if (onDrawEnd) onDrawEnd();
+            }
+        };
 
-    const handlePointerMove = (e: React.MouseEvent | React.TouchEvent) => {
-        const screenPoint = getScreenPoint(e);
-        const worldPoint = toWorldPoint(screenPoint);
+        const handleWheel = (e: React.WheelEvent) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const zoomSensitivity = 0.001;
+                const delta = -e.deltaY * zoomSensitivity;
+                const newScale = Math.min(Math.max(0.1, scale + delta), 5);
+                setScale(newScale);
+            } else {
+                setOffset(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
+            }
+        };
 
-        if (isPanning && lastPanPoint) {
-            const dx = screenPoint.x - lastPanPoint.x;
-            const dy = screenPoint.y - lastPanPoint.y;
-            setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-            setLastPanPoint(screenPoint);
-            return;
-        }
+        useImperativeHandle(ref, () => ({
+            clear: () => {
+                setPaths([]);
+                setHistoryStep(0);
+            },
+            undo: () => setHistoryStep(prev => Math.max(0, prev - 1)),
+            redo: () => setHistoryStep(prev => Math.min(paths.length, prev + 1)),
+            setTool,
+            setColor,
+            setLineWidth,
+            resetView: () => {
+                setScale(1);
+                setOffset({ x: 0, y: 0 });
+            },
+            zoomIn: () => setScale(s => Math.min(s * 1.2, 5)),
+            zoomOut: () => setScale(s => Math.max(s / 1.2, 0.1)),
+            getCanvas: () => canvasRef.current,
+            getPaths: () => paths,
+            loadPaths: (newPaths: Stroke[]) => {
+                setPaths(newPaths);
+                setHistoryStep(newPaths.length);
+            }
+        }));
 
-        if (tool === 'laser' && isDrawing) {
-            laserTrailRef.current.push({ ...worldPoint, time: Date.now() });
-            return;
-        }
-
-        if (isDrawing && currentStroke) {
-            setCurrentStroke(prev => prev ? {
-                ...prev,
-                points: [...prev.points, worldPoint]
-            } : null);
-        }
-    };
-
-    const handlePointerUp = () => {
-        setIsDrawing(false);
-        setIsPanning(false);
-        setLastPanPoint(null);
-
-        if (tool === 'laser') {
-            return;
-        }
-
-        if (currentStroke) {
-            const newPaths = paths.slice(0, historyStep);
-            newPaths.push(currentStroke);
-            setPaths(newPaths);
-            setHistoryStep(newPaths.length);
-            setCurrentStroke(null);
-
-            if (onDrawEnd) onDrawEnd();
-        }
-    };
-
-    const handleWheel = (e: React.WheelEvent) => {
-        if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            const zoomSensitivity = 0.001;
-            const delta = -e.deltaY * zoomSensitivity;
-            const newScale = Math.min(Math.max(0.1, scale + delta), 5);
-            setScale(newScale);
-        } else {
-            setOffset(prev => ({ x: prev.x - e.deltaX, y: prev.y - e.deltaY }));
-        }
-    };
-
-    useImperativeHandle(ref, () => ({
-        clear: () => {
-            setPaths([]);
-            setHistoryStep(0);
-        },
-        undo: () => setHistoryStep(prev => Math.max(0, prev - 1)),
-        redo: () => setHistoryStep(prev => Math.min(paths.length, prev + 1)),
-        setTool,
-        setColor,
-        setLineWidth,
-        resetView: () => {
-            setScale(1);
-            setOffset({ x: 0, y: 0 });
-        },
-        zoomIn: () => setScale(s => Math.min(s * 1.2, 5)),
-        zoomOut: () => setScale(s => Math.max(s / 1.2, 0.1)),
-        getCanvas: () => canvasRef.current,
-        getPaths: () => paths,
-        loadPaths: (newPaths: Stroke[]) => {
-            setPaths(newPaths);
-            setHistoryStep(newPaths.length);
-        }
-    }));
-
-    return (
-        <div ref={containerRef} className={`relative w-full h-full overflow-hidden touch-none ${className}`}>
-            <canvas
-                ref={canvasRef}
-                onMouseDown={handlePointerDown}
-                onMouseMove={handlePointerMove}
-                onMouseUp={handlePointerUp}
-                onMouseLeave={handlePointerUp}
-                onTouchStart={handlePointerDown}
-                onTouchMove={handlePointerMove}
-                onTouchEnd={handlePointerUp}
-                onWheel={handleWheel}
-                className={`block ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
-            />
-        </div>
-    );
-});
-
-SmartBoard.displayName = "SmartBoard";
-
-// --- Helper Functions for PDF Export ---
-
-/**
- * Calculates the bounding box of a set of strokes.
- * Returns null if no paths or valid points.
- */
-export function getPathBoundingBox(paths: Stroke[]) {
-    if (!paths || paths.length === 0) return null;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    let hasPoints = false;
-
-    paths.forEach(p => {
-        if (p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
-        p.points.forEach(pt => {
-            if (pt.x < minX) minX = pt.x;
-            if (pt.y < minY) minY = pt.y;
-            if (pt.x > maxX) maxX = pt.x;
-            if (pt.y > maxY) maxY = pt.y;
-            hasPoints = true;
-        });
+        return (
+            <div ref={containerRef} className={`relative w-full h-full overflow-hidden touch-none ${className}`}>
+                <canvas
+                    ref={canvasRef}
+                    onMouseDown={handlePointerDown}
+                    onMouseMove={handlePointerMove}
+                    onMouseUp={handlePointerUp}
+                    onMouseLeave={handlePointerUp}
+                    onTouchStart={handlePointerDown}
+                    onTouchMove={handlePointerMove}
+                    onTouchEnd={handlePointerUp}
+                    onWheel={handleWheel}
+                    className={`block ${tool === 'move' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair'}`}
+                />
+            </div>
+        );
     });
 
-    if (!hasPoints) return null;
-    return { minX, minY, maxX, maxY };
-}
+    SmartBoard.displayName = "SmartBoard";
 
-/**
- * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
- */
-export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors = false): string | null {
-    const bbox = getPathBoundingBox(paths);
-    if (!bbox) return null;
+    // --- Helper Functions for PDF Export ---
 
-    const width = bbox.maxX - bbox.minX + (padding * 2);
-    const height = bbox.maxY - bbox.minY + (padding * 2);
+    /**
+     * Calculates the bounding box of a set of strokes.
+     * Returns null if no paths or valid points.
+     */
+    export function getPathBoundingBox(paths: Stroke[]) {
+        if (!paths || paths.length === 0) return null;
 
-    // Create off-screen canvas (not attached to DOM, purely for export)
-    if (typeof document === 'undefined') return null;
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+        let hasPoints = false;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+        paths.forEach(p => {
+            if (p.tool === 'eraser' || p.tool === 'laser') return; // Ignore eraser/laser
+            p.points.forEach(pt => {
+                if (pt.x < minX) minX = pt.x;
+                if (pt.y < minY) minY = pt.y;
+                if (pt.x > maxX) maxX = pt.x;
+                if (pt.y > maxY) maxY = pt.y;
+                hasPoints = true;
+            });
+        });
 
-    // Fill white background if inverting colors (simulating paper)
-    if (invertColors) {
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, width, height);
+        if (!hasPoints) return null;
+        return { minX, minY, maxX, maxY };
     }
 
-    // Translate context to center the drawing in the cropped canvas
-    ctx.translate(-bbox.minX + padding, -bbox.minY + padding);
+    /**
+     * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
+     */
+    export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors = false): string | null {
+        const bbox = getPathBoundingBox(paths);
+        if (!bbox) return null;
 
-    // Set consistent styling for export (e.g. rounded caps)
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+        const width = bbox.maxX - bbox.minX + (padding * 2);
+        const height = bbox.maxY - bbox.minY + (padding * 2);
 
-    paths.forEach(stroke => {
-        if (stroke.tool === 'eraser' || stroke.tool === 'laser') return;
+        // Create off-screen canvas (not attached to DOM, purely for export)
+        if (typeof document === 'undefined') return null;
 
-        ctx.beginPath();
-        let strokeColor = stroke.color;
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return null;
 
+        // Fill white background if inverting colors (simulating paper)
         if (invertColors) {
-            // Simple color mapping for dark mode -> print mode
-            if (strokeColor.toLowerCase() === '#ffffff' || strokeColor.toLowerCase() === '#fff') {
-                strokeColor = '#000000'; // White -> Black
-            } else if (strokeColor.toLowerCase() === '#ffff00' || strokeColor.toLowerCase() === 'yellow') {
-                strokeColor = '#eab308'; // Bright Yellow -> Darker Yellow/Gold
-            } else if (strokeColor.toLowerCase() === '#00ff00' || strokeColor.toLowerCase() === 'lime') {
-                strokeColor = '#16a34a'; // Bright Green -> Darker Green
-            } else if (strokeColor.toLowerCase() === '#00ffff' || strokeColor.toLowerCase() === 'cyan') {
-                strokeColor = '#0891b2'; // Cyan -> Teal
-            }
-            // Add more mappings as needed or use a color manipulation lib if available
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
         }
 
-        ctx.strokeStyle = strokeColor;
+        // Translate context to center the drawing in the cropped canvas
+        ctx.translate(-bbox.minX + padding, -bbox.minY + padding);
 
-        // Handle highlighter transparency
-        if (stroke.tool === 'highlighter') {
-            ctx.globalAlpha = 0.3;
-            ctx.lineWidth = stroke.width * 2; // Highlighter is wider
-        } else {
-            ctx.globalAlpha = 1.0;
-            ctx.lineWidth = stroke.width;
-        }
+        // Set consistent styling for export (e.g. rounded caps)
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-        if (stroke.points.length > 0) {
-            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-            for (let i = 1; i < stroke.points.length; i++) {
-                // Use quadratic curves for smoothness (matching SmartBoard rendering)
-                const p1 = stroke.points[i - 1];
-                const p2 = stroke.points[i];
-                const midX = (p1.x + p2.x) / 2;
-                const midY = (p1.y + p2.y) / 2;
-                if (i === 1) { ctx.lineTo(p1.x, p1.y); }
-                ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+        paths.forEach(stroke => {
+            if (stroke.tool === 'eraser' || stroke.tool === 'laser') return;
+
+            ctx.beginPath();
+            let strokeColor = stroke.color;
+
+            if (invertColors) {
+                // Simple color mapping for dark mode -> print mode
+                if (strokeColor.toLowerCase() === '#ffffff' || strokeColor.toLowerCase() === '#fff') {
+                    strokeColor = '#000000'; // White -> Black
+                } else if (strokeColor.toLowerCase() === '#ffff00' || strokeColor.toLowerCase() === 'yellow') {
+                    strokeColor = '#eab308'; // Bright Yellow -> Darker Yellow/Gold
+                } else if (strokeColor.toLowerCase() === '#00ff00' || strokeColor.toLowerCase() === 'lime') {
+                    strokeColor = '#16a34a'; // Bright Green -> Darker Green
+                } else if (strokeColor.toLowerCase() === '#00ffff' || strokeColor.toLowerCase() === 'cyan') {
+                    strokeColor = '#0891b2'; // Cyan -> Teal
+                }
+                // Add more mappings as needed or use a color manipulation lib if available
             }
-            if (stroke.points.length > 1) {
-                const last = stroke.points[stroke.points.length - 1];
-                ctx.lineTo(last.x, last.y);
+
+            ctx.strokeStyle = strokeColor;
+
+            // Handle highlighter transparency
+            if (stroke.tool === 'highlighter') {
+                ctx.globalAlpha = 0.3;
+                ctx.lineWidth = stroke.width * 2; // Highlighter is wider
+            } else {
+                ctx.globalAlpha = 1.0;
+                ctx.lineWidth = stroke.width;
             }
-        }
-        ctx.stroke();
-    });
 
-    return canvas.toDataURL('image/png');
-}
+            if (stroke.points.length > 0) {
+                ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    // Use quadratic curves for smoothness (matching SmartBoard rendering)
+                    const p1 = stroke.points[i - 1];
+                    const p2 = stroke.points[i];
+                    const midX = (p1.x + p2.x) / 2;
+                    const midY = (p1.y + p2.y) / 2;
+                    if (i === 1) { ctx.lineTo(p1.x, p1.y); }
+                    ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+                }
+                if (stroke.points.length > 1) {
+                    const last = stroke.points[stroke.points.length - 1];
+                    ctx.lineTo(last.x, last.y);
+                }
+            }
+            ctx.stroke();
+        });
 
-export default SmartBoard;
+        return canvas.toDataURL('image/png');
+    }
+
+    export default SmartBoard;

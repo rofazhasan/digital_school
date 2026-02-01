@@ -51,6 +51,7 @@ export default function ProblemSolvingSession() {
 
     // Session State
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [examName, setExamName] = useState("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -100,7 +101,16 @@ export default function ProblemSolvingSession() {
                     return;
                 }
 
-                const sessionQuestions = JSON.parse(storedIds) as Question[];
+                // Handle new Object structure vs Legacy Array
+                const parsed = JSON.parse(storedIds);
+                let sessionQuestions: Question[] = [];
+
+                if (Array.isArray(parsed)) {
+                    sessionQuestions = parsed;
+                } else if (parsed.questions) {
+                    sessionQuestions = parsed.questions;
+                    if (parsed.examName) setExamName(parsed.examName);
+                }
 
                 if (!sessionQuestions || sessionQuestions.length === 0) {
                     toast.error("Questions not found");
@@ -231,7 +241,7 @@ export default function ProblemSolvingSession() {
                 const jsPDF = (await import('jspdf')).default;
 
                 const canvas = await html2canvas(input, {
-                    scale: 2,
+                    scale: 1.5, // Reduced from 2 to avoid memory crash
                     useCORS: true,
                     logging: false,
                     ignoreElements: (element) => element.classList.contains('no-print')
@@ -334,6 +344,9 @@ export default function ProblemSolvingSession() {
                 }
 
                 // 3. Capture Question Image
+                // Wait for MathJax
+                await new Promise(resolve => setTimeout(resolve, 500)); // Give a tick for rendering
+
                 const qCanvas = await html2canvas(wrapper, { scale: 2, useCORS: true, logging: false });
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
                 const qImgProps = pdf.getImageProperties(qImgData);
@@ -419,7 +432,9 @@ export default function ProblemSolvingSession() {
                     <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/80 backdrop-blur px-4 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
                         <div className="flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                            <span className="text-sm font-bold text-indigo-800">Review Mode</span>
+                            <span className="text-sm font-bold text-indigo-800 max-w-[200px] truncate">
+                                {examName || "Review Mode"}
+                            </span>
                         </div>
                         <div className="w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">
@@ -528,41 +543,61 @@ export default function ProblemSolvingSession() {
 
                                                     // Visual State Logic for Review
                                                     // 1. Base: Neutral
-                                                    // 2. UserSelected: Blue Border (Your Answer)
-                                                    // 3. Checked + Correct: Green
-                                                    // 4. Checked + Wrong: Red (if UserSelected)
+                                                    // 2. UserSelected (Student): Blue Border "Your Answer"
+                                                    // 3. CurrentSelection (Teacher): Highlighted Background
 
                                                     let statusClass = isDark
-                                                        ? "border-slate-700 bg-slate-800/50"
-                                                        : "border-transparent bg-white shadow-sm border-gray-100";
+                                                        ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
+                                                        : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
+                                                    // Student Answer Indication (Always visible)
                                                     if (isUserSelected) {
-                                                        statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50"; // Highlight User's Choice
+                                                        statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50/50";
                                                     }
 
-                                                    if (isAnswerChecked) {
+                                                    // Teacher Selection Indication (Interactive)
+                                                    if (isSelected) {
+                                                        statusClass = isDark
+                                                            ? "bg-indigo-900/60 border-indigo-500"
+                                                            : "bg-indigo-50 border-indigo-300";
+                                                    }
+
+                                                    // REVEAL LOGIC
+                                                    // Show solution if "Check Answer" is clicked
+                                                    const shouldReveal = isAnswerChecked;
+
+                                                    if (shouldReveal) {
+                                                        // 1. Correct Answer: Always Green
                                                         if (isCorrect) {
-                                                            statusClass = "bg-green-100 border-green-500 ring-1 ring-green-500 text-green-900";
-                                                        } else if (isUserSelected && !isCorrect) {
-                                                            statusClass = "bg-red-100 border-red-500 ring-1 ring-red-500 text-red-900 opacity-80";
-                                                        } else {
-                                                            statusClass += " opacity-50 grayscale";
+                                                            statusClass = isDark ? "bg-green-900/30 border-green-500/50" : "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                                        }
+                                                        // 2. Wrong Selection (Teacher or Student): Red
+                                                        // Show Red if this specific option is selected AND wrong
+                                                        else if ((isSelected || isUserSelected) && !isCorrect) {
+                                                            statusClass = isDark ? "bg-red-900/30 border-red-500/50" : "bg-red-50 border-red-300 ring-1 ring-red-300 opacity-80";
+                                                        }
+                                                        else {
+                                                            statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
                                                         }
                                                     }
 
                                                     return (
                                                         <div
                                                             key={idx}
+                                                            onClick={() => {
+                                                                if (annotationMode || isAnswerChecked) return; // Only lock after check
+                                                                setSelectedOption(idx); // Allow teacher to choose
+                                                            }}
                                                             className={`
-                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
+                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group cursor-pointer
                                                                 ${statusClass}
                                                             `}
                                                         >
                                                             <div className={`
                                                                 shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                                ${isUserSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}
-                                                                ${isAnswerChecked && isCorrect ? '!bg-green-600 !text-white' : ''}
-                                                                ${isAnswerChecked && isUserSelected && !isCorrect ? '!bg-red-600 !text-white' : ''}
+                                                                ${isSelected ? 'bg-indigo-600 text-white' : (isUserSelected ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 text-gray-500')}
+                                                                ${shouldReveal && isCorrect ? '!bg-green-600 !text-white !border-green-600' : ''}
+                                                                ${shouldReveal && (isSelected || isUserSelected) && !isCorrect ? '!bg-red-600 !text-white !border-red-600' : ''}
                                                             `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
@@ -570,12 +605,14 @@ export default function ProblemSolvingSession() {
                                                                 <span className={`text-lg w-full text-foreground`}>
                                                                     <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                                 </span>
-                                                                {isUserSelected && !isAnswerChecked && (
-                                                                    <div className="text-xs text-blue-600 font-bold mt-1">Your Answer</div>
+                                                                {isUserSelected && (
+                                                                    <div className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1">
+                                                                        <User className="w-3 h-3" /> Student Answer
+                                                                    </div>
                                                                 )}
                                                             </div>
-                                                            {isAnswerChecked && isCorrect && <CheckCircle className="w-5 h-5 text-green-600" />}
-                                                            {isAnswerChecked && isUserSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-600" />}
+                                                            {shouldReveal && isCorrect && <CheckCircle className="w-6 h-6 text-green-600 drop-shadow-sm" />}
+                                                            {shouldReveal && (isSelected || isUserSelected) && !isCorrect && <XCircle className="w-6 h-6 text-red-600 drop-shadow-sm" />}
                                                         </div>
                                                     );
                                                 })}
@@ -583,14 +620,15 @@ export default function ProblemSolvingSession() {
                                         )}
                                     </div>
 
-                                    {/* Action Buttons */}
+                                    {/* Action Buttons: Always allow check if not checked */}
                                     <div className="mt-6 flex gap-3">
-                                        {!isAnswerChecked && (
+                                        {!isAnswerChecked && currentQ.type === 'MCQ' && (
                                             <Button
                                                 onClick={() => setIsAnswerChecked(true)}
-                                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+                                                // Enable even if nothing selected (just to see answer)
+                                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg"
                                             >
-                                                Check Answer & Explanation
+                                                {selectedOption !== null ? "Check My Selection" : "Show Correct Answer"}
                                             </Button>
                                         )}
                                     </div>
