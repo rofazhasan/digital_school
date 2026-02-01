@@ -44,6 +44,13 @@ export default function ProblemSolvingSelector() {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+    // Navigation Helper
+    const navItems = [
+        { label: "Dashboard", href: "/dashboard", icon: LayoutGrid },
+        { label: "Question Bank", href: "/question-bank", icon: BookOpen },
+        { label: "Exams", href: "/exams", icon: GraduationCap },
+    ];
+
     // Filters
     const [filterClass, setFilterClass] = useState<string>("all");
     const [filterSubject, setFilterSubject] = useState<string>("all");
@@ -107,7 +114,41 @@ export default function ProblemSolvingSelector() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div className="min-h-screen bg-slate-50 font-sans selection:bg-indigo-100 selection:text-indigo-900">
+            <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
+                {/* Navigation Header */}
+                <div className="bg-white border-b border-slate-200 sticky top-0 z-50">
+                    <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/dashboard')}>
+                            <div className="bg-indigo-600 p-2 rounded-lg">
+                                <BrainCircuit className="w-5 h-5 text-white" />
+                            </div>
+                            <span className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
+                                Problem Solver
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-full">
+                            {navItems.map((item) => (
+                                <Button
+                                    key={item.label}
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => router.push(item.href)}
+                                    className="rounded-full text-slate-600 hover:text-indigo-600 hover:bg-white transition-all gap-2"
+                                >
+                                    <item.icon className="w-4 h-4" />
+                                    {item.label}
+                                </Button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <Button variant="outline" size="sm" className="rounded-full" onClick={() => router.back()}>
+                                Exit
+                            </Button>
+                        </div>
+                    </div>
+                </div>
 
                 {/* Hero Section */}
                 <div className="relative bg-white border-b border-indigo-100/50 pb-8 pt-6 overflow-hidden">
@@ -355,6 +396,6 @@ export default function ProblemSolvingSelector() {
                     </div>
                 </div>
             </div>
-        </MathJaxContext>
+        </MathJaxContext >
     );
 }

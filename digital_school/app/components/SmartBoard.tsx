@@ -439,7 +439,7 @@ export function getPathBoundingBox(paths: Stroke[]) {
 /**
  * Generates a Data URL image of the given paths, cropped to their bounding box with padding.
  */
-export function exportPathsToImage(paths: Stroke[], padding = 20): string | null {
+export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors = false): string | null {
     const bbox = getPathBoundingBox(paths);
     if (!bbox) return null;
 
@@ -447,7 +447,6 @@ export function exportPathsToImage(paths: Stroke[], padding = 20): string | null
     const height = bbox.maxY - bbox.minY + (padding * 2);
 
     // Create off-screen canvas (not attached to DOM, purely for export)
-    // Note: In Next.js/React, document might not exist during SSR. But this function is called on client.
     if (typeof document === 'undefined') return null;
 
     const canvas = document.createElement('canvas');
@@ -455,6 +454,12 @@ export function exportPathsToImage(paths: Stroke[], padding = 20): string | null
     canvas.height = height;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
+
+    // Fill white background if inverting colors (simulating paper)
+    if (invertColors) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
+    }
 
     // Translate context to center the drawing in the cropped canvas
     ctx.translate(-bbox.minX + padding, -bbox.minY + padding);
@@ -467,7 +472,23 @@ export function exportPathsToImage(paths: Stroke[], padding = 20): string | null
         if (stroke.tool === 'eraser' || stroke.tool === 'laser') return;
 
         ctx.beginPath();
-        ctx.strokeStyle = stroke.color;
+        let strokeColor = stroke.color;
+
+        if (invertColors) {
+            // Simple color mapping for dark mode -> print mode
+            if (strokeColor.toLowerCase() === '#ffffff' || strokeColor.toLowerCase() === '#fff') {
+                strokeColor = '#000000'; // White -> Black
+            } else if (strokeColor.toLowerCase() === '#ffff00' || strokeColor.toLowerCase() === 'yellow') {
+                strokeColor = '#eab308'; // Bright Yellow -> Darker Yellow/Gold
+            } else if (strokeColor.toLowerCase() === '#00ff00' || strokeColor.toLowerCase() === 'lime') {
+                strokeColor = '#16a34a'; // Bright Green -> Darker Green
+            } else if (strokeColor.toLowerCase() === '#00ffff' || strokeColor.toLowerCase() === 'cyan') {
+                strokeColor = '#0891b2'; // Cyan -> Teal
+            }
+            // Add more mappings as needed or use a color manipulation lib if available
+        }
+
+        ctx.strokeStyle = strokeColor;
 
         // Handle highlighter transparency
         if (stroke.tool === 'highlighter') {

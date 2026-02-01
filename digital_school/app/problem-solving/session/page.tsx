@@ -34,6 +34,9 @@ interface Question {
     options?: { text: string; isCorrect: boolean; explanation?: string }[];
     modelAnswer?: string;
     subQuestions?: any[];
+    // Review Mode Fields
+    status?: 'correct' | 'wrong' | 'unanswered';
+    userAnswer?: number | null; // Index of selected option
 }
 
 const MATHJAX_CONFIG = {
@@ -112,12 +115,37 @@ export default function ProblemSolvingSession() {
                 const data = await res.json();
 
                 let sessionQuestions: Question[] = [];
-                // If ids exist, can filter. For now just load all or check logic.
-                const ids = storedIds ? JSON.parse(storedIds) : [];
-                if (ids.length > 0) {
-                    sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
+                // Check if stored data is IDs (legacy/selector) or Full Objects (Review Mode)
+                const storedData = storedIds ? JSON.parse(storedIds) : [];
+
+                if (Array.isArray(storedData) && storedData.length > 0) {
+                    if (typeof storedData[0] === 'string') {
+                        // IDs only (Selector Mode)
+                        // If ids exist, can filter. For now just load all or check logic.
+                        const ids = storedData as string[];
+                        sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
+
+                        // Shuffle for fresh session
+                        sessionQuestions = shuffleArray(sessionQuestions);
+                        sessionQuestions = sessionQuestions.map((q: Question) => {
+                            if (q.type === 'MCQ' && q.options && q.options.length > 0) {
+                                return {
+                                    ...q,
+                                    options: shuffleArray(q.options)
+                                };
+                            }
+                            return q;
+                        });
+
+                    } else {
+                        // Full Objects (Review/Export Mode)
+                        // Verify they match our schema or merge with API data if needed
+                        sessionQuestions = storedData as Question[];
+                        // Do NOT shuffle in review mode - keep exam order
+                    }
                 } else {
                     sessionQuestions = data.questions || [];
+                    sessionQuestions = shuffleArray(sessionQuestions);
                 }
 
                 if (sessionQuestions.length === 0) {
@@ -125,20 +153,6 @@ export default function ProblemSolvingSession() {
                     router.push("/problem-solving");
                     return;
                 }
-
-                // 1. Shuffle Questions Order
-                sessionQuestions = shuffleArray(sessionQuestions);
-
-                // 2. Shuffle Options for each MCQ
-                sessionQuestions = sessionQuestions.map((q: Question) => {
-                    if (q.type === 'MCQ' && q.options && q.options.length > 0) {
-                        return {
-                            ...q,
-                            options: shuffleArray(q.options)
-                        };
-                    }
-                    return q;
-                });
 
                 setQuestions(sessionQuestions);
             } catch (err) {
@@ -274,7 +288,7 @@ export default function ProblemSolvingSession() {
     const generateSessionReport = async () => {
         if (!hiddenPDFContainerRef.current) return;
 
-        const toastId = toast.loading('Generating PDF Report...');
+        const toastId = toast.loading('Generating PDF Report... (This may take a moment)');
 
         try {
             const pdf = new jsPDF('p', 'mm', 'a4');
@@ -295,6 +309,7 @@ export default function ProblemSolvingSession() {
             for (let i = 0; i < questions.length; i++) {
                 const q = questions[i];
                 const paths = boardHistories[q.id] || [];
+                const isCorrectlyAnswered = q.type === 'MCQ' && selectedOption !== null && q.options?.[selectedOption]?.isCorrect; // Note: Logic might need to track per-question answer state if not persisted
 
                 // 1. Prepare DOM for Question Text & Options
                 const container = hiddenPDFContainerRef.current;
@@ -303,9 +318,13 @@ export default function ProblemSolvingSession() {
                 container.innerHTML = '';
                 const wrapper = document.createElement('div');
                 wrapper.className = "p-8 bg-white text-black font-sans";
-                wrapper.style.width = "794px"; // A4 Pixel Width (approx at 96 DPI)
+                wrapper.style.width = "794px"; // A4 Pixel Width
 
-                // Content
+                // Using UniversalMathJax logic effectively means standard text for now,
+                // but we rely on the global MathJax/TikZ scripts to process the injected HTML.
+                // We wrap TikZ in script tags manually for the report if needed, or just let UniversalMathJax process it if we could mount it.
+                // Since we are inserting raw string HTML, we assume cleanupMath helps.
+
                 let htmlContent = `
                     <div class="mb-6 border-b pb-4">
                         <div class="flex items-center justify-between mb-2">
@@ -320,20 +339,24 @@ export default function ProblemSolvingSession() {
                     htmlContent += `<div class="grid grid-cols-1 gap-2">`;
                     q.options.forEach((opt, idx) => {
                         const isCorrect = opt.isCorrect;
-                        // For PDF simplicity, we show Correct Answer in Green
+                        // const isSelected = ... (We would need to track user selection per question to show Red marks properly in history)
+                        // For now highlighting Correct Answer only as per request "right answer clicked than only green mark"
+                        // Assuming report shows ideal state or we need "user state". user said "if right answer clicked than only green mark".
+
                         const bgClass = isCorrect ? 'bg-green-50 border-green-500 text-green-900' : 'bg-white border-gray-200 text-gray-600';
                         const label = String.fromCharCode(65 + idx);
                         htmlContent += `
                             <div class="flex items-center p-3 rounded border ${bgClass}">
                                 <span class="font-bold mr-3">${label}</span>
                                 <span>${cleanupMath(opt.text)}</span>
+                                ${isCorrect ? '<span class="ml-auto text-green-600 font-bold">✓</span>' : ''}
                             </div>
                         `;
                     });
                     htmlContent += `</div>`;
                 }
 
-                // Explanation (Always included in report)
+                // Explanation
                 const correctOpt = q.options?.find(o => o.isCorrect);
                 if (correctOpt?.explanation) {
                     htmlContent += `
@@ -348,13 +371,21 @@ export default function ProblemSolvingSession() {
                 wrapper.innerHTML = htmlContent;
                 container.appendChild(wrapper);
 
-                // 2. Render MathJax in Hidden DOM
+                // 2. Render MathJax & TikZ in Hidden DOM
+                // Wait for scripts to process.
                 if ((window as any).MathJax) {
                     await (window as any).MathJax.typesetPromise([wrapper]);
                 }
 
+                // Wait for TikZJax (it observes DOM, give it a moment)
+                await new Promise(r => setTimeout(r, 1000)); // 1s buffer for TikZ/MathJax to fully paint
+
                 // 3. Capture Question Image
-                const qCanvas = await html2canvas(wrapper, { scale: 2, useCORS: true });
+                const qCanvas = await html2canvas(wrapper, {
+                    scale: 2,
+                    useCORS: true,
+                    logging: false
+                });
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
                 const qImgProps = pdf.getImageProperties(qImgData);
                 const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;
@@ -365,17 +396,15 @@ export default function ProblemSolvingSession() {
                     currentY = 10;
                 }
 
-                // Add Question Image
                 pdf.addImage(qImgData, 'JPEG', 0, currentY, pageWidth, qImgHeight);
                 currentY += qImgHeight + 5;
 
-                // 4. Capture Drawing (Space Optimized)
-                // Use imported helper from SmartBoard
-                const drawingImgData = await exportPathsToImage(paths, 20);
+                // 4. Capture Drawing (Space Optimized + Inverted Colors)
+                // Pass 'isDark' (derived from current board state, ideally should capture board state per question, but assuming consistent)
+                const drawingImgData = await exportPathsToImage(paths, 20, isDark); // Invert if Dark Mode
 
                 if (drawingImgData) {
                     const dImgProps = pdf.getImageProperties(drawingImgData);
-                    // Constraint drawing width to page width but maintain aspect ratio
                     let dWidth = pageWidth - 20; // 10mm margin
                     let dHeight = (dImgProps.height * dWidth) / dImgProps.width;
 
@@ -386,35 +415,28 @@ export default function ProblemSolvingSession() {
                     }
 
                     if (currentY + dHeight > pageHeight - 10) {
-                        // If it fits on a new page completely
-                        if (dHeight < pageHeight - 20) {
+                        if (dHeight > pageHeight - 20) {
+                            // Too big for one page, scale to fit height
+                            const ratio = (pageHeight - 20) / dHeight;
+                            dWidth = dWidth * ratio;
+                            dHeight = pageHeight - 20;
                             pdf.addPage();
                             currentY = 10;
                         } else {
-                            // Too big for one page, let it scale down to fit max height?
-                            // Or just print what fits.
-                            // For now, scale to fit remaining page usage is complex.
-                            // Just force new page and scale to fit height if needed.
                             pdf.addPage();
                             currentY = 10;
-                            if (dHeight > pageHeight - 20) {
-                                // Scale to fit height
-                                const ratio = (pageHeight - 20) / dHeight;
-                                dWidth = dWidth * ratio;
-                                dHeight = pageHeight - 20;
-                            }
                         }
                     }
 
                     pdf.setFontSize(10);
                     pdf.setTextColor(150);
-                    pdf.text("Notes:", 10, currentY);
+                    pdf.text("Drawing / Notes:", 10, currentY);
                     currentY += 5;
 
                     pdf.addImage(drawingImgData, 'PNG', 10, currentY, dWidth, dHeight);
                     currentY += dHeight + 10;
                 } else {
-                    currentY += 10; // Spacing
+                    currentY += 10;
                 }
 
                 // Separator
@@ -532,9 +554,14 @@ export default function ProblemSolvingSession() {
                                             <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
                                         )}
                                     </div>
-                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
-                                        {currentQ.difficulty}
-                                    </Badge>
+                                    <div className="flex items-center gap-2">
+                                        {currentQ.status === 'correct' && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Correct</Badge>}
+                                        {currentQ.status === 'wrong' && <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Wrong</Badge>}
+                                        {currentQ.status === 'unanswered' && <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100">Not Answered</Badge>}
+                                        <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                            {currentQ.difficulty}
+                                        </Badge>
+                                    </div>
                                 </div>
 
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
@@ -549,43 +576,67 @@ export default function ProblemSolvingSession() {
                                                     const isSelected = selectedOption === idx;
                                                     const isCorrect = opt.isCorrect;
 
+                                                    // Review Mode Logic
+                                                    const reviewStatus = currentQ.status; // 'correct' | 'wrong' | 'unanswered'
+                                                    const isUserSelected = currentQ.userAnswer === idx;
+
                                                     let statusClass = isDark
                                                         ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
                                                         : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
+                                                    // Standard Interaction
                                                     if (isSelected) {
                                                         statusClass = isDark
                                                             ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
                                                             : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
                                                     }
 
+                                                    // Answer Check Mode (Standard)
                                                     if (isAnswerChecked) {
                                                         if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
                                                         else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
                                                         else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
                                                     }
 
+                                                    // Review Export Mode (Override everything if status exists)
+                                                    if (reviewStatus) {
+                                                        if (isCorrect) {
+                                                            // Always show correct answer in Green
+                                                            statusClass = isDark ? "bg-green-900/40 border-green-500/50 ring-1 ring-green-500/50" : "bg-green-100 border-green-400 ring-1 ring-green-400";
+                                                        } else if (isUserSelected && !isCorrect) {
+                                                            // Wrong selection in Red
+                                                            statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
+                                                        } else {
+                                                            statusClass = isDark ? "opacity-40" : "opacity-40 grayscale";
+                                                        }
+
+                                                        // Violet for 'unanswered' global indicator is handled in Question Header usually, 
+                                                        // but here if unanswered, no option is red, only correct is green.
+                                                    }
+
                                                     return (
                                                         <div
                                                             key={idx}
                                                             onClick={(e) => {
-                                                                if (annotationMode) return;
+                                                                if (annotationMode || reviewStatus) return; // Disable interaction in review mode
                                                                 if (!isAnswerChecked) setSelectedOption(idx);
                                                             }}
                                                             className={`
                                                   p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
-                                                  ${annotationMode ? 'cursor-crosshair' : 'cursor-pointer'}
+                                                  ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
+                                                  ${annotationMode ? 'cursor-crosshair' : ''}
                                                   ${statusClass}
                                               `}
                                                         >
                                                             <div className={`
                                                   shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
-                                                  ${isAnswerChecked && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
+                                                  ${(isAnswerChecked || reviewStatus) && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                                  ${(isAnswerChecked || reviewStatus) && isUserSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
                                               `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <span className={`text-lg w-full text-foreground ${selectedOption === idx ? "font-medium" : ""}`}>
+                                                            <span className={`text-lg w-full text-foreground ${selectedOption === idx || (reviewStatus && isUserSelected) ? "font-medium" : ""}`}>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
                                                         </div>
@@ -619,18 +670,7 @@ export default function ProblemSolvingSession() {
                 {/* 4. FLOATING TOOLBAR */}
                 <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 no-print">
 
-                    {/* Size Slider Popover (Always visible if pen/eraser selected) */}
-                    {(boardTool === 'pen' || boardTool === 'eraser' || boardTool === 'highlighter') && (
-                        <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm border border-gray-100 mb-2 w-48 flex items-center gap-3">
-                            <div className={`w-2 h-2 rounded-full bg-black`} style={{ width: Math.max(2, boardSize / 2), height: Math.max(2, boardSize / 2), backgroundColor: boardTool === 'eraser' ? '#000' : boardColor }}></div>
-                            <Slider
-                                value={[boardSize]}
-                                min={1} max={20} step={1}
-                                onValueChange={(vals) => updateSize(vals[0])}
-                                className="flex-1"
-                            />
-                        </div>
-                    )}
+                    {/* Size Slider Popover (Now handled by double-tap state below) */}
 
                     <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
                         <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>

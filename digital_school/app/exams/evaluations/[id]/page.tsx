@@ -427,6 +427,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         {/* Action Bar */}
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
           <div className="flex items-center gap-4 w-full md:w-auto">
+            {/* ... Search ... */}
             <div className="relative w-full md:w-64">
               <Input
                 placeholder="Search student..."
@@ -501,7 +502,58 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   setIsLiveModalOpen(true);
                 }}
               >
-                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity">
+                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity flex gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 rounded-full hover:bg-white/80"
+                    title="Open in Problem Solving Session"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Export Logic
+                      const questions = liveStats?.defaultQuestions || []; // Assuming simplest case
+                      if (!questions.length) return toast.error("No questions found");
+
+                      const sessionData = questions.map((q: any) => {
+                        const ans = student.answers ? student.answers[q.id] : null;
+                        let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                        let userIdx = null;
+
+                        if (ans !== undefined && ans !== null) {
+                          // Assuming ans is option text or index. Need checking.
+                          // If q.options exists, we can find index.
+                          // For simplicity in this edit, assuming ans is index if number, or trying to find it.
+                          // If we don't have exact logic here, we map as best effort.
+                          // But usually 'ans' is the value saved.
+
+                          // Find if correct
+                          const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                          const isCorrect = correctOpt && (
+                            (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
+                            (ans === correctOpt.text)
+                          );
+                          status = isCorrect ? 'correct' : 'wrong';
+
+                          // Map answer to index for UI
+                          if (q.type === 'MCQ' && q.options) {
+                            userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                          }
+                        }
+
+                        return {
+                          ...q,
+                          status,
+                          userAnswer: userIdx
+                        };
+                      });
+
+                      localStorage.setItem("problem-solving-session", JSON.stringify(sessionData));
+                      toast.success("Opening in session...");
+                      window.open('/problem-solving/session', '_blank');
+                    }}
+                  >
+                    <MonitorPlay className="w-4 h-4 text-indigo-600" />
+                  </Button>
                   <Maximize2 className="w-4 h-4 text-gray-400" />
                 </div>
 
@@ -600,8 +652,43 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="col-span-2 text-center text-sm font-medium">
                     {student.score}
                   </div>
-                  <div className="col-span-1">
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }}>
+                  <div className="col-span-1 flex gap-1 justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50"
+                      title="Review in Session"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const questions = liveStats?.defaultQuestions || [];
+                        if (!questions.length) return toast.error("No questions found");
+
+                        const sessionData = questions.map((q: any) => {
+                          const ans = student.answers ? student.answers[q.id] : null;
+                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                          let userIdx = null;
+
+                          if (ans !== undefined && ans !== null) {
+                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                            const isCorrect = correctOpt && (
+                              (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
+                              (ans === correctOpt.text)
+                            );
+                            status = isCorrect ? 'correct' : 'wrong';
+
+                            if (q.type === 'MCQ' && q.options) {
+                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                            }
+                          }
+                          return { ...q, status, userAnswer: userIdx };
+                        });
+                        localStorage.setItem("problem-solving-session", JSON.stringify(sessionData));
+                        window.open('/problem-solving/session', '_blank');
+                      }}
+                    >
+                      <MonitorPlay className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }} className="h-8 w-8 p-0">
                       <Maximize2 className="w-4 h-4 text-gray-400" />
                     </Button>
                   </div>

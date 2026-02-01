@@ -6,7 +6,6 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -223,6 +222,11 @@ model Question {
   TeacherProfile         TeacherProfile?          @relation("TeacherQuestions", fields: [teacherProfileId], references: [id])
   examSets               ExamSet[]                @relation("ExamSetToQuestion")
 
+  @@index([type])
+  @@index([subject])
+  @@index([difficulty])
+  @@index([topic])
+  @@index([hasMath])
   @@map("questions")
 }
 
@@ -321,6 +325,7 @@ model AdmitCard {
   student      StudentProfile @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
+  @@index([qrCode])
   @@map("admit_cards")
 }
 
@@ -427,6 +432,9 @@ model Log {
   userId    String
   user      User       @relation(fields: [userId], references: [id])
 
+  @@index([timestamp])
+  @@index([action])
+  @@index([userId])
   @@map("logs")
 }
 
@@ -558,6 +566,8 @@ model ActivityAudit {
   user      User?    @relation(fields: [userId], references: [id])
 
   @@unique([date, module, userId])
+  @@index([date])
+  @@index([module])
   @@map("activity_audits")
 }
 
@@ -603,6 +613,9 @@ model ExamSubmission {
   result         Result?
 
   @@unique([studentId, examId])
+  @@index([status])
+  @@index([score])
+  @@index([submittedAt])
 }
 
 model ExamSubmissionDrawing {
@@ -679,6 +692,7 @@ model Notification {
   updatedAt   DateTime         @updatedAt
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, isRead])
   @@map("notifications")
 }
 
