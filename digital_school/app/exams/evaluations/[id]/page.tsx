@@ -1662,7 +1662,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                         localStorage.setItem("review-session-data", JSON.stringify(payload));
                         toast.success("Opening Review Session...");
-                        window.open('/problem-solving/review', '_blank'); // Targeted dedicated page
+                        window.open(`/problem-solving/review?id=${id}`, '_blank'); // Targeted dedicated page
                       }}
                       disabled={!currentStudent}
                       title="Open in interactive Problem Solving Session"

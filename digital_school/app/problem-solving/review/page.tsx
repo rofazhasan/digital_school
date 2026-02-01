@@ -102,19 +102,31 @@ export default function ReviewToSessionPort() {
                         const submission = data.submissions?.[0]; // Take first submission
                         const answers = submission?.answers || {};
 
+
                         if (data.questions && Array.isArray(data.questions)) {
                             sessionQuestions = data.questions.map((q: any) => {
                                 // Map API Question to Local Question
-                                // We need to determine userAnswer and status locally if not provided
-                                const userAnsIndex = answers[q.id];
+                                // 1. Map 'text' to 'questionText' (Essential for display)
+                                const qText = q.questionText || q.text || "Question text missing";
 
-                                // Determine Status
+                                // 2. Determine userAnswer INDEX from Answer TEXT (Essential for checking)
+                                const userAnsText = answers[q.id];
+                                let userAnsIndex: number | null = null;
+
+                                if (userAnsText !== undefined && userAnsText !== null && q.options) {
+                                    // Find index of option matching the text
+                                    userAnsIndex = q.options.findIndex((opt: any) => opt.text === userAnsText);
+                                    if (userAnsIndex === -1) {
+                                        // Fallback: If text doesn't match, maybe it's already an index?
+                                        if (typeof userAnsText === 'number') userAnsIndex = userAnsText;
+                                        else userAnsIndex = null;
+                                    }
+                                }
+
+                                // 3. Determine Status
                                 let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                                if (userAnsIndex !== undefined && userAnsIndex !== null) {
-                                    // Check correctness
-                                    // API questions usually have options with isCorrect key? 
-                                    // Or q.correctOption index?
-                                    // Let's assume options array has isCorrect boolean.
+                                if (userAnsIndex !== null && userAnsIndex !== undefined) {
+                                    // Assuming options have { text, isCorrect }
                                     const selectedOpt = q.options?.[userAnsIndex];
                                     if (selectedOpt?.isCorrect) status = 'correct';
                                     else status = 'wrong';
@@ -122,6 +134,7 @@ export default function ReviewToSessionPort() {
 
                                 return {
                                     ...q,
+                                    questionText: qText,
                                     userAnswer: userAnsIndex,
                                     status: status
                                 };
@@ -134,7 +147,6 @@ export default function ReviewToSessionPort() {
                     } catch (e) {
                         console.error("Cloud fetch failed", e);
                         toast.error("Could not load evaluation from Server");
-                        // Do not return, try local storage as fallback? No, if ID requested, fail here.
                         setLoading(false);
                         return;
                     }
