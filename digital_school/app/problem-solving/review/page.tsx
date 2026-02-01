@@ -375,21 +375,27 @@ export default function ProblemSolvingSession() {
                 clone.style.opacity = '1';
                 clone.style.background = 'white';
 
+                clone.style.pointerEvents = 'none'; // Prevent blocking clicks if leaked
+
                 document.body.appendChild(clone);
 
-                // Wait for clone to render 
-                await new Promise(r => setTimeout(r, 500));
+                let qCanvas;
+                try {
+                    // Wait for clone to render 
+                    await new Promise(r => setTimeout(r, 500));
 
-                const qCanvas = await html2canvas(clone, {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    height: clone.scrollHeight,
-                    windowWidth: 1920
-                });
+                    qCanvas = await html2canvas(clone, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#ffffff',
+                        height: clone.scrollHeight,
+                        windowWidth: 1920
+                    });
+                } finally {
+                    document.body.removeChild(clone); // Cleanup
+                    container.innerHTML = ''; // Clear hidden container too
+                }
 
-                document.body.removeChild(clone); // Cleanup
-                container.innerHTML = ''; // Clear hidden container too
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
                 const qImgProps = pdf.getImageProperties(qImgData);
                 const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;

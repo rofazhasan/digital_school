@@ -49,6 +49,7 @@ export default function ProblemSolvingSession() {
 
     // Session State
     const [questions, setQuestions] = useState<Question[]>([]);
+    const [examName, setExamName] = useState<string>("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -140,6 +141,16 @@ export default function ProblemSolvingSession() {
                         // Full Objects (Review/Export Mode)
                         // Verify they match our schema or merge with API data if needed
                         sessionQuestions = storedData as Question[];
+
+                        // Extract Exam Name if available
+                        if ((storedData as any).examName) {
+                            setExamName((storedData as any).examName);
+                        } else if ((storedData as any).questions) {
+                            // Handle new object structure { questions: [], examName: "" }
+                            sessionQuestions = (storedData as any).questions;
+                            if ((storedData as any).examName) setExamName((storedData as any).examName);
+                        }
+
                         // Do NOT shuffle in review mode - keep exam order
                     }
                 } else {
@@ -409,21 +420,26 @@ export default function ProblemSolvingSession() {
                 clone.style.visibility = 'visible'; // Must be visible for html2canvas
                 clone.style.opacity = '1';
                 clone.style.background = 'white';
+                clone.style.pointerEvents = 'none'; // Prevent blocking clicks
 
                 document.body.appendChild(clone);
 
-                // Wait for clone to render (images/fonts)
-                await new Promise(r => setTimeout(r, 500));
+                let qCanvas;
+                try {
+                    // Wait for clone to render (images/fonts)
+                    await new Promise(r => setTimeout(r, 500));
 
-                const qCanvas = await html2canvas(clone, {
-                    scale: 2,
-                    useCORS: true,
-                    backgroundColor: '#ffffff',
-                    height: clone.scrollHeight,
-                    windowWidth: 1920
-                });
+                    qCanvas = await html2canvas(clone, {
+                        scale: 2,
+                        useCORS: true,
+                        backgroundColor: '#ffffff',
+                        height: clone.scrollHeight,
+                        windowWidth: 1920
+                    });
+                } finally {
+                    document.body.removeChild(clone); // Ensure Cleanup happens!
+                }
 
-                document.body.removeChild(clone); // Cleanup
                 container.innerHTML = ''; // Clear hidden container too
 
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
@@ -536,7 +552,7 @@ export default function ProblemSolvingSession() {
                         <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                <span className="text-sm font-bold text-green-800">Session Mode</span>
+                                <span className="text-sm font-bold text-green-800">{examName || "Session Mode"}</span>
                             </div>
                             <div className="w-px h-4 bg-gray-300"></div>
                             {/* Clock Component */}
