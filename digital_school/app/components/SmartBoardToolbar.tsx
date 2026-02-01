@@ -83,7 +83,9 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
     const [activeTool, setActiveTool] = useState<ToolType>('pen');
     const [activeColor, setActiveColor] = useState('#000000');
     const [strokeWidth, setStrokeWidth] = useState(2);
-    const [bgMode, setBgMode] = useState<'white' | 'black' | 'grid'>('white');
+
+    // Removed local bgMode state to rely on props
+
 
     // Collapse State
     const [isCollapsed, setIsCollapsed] = useState(false);
@@ -107,15 +109,15 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
     };
 
     const setBackground = () => {
-        const next = bgMode === 'white' ? 'grid' : bgMode === 'grid' ? 'black' : 'white';
-        setBgMode(next);
+        onNavigateBg();
+    };
 
-        // Auto-contrast color
-        const newColor = next === 'black' ? '#ffffff' : '#000000';
+    // Auto-switch contrast color when background changes
+    useEffect(() => {
+        const newColor = bgMode === 'black' ? '#ffffff' : '#000000';
         setActiveColor(newColor);
         boardRef.current?.setColor(newColor);
-        setTool('pen');
-    };
+    }, [bgMode]);
 
     // Keyboard Shortcuts (optional, can add later)
 
