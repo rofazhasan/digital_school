@@ -366,7 +366,30 @@ export default function ProblemSolvingSession() {
                 // Wait for MathJax
                 await new Promise(resolve => setTimeout(resolve, 500)); // Give a tick for rendering
 
-                const qCanvas = await html2canvas(wrapper, { scale: 2, useCORS: true, logging: false });
+                const clone = wrapper.cloneNode(true) as HTMLElement;
+                clone.style.position = 'fixed';
+                clone.style.top = '0';
+                clone.style.left = '0';
+                clone.style.zIndex = '-100'; // Behind everything
+                clone.style.visibility = 'visible'; // Must be visible for html2canvas
+                clone.style.opacity = '1';
+                clone.style.background = 'white';
+
+                document.body.appendChild(clone);
+
+                // Wait for clone to render 
+                await new Promise(r => setTimeout(r, 500));
+
+                const qCanvas = await html2canvas(clone, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    height: clone.scrollHeight,
+                    windowWidth: 1920
+                });
+
+                document.body.removeChild(clone); // Cleanup
+                container.innerHTML = ''; // Clear hidden container too
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
                 const qImgProps = pdf.getImageProperties(qImgData);
                 const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;

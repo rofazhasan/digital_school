@@ -205,8 +205,8 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
 
             ctx.stroke();
 
-        } else if (stroke.tool === 'pen' || stroke.tool === 'semigloss') {
-            // Standard Pen
+        } else if (stroke.tool === 'pen' || stroke.tool === 'semigloss' || stroke.tool === 'eraser') {
+            // Standard Pen & Eraser
             if (stroke.points.length < 2) return;
             ctx.beginPath();
             ctx.moveTo(p1.x, p1.y);

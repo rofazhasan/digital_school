@@ -398,11 +398,34 @@ export default function ProblemSolvingSession() {
                 await new Promise(r => setTimeout(r, 1000)); // 1s buffer for TikZ/MathJax to fully paint
 
                 // 3. Capture Question Image
-                const qCanvas = await html2canvas(wrapper, {
+                // Strategy: Clone the wrapper, append to body (visible but off-screen), capture, then remove.
+                // This circumvents issues with hidden containers.
+
+                const clone = wrapper.cloneNode(true) as HTMLElement;
+                clone.style.position = 'fixed';
+                clone.style.top = '0';
+                clone.style.left = '0';
+                clone.style.zIndex = '-100'; // Behind everything
+                clone.style.visibility = 'visible'; // Must be visible for html2canvas
+                clone.style.opacity = '1';
+                clone.style.background = 'white';
+
+                document.body.appendChild(clone);
+
+                // Wait for clone to render (images/fonts)
+                await new Promise(r => setTimeout(r, 500));
+
+                const qCanvas = await html2canvas(clone, {
                     scale: 2,
                     useCORS: true,
-                    logging: false
+                    backgroundColor: '#ffffff',
+                    height: clone.scrollHeight,
+                    windowWidth: 1920
                 });
+
+                document.body.removeChild(clone); // Cleanup
+                container.innerHTML = ''; // Clear hidden container too
+
                 const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
                 const qImgProps = pdf.getImageProperties(qImgData);
                 const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;

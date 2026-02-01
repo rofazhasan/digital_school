@@ -546,7 +546,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           return { ...q, status, userAnswer: userIdx };
                         });
 
-                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        const sessionPayload = {
+                          questions: sessionData,
+                          examName: liveStats?.examName || "Review Session"
+                        };
+                        localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
                         toast.success("Opening Review Session...");
                         window.open('/problem-solving/session?mode=review', '_blank');
                       }}
@@ -666,7 +670,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           }
                           return { ...q, status, userAnswer: userIdx };
                         });
-                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        const sessionPayload = {
+                          questions: sessionData,
+                          examName: liveStats?.examName || "Review Session"
+                        };
+                        localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
                         window.open('/problem-solving/session?mode=review', '_blank');
                       }}
                     >
