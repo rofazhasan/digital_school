@@ -60,6 +60,8 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
 // Sub-component for individual TikZ blocks to handle lifecycle
 const TikZBlock = ({ code }: { code: string }) => {
     const containerRef = React.useRef<HTMLSpanElement>(null);
+    const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
+    const [debugMsg, setDebugMsg] = useState("");
 
     useEffect(() => {
         const container = containerRef.current;
@@ -67,40 +69,52 @@ const TikZBlock = ({ code }: { code: string }) => {
 
         // 1. Clear previous content
         container.innerHTML = '';
+        setStatus("pending");
+        setDebugMsg("");
 
         // 2. Create script tag manually
         const script = document.createElement('script');
         script.type = 'text/tikz';
         script.textContent = code;
 
-        // 3. Append to container (React doesn't know about this node, so it won't complain when TikZJax eats it)
+        // 3. Append to container
         container.appendChild(script);
 
         // 4. Trigger TikZJax
         const trigger = async () => {
-            if (typeof window !== 'undefined') {
-                const win = window as any;
-                // Retry a few times if library is still loading
-                for (let i = 0; i < 10; i++) {
+            let attempts = 0;
+            // Increase timeout to 15 seconds to allow for slow network loading of the library
+            const maxAttempts = 30;
+
+            while (attempts < maxAttempts) {
+                if (typeof window !== 'undefined') {
+                    const win = window as any;
+                    // Check if library is loaded
                     if (win.tikzjax) {
                         try {
-                            // If process() accepts an element, pass the script. 
-                            // Otherwise it usually scans the doc.
-                            // Some versions return a promise.
                             if (typeof win.tikzjax.process === 'function') {
                                 await win.tikzjax.process(script);
+                                setStatus("success");
+                                return;
+                            } else {
+                                // Fallback for some versions
+                                setDebugMsg("process() not found on tikzjax");
                             }
-                            return;
-                        } catch (e) {
-                            // process() might be global scan only?
-                            // Try global scan as fallback
-                            try { win.tikzjax.process(); } catch (e2) { }
+                        } catch (e: any) {
+                            console.error("TikZ process error:", e);
+                            setStatus("error");
+                            setDebugMsg(e.message || "Process failed");
                             return;
                         }
+                    } else {
+                        // Library not loaded yet
                     }
-                    await new Promise(r => setTimeout(r, 500));
                 }
+                attempts++;
+                await new Promise(r => setTimeout(r, 500));
             }
+            setStatus("error");
+            setDebugMsg("TikZJax library not loaded (timeout)");
         };
 
         trigger();
@@ -110,7 +124,19 @@ const TikZBlock = ({ code }: { code: string }) => {
     return (
         <span
             ref={containerRef}
-            className="tikz-wrapper block my-4 flex justify-center overflow-x-auto min-h-[50px]"
-        />
+            className="tikz-wrapper block my-4 flex justify-center overflow-x-auto min-h-[50px] border border-transparent p-2 transition-all"
+        >
+            {status === "error" && (
+                <span className="text-red-500 text-xs font-mono bg-red-50 p-1 rounded border border-red-200">
+                    Graphics Error: {debugMsg}
+                </span>
+            )}
+            {status === "pending" && (
+                <span className="text-gray-400 text-xs animate-pulse flex items-center gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                    Rendering graphics...
+                </span>
+            )}
+        </span>
     );
 };
