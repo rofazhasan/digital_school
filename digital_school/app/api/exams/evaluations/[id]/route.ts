@@ -18,44 +18,65 @@ export async function GET(
 
     // Check if user has access to this exam
     let exam;
-    if (tokenData.user.role === "SUPER_USER") {
-      exam = await prisma.exam.findUnique({
-        where: { id: examId },
-        include: {
-          class: true,
-          createdBy: {
+
+    // Common selection object for sub-relations to reuse
+    const examInclude = {
+      class: true,
+      createdBy: {
+        select: {
+          name: true,
+          email: true
+        }
+      },
+      examSets: {
+        // Optimize: Only fetch ID and questions, skip metadata
+        select: {
+          id: true,
+          questionsJson: true
+        }
+      },
+      examSubmissions: {
+        select: {
+          id: true,
+          studentId: true,
+          answers: true,
+          status: true,
+          submittedAt: true,
+          score: true,
+          evaluatorNotes: true,
+          evaluatedAt: true,
+          student: {
             select: {
-              name: true,
-              email: true
-            }
-          },
-          examSets: true,
-          examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: {
-                      name: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { submittedAt: 'asc' }
-          },
-          evaluationAssignments: {
-            include: {
-              evaluator: {
+              id: true,
+              roll: true,
+              registrationNo: true,
+              user: {
                 select: {
-                  name: true,
-                  email: true,
-                  role: true
+                  name: true
                 }
               }
             }
           }
+        },
+        orderBy: { submittedAt: 'asc' }
+      },
+      evaluationAssignments: {
+        include: {
+          evaluator: {
+            select: {
+              name: true,
+              email: true,
+              role: true
+            }
+          }
         }
+      }
+    };
+
+    if (tokenData.user.role === "SUPER_USER") {
+      exam = await prisma.exam.findUnique({
+        where: { id: examId },
+        include: examInclude as any // Type assertion for complex include
       });
     } else {
       // For TEACHER/ADMIN, only show if assigned
@@ -68,41 +89,7 @@ export async function GET(
             }
           }
         },
-        include: {
-          class: true,
-          createdBy: {
-            select: {
-              name: true,
-              email: true
-            }
-          },
-          examSets: true,
-          examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: {
-                      name: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { submittedAt: 'asc' }
-          },
-          evaluationAssignments: {
-            include: {
-              evaluator: {
-                select: {
-                  name: true,
-                  email: true,
-                  role: true
-                }
-              }
-            }
-          }
-        }
+        include: examInclude as any
       });
     }
 
@@ -180,7 +167,12 @@ export async function GET(
 
     // Batch Fetch: Get all ExamStudentMaps for this exam at once
     const examStudentMaps = await prisma.examStudentMap.findMany({
-      where: { examId: examId }
+      where: { examId: examId },
+      // Optimize: Select only needed fields
+      select: {
+        studentId: true,
+        examSetId: true
+      }
     });
     // Create lookup map: studentId -> examSetId
     const studentExamSetMap = new Map<string, string>();
@@ -190,7 +182,15 @@ export async function GET(
 
     // Batch Fetch: Get all Results for this exam at once
     const examResults = await prisma.result.findMany({
-      where: { examId: examId }
+      where: { examId: examId },
+      // Optimize: Select only needed fields
+      select: {
+        studentId: true,
+        mcqMarks: true,
+        cqMarks: true,
+        sqMarks: true,
+        total: true
+      }
     });
     // Create lookup map: studentId -> Result
     const studentResultMap = new Map<string, any>();
