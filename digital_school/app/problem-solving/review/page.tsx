@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-
-import { LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, Highlighter, Ruler, Box, BarChart2, CheckCircle, XCircle, Presentation, ZoomIn, ZoomOut } from "lucide-react";
+import {
+    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,16 +12,17 @@ import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
-
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
-import { useReactToPrint } from "react-to-print";
-import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
-// Dynamic Imports to avoid Hydration Mismatch
+
+// Dynamic Imports
 import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Types
 interface Question {
@@ -47,95 +49,69 @@ const MATHJAX_CONFIG = {
     }
 };
 
-export default function ProblemSolvingSession() {
+export default function ReviewToSessionPort() {
     const router = useRouter();
     const boardRef = useRef<SmartBoardRef>(null);
-    // Force Rebuild Check
-
 
     // Session State
     const [questions, setQuestions] = useState<Question[]>([]);
-    const [examName, setExamName] = useState("");
+    const [examName, setExamName] = useState<string>("");
     const [currentIndex, setCurrentIndex] = useState(0);
-
     const [loading, setLoading] = useState(true);
-    const [hasError, setHasError] = useState(false);
 
-    const [showOverlay, setShowOverlay] = useState(true);
-    const [annotationMode, setAnnotationMode] = useState(false); // Controls z-index of board vs overlay
-
-    // --- Export Logic (react-to-print) ---
-    const printRef = useRef<HTMLDivElement>(null);
-    const handleExport = useReactToPrint({
-        contentRef: printRef,
-        documentTitle: `Review_Session_${new Date().toISOString().slice(0, 10)}`,
-    });
-
-    const handleToggleAnnotation = () => {
-        setAnnotationMode(prev => !prev);
-    };
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
+    const [annotationMode, setAnnotationMode] = useState(false);
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
     // Persistence
     const [boardHistories, setBoardHistories] = useState<Record<string, any[]>>({});
 
     // Interaction State
-    const [showAnswer, setShowAnswer] = useState(false);
+    const [showOverlay, setShowOverlay] = useState(true);
 
     // MCQ State
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
-    // Timer (No Timer in Review)
-    // Live Clock Component (Client Only)
-
-    // useEffect(() => {
-    //     const timer = setInterval(() => {
-    //         setElapsedTime(prev => prev + 1);
-    //     }, 1000);
-    //     return () => clearInterval(timer);
-    // }, []);
-
-    // Initialize (Review Only)
+    // Initialize
     useEffect(() => {
-        const initSession = async () => {
+        const initReviewSession = async () => {
             try {
                 setLoading(true);
-                // Load Review Data directly
+                // FORCE REVIEW MODE logic
+                // We do NOT check URL params 'mode'. We assume this page IS Review.
                 const storedIds = localStorage.getItem("review-session-data");
 
                 if (!storedIds) {
                     toast.error("No review data found");
-                    setHasError(true);
                     setLoading(false);
                     return;
                 }
 
-                // Handle new Object structure vs Legacy Array
                 let sessionQuestions: Question[] = [];
-                try {
-                    const parsed = JSON.parse(storedIds);
-                    if (Array.isArray(parsed)) {
-                        sessionQuestions = parsed;
-                    } else if (parsed && parsed.questions) {
-                        sessionQuestions = parsed.questions;
-                        if (parsed.examName) setExamName(parsed.examName);
+                const storedData = JSON.parse(storedIds);
+
+                // logic from session/page.tsx adapted for review:
+                if (Array.isArray(storedData) && storedData.length > 0) {
+                    // Full Objects (Review/Export Mode)
+                    // Verify they match our schema or merge with API data if needed
+                    sessionQuestions = storedData as Question[];
+
+                    // Extract Exam Name if available
+                    if ((storedData as any).examName) {
+                        setExamName((storedData as any).examName);
+                    } else if ((storedData as any).questions) {
+                        // Handle new object structure { questions: [], examName: "" }
+                        sessionQuestions = (storedData as any).questions;
+                        if ((storedData as any).examName) setExamName((storedData as any).examName);
                     }
-                } catch (e) {
-                    console.error("Data parse error", e);
-                    localStorage.removeItem("review-session-data"); // Clear bad data
-                    localStorage.removeItem("review-session-data"); // Clear bad data
-                    toast.error("Review data corrupted. Please start again.");
-                    setHasError(true);
-                    setLoading(false);
-                    return;
+                    // NEVER SHUFFLE IN REVIEW MODE
                 }
 
-                if (!sessionQuestions || sessionQuestions.length === 0) {
-                    toast.error("Questions not found reviews");
-                    setHasError(true);
+                if (sessionQuestions.length === 0) {
+                    toast.error("Questions not found");
+                    // Do not redirect, just show empty or error
                     setLoading(false);
                     return;
                 }
@@ -144,29 +120,12 @@ export default function ProblemSolvingSession() {
             } catch (err) {
                 console.error(err);
                 toast.error("Failed to load review session");
-                setHasError(true);
             } finally {
                 setLoading(false);
             }
         };
-        initSession();
+        initReviewSession();
     }, []);
-
-    // Sync State with Question
-    useEffect(() => {
-        const q = questions[currentIndex];
-        if (!q) return;
-
-        // In Review Mode:
-        // 1. Reset 'isChecked' (User must explicitly check for each question unless we want persistence)
-        // 2. We do NOT pre-select based on their answer to avoid confusion with "Active Selection".
-        //    Instead, we show "Your Answer" visually in the options list.
-
-        setIsAnswerChecked(false);
-        setSelectedOption(null); // Reset manual selection
-
-        // Note: We don't need 'setShowAnswer' logic here as 'isAnswerChecked' controls the reveal.
-    }, [currentIndex, questions]);
 
     // Board Persistence
     const saveCurrentBoardState = () => {
@@ -204,6 +163,28 @@ export default function ProblemSolvingSession() {
         }
     };
 
+    // Sync State with Question (Review Mode Logic Only)
+    useEffect(() => {
+        const q = questions[currentIndex];
+        if (!q) return;
+
+        // Reset for new question
+        setIsAnswerChecked(false);
+
+        if (q.status) {
+            // Review Mode
+            // Set user's selected option if it exists
+            setSelectedOption(typeof q.userAnswer === 'number' ? q.userAnswer : null);
+
+            // If they were correct, we auto-reveal (show Green).
+            setIsAnswerChecked(q.status === 'correct');
+        } else {
+            // Fallback if status missing
+            setSelectedOption(null);
+        }
+    }, [currentIndex, questions]);
+
+
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen();
@@ -226,24 +207,16 @@ export default function ProblemSolvingSession() {
         if (input) {
             const toastId = toast.loading("Generating PDF...");
             try {
-                // Dynamic import to avoid SSR crash
-                const html2canvas = (await import('html2canvas')).default;
-                const jsPDF = (await import('jspdf')).default;
-
                 const canvas = await html2canvas(input, {
-                    scale: 1.5, // Reduced from 2 to avoid memory crash
+                    scale: 2,
                     useCORS: true,
                     logging: false,
                     ignoreElements: (element) => element.classList.contains('no-print')
                 });
 
                 const imgData = canvas.toDataURL('image/png');
-                // Calculate dimensions (Landscape)
-                const imgWidth = canvas.width;
-                const imgHeight = canvas.height;
-
-                const pdf = new jsPDF('l', 'px', [imgWidth, imgHeight]);
-                pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                const pdf = new jsPDF('l', 'px', [canvas.width, canvas.height]);
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
                 pdf.save(`Review_Session_${new Date().getTime()}.pdf`);
                 toast.dismiss(toastId);
                 toast.success("PDF Downloaded!");
@@ -255,197 +228,22 @@ export default function ProblemSolvingSession() {
         }
     };
 
-    // --- PDF Generation ---
-    const generateSessionReport = async () => {
-        if (!hiddenPDFContainerRef.current) return;
-
-        const toastId = toast.loading('Generating PDF Report...');
-
-        try {
-            // Dynamic import to avoid SSR crash
-            const jsPDF = (await import('jspdf')).default;
-            const html2canvas = (await import('html2canvas')).default;
-
-            const pdf = new jsPDF('p', 'mm', 'a4');
-            const pageWidth = pdf.internal.pageSize.getWidth();
-            const pageHeight = pdf.internal.pageSize.getHeight();
-            let currentY = 10; // Top margin
-
-            // Title Page
-            pdf.setFontSize(24);
-            pdf.text("Review Session Report", pageWidth / 2, 40, { align: 'center' });
-            pdf.setFontSize(14);
-            pdf.text(new Date().toLocaleDateString(), pageWidth / 2, 50, { align: 'center' });
-            pdf.text(`Total Questions: ${questions.length}`, pageWidth / 2, 60, { align: 'center' });
-
-            pdf.addPage();
-            currentY = 10;
-
-            for (let i = 0; i < questions.length; i++) {
-                const q = questions[i];
-                const paths = boardHistories[q.id] || [];
-
-                // 1. Prepare DOM for Question Text & Options
-                const container = hiddenPDFContainerRef.current;
-                if (!container) continue;
-
-                container.innerHTML = '';
-                const wrapper = document.createElement('div');
-                wrapper.className = "p-8 bg-white text-black font-sans";
-                wrapper.style.width = "794px"; // A4 Pixel Width
-
-                let htmlContent = `
-                    <div class="mb-6 border-b pb-4">
-                        <div class="flex items-center justify-between mb-2">
-                            <span class="text-xs font-bold text-gray-400">Question ${i + 1}</span>
-                            <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600">${q.type} • ${q.marks} Marks</span>
-                        </div>
-                        <div class="text-xl font-bold text-gray-900 mb-4 leading-relaxed">${cleanupMath(q.questionText)}</div>
-                `;
-
-                // Options (if MCQ)
-                if (q.type === 'MCQ' && q.options) {
-                    htmlContent += `<div class="grid grid-cols-1 gap-2">`;
-                    q.options.forEach((opt, idx) => {
-                        const isCorrect = opt.isCorrect;
-                        const label = String.fromCharCode(65 + idx);
-                        const bgClass = isCorrect ? 'bg-green-50 border-green-500 text-green-900' : 'bg-white border-gray-200 text-gray-600';
-
-                        htmlContent += `
-                            <div class="flex items-center p-3 rounded border ${bgClass}">
-                                <span class="font-bold mr-3">${label}</span>
-                                <span>${cleanupMath(opt.text)}</span>
-                                ${isCorrect ? '<span class="ml-auto text-green-600 font-bold">✓</span>' : ''}
-                            </div>
-                        `;
-                    });
-                    htmlContent += `</div>`;
-                }
-
-                htmlContent += `</div>`; // Close Wrapper
-                wrapper.innerHTML = htmlContent;
-                container.appendChild(wrapper);
-
-                // 2. Render MathJax & TikZ
-                if ((window as any).MathJax) {
-                    try {
-                        await (window as any).MathJax.typesetPromise([wrapper]);
-                    } catch (e) { console.warn("MathJax typeset failed", e); }
-                }
-
-                // 3. Capture Question Image
-                // Wait for MathJax
-                await new Promise(resolve => setTimeout(resolve, 500)); // Give a tick for rendering
-
-                const clone = wrapper.cloneNode(true) as HTMLElement;
-                clone.style.position = 'fixed';
-                clone.style.top = '0';
-                clone.style.left = '0';
-                clone.style.zIndex = '-100'; // Behind everything
-                clone.style.visibility = 'visible'; // Must be visible for html2canvas
-                clone.style.opacity = '1';
-                clone.style.background = 'white';
-
-                clone.style.pointerEvents = 'none'; // Prevent blocking clicks if leaked
-
-                document.body.appendChild(clone);
-
-                let qCanvas;
-                try {
-                    // Wait for clone to render 
-                    await new Promise(r => setTimeout(r, 500));
-
-                    qCanvas = await html2canvas(clone, {
-                        scale: 2,
-                        useCORS: true,
-                        backgroundColor: '#ffffff',
-                        height: clone.scrollHeight,
-                        windowWidth: 1920
-                    });
-                } finally {
-                    document.body.removeChild(clone); // Cleanup
-                    container.innerHTML = ''; // Clear hidden container too
-                }
-
-                const qImgData = qCanvas.toDataURL('image/jpeg', 0.9);
-                const qImgProps = pdf.getImageProperties(qImgData);
-                const qImgHeight = (qImgProps.height * pageWidth) / qImgProps.width;
-
-                if (currentY + qImgHeight > pageHeight - 10) {
-                    pdf.addPage();
-                    currentY = 10;
-                }
-
-                pdf.addImage(qImgData, 'JPEG', 0, currentY, pageWidth, qImgHeight);
-                currentY += qImgHeight + 5;
-
-                // 4. Capture Drawing
-                // Assuming exportPathsToImage is imported from SmartBoard
-                try {
-                    const drawingImgData = await exportPathsToImage(paths, 20, false); // Always white background for PDF
-                    if (drawingImgData) {
-                        const dImgProps = pdf.getImageProperties(drawingImgData);
-                        let dWidth = pageWidth - 20;
-                        let dHeight = (dImgProps.height * dWidth) / dImgProps.width;
-
-                        if (currentY + dHeight > pageHeight - 10) {
-                            pdf.addPage();
-                            currentY = 10;
-                        }
-                        pdf.text("Notes:", 10, currentY);
-                        currentY += 5;
-                        pdf.addImage(drawingImgData, 'PNG', 10, currentY, dWidth, dHeight);
-                        currentY += dHeight + 10;
-                    }
-                } catch (e) { console.warn("Drawing export failed", e); }
-
-                // Separator
-                pdf.setDrawColor(200);
-                pdf.line(10, currentY, pageWidth - 10, currentY);
-                currentY += 10;
-            }
-
-            pdf.save(`Report_${new Date().toISOString().slice(0, 10)}.pdf`);
-            toast.dismiss(toastId);
-            toast.success("Report Generated!");
-
-        } catch (error) {
-            console.error(error);
-            toast.dismiss(toastId);
-            toast.error("Failed to generate report.");
-        }
-    };
 
     const currentQ = questions[currentIndex];
     const isDark = boardBackground === 'black';
 
-    if (hasError) {
-        return (
-            <div className="h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-900 font-sans p-4">
-                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-gray-100">
-                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <LogOut className="w-8 h-8 text-red-500" />
-                    </div>
-                    <h2 className="text-2xl font-bold mb-2 text-gray-800">No Review Session Found</h2>
-                    <p className="text-gray-500 mb-8 leading-relaxed">
-                        We couldn't find any session data to review. This usually happens if you visit this page directly or cleared your browser data.
-                    </p>
-                    <Button
-                        onClick={() => router.push('/problem-solving')}
-                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-6 font-semibold shadow-lg shadow-indigo-200"
-                    >
-                        Go to Problem Solving
-                    </Button>
-                </div>
-            </div>
-        );
-    }
-
     if (loading || !currentQ) {
         return (
-            <div className={`h-screen flex flex-col items-center justify-center ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-gray-900'}`}>
+            <div className="h-screen flex flex-col items-center justify-center bg-white">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                <p className="font-medium">Loading Review...</p>
+                <p className="text-gray-500 font-medium">Loading Review...</p>
+                {/* No Data Fallback UI */}
+                {!loading && (
+                    <div className="mt-4 text-center">
+                        <p className="text-red-500 mb-4">No review data found.</p>
+                        <Button onClick={() => router.push('/problem-solving')}>Go Back</Button>
+                    </div>
+                )}
             </div>
         );
     }
@@ -455,11 +253,11 @@ export default function ProblemSolvingSession() {
             <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
 
                 {/* 1. TOP BAR */}
-                <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none no-print">
+                <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none bg-gradient-to-b from-black/10 to-transparent no-print">
                     <div className="flex items-center gap-4 pointer-events-auto">
                         <Button
                             variant="secondary" size="sm"
-                            onClick={() => window.close()} // Close Tab
+                            onClick={() => router.push('/problem-solving')} // Or window.close()
                             className="bg-white/90 backdrop-blur shadow-sm hover:bg-white border border-gray-100 rounded-full pl-3 pr-4"
                         >
                             <LogOut className="w-4 h-4 mr-2 text-gray-500" />
@@ -471,33 +269,19 @@ export default function ProblemSolvingSession() {
                     </div>
 
                     <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/80 backdrop-blur px-4 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
-                            <span className="text-sm font-bold text-indigo-800 max-w-[200px] truncate">
-                                {examName || "Review Mode"}
-                            </span>
+                        <div className="flex items-center gap-2 border-r border-gray-200 pr-4">
+                            <User className="w-4 h-4 text-indigo-500" />
+                            <span className="text-sm font-medium text-gray-700">Review Mode</span>
                         </div>
-                        <div className="w-px h-4 bg-gray-300"></div>
-                        {/* Clock Component */}
-                        <div className="flex items-center gap-2 text-gray-600 font-medium font-mono text-sm bg-gray-50 px-2 py-1 rounded">
-                            <Clock className="w-3.5 h-3.5" />
-                            <LiveClock />
-                        </div>
-                        <div className="w-px h-4 bg-gray-300"></div>
                         <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">
-                                Result: <span className={
-                                    currentQ.status === 'correct' ? 'text-green-600 font-bold' :
-                                        currentQ.status === 'wrong' ? 'text-red-600 font-bold' : 'text-violet-600 font-bold'
-                                }>
-                                    {currentQ.status ? currentQ.status.toUpperCase() : 'UNKNOWN'}
-                                </span>
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                                <span className="text-sm font-bold text-blue-800">{examName || "Exam Review"}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 pointer-events-auto">
-                        {/* Right tools (Annotate, View, Export) */}
+                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
                         <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
                             {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
                         </Button>
@@ -507,12 +291,9 @@ export default function ProblemSolvingSession() {
                         </Button>
                     </div>
                 </div>
-            </div>
 
-            {/* 2. MAIN CANVAS (Unchanged) */}
-            <div className="relative w-full h-full overflow-hidden" ref={printRef}>
-                {/* 2. MAIN BOARD - Z-Index Flipped based on Annotation Mode */}
-                <div className={`absolute inset-0 transition-all duration-300 ${annotationMode ? 'z-30 pointer-events-auto bg-transparent' : 'z-0'}`}>
+                {/* 2. MAIN CANVAS */}
+                <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
                     <SmartBoard
                         ref={boardRef}
                         className=""
@@ -520,14 +301,15 @@ export default function ProblemSolvingSession() {
                     />
                 </div>
 
-                {/* 3. QUESTION OVERLAY (Review Logic) */}
+                {/* 3. QUESTION OVERLAY */}
+                {/* REMOVED ANIMATEPRESENCE TO GUARANTEE VISIBILITY (Fix for blank screen) */}
                 {showOverlay && (
                     <div className={`absolute top-24 left-6 w-[480px] flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-10 pointer-events-none opacity-50' : 'z-20 pointer-events-auto'}`}>
                         <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}>
                             <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                 <div className="flex flex-col">
                                     <div className="flex items-center gap-2 mb-1">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
                                         <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
                                     </div>
                                     {currentQ.topic && (
@@ -535,25 +317,11 @@ export default function ProblemSolvingSession() {
                                     )}
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {/* Review Status Badge replacing Difficulty */}
-                                    {currentQ.status === 'correct' && (
-                                        <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100 px-3 py-1 font-bold">
-                                            <CheckCircle className="w-3 h-3 mr-1" /> Correct
-                                        </Badge>
-                                    )}
-                                    {currentQ.status === 'wrong' && (
-                                        <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100 px-3 py-1 font-bold">
-                                            <XCircle className="w-3 h-3 mr-1" /> Wrong
-                                        </Badge>
-                                    )}
-                                    {currentQ.status === 'unanswered' && (
-                                        <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100 px-3 py-1 font-bold">
-                                            Not Answered
-                                        </Badge>
-                                    )}
-                                    {/* Optional: Keep Difficulty as tertiary info or remove if strictly replacing */}
-                                    <Badge variant="outline" className="text-xs text-gray-400 border-gray-100">
-                                        {currentQ.marks} Marks
+                                    {currentQ.status === 'correct' && <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">Correct</Badge>}
+                                    {currentQ.status === 'wrong' && <Badge className="bg-red-100 text-red-700 border-red-200 hover:bg-red-100">Wrong</Badge>}
+                                    {currentQ.status === 'unanswered' && <Badge className="bg-violet-100 text-violet-700 border-violet-200 hover:bg-violet-100">Not Answered</Badge>}
+                                    <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                        {currentQ.difficulty}
                                     </Badge>
                                 </div>
                             </div>
@@ -564,85 +332,75 @@ export default function ProblemSolvingSession() {
                                 </h3>
 
                                 <div className="mt-8 space-y-4">
+                                    {/* Case Insensitive Check */}
                                     {currentQ.type?.toUpperCase() === 'MCQ' && currentQ.options && (
                                         <div className="grid gap-3">
                                             {currentQ.options.map((opt, idx) => {
+                                                const isSelected = selectedOption === idx;
                                                 const isCorrect = opt.isCorrect;
+
+                                                // Review Mode Logic
+                                                const reviewStatus = currentQ.status; // 'correct' | 'wrong' | 'unanswered'
                                                 const isUserSelected = currentQ.userAnswer === idx;
-                                                const isSelected = selectedOption === idx; // Define Teacher Selection
 
-                                                // Visual State Logic for Review
-                                                // 1. Base: Neutral
-                                                // 2. UserSelected (Student): Blue Border "Your Answer"
-                                                // 3. CurrentSelection (Teacher): Highlighted Background
-
+                                                // Base Style
                                                 let statusClass = isDark
                                                     ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
                                                     : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
-                                                // Student Answer Indication (Always visible)
-                                                if (isUserSelected) {
-                                                    statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50/50";
-                                                }
-
-                                                // Teacher Selection Indication (Interactive)
+                                                // Interaction State (Standard)
                                                 if (isSelected) {
                                                     statusClass = isDark
-                                                        ? "bg-indigo-900/60 border-indigo-500"
-                                                        : "bg-indigo-50 border-indigo-300";
+                                                        ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
+                                                        : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
                                                 }
 
                                                 // REVEAL LOGIC
-                                                // Show solution if "Check Answer" is clicked
-                                                const shouldReveal = isAnswerChecked;
+                                                const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
 
                                                 if (shouldReveal) {
-                                                    // 1. Correct Answer: Always Green
-                                                    if (isCorrect) {
-                                                        statusClass = isDark ? "bg-green-900/30 border-green-500/50" : "bg-green-50 border-green-300 ring-1 ring-green-300";
-                                                    }
-                                                    // 2. Wrong Selection (Teacher or Student): Red
-                                                    // Show Red if this specific option is selected AND wrong
-                                                    else if ((isSelected || isUserSelected) && !isCorrect) {
-                                                        statusClass = isDark ? "bg-red-900/30 border-red-500/50" : "bg-red-50 border-red-300 ring-1 ring-red-300 opacity-80";
-                                                    }
-                                                    else {
-                                                        statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
-                                                    }
+                                                    if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
+                                                    else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
+                                                    else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                }
+                                                // Review Mode: WRONG Answer State (Before Reveal or After)
+                                                // Highlighting the WRONG answer the user picked
+                                                else if (reviewStatus === 'wrong' && isUserSelected) {
+                                                    statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
+                                                }
+                                                else if (reviewStatus) {
+                                                    statusClass = isDark ? "opacity-60" : "opacity-60 grayscale";
                                                 }
 
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        onClick={() => {
-                                                            if (annotationMode || isAnswerChecked) return; // Only lock after check
-                                                            setSelectedOption(idx); // Allow teacher to choose
+                                                        onClick={(e) => {
+                                                            // In proper review mode, we usually disable changing answer
+                                                            if (annotationMode || reviewStatus) return;
+                                                            if (!shouldReveal) setSelectedOption(idx);
                                                         }}
                                                         className={`
-                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group cursor-pointer
-                                                                ${statusClass}
-                                                            `}
+                                                  p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
+                                                  ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
+                                                  ${annotationMode ? 'cursor-crosshair' : ''}
+                                                  ${statusClass}
+                                              `}
                                                     >
                                                         <div className={`
-                                                                shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                                ${isSelected ? 'bg-indigo-600 text-white' : (isUserSelected ? 'bg-blue-100 text-blue-600 border border-blue-300' : 'bg-gray-100 text-gray-500')}
-                                                                ${shouldReveal && isCorrect ? '!bg-green-600 !text-white !border-green-600' : ''}
-                                                                ${shouldReveal && (isSelected || isUserSelected) && !isCorrect ? '!bg-red-600 !text-white !border-red-600' : ''}
-                                                            `}>
+                                                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
+                                                  ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
+                                                  ${(!shouldReveal && reviewStatus === 'wrong' && isUserSelected) ? '!bg-red-500 !text-white' : ''}
+                                              `}>
                                                             {String.fromCharCode(65 + idx)}
                                                         </div>
                                                         <div className="flex-1">
                                                             <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
-                                                            {isUserSelected && (
-                                                                <div className="text-xs text-blue-600 font-bold mt-1 flex items-center gap-1">
-                                                                    <User className="w-3 h-3" /> Student Answer
-                                                                </div>
-                                                            )}
                                                         </div>
-                                                        {shouldReveal && isCorrect && <CheckCircle className="w-6 h-6 text-green-600 drop-shadow-sm" />}
-                                                        {shouldReveal && (isSelected || isUserSelected) && !isCorrect && <XCircle className="w-6 h-6 text-red-600 drop-shadow-sm" />}
                                                     </div>
                                                 );
                                             })}
@@ -650,43 +408,32 @@ export default function ProblemSolvingSession() {
                                     )}
                                 </div>
 
-                                {/* Action Buttons: Always allow check if not checked */}
-                                <div className="mt-6 flex gap-3 relative z-10">
-                                    {!isAnswerChecked && currentQ.type?.toUpperCase() === 'MCQ' && (
-                                        <Button
-                                            onClick={() => setIsAnswerChecked(true)}
-                                            // Enable even if nothing selected (just to see answer)
-                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg tracking-wide font-semibold transform active:scale-95 transition-all"
-                                        >
-                                            {selectedOption !== null ? "Check My Selection" : "Show Correct Answer"}
-                                        </Button>
-                                    )}
-                                </div>
+                                {/* Check Answer Button: Show if NOT revealed yet */}
+                                {(!isAnswerChecked && currentQ.status !== 'correct') && currentQ.type?.toUpperCase() === 'MCQ' && (
+                                    <Button
+                                        onClick={() => setIsAnswerChecked(true)}
+                                        // Allow checking if there is a status (meaning it was answered wrong) OR if an option is selected
+                                        disabled={selectedOption === null && !currentQ.status}
+                                        className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700"
+                                    >
+                                        {currentQ.status ? "Show Correct Answer" : "Check Answer"}
+                                    </Button>
+                                )}
 
-                                {/* Explanation */}
-                                <AnimatePresence>
-                                    {isAnswerChecked && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: "auto", opacity: 1 }}
-                                            className={`mt-4 overflow-hidden rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}
-                                        >
-                                            <div className="p-4">
-                                                <h4 className="font-bold text-indigo-500 flex items-center gap-2 mb-2">
-                                                    <Presentation className="w-4 h-4" /> Explanation
-                                                </h4>
-                                                <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm leading-relaxed">
-                                                    <UniversalMathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</UniversalMathJax>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
+                                {(isAnswerChecked || currentQ.status === 'correct') && (
+                                    <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
+                                        <h4 className="font-bold text-indigo-500 flex items-center gap-2">
+                                            <CheckCircle className="w-4 h-4" /> Explanation
+                                        </h4>
+                                        <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
+                                            <MathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </Card>
                     </div>
                 )}
-                {/* </AnimatePresence> */}
 
                 {/* 4. FLOATING TOOLBAR */}
                 <SmartBoardToolbar
@@ -695,36 +442,17 @@ export default function ProblemSolvingSession() {
                     totalQuestions={questions.length}
                     onPrev={handlePrev}
                     onNext={handleNext}
+                    onExport={handleExportPDF}
                     bgMode={boardBackground}
                     onNavigateBg={handleToggleBackground}
                     isAnnotationMode={annotationMode}
-                    onToggleAnnotation={handleToggleAnnotation}
-                    onExport={() => handleExport()}
+                    onToggleAnnotation={() => setAnnotationMode(!annotationMode)}
                 />
-
 
                 {/* Hidden Container for PDF Generation */}
                 <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
             </div>
 
-        </MathJaxContext >
+        </MathJaxContext>
     );
 }
-
-// Live Clock Component (Client Only)
-function LiveClock() {
-    const [time, setTime] = useState<Date | null>(null);
-    const [isMounted, setIsMounted] = useState(false);
-
-    useEffect(() => {
-        setIsMounted(true);
-        setTime(new Date());
-        const timer = setInterval(() => setTime(new Date()), 1000);
-        return () => clearInterval(timer);
-    }, []);
-
-    if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
-
-    return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
-}
-
