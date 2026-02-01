@@ -266,24 +266,15 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        // 2. Draw Background
-        if (backgroundColor === 'black') {
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else if (backgroundColor === 'grid') {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        } else if (backgroundColor === 'white') {
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
-        // 'transparent' does nothing (clearRect already made it transparent)
+        // 2. Draw Background - REMOVED to allow Eraser to work (transparent strokes = show CSS background)
+        // If we draw fillRect here, destination-out cuts a hole to the browser body (white).
+        // Instead, we rely on the canvas container having the correct background-color via CSS.
 
         // 3. Apply View Transform (Including DPR!)
         ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offset.x * dpr, offset.y * dpr);
 
         if (backgroundColor === 'grid') {
-            drawGrid(ctx, canvas.width, canvas.height, dpr);
+            // drawGrid(ctx, canvas.width, canvas.height, dpr); // Using CSS background for grid now
         }
 
         // 4. Draw Paths
@@ -503,7 +494,15 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
     }));
 
     return (
-        <div ref={containerRef} className={`relative w-full h-full overflow-hidden touch-none ${className}`}>
+        <div
+            ref={containerRef}
+            className={`relative w-full h-full overflow-hidden touch-none ${className}`}
+            style={{
+                backgroundColor: backgroundColor === 'black' ? '#0f172a' : '#ffffff',
+                backgroundImage: backgroundColor === 'grid' ? 'radial-gradient(#cbd5e1 1px, transparent 1px)' : undefined,
+                backgroundSize: backgroundColor === 'grid' ? '20px 20px' : undefined
+            }}
+        >
             <canvas
                 ref={canvasRef}
                 onMouseDown={handlePointerDown}
