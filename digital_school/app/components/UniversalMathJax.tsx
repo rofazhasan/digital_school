@@ -1,4 +1,3 @@
-
 "use client";
 
 import { MathJax } from "better-react-mathjax";
@@ -33,8 +32,6 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
     const tikzRegex = /(\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\})/g;
 
     const parts = content.split(tikzRegex);
-
-
 
     // TikZ rendering with manual DOM manipulation to avoid React reconciliation conflicts
     // (TikZJax replaces the <script> tag with <svg>, which breaks React if we render <script> directly)
@@ -84,8 +81,35 @@ const TikZBlock = ({ code }: { code: string }) => {
         // 4. Trigger TikZJax
         const trigger = async () => {
             let attempts = 0;
-            // Increase timeout to 15 seconds to allow for slow network loading of the library
-            const maxAttempts = 30;
+            const maxAttempts = 60; // 30 seconds wait
+
+            // Helper to check and load library if missing
+            const ensureLibrary = () => {
+                if (typeof window !== 'undefined' && !(window as any).tikzjax) {
+                    // Check if script tag exists in DOM
+                    const existingScript = document.querySelector('script[src*="tikzjax.js"]');
+                    if (!existingScript) {
+                        console.warn("TikZJax script missing from DOM, injecting fallback...");
+
+                        // Inject CSS
+                        if (!document.querySelector('link[href*="fonts.css"]')) {
+                            const link = document.createElement("link");
+                            link.href = "https://tikzjax.com/v1/fonts.css";
+                            link.type = "text/css";
+                            link.rel = "stylesheet";
+                            document.head.appendChild(link);
+                        }
+
+                        // Inject JS
+                        const libScript = document.createElement('script');
+                        libScript.src = "https://tikzjax.com/v1/tikzjax.js";
+                        libScript.async = true;
+                        document.head.appendChild(libScript);
+                    }
+                }
+            };
+
+            ensureLibrary();
 
             while (attempts < maxAttempts) {
                 if (typeof window !== 'undefined') {
@@ -107,15 +131,13 @@ const TikZBlock = ({ code }: { code: string }) => {
                             setDebugMsg(e.message || "Process failed");
                             return;
                         }
-                    } else {
-                        // Library not loaded yet
                     }
                 }
                 attempts++;
                 await new Promise(r => setTimeout(r, 500));
             }
             setStatus("error");
-            setDebugMsg("TikZJax library not loaded (timeout)");
+            setDebugMsg("TikZJax library not loaded (timeout). Check your internet connection.");
         };
 
         trigger();
