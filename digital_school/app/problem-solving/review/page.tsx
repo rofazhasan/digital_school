@@ -80,33 +80,81 @@ export default function ReviewToSessionPort() {
             try {
                 setLoading(true);
                 // FORCE REVIEW MODE logic
-                // We do NOT check URL params 'mode'. We assume this page IS Review.
+                // 1. Check for ID provided in URL (e.g. ?id=...) which allows viewing specific evaluation
+                // 2. Fallback to localStorage
+
+                const params = new URLSearchParams(window.location.search);
+                const queryId = params.get('id');
                 const storedIds = localStorage.getItem("review-session-data");
 
-                if (!storedIds) {
+                let sessionQuestions: Question[] = [];
+
+                if (queryId) {
+                    // --- CLOUD FETCH MODE ---
+                    try {
+                        // Attempt to fetch specific evaluation
+                        const res = await fetch(`/api/exams/evaluations/${queryId}`);
+                        if (!res.ok) throw new Error("Failed to fetch evaluation");
+
+                        const data = await res.json();
+                        // Data structure expected: { questions: [], submissions: [ { answers: {}, result: {} } ] }
+
+                        const submission = data.submissions?.[0]; // Take first submission
+                        const answers = submission?.answers || {};
+
+                        if (data.questions && Array.isArray(data.questions)) {
+                            sessionQuestions = data.questions.map((q: any) => {
+                                // Map API Question to Local Question
+                                // We need to determine userAnswer and status locally if not provided
+                                const userAnsIndex = answers[q.id];
+
+                                // Determine Status
+                                let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                                if (userAnsIndex !== undefined && userAnsIndex !== null) {
+                                    // Check correctness
+                                    // API questions usually have options with isCorrect key? 
+                                    // Or q.correctOption index?
+                                    // Let's assume options array has isCorrect boolean.
+                                    const selectedOpt = q.options?.[userAnsIndex];
+                                    if (selectedOpt?.isCorrect) status = 'correct';
+                                    else status = 'wrong';
+                                }
+
+                                return {
+                                    ...q,
+                                    userAnswer: userAnsIndex,
+                                    status: status
+                                };
+                            });
+                        }
+
+                        if (data.exam?.name || data.name) {
+                            setExamName(data.exam?.name || data.name);
+                        }
+                    } catch (e) {
+                        console.error("Cloud fetch failed", e);
+                        toast.error("Could not load evaluation from Server");
+                        // Do not return, try local storage as fallback? No, if ID requested, fail here.
+                        setLoading(false);
+                        return;
+                    }
+
+                } else if (storedIds) {
+                    // --- LOCAL STORAGE MODE ---
+                    const storedData = JSON.parse(storedIds);
+
+                    if (Array.isArray(storedData) && storedData.length > 0) {
+                        sessionQuestions = storedData as Question[];
+                        if ((storedData as any).examName) setExamName((storedData as any).examName);
+                        else if ((storedData as any).questions) {
+                            sessionQuestions = (storedData as any).questions;
+                            if ((storedData as any).examName) setExamName((storedData as any).examName);
+                        }
+                    }
+                } else {
                     toast.error("No review data found");
                     setLoading(false);
                     return;
-                }
-
-                let sessionQuestions: Question[] = [];
-                const storedData = JSON.parse(storedIds);
-
-                // logic from session/page.tsx adapted for review:
-                if (Array.isArray(storedData) && storedData.length > 0) {
-                    // Full Objects (Review/Export Mode)
-                    // Verify they match our schema or merge with API data if needed
-                    sessionQuestions = storedData as Question[];
-
-                    // Extract Exam Name if available
-                    if ((storedData as any).examName) {
-                        setExamName((storedData as any).examName);
-                    } else if ((storedData as any).questions) {
-                        // Handle new object structure { questions: [], examName: "" }
-                        sessionQuestions = (storedData as any).questions;
-                        if ((storedData as any).examName) setExamName((storedData as any).examName);
-                    }
-                    // NEVER SHUFFLE IN REVIEW MODE
                 }
 
                 if (sessionQuestions.length === 0) {
