@@ -102,24 +102,32 @@ export default function ReviewToSessionPort() {
                         const submission = data.submissions?.[0]; // Take first submission
                         const answers = submission?.answers || {};
 
-
                         if (data.questions && Array.isArray(data.questions)) {
                             sessionQuestions = data.questions.map((q: any) => {
                                 // Map API Question to Local Question
-                                // 1. Map 'text' to 'questionText' (Essential for display)
-                                const qText = q.questionText || q.text || "Question text missing";
+                                // 1. Map 'text' to 'questionText' (API returns 'text')
+                                // Added strict check for text sources
+                                const qText = q.text || q.questionText || "Question text missing";
 
-                                // 2. Determine userAnswer INDEX from Answer TEXT (Essential for checking)
+                                // 2. Determine userAnswer INDEX from Answer TEXT
                                 const userAnsText = answers[q.id];
                                 let userAnsIndex: number | null = null;
 
                                 if (userAnsText !== undefined && userAnsText !== null && q.options) {
+                                    // Robust Matching: Normalize both
+                                    const normalize = (s: any) => String(s).trim().toLowerCase().replace(/\s+/g, ' ');
+                                    const normalizedUserAns = normalize(userAnsText);
+
                                     // Find index of option matching the text
-                                    userAnsIndex = q.options.findIndex((opt: any) => opt.text === userAnsText);
+                                    userAnsIndex = q.options.findIndex((opt: any) => normalize(opt.text) === normalizedUserAns);
+
                                     if (userAnsIndex === -1) {
-                                        // Fallback: If text doesn't match, maybe it's already an index?
-                                        if (typeof userAnsText === 'number') userAnsIndex = userAnsText;
-                                        else userAnsIndex = null;
+                                        // Fallback: Check if it matches 'text' property directly in case opt is object
+                                        // or if userAnsText is actually an index
+                                        if (!isNaN(Number(userAnsText))) {
+                                            const idx = Number(userAnsText);
+                                            if (idx >= 0 && idx < q.options.length) userAnsIndex = idx;
+                                        }
                                     }
                                 }
 
@@ -236,8 +244,8 @@ export default function ReviewToSessionPort() {
             // Set user's selected option if it exists
             setSelectedOption(typeof q.userAnswer === 'number' ? q.userAnswer : null);
 
-            // If they were correct, we auto-reveal (show Green).
-            setIsAnswerChecked(q.status === 'correct');
+            // REMOVED AUTO-REVEAL: User wants manual check only
+            // setIsAnswerChecked(q.status === 'correct'); 
         } else {
             // Fallback if status missing
             setSelectedOption(null);
@@ -399,67 +407,90 @@ export default function ReviewToSessionPort() {
                                                 const isSelected = selectedOption === idx;
                                                 const isCorrect = opt.isCorrect;
 
-                                                // Review Mode Logic
-                                                const reviewStatus = currentQ.status; // 'correct' | 'wrong' | 'unanswered'
-                                                const isUserSelected = currentQ.userAnswer === idx;
+                                                // Student's original submission (Persistent)
+                                                const isStudentAnswer = currentQ.userAnswer === idx;
+
+                                                // REVEAL LOGIC: STRICTLY MANUAL
+                                                // Only show colors if the "Check Answer" button was clicked.
+                                                const shouldReveal = isAnswerChecked;
 
                                                 // Base Style
                                                 let statusClass = isDark
                                                     ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
                                                     : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
 
-                                                // Interaction State (Standard)
+                                                // INTERACTION STATE: Highlight selected option (Blue border/bg) before reveal
                                                 if (isSelected) {
                                                     statusClass = isDark
                                                         ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
                                                         : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
                                                 }
 
-                                                // REVEAL LOGIC
-                                                const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
-
+                                                // REVEAL STATE: Colors override selection styles
                                                 if (shouldReveal) {
-                                                    if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
-                                                    else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
-                                                    else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                    if (isCorrect) {
+                                                        // Always show CORRECT answer in GREEN
+                                                        statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
+                                                    }
+                                                    else if (isSelected) {
+                                                        // Show SELECTED WRONG answer in RED
+                                                        statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-80" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-80";
+                                                    }
+                                                    else {
+                                                        // Dim others
+                                                        statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                    }
                                                 }
-                                                // Review Mode: WRONG Answer State (Before Reveal or After)
-                                                // Highlighting the WRONG answer the user picked
-                                                else if (reviewStatus === 'wrong' && isUserSelected) {
-                                                    statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
-                                                }
-                                                else if (reviewStatus) {
-                                                    statusClass = isDark ? "opacity-60" : "opacity-60 grayscale";
-                                                }
+                                                // Note: We deliberately do NOT color the "isStudentAnswer" red here if not selected.
+                                                // The requirement is "his choose is right or wrong seen". Only the current active selection gets graded red/green.
+                                                // But the Correct answer (green) is always shown on reveal.
 
                                                 return (
                                                     <div
                                                         key={idx}
                                                         onClick={(e) => {
-                                                            // In proper review mode, we usually disable changing answer
-                                                            if (annotationMode || reviewStatus) return;
-                                                            if (!shouldReveal) setSelectedOption(idx);
+                                                            if (annotationMode) return;
+                                                            // Teacher Interaction:
+                                                            // Always allow selecting. If already checked, uncheck to allow trying again?
+                                                            // User said "if he tap Check Answer... his choose is right or wrong seen".
+                                                            // Let's reset isAnswerChecked on new selection so they can click Check again.
+                                                            setSelectedOption(idx);
+                                                            setIsAnswerChecked(false);
                                                         }}
                                                         className={`
-                                                  p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
-                                                  ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
+                                                  p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group cursor-pointer
                                                   ${annotationMode ? 'cursor-crosshair' : ''}
                                                   ${statusClass}
                                               `}
                                                     >
                                                         <div className={`
                                                   shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
+                                                  ${isSelected ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
                                                   ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
                                                   ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
-                                                  ${(!shouldReveal && reviewStatus === 'wrong' && isUserSelected) ? '!bg-red-500 !text-white' : ''}
                                               `}>
                                                             {String.fromCharCode(65 + idx)}
                                                         </div>
-                                                        <div className="flex-1">
+                                                        <div className="flex-1 flex flex-col">
                                                             <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
                                                                 <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
+
+                                                            {/* Student Answer Indicator (ALWAYS VISIBLE) */}
+                                                            {isStudentAnswer && (
+                                                                <div className="mt-2 flex items-center gap-1.5 animate-in fade-in slide-in-from-left-2 duration-300">
+                                                                    <User className="w-3 h-3 text-indigo-500" />
+                                                                    <span className="text-xs font-bold text-indigo-500 uppercase tracking-wide">Student Answer</span>
+
+                                                                    {/* Status Badges (Only after Reveal) */}
+                                                                    {shouldReveal && currentQ.status === 'correct' && (
+                                                                        <span className="text-xs text-green-600 font-bold ml-1 bg-green-100 px-1.5 py-0.5 rounded-full border border-green-200">Correct</span>
+                                                                    )}
+                                                                    {shouldReveal && currentQ.status === 'wrong' && (
+                                                                        <span className="text-xs text-red-500 font-bold ml-1 bg-red-100 px-1.5 py-0.5 rounded-full border border-red-200">Wrong</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 );
@@ -469,14 +500,14 @@ export default function ReviewToSessionPort() {
                                 </div>
 
                                 {/* Check Answer Button: Show if NOT revealed yet */}
-                                {(!isAnswerChecked && currentQ.status !== 'correct') && currentQ.type?.toUpperCase() === 'MCQ' && (
+                                {(!isAnswerChecked) && currentQ.type?.toUpperCase() === 'MCQ' && (
                                     <Button
                                         onClick={() => setIsAnswerChecked(true)}
-                                        // Allow checking if there is a status (meaning it was answered wrong) OR if an option is selected
-                                        disabled={selectedOption === null && !currentQ.status}
-                                        className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700"
+                                        // Allow checking even if nothing selected (to just see the answer)
+                                        // disabled={selectedOption === null} // REMOVED
+                                        className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 shadow-sm transition-all hover:scale-[1.01]"
                                     >
-                                        {currentQ.status ? "Show Correct Answer" : "Check Answer"}
+                                        Check Answer & Explanation
                                     </Button>
                                 )}
 
