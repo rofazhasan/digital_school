@@ -15,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Toaster, toast } from 'sonner';
 
 // Use better-react-mathjax for consistent math rendering across the app
-import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { MathJaxContext } from "better-react-mathjax";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import debounce from 'lodash.debounce';
 import { startOfDay, endOfDay } from "date-fns";
 import { DateRange } from "react-day-picker";
@@ -82,8 +83,8 @@ const useDebounce = (callback: (...args: any[]) => void, delay: number) => {
 // --- Helper Components ---
 const MathRenderer = ({ content, inline = true }: { content: string; inline?: boolean }) => {
   try {
-    if (inline) return <MathJax inline>{cleanupMath(content)}</MathJax>;
-    return <MathJax>{cleanupMath(content)}</MathJax>;
+    if (inline) return <UniversalMathJax inline>{cleanupMath(content)}</UniversalMathJax>;
+    return <UniversalMathJax>{cleanupMath(content)}</UniversalMathJax>;
   } catch (error) {
     return <span className="text-red-500">Invalid Math Syntax</span>;
   }
@@ -100,16 +101,12 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
   <div className={`p-4 border rounded-lg mb-3 transition-all ${isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
     <div className="flex justify-between items-start gap-4">
       <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
-        {question.hasMath && question.questionLatex ? (
-          <MathJax inline>{cleanupMath(question.questionLatex)}</MathJax>
-        ) : (
-          <MathJax inline>{cleanupMath(question.questionText || "")}</MathJax>
-        )}
+        <h4 className="font-semibold text-sm mb-1 leading-snug"><UniversalMathJax inline>{cleanupMath(question.questionLatex || question.questionText)}</UniversalMathJax></h4>
         {question.type === 'MCQ' && Array.isArray(question.options) && (
           <ul className="list-disc pl-5 mt-2 space-y-1">
             {question.options.map((opt: any, i: number) => (
               <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                <MathJax inline>{cleanupMath(opt.text || "")}</MathJax>
+                <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax>
               </li>
             ))}
           </ul>
@@ -850,7 +847,7 @@ export default function ExamBuilderPage() {
                       <tr key={q.id}>
                         <td className="border px-2 py-1">{qIdx + 1}</td>
                         <td className="border px-2 py-1">
-                          {q.hasMath && q.questionLatex ? <MathJax inline>{cleanupMath(q.questionLatex)}</MathJax> : q.questionText}
+                          {q.hasMath && q.questionLatex ? <UniversalMathJax inline>{cleanupMath(q.questionLatex)}</UniversalMathJax> : q.questionText}
                         </td>
                         {sets.map((set, sIdx) => {
                           const setQ = Array.isArray(set.questionsJson) ? set.questionsJson[qIdx] : undefined;
@@ -858,12 +855,12 @@ export default function ExamBuilderPage() {
                             <td key={set.name} className="border px-2 py-1">
                               {setQ ? (
                                 <div>
-                                  {setQ.hasMath && setQ.questionLatex ? <MathJax inline>{cleanupMath(setQ.questionLatex)}</MathJax> : setQ.questionText}
+                                  {setQ.hasMath && setQ.questionLatex ? <UniversalMathJax inline>{cleanupMath(setQ.questionLatex)}</UniversalMathJax> : setQ.questionText}
                                   {setQ.type === 'MCQ' && Array.isArray(setQ.options) && (
                                     <ul className="list-disc pl-4 mt-1">
                                       {setQ.options.map((opt: any, i: number) => (
                                         <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                                          {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <MathJax inline>{cleanupMath(opt.text)}</MathJax> : opt.text}
+                                          {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
                                         </li>
                                       ))}
                                     </ul>
@@ -895,7 +892,7 @@ export default function ExamBuilderPage() {
                         <div key={q.id || idx} className="mb-6">
                           <div className="font-bold mb-1">Q{idx + 1}.</div>
                           <div className="mb-2">
-                            {q.hasMath && q.questionLatex ? <MathJax inline>{cleanupMath(q.questionLatex)}</MathJax> : q.questionText}
+                            {q.hasMath && q.questionLatex ? <UniversalMathJax inline>{cleanupMath(q.questionLatex)}</UniversalMathJax> : q.questionText}
                           </div>
                           {q.type === 'MCQ' && Array.isArray(q.options) && (
                             <ul className="list-disc pl-6 mt-1">

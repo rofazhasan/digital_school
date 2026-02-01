@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
-import { MathJax, MathJaxContext } from 'better-react-mathjax';
+import { MathJaxContext } from 'better-react-mathjax';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { cleanupMath } from '@/lib/utils';
 
@@ -59,7 +60,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 // Helper to render text with react-latex
 const Text = ({ children }: { children: string }) => (
-  <MathJax inline dynamic>{cleanupMath(children)}</MathJax>
+  <UniversalMathJax inline dynamic>{cleanupMath(children)}</UniversalMathJax>
 );
 
 // Main QuestionPaper component (forwardRef for printing)

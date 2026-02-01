@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
-import { MathJax } from 'better-react-mathjax';
+import { MathJaxContext } from 'better-react-mathjax';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from '@/lib/utils';
 
 // --- TYPES ---
@@ -65,7 +66,7 @@ const normalizeAnswer = (ans: string | undefined | number) => {
 
 // Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
-  <MathJax dynamic inline>{cleanupMath(children)}</MathJax>
+  <UniversalMathJax dynamic inline>{cleanupMath(children)}</UniversalMathJax>
 );
 
 // Main AnswerQuestionPaper component (forwardRef for printing)

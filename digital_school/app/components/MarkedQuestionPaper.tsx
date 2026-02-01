@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
-import { MathJax } from 'better-react-mathjax';
+import { MathJaxContext } from 'better-react-mathjax';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
 import { cleanupMath } from '@/lib/utils';
@@ -85,9 +86,9 @@ interface MarkedQuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
-const Text = ({ children }: { children: string }) => (
+const Text = ({ children }: { children: React.ReactNode }) => (
     <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper">
-        <MathJax inline dynamic>{cleanupMath(children)}</MathJax>
+        <UniversalMathJax inline dynamic>{typeof children === 'string' ? cleanupMath(children) : children}</UniversalMathJax>
     </div>
 );
 

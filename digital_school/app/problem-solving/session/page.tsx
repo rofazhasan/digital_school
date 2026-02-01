@@ -20,6 +20,7 @@ import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Types
 interface Question {
@@ -537,9 +538,9 @@ export default function ProblemSolvingSession() {
                                 </div>
 
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    <h2 className="text-xl md:text-2xl font-bold text-foreground leading-relaxed">
-                                        <MathJax dynamic inline>{cleanupMath(currentQ.questionText)}</MathJax>
-                                    </h2>
+                                    <h3 className="text-xl font-medium text-slate-800 leading-relaxed max-w-3xl">
+                                        <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
+                                    </h3>
 
                                     <div className="mt-8 space-y-4">
                                         {currentQ.type === 'MCQ' && currentQ.options && (
@@ -584,8 +585,8 @@ export default function ProblemSolvingSession() {
                                               `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
-                                                            <span className="font-medium text-foreground text-lg w-full">
-                                                                <MathJax dynamic inline>{cleanupMath(opt.text)}</MathJax>
+                                                            <span className={`text-lg w-full text-foreground ${selectedOption === idx ? "font-medium" : ""}`}>
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
                                                         </div>
                                                     );

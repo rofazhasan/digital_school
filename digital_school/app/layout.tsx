@@ -49,6 +49,8 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
+        <Script src="https://tikzjax.com/v1/tikzjax.js" strategy="lazyOnload" />
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
       <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable}`}>
         <ErrorBoundary>

@@ -198,7 +198,7 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
           }}
           title={s.latex}
         >
-          <MathJax inline>{`$${s.display}$`}</MathJax>
+          <UniversalMathJax inline>{`$${s.display}$`}</UniversalMathJax>
         </Button>
       ))}
     </div>
@@ -208,7 +208,8 @@ const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
 import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { DateRange } from "react-day-picker";
 import { addDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
-import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { MathJaxContext } from "better-react-mathjax";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 
 // --- Main Page Component ---
@@ -617,7 +618,7 @@ const QuestionCard: React.FC<{
             )}
             <div className="flex-1">
               <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
-                <MathJax>{question.questionText || ''}</MathJax>
+                <UniversalMathJax>{question.questionText || ''}</UniversalMathJax>
               </CardTitle>
             </div>
           </div>
@@ -644,7 +645,7 @@ const QuestionCard: React.FC<{
             <ul className="list-disc pl-5 my-0 space-y-2">
               {((question.options || []) || []).map((opt: any, i: number) => (
                 <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                  <MathJax inline>{opt.text || ''}</MathJax>
+                  <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
                   {opt.image && (
                     <div className="my-2">
                       <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
@@ -653,7 +654,7 @@ const QuestionCard: React.FC<{
                   {opt.isCorrect && opt.explanation && (
                     <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
                       <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
-                      <span className="text-green-600 dark:text-green-400 text-xs"><MathJax inline>{opt.explanation}</MathJax></span>
+                      <span className="text-green-600 dark:text-green-400 text-xs"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></span>
                     </div>
                   )}
                 </li>
@@ -668,7 +669,7 @@ const QuestionCard: React.FC<{
               {((question.subQuestions || []) || []).map((sq: any, i: number) => (
                 <li key={i} className="space-y-2">
                   <div>
-                    <MathJax>{sq.question || ''}</MathJax>
+                    <UniversalMathJax>{sq.question || ''}</UniversalMathJax>
 
                     {sq.image && (
                       <div className="my-2">
@@ -680,7 +681,7 @@ const QuestionCard: React.FC<{
                   {sq.modelAnswer && (
                     <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
                       <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
-                      <span className="text-blue-600 dark:text-blue-400 text-xs"><MathJax>{sq.modelAnswer}</MathJax></span>
+                      <span className="text-blue-600 dark:text-blue-400 text-xs"><UniversalMathJax>{sq.modelAnswer}</UniversalMathJax></span>
                     </div>
                   )}
                 </li>
@@ -692,7 +693,7 @@ const QuestionCard: React.FC<{
           <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
             <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
             <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-              <MathJax>{question.modelAnswer}</MathJax>
+              <UniversalMathJax>{question.modelAnswer}</UniversalMathJax>
             </div>
           </div>
         )}
@@ -1275,14 +1276,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           <Label>Live Preview</Label>
           <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
             <div className="prose dark:prose-invert max-w-none">
-              <MathJax>{questionText || ''}</MathJax>
+              <UniversalMathJax>{questionText || ''}</UniversalMathJax>
               {type === 'MCQ' && (
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
                   <ul className="list-disc pl-5 space-y-2">
                     {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string; image?: string }, i: number) => (
                       <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                        <MathJax inline>{opt.text || `(Option ${i + 1})`}</MathJax>
+                        <UniversalMathJax inline>{opt.text || `(Option ${i + 1})`}</UniversalMathJax>
                         {opt.image && (
                           <div className="my-2">
                             <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
@@ -1291,7 +1292,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         {opt.isCorrect && opt.explanation && (
                           <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                             <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
-                            <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{opt.explanation}</MathJax></p>
+                            <p className="text-xs text-green-600 dark:text-green-400"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></p>
                           </div>
                         )}
                       </li>
@@ -1306,7 +1307,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
                       <li key={i} className="space-y-2">
                         <div>
-                          <MathJax>{sq.question || `(Sub-question ${i + 1})`}</MathJax>
+                          <UniversalMathJax>{sq.question || `(Sub-question ${i + 1})`}</UniversalMathJax>
                           {sq.image && (
                             <div className="my-2">
                               <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-32 rounded border" />
@@ -1317,7 +1318,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         {sq.modelAnswer && (
                           <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                            <MathJax>{sq.modelAnswer}</MathJax>
+                            <UniversalMathJax>{sq.modelAnswer}</UniversalMathJax>
                           </div>
                         )}
                       </li>
@@ -1329,7 +1330,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                    <MathJax>{modelAnswer}</MathJax>
+                    <UniversalMathJax>{modelAnswer}</UniversalMathJax>
                   </div>
                 </div>
               )}
@@ -1550,7 +1551,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       )}
                     </div>
                     <div className="whitespace-pre-wrap overflow-x-auto">
-                      <MathJax inline>{cleanupMath(q.questionText || '')}</MathJax>
+                      <UniversalMathJax inline>{cleanupMath(q.questionText || '')}</UniversalMathJax>
                     </div>
 
                     {/* MCQ Options with Explanations */}
@@ -1560,11 +1561,11 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                         <ul className="list-disc pl-5 space-y-2">
                           {((q.options || []) || []).map((opt, i) => (
                             <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                              <MathJax inline>{cleanupMath(opt.text || '')}</MathJax>
+                              {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
                               {opt.isCorrect && opt.explanation && (
                                 <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-green-700 dark:text-green-300">Why this is correct:</p>
-                                  <p className="text-xs text-green-600 dark:text-green-400"><MathJax inline>{cleanupMath(opt.explanation)}</MathJax></p>
+                                  <p className="text-xs text-green-600 dark:text-green-400"><UniversalMathJax inline>{cleanupMath(opt.explanation)}</UniversalMathJax></p>
                                 </div>
                               )}
                             </li>
@@ -1581,13 +1582,13 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                <MathJax inline>{cleanupMath(sq.question || '')}</MathJax>
+                                {q.hasMath && q.questionLatex ? <UniversalMathJax inline>{cleanupMath(q.questionLatex)}</UniversalMathJax> : q.questionText}
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (
                                 <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                                   <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                                  <MathJax inline>{cleanupMath(sq.modelAnswer)}</MathJax>
+                                  <UniversalMathJax inline>{cleanupMath(sq.modelAnswer)}</UniversalMathJax>
                                 </div>
                               )}
                             </li>
@@ -1601,7 +1602,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                         <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                          <MathJax inline>{cleanupMath(q.modelAnswer)}</MathJax>
+                          <UniversalMathJax inline>{cleanupMath(q.modelAnswer)}</UniversalMathJax>
                         </div>
                       </div>
                     )}
