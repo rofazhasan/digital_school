@@ -57,7 +57,9 @@ export default function ProblemSolvingSession() {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [examName, setExamName] = useState("");
     const [currentIndex, setCurrentIndex] = useState(0);
+
     const [loading, setLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
 
     const [showOverlay, setShowOverlay] = useState(true);
     const [annotationMode, setAnnotationMode] = useState(false); // Controls z-index of board vs overlay
@@ -106,7 +108,8 @@ export default function ProblemSolvingSession() {
 
                 if (!storedIds) {
                     toast.error("No review data found");
-                    window.close(); // Or router.push
+                    setHasError(true);
+                    setLoading(false);
                     return;
                 }
 
@@ -123,13 +126,17 @@ export default function ProblemSolvingSession() {
                 } catch (e) {
                     console.error("Data parse error", e);
                     localStorage.removeItem("review-session-data"); // Clear bad data
+                    localStorage.removeItem("review-session-data"); // Clear bad data
                     toast.error("Review data corrupted. Please start again.");
-                    window.close();
+                    setHasError(true);
+                    setLoading(false);
                     return;
                 }
 
                 if (!sessionQuestions || sessionQuestions.length === 0) {
                     toast.error("Questions not found reviews");
+                    setHasError(true);
+                    setLoading(false);
                     return;
                 }
 
@@ -137,6 +144,7 @@ export default function ProblemSolvingSession() {
             } catch (err) {
                 console.error(err);
                 toast.error("Failed to load review session");
+                setHasError(true);
             } finally {
                 setLoading(false);
             }
@@ -410,6 +418,28 @@ export default function ProblemSolvingSession() {
 
     const currentQ = questions[currentIndex];
     const isDark = boardBackground === 'black';
+
+    if (hasError) {
+        return (
+            <div className="h-screen flex flex-col items-center justify-center bg-gray-50 text-gray-900 font-sans p-4">
+                <div className="bg-white p-8 rounded-2xl shadow-xl max-w-md w-full text-center border border-gray-100">
+                    <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <LogOut className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h2 className="text-2xl font-bold mb-2 text-gray-800">No Review Session Found</h2>
+                    <p className="text-gray-500 mb-8 leading-relaxed">
+                        We couldn't find any session data to review. This usually happens if you visit this page directly or cleared your browser data.
+                    </p>
+                    <Button
+                        onClick={() => router.push('/problem-solving')}
+                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl py-6 font-semibold shadow-lg shadow-indigo-200"
+                    >
+                        Go to Problem Solving
+                    </Button>
+                </div>
+            </div>
+        );
+    }
 
     if (loading || !currentQ) {
         return (
