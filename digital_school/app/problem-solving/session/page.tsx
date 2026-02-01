@@ -831,3 +831,20 @@ const ToolBtn = ({ active, onClick, icon, tooltip }: { active: boolean, onClick:
         {icon}
     </Button>
 );
+
+// Live Clock Component (Client Only)
+function LiveClock() {
+    const [time, setTime] = useState<Date | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        setTime(new Date());
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
+
+    return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+}

@@ -81,6 +81,22 @@ export default function ProblemSolvingSession() {
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
     // Timer (No Timer in Review)
+    // Live Clock Component (Client Only)
+    function LiveClock() {
+        const [time, setTime] = useState<Date | null>(null);
+        const [isMounted, setIsMounted] = useState(false);
+
+        useEffect(() => {
+            setIsMounted(true);
+            setTime(new Date());
+            const timer = setInterval(() => setTime(new Date()), 1000);
+            return () => clearInterval(timer);
+        }, []);
+
+        if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
+
+        return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+    }
     // useEffect(() => {
     //     const timer = setInterval(() => {
     //         setElapsedTime(prev => prev + 1);
@@ -103,18 +119,25 @@ export default function ProblemSolvingSession() {
                 }
 
                 // Handle new Object structure vs Legacy Array
-                const parsed = JSON.parse(storedIds);
                 let sessionQuestions: Question[] = [];
-
-                if (Array.isArray(parsed)) {
-                    sessionQuestions = parsed;
-                } else if (parsed.questions) {
-                    sessionQuestions = parsed.questions;
-                    if (parsed.examName) setExamName(parsed.examName);
+                try {
+                    const parsed = JSON.parse(storedIds);
+                    if (Array.isArray(parsed)) {
+                        sessionQuestions = parsed;
+                    } else if (parsed && parsed.questions) {
+                        sessionQuestions = parsed.questions;
+                        if (parsed.examName) setExamName(parsed.examName);
+                    }
+                } catch (e) {
+                    console.error("Data parse error", e);
+                    localStorage.removeItem("review-session-data"); // Clear bad data
+                    toast.error("Review data corrupted. Please start again.");
+                    window.close();
+                    return;
                 }
 
                 if (!sessionQuestions || sessionQuestions.length === 0) {
-                    toast.error("Questions not found");
+                    toast.error("Questions not found reviews");
                     return;
                 }
 
@@ -636,12 +659,12 @@ export default function ProblemSolvingSession() {
                                     </div>
 
                                     {/* Action Buttons: Always allow check if not checked */}
-                                    <div className="mt-6 flex gap-3">
+                                    <div className="mt-6 flex gap-3 relative z-10">
                                         {!isAnswerChecked && currentQ.type === 'MCQ' && (
                                             <Button
                                                 onClick={() => setIsAnswerChecked(true)}
                                                 // Enable even if nothing selected (just to see answer)
-                                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg"
+                                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 py-6 text-lg tracking-wide font-semibold transform active:scale-95 transition-all"
                                             >
                                                 {selectedOption !== null ? "Check My Selection" : "Show Correct Answer"}
                                             </Button>
