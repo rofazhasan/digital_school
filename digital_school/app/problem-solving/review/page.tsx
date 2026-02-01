@@ -527,8 +527,20 @@ export default function ProblemSolvingSession() {
                             {/* DEBUG STATUS */}
                             <div className="fixed bottom-4 right-4 z-[9999] bg-black/80 text-white p-2 rounded text-xs pointer-events-auto font-mono">
                                 {loading ? 'Loading...' : 'Ready'} | Err: {hasError ? 'YES' : 'NO'} | Qs: {questions.length} | Idx: {currentIndex}
+                                <br />QID: {currentQ?.id} | TextLen: {currentQ?.questionText?.length}
                             </div>
-                            <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}>
+
+                            {/* DIAGNOSTIC RED BOXREPLACEMENT FOR CARD */}
+                            <div className="bg-red-100 border-4 border-red-500 p-4 text-red-900 rounded-xl z-50 relative pointer-events-auto">
+                                <h1 className="text-xl font-bold">DIAGNOSTIC MODE</h1>
+                                <p>If you see this, the Card component was the issue.</p>
+                                <hr className="border-red-500 my-2" />
+                                <h2 className="font-bold">Question Data:</h2>
+                                <pre className="text-xs overflow-auto max-h-40">{JSON.stringify(currentQ, null, 2)}</pre>
+                            </div>
+
+                            {/* <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}> */}
+                            <div className="hidden">
                                 <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1">
@@ -688,7 +700,8 @@ export default function ProblemSolvingSession() {
                                         )}
                                     </AnimatePresence>
                                 </div>
-                            </Card>
+                            </div>
+                            {/* </Card> */}
                         </div>
                     )}
                 </AnimatePresence>
