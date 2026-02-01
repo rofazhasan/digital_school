@@ -1633,12 +1633,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
                             }
                           }
-                          return { ...q, status, userAnswer: userIdx, type: q.type.toUpperCase() === 'MCQ' ? 'MCQ' : q.type };
+
+                          // normalize questionText
+                          const questionText = q.questionText || q.text || "Question text missing";
+
+                          return {
+                            ...q,
+                            questionText, // Ensure this exists for the session page
+                            status,
+                            userAnswer: userIdx,
+                            type: q.type.toUpperCase() === 'MCQ' ? 'MCQ' : q.type
+                          };
                         });
 
                         localStorage.setItem("review-session-data", JSON.stringify(sessionData));
                         toast.success("Opening Review Session...");
-                        window.open('/problem-solving/session?mode=review', '_blank');
+                        window.open('/problem-solving/review', '_blank'); // Targeted dedicated page
                       }}
                       disabled={!currentStudent}
                       title="Open in interactive Problem Solving Session"

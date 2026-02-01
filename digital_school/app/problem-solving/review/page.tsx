@@ -1,0 +1,495 @@
+"use client";
+
+import React, { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import {
+    ChevronLeft, ChevronRight, PenTool, Eraser, Move,
+    RotateCcw, Undo, Redo, Share, Printer, Eye, Lock, Unlock,
+    CheckCircle, XCircle, MoreVertical, Settings, LogOut, Maximize2, Minimize2,
+    Highlighter, Minus, MousePointer2, ZoomIn, ZoomOut, Grid3X3, Sun, Moon,
+    Clock, User, Presentation, Layout, Download, FileDown
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { MathJaxContext, MathJax } from "better-react-mathjax";
+import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
+import { toast } from "sonner";
+import { cleanupMath } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
+
+// Types
+interface Question {
+    id: string;
+    questionText: string;
+    type: 'MCQ' | 'CQ' | 'SQ';
+    subject: string;
+    topic?: string;
+    difficulty: string;
+    marks: number;
+    options?: { text: string; isCorrect: boolean; explanation?: string }[];
+    modelAnswer?: string;
+    subQuestions?: any[];
+    // Review Mode Fields
+    status?: 'correct' | 'wrong' | 'unanswered';
+    userAnswer?: number | null; // Index of selected option
+}
+
+const MATHJAX_CONFIG = {
+    loader: { load: ["input/tex", "output/chtml"] },
+    tex: {
+        inlineMath: [["$", "$"], ["\\(", "\\)"]],
+        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+    }
+};
+
+export default function ProblemSolvingSession() {
+    const router = useRouter();
+    const boardRef = useRef<SmartBoardRef>(null);
+
+    // Session State
+    const [questions, setQuestions] = useState<Question[]>([]);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [elapsedTime, setElapsedTime] = useState(0);
+
+    // Board State
+    const [boardTool, setBoardTool] = useState<ToolType>('pen');
+    const [boardColor, setBoardColor] = useState('#000000');
+    const [boardSize, setBoardSize] = useState(2);
+    const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [annotationMode, setAnnotationMode] = useState(false);
+    const [showToolSize, setShowToolSize] = useState(false);
+    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
+    const lastToolClickTime = useRef<{ [key: string]: number }>({});
+    const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
+
+    // Persistence
+    const [boardHistories, setBoardHistories] = useState<Record<string, any[]>>({});
+
+    // Interaction State
+    const [showAnswer, setShowAnswer] = useState(false);
+    const [showOverlay, setShowOverlay] = useState(true);
+
+    // MCQ State
+    const [selectedOption, setSelectedOption] = useState<number | null>(null);
+    const [isAnswerChecked, setIsAnswerChecked] = useState(false);
+
+    // Timer (No Timer in Review)
+    // useEffect(() => {
+    //     const timer = setInterval(() => {
+    //         setElapsedTime(prev => prev + 1);
+    //     }, 1000);
+    //     return () => clearInterval(timer);
+    // }, []);
+
+    // Initialize (Review Only)
+    useEffect(() => {
+        const initSession = async () => {
+            try {
+                setLoading(true);
+                // Load Review Data directly
+                const storedIds = localStorage.getItem("review-session-data");
+
+                if (!storedIds) {
+                    toast.error("No review data found");
+                    window.close(); // Or router.push
+                    return;
+                }
+
+                const sessionQuestions = JSON.parse(storedIds) as Question[];
+
+                if (!sessionQuestions || sessionQuestions.length === 0) {
+                    toast.error("Questions not found");
+                    return;
+                }
+
+                setQuestions(sessionQuestions);
+            } catch (err) {
+                console.error(err);
+                toast.error("Failed to load review session");
+            } finally {
+                setLoading(false);
+            }
+        };
+        initSession();
+    }, []);
+
+    // Sync State with Question
+    useEffect(() => {
+        const q = questions[currentIndex];
+        if (!q) return;
+
+        // In Review Mode:
+        // 1. Reset 'isChecked' (User must explicitly check for each question unless we want persistence)
+        // 2. We do NOT pre-select based on their answer to avoid confusion with "Active Selection".
+        //    Instead, we show "Your Answer" visually in the options list.
+
+        setIsAnswerChecked(false);
+        setSelectedOption(null); // Reset manual selection
+
+        // Note: We don't need 'setShowAnswer' logic here as 'isAnswerChecked' controls the reveal.
+    }, [currentIndex, questions]);
+
+    // ... saveCurrentBoardState, restoreBoardState, handleNext, handlePrev unchanged ...
+
+    // ... toggleFullscreen, toggleTool, updateSize, toggleBackground, handleExportPDF unchanged ...
+
+    // ... generateSessionReport unchanged ...
+
+    const currentQ = questions[currentIndex];
+    const isDark = boardBackground === 'black';
+
+    if (loading || !currentQ) {
+        return (
+            <div className={`h-screen flex flex-col items-center justify-center ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-gray-900'}`}>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                <p className="font-medium">Loading Review...</p>
+            </div>
+        );
+    }
+
+    return (
+        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
+            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+
+                {/* 1. TOP BAR */}
+                <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none no-print">
+                    <div className="flex items-center gap-4 pointer-events-auto">
+                        <Button
+                            variant="secondary" size="sm"
+                            onClick={() => window.close()} // Close Tab
+                            className="bg-white/90 backdrop-blur shadow-sm hover:bg-white border border-gray-100 rounded-full pl-3 pr-4"
+                        >
+                            <LogOut className="w-4 h-4 mr-2 text-gray-500" />
+                            <span className="text-gray-700">Close Review</span>
+                        </Button>
+                        <div className="bg-white/90 backdrop-blur shadow-sm border border-gray-100 px-4 py-1.5 rounded-full flex items-center gap-3">
+                            <span className="text-sm font-semibold text-gray-800">Q {currentIndex + 1} / {questions.length}</span>
+                        </div>
+                    </div>
+
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/80 backdrop-blur px-4 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                            <span className="text-sm font-bold text-indigo-800">Review Mode</span>
+                        </div>
+                        <div className="w-px h-4 bg-gray-300"></div>
+                        <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">
+                                Result: <span className={
+                                    currentQ.status === 'correct' ? 'text-green-600 font-bold' :
+                                        currentQ.status === 'wrong' ? 'text-red-600 font-bold' : 'text-violet-600 font-bold'
+                                }>
+                                    {currentQ.status ? currentQ.status.toUpperCase() : 'UNKNOWN'}
+                                </span>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                        {/* Right tools (Annotate, View, Export) */}
+                        <Button
+                            variant={annotationMode ? "default" : "secondary"}
+                            size="sm"
+                            onClick={() => setAnnotationMode(!annotationMode)}
+                            className={`rounded-full shadow-sm transition-all ${annotationMode ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : 'bg-white/90 text-gray-600'}`}
+                        >
+                            {annotationMode ? <PenTool className="w-4 h-4 mr-2" /> : <MousePointer2 className="w-4 h-4 mr-2" />}
+                            {annotationMode ? "Annotating" : "Interact"}
+                        </Button>
+
+                        <div className="h-6 w-px bg-gray-300/50 mx-1"></div>
+
+                        <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
+                            {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={handleExportPDF} className="bg-white/80 hover:bg-white rounded-full">
+                            <FileDown className="w-5 h-5 text-gray-600" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-white/80 hover:bg-white rounded-full">
+                            {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* 2. MAIN CANVAS (Unchanged) */}
+                <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
+                    <SmartBoard
+                        ref={boardRef}
+                        className=""
+                        backgroundColor={annotationMode ? 'transparent' : boardBackground}
+                    />
+                </div>
+
+                {/* 3. QUESTION OVERLAY (Review Logic) */}
+                <AnimatePresence>
+                    {showOverlay && (
+                        <motion.div
+                            initial={{ x: -400, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: -400, opacity: 0 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            className={`absolute top-24 left-6 w-[480px] pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
+                        >
+                            <Card className={`shadow-2xl shadow-black/20 overflow-hidden flex flex-col rounded-2xl ring-1 ring-white/10 backdrop-blur-xl ${isDark ? 'bg-slate-900/95 border-slate-700 text-slate-100' : 'bg-white/95 border-white/40 text-gray-900'}`}>
+                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-slate-800/50 border-b border-slate-700' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500"></div>
+                                            <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
+                                        </div>
+                                        {currentQ.topic && (
+                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className={`border-0 ${currentQ.difficulty === 'HARD' ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'}`}>
+                                            {currentQ.difficulty}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
+                                    <h3 className="text-xl font-medium text-slate-800 leading-relaxed max-w-3xl">
+                                        <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
+                                    </h3>
+
+                                    <div className="mt-8 space-y-4">
+                                        {currentQ.type === 'MCQ' && currentQ.options && (
+                                            <div className="grid gap-3">
+                                                {currentQ.options.map((opt, idx) => {
+                                                    const isCorrect = opt.isCorrect;
+                                                    const isUserSelected = currentQ.userAnswer === idx;
+
+                                                    // Visual State Logic for Review
+                                                    // 1. Base: Neutral
+                                                    // 2. UserSelected: Blue Border (Your Answer)
+                                                    // 3. Checked + Correct: Green
+                                                    // 4. Checked + Wrong: Red (if UserSelected)
+
+                                                    let statusClass = isDark
+                                                        ? "border-slate-700 bg-slate-800/50"
+                                                        : "border-transparent bg-white shadow-sm border-gray-100";
+
+                                                    if (isUserSelected) {
+                                                        statusClass = "border-blue-500 ring-1 ring-blue-500 bg-blue-50"; // Highlight User's Choice
+                                                    }
+
+                                                    if (isAnswerChecked) {
+                                                        if (isCorrect) {
+                                                            statusClass = "bg-green-100 border-green-500 ring-1 ring-green-500 text-green-900";
+                                                        } else if (isUserSelected && !isCorrect) {
+                                                            statusClass = "bg-red-100 border-red-500 ring-1 ring-red-500 text-red-900 opacity-80";
+                                                        } else {
+                                                            statusClass += " opacity-50 grayscale";
+                                                        }
+                                                    }
+
+                                                    return (
+                                                        <div
+                                                            key={idx}
+                                                            className={`
+                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
+                                                                ${statusClass}
+                                                            `}
+                                                        >
+                                                            <div className={`
+                                                                shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                                                                ${isUserSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'}
+                                                                ${isAnswerChecked && isCorrect ? '!bg-green-600 !text-white' : ''}
+                                                                ${isAnswerChecked && isUserSelected && !isCorrect ? '!bg-red-600 !text-white' : ''}
+                                                            `}>
+                                                                {String.fromCharCode(65 + idx)}
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <span className={`text-lg w-full text-foreground`}>
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                                                                </span>
+                                                                {isUserSelected && !isAnswerChecked && (
+                                                                    <div className="text-xs text-blue-600 font-bold mt-1">Your Answer</div>
+                                                                )}
+                                                            </div>
+                                                            {isAnswerChecked && isCorrect && <CheckCircle className="w-5 h-5 text-green-600" />}
+                                                            {isAnswerChecked && isUserSelected && !isCorrect && <XCircle className="w-5 h-5 text-red-600" />}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="mt-6 flex gap-3">
+                                        {!isAnswerChecked && (
+                                            <Button
+                                                onClick={() => setIsAnswerChecked(true)}
+                                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+                                            >
+                                                Check Answer & Explanation
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Explanation */}
+                                    <AnimatePresence>
+                                        {isAnswerChecked && (
+                                            <motion.div
+                                                initial={{ height: 0, opacity: 0 }}
+                                                animate={{ height: "auto", opacity: 1 }}
+                                                className={`mt-4 overflow-hidden rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}
+                                            >
+                                                <div className="p-4">
+                                                    <h4 className="font-bold text-indigo-500 flex items-center gap-2 mb-2">
+                                                        <Presentation className="w-4 h-4" /> Explanation
+                                                    </h4>
+                                                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm leading-relaxed">
+                                                        <UniversalMathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</UniversalMathJax>
+                                                    </div>
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            </Card>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* 4. FLOATING TOOLBAR */}
+                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 no-print">
+
+                    {/* Size Slider Popover (Now handled by double-tap state below) */}
+
+                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
+                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()}><Redo className="w-4 h-4" /></Button>
+                        <div className="w-px h-4 bg-gray-200 mx-1"></div>
+                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomOut()}><ZoomOut className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.resetView()}><Layout className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomIn()}><ZoomIn className="w-4 h-4" /></Button>
+                    </div>
+
+                    <div className={`transition-all duration-300 ${isToolbarCollapsed ? 'w-12 h-12 rounded-full p-0' : 'w-auto h-auto p-2 rounded-full'} flex items-center justify-center bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 overflow-hidden`}>
+
+                        {isToolbarCollapsed ? (
+                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(false)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
+                                <Maximize2 className="w-5 h-5" />
+                            </Button>
+                        ) : (
+                            <div className="flex items-center gap-1">
+                                {/* Minimize */}
+                                <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 mr-2 -ml-1">
+                                    <Minimize2 className="w-4 h-4" />
+                                </Button>
+
+                                <Button variant="ghost" size="icon" onClick={handlePrev} disabled={currentIndex === 0} className="rounded-full hover:bg-gray-100">
+                                    <ChevronLeft className="w-5 h-5" />
+                                </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                <div className="flex items-center gap-1">
+                                    <ToolBtn active={boardTool === 'move'} onClick={() => toggleTool('move')} icon={<Move className="w-5 h-5" />} tooltip="Pan" />
+                                    <ToolBtn active={boardTool === 'pen'} onClick={() => toggleTool('pen')} icon={<PenTool className="w-5 h-5" />} tooltip="Pen" />
+                                    <ToolBtn active={boardTool === 'highlighter'} onClick={() => toggleTool('highlighter')} icon={<Highlighter className="w-5 h-5" />} tooltip="Highlighter" />
+                                    <ToolBtn active={boardTool === 'eraser'} onClick={() => toggleTool('eraser')} icon={<Eraser className="w-5 h-5" />} tooltip="Eraser" />
+                                    <ToolBtn active={boardTool === 'laser'} onClick={() => toggleTool('laser')} icon={<MousePointer2 className="w-5 h-5 text-red-500" />} tooltip="Laser Pointer" />
+                                </div>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                <div className="flex items-center gap-2 px-2">
+                                    {['#000000', '#EF4444', '#3B82F6', '#10B981', '#FFFFFF'].map(c => (
+                                        <button
+                                            key={c}
+                                            onClick={() => {
+                                                setBoardColor(c);
+                                                boardRef.current?.setColor(c);
+                                                setBoardTool('pen');
+                                                boardRef.current?.setTool('pen');
+                                            }}
+                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c && boardTool === 'pen' ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
+                                            style={{ backgroundColor: c }}
+                                        />
+                                    ))}
+                                </div>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                <Button variant="ghost" size="icon" onClick={toggleBackground} className="rounded-full hover:bg-gray-100">
+                                    {boardBackground === 'white' && <Sun className="w-5 h-5 text-yellow-500" />}
+                                    {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
+                                    {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
+                                </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
+                                    <ChevronRight className="w-5 h-5" />
+                                </Button>
+
+                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
+
+                                {/* Report Button */}
+                                <Button
+                                    className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 px-4"
+                                    onClick={generateSessionReport}
+                                    size="sm"
+                                >
+                                    <FileDown className="w-4 h-4 mr-2" />
+                                    Export
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Tool Size Slider (Conditional) */}
+                    <AnimatePresence>
+                        {showToolSize && (
+                            <motion.div
+                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
+                                className="absolute bottom-24 bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl p-4 w-64 z-50 flex items-center gap-3"
+                            >
+                                <div className={`w-8 h-8 rounded-full border flex items-center justify-center bg-white shadow-sm font-bold text-xs`} style={{ borderColor: boardColor }}>
+                                    {boardSize}
+                                </div>
+                                <Slider
+                                    value={[boardSize]}
+                                    min={1}
+                                    max={20}
+                                    step={1}
+                                    onValueChange={([val]) => updateSize(val)}
+                                    className="flex-1"
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+
+                    {/* Hidden Container for PDF Generation */}
+                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-0 w-[794px] pointer-events-none opacity-0 invisible -z-50 bg-white"></div>
+                </div>
+
+            </div>
+        </MathJaxContext>
+    );
+}
+
+const ToolBtn = ({ active, onClick, icon, tooltip }: { active: boolean, onClick: () => void, icon: React.ReactNode, tooltip: string }) => (
+    <Button
+        variant={active ? "default" : "ghost"}
+        size="icon"
+        onClick={onClick}
+        className={`rounded-full transition-all ${active ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md scale-110' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
+        title={tooltip}
+    >
+        {icon}
+    </Button>
+);
