@@ -22,6 +22,35 @@ export async function GET(
     // Dynamic filtering for submissions
     const submissionWhere = studentId ? { studentId: studentId } : {};
 
+    // Optimization: Pre-fetch ExamStudentMap to identify the specific ExamSet needed
+    let targetExamSetId: string | undefined = undefined;
+    let preFetchedTeacherMap = null; // To avoid re-fetching later if possible (though structure differs)
+
+    // We only optimize ExamSet fetching if a specific student is requested
+    if (studentId) {
+      const studentMap = await prisma.examStudentMap.findUnique({
+        where: {
+          studentId_examId: {
+            studentId,
+            examId
+          }
+        },
+        select: { examSetId: true }
+      });
+      if (studentMap?.examSetId) {
+        targetExamSetId = studentMap.examSetId;
+      }
+    }
+
+    // Dynamic ExamSet filtering
+    // If we know the target set, ONLY fetch that one.
+    // If targetSetId is explicitly found (string), filter by it.
+    // If studentId matches but no set (null), it means Generated Set, so fetch NO examSets.
+    // If no studentId (Teacher View), fetch ALL sets.
+    const examSetWhere = studentId
+      ? (targetExamSetId ? { id: targetExamSetId } : { id: 'none' })
+      : {};
+
     // Common selection object for sub-relations to reuse
     const examInclude = {
       class: true,
@@ -32,6 +61,8 @@ export async function GET(
         }
       },
       examSets: {
+        // Optimize: Filter by specific set ID if known
+        where: examSetWhere,
         // Optimize: Only fetch ID and questions, skip metadata
         select: {
           id: true,
