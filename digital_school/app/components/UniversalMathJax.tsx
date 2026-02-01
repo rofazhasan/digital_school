@@ -59,15 +59,16 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
 
 // Sub-component for individual TikZ blocks to handle lifecycle
 const TikZBlock = ({ code }: { code: string }) => {
-    const containerRef = React.useRef<HTMLSpanElement>(null);
+    // Separate ref for the script container so we don't wipe out React's status UI
+    const scriptContainerRef = React.useRef<HTMLSpanElement>(null);
     const [status, setStatus] = useState<"pending" | "success" | "error">("pending");
     const [debugMsg, setDebugMsg] = useState("");
 
     useEffect(() => {
-        const container = containerRef.current;
+        const container = scriptContainerRef.current;
         if (!container) return;
 
-        // 1. Clear previous content
+        // 1. Clear previous content (only the script container)
         container.innerHTML = '';
         setStatus("pending");
         setDebugMsg("");
@@ -122,17 +123,18 @@ const TikZBlock = ({ code }: { code: string }) => {
     }, [code]);
 
     return (
-        <span
-            ref={containerRef}
-            className="tikz-wrapper block my-4 flex justify-center overflow-x-auto min-h-[50px] border border-transparent p-2 transition-all"
-        >
+        <span className="tikz-wrapper block my-4 flex flex-col items-center justify-center overflow-x-auto min-h-[50px] border border-transparent p-2 transition-all">
+            {/* The script injection happens here. React leaves this empty. */}
+            <span ref={scriptContainerRef} />
+
+            {/* React manages these. They are siblings, not children of the ref. */}
             {status === "error" && (
-                <span className="text-red-500 text-xs font-mono bg-red-50 p-1 rounded border border-red-200">
+                <span className="text-red-500 text-xs font-mono bg-red-50 p-1 rounded border border-red-200 mt-2">
                     Graphics Error: {debugMsg}
                 </span>
             )}
             {status === "pending" && (
-                <span className="text-gray-400 text-xs animate-pulse flex items-center gap-1">
+                <span className="text-gray-400 text-xs animate-pulse flex items-center gap-1 mt-2">
                     <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
                     Rendering graphics...
                 </span>
