@@ -502,16 +502,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   setIsLiveModalOpen(true);
                 }}
               >
-                <div className="absolute top-0 right-0 p-2 opacity-50 group-hover:opacity-100 transition-opacity flex gap-1">
+                <div className="absolute top-0 right-0 p-2 flex gap-1 z-10">
                   <Button
                     size="icon"
-                    variant="ghost"
-                    className="h-6 w-6 rounded-full hover:bg-white/80"
-                    title="Open in Problem Solving Session"
+                    variant="secondary"
+                    className="h-8 w-8 rounded-full shadow-sm bg-white/90 hover:bg-white text-indigo-600 hover:text-indigo-700 hover:scale-105 transition-all"
+                    title="Open Review Session"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Export Logic
-                      const questions = liveStats?.defaultQuestions || []; // Assuming simplest case
+                      const questions = liveStats?.defaultQuestions || [];
                       if (!questions.length) return toast.error("No questions found");
 
                       const sessionData = questions.map((q: any) => {
@@ -520,41 +519,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                         let userIdx = null;
 
                         if (ans !== undefined && ans !== null) {
-                          // Assuming ans is option text or index. Need checking.
-                          // If q.options exists, we can find index.
-                          // For simplicity in this edit, assuming ans is index if number, or trying to find it.
-                          // If we don't have exact logic here, we map as best effort.
-                          // But usually 'ans' is the value saved.
-
-                          // Find if correct
                           const correctOpt = q.options?.find((o: any) => o.isCorrect);
                           const isCorrect = correctOpt && (
                             (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
                             (ans === correctOpt.text)
                           );
                           status = isCorrect ? 'correct' : 'wrong';
-
-                          // Map answer to index for UI
                           if (q.type === 'MCQ' && q.options) {
                             userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
                           }
                         }
-
-                        return {
-                          ...q,
-                          status,
-                          userAnswer: userIdx
-                        };
+                        return { ...q, status, userAnswer: userIdx };
                       });
 
-                      localStorage.setItem("problem-solving-session", JSON.stringify(sessionData));
-                      toast.success("Opening in session...");
-                      window.open('/problem-solving/session', '_blank');
+                      localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                      toast.success("Opening Review Session...");
+                      window.open('/problem-solving/session?mode=review', '_blank');
                     }}
                   >
-                    <MonitorPlay className="w-4 h-4 text-indigo-600" />
+                    <MonitorPlay className="w-4 h-4 ml-0.5" />
                   </Button>
-                  <Maximize2 className="w-4 h-4 text-gray-400" />
+                  {/* <Maximize2 className="w-4 h-4 text-gray-400" /> */}
                 </div>
 
                 <CardContent className="p-5 space-y-4">
@@ -656,8 +641,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     <Button
                       size="sm"
                       variant="ghost"
-                      className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50"
-                      title="Review in Session"
+                      className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+                      title="Open Review Session"
                       onClick={(e) => {
                         e.stopPropagation();
                         const questions = liveStats?.defaultQuestions || [];
@@ -682,8 +667,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           }
                           return { ...q, status, userAnswer: userIdx };
                         });
-                        localStorage.setItem("problem-solving-session", JSON.stringify(sessionData));
-                        window.open('/problem-solving/session', '_blank');
+                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        window.open('/problem-solving/session?mode=review', '_blank');
                       }}
                     >
                       <MonitorPlay className="w-4 h-4" />
