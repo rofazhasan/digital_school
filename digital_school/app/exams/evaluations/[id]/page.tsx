@@ -502,58 +502,57 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   setIsLiveModalOpen(true);
                 }}
               >
-                <div className="absolute top-0 right-0 p-2 flex gap-1 z-10">
-                  <Button
-                    size="icon"
-                    variant="secondary"
-                    className="h-8 w-8 rounded-full shadow-sm bg-white/90 hover:bg-white text-indigo-600 hover:text-indigo-700 hover:scale-105 transition-all"
-                    title="Open Review Session"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      const questions = liveStats?.defaultQuestions || [];
-                      if (!questions.length) return toast.error("No questions found");
-
-                      const sessionData = questions.map((q: any) => {
-                        const ans = student.answers ? student.answers[q.id] : null;
-                        let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                        let userIdx = null;
-
-                        if (ans !== undefined && ans !== null) {
-                          const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                          const isCorrect = correctOpt && (
-                            (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
-                            (ans === correctOpt.text)
-                          );
-                          status = isCorrect ? 'correct' : 'wrong';
-                          if (q.type === 'MCQ' && q.options) {
-                            userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
-                          }
-                        }
-                        return { ...q, status, userAnswer: userIdx };
-                      });
-
-                      localStorage.setItem("review-session-data", JSON.stringify(sessionData));
-                      toast.success("Opening Review Session...");
-                      window.open('/problem-solving/session?mode=review', '_blank');
-                    }}
-                  >
-                    <MonitorPlay className="w-4 h-4 ml-0.5" />
-                  </Button>
-                  {/* <Maximize2 className="w-4 h-4 text-gray-400" /> */}
-                </div>
-
                 <CardContent className="p-5 space-y-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md
-                        ${student.status === 'IN_PROGRESS'
-                        ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                        : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
-                      {student.studentName.substring(0, 2).toUpperCase()}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md shrink-0
+                            ${student.status === 'IN_PROGRESS'
+                          ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                          : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
+                        {student.studentName.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
+                        <p className="text-xs text-gray-500 font-mono">Roll: {student.roll}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
-                      <p className="text-xs text-gray-500 font-mono">Roll: {student.roll}</p>
-                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="h-8 w-8 rounded-full shadow-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shrink-0"
+                      title="Open Review Session"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const questions = liveStats?.defaultQuestions || [];
+                        if (!questions.length) return toast.error("No questions found");
+
+                        const sessionData = questions.map((q: any) => {
+                          const ans = student.answers ? student.answers[q.id] : null;
+                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                          let userIdx = null;
+
+                          if (ans !== undefined && ans !== null) {
+                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                            const isCorrect = correctOpt && (
+                              (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
+                              (ans === correctOpt.text)
+                            );
+                            status = isCorrect ? 'correct' : 'wrong';
+                            if (q.type === 'MCQ' && q.options) {
+                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                            }
+                          }
+                          return { ...q, status, userAnswer: userIdx };
+                        });
+
+                        localStorage.setItem("review-session-data", JSON.stringify(sessionData));
+                        toast.success("Opening Review Session...");
+                        window.open('/problem-solving/session?mode=review', '_blank');
+                      }}
+                    >
+                      <MonitorPlay className="w-4 h-4 ml-0.5" />
+                    </Button>
                   </div>
 
                   {/* Stats Grid inside Card */}
