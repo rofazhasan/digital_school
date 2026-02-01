@@ -42,3 +42,6 @@ tailwindcss-*.log
 next-env.d.ts
 
 /generated/prisma
+
+# netlify
+netlify.toml

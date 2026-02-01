@@ -160,7 +160,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { PuterFileUpload } from "@/components/ui/puter-file-upload";
+
+
+
 import { AppFooter } from "@/components/AppFooter";
 
 export default function SuperUserDashboardPage() {
@@ -959,24 +961,10 @@ export default function SuperUserDashboardPage() {
                                 <Label>Institute Logo</Label>
                                 <div className="border rounded p-2">
                                   {formData.logoUrl && <img src={formData.logoUrl} alt="Logo" className="h-10 mb-2 object-contain" />}
-                                  <PuterFileUpload
-                                    title="Upload Logo"
-                                    accept="image/*"
-                                    maxSize={2 * 1024 * 1024}
-                                    onFileUpload={(files) => {
-                                      if (files?.[0]?.url) {
-                                        setFormData({ ...formData, logoUrl: files[0].url });
-                                      } else if (files?.[0]?.name) {
-                                        // Fallback if URL is not directly returned, might need to construct it or store path
-                                        // Assuming PUTER returns a usable URL or we need to Serve it.
-                                        // For now, let's assume valid URL or fallback to path?
-                                        // Actually puter file object has `url` if public? 
-                                        // Or we use name. Let's hope for URL.
-                                        // If not, we might need a transform.
-                                        setFormData({ ...formData, logoUrl: files[0].url || '' });
-                                      }
-                                    }}
-                                  />
+                                  <div className="border border-dashed rounded p-4 text-center">
+                                    <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
+                                    <p className="text-xs text-muted-foreground">Logo upload temporarily unavailable</p>
+                                  </div>
                                 </div>
                               </div>
 
@@ -984,16 +972,10 @@ export default function SuperUserDashboardPage() {
                                 <Label>Digital Signature</Label>
                                 <div className="border rounded p-2">
                                   {formData.signatureUrl && <img src={formData.signatureUrl} alt="Signature" className="h-10 mb-2 object-contain" />}
-                                  <PuterFileUpload
-                                    title="Upload Signature"
-                                    accept="image/*"
-                                    maxSize={2 * 1024 * 1024}
-                                    onFileUpload={(files) => {
-                                      if (files?.[0]?.url) {
-                                        setFormData({ ...formData, signatureUrl: files[0].url });
-                                      }
-                                    }}
-                                  />
+                                  <div className="border border-dashed rounded p-4 text-center">
+                                    <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
+                                    <p className="text-xs text-muted-foreground">Signature upload temporarily unavailable</p>
+                                  </div>
                                 </div>
                               </div>
                             </div>

@@ -11,7 +11,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
-import { PuterFileUpload } from "@/components/ui/puter-file-upload";
+
+
+
 import {
     BookOpen,
     FileText,
@@ -955,16 +957,13 @@ export default function TeacherDashboardPage() {
                                         <CardDescription>Scan creative question answer sheets</CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <PuterFileUpload
-                                            title="Upload CQ Sheets"
-                                            description="Upload creative question answer sheets for evaluation"
-                                            storageType="cloud"
-                                            multiple={true}
-                                            accept=".pdf,.jpg,.jpeg,.png"
-                                            maxSize={50 * 1024 * 1024} // 50MB
-                                            showFileList={false}
-                                            className="border-0 p-0"
-                                        />
+                                        <div className="border border-dashed rounded-lg p-6 text-center">
+                                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                                            <p className="text-sm font-medium">Upload CQ Sheets</p>
+                                            <p className="text-xs text-muted-foreground mb-4">Upload creative question answer sheets for evaluation</p>
+                                            <Input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="max-w-xs mx-auto" />
+                                            <p className="text-xs text-muted-foreground mt-2">(File upload module under maintenance)</p>
+                                        </div>
                                         <div className="mt-4">
                                             <h4 className="font-medium mb-2">Recent Scans</h4>
                                             <div className="space-y-2">

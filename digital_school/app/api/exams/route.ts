@@ -9,12 +9,14 @@ export async function GET(request: NextRequest) {
   const id = url.searchParams.get('id');
 
   if (id) {
-    // Fetch single exam by ID with caching
+    // Fetch single exam by ID with caching (Stale-While-Revalidate)
     const cacheKey = `exam:${id}`;
-    const cached = DatabaseCache.get(cacheKey);
+    const cached = DatabaseCache.getSWR(cacheKey);
 
-    if (cached) {
-      return createApiResponse(cached);
+    if (cached && !cached.isStale) {
+      return createApiResponse(cached.data, undefined, 200, {
+        cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+      });
     }
 
     try {
@@ -88,55 +90,99 @@ export async function GET(request: NextRequest) {
         cqSubsections: exam.cqSubsections || null,
       };
 
-      // Cache the result for 2 minutes
-      DatabaseCache.set(cacheKey, examData, 120000);
+      // Cache the result for 5 minutes (TTL)
+      DatabaseCache.set(cacheKey, examData, 300000);
 
-      return createApiResponse(examData);
+      // Return fresh data (or SWR stale match if we had one but updated in bg? No, this is fresh fetch)
+      return createApiResponse(examData, undefined, 200, {
+        cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+      });
     } catch (error) {
       console.error('Failed to fetch exam:', error);
+      // If we have stale data, return it as fallback even on error
+      if (cached) {
+        return createApiResponse(cached.data, undefined, 200, {
+          cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+        });
+      }
       return createApiResponse(null, 'Failed to fetch exam', 500);
     }
   }
 
-  // Fetch all exams with caching
-  const cacheKey = 'exams:all';
-  const cached = DatabaseCache.get(cacheKey);
+  // Fetch exams with caching and pagination (SWR)
+  // url is already defined at line 8
+  const page = parseInt(url.searchParams.get('page') || '1');
+  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const skip = (page - 1) * limit;
 
-  if (cached) {
-    return createApiResponse(cached);
+  const cacheKey = `exams:all:${page}:${limit}`;
+  const cached = DatabaseCache.getSWR(cacheKey);
+
+  // If valid cache exists, return immediately (Edge will handle SWR)
+  if (cached && !cached.isStale) {
+    return createApiResponse(cached.data, undefined, 200, {
+      cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+    });
   }
 
   try {
-    const exams = await safeDatabaseOperation(
+    const [exams, total] = await safeDatabaseOperation(
       async () => {
         const db = await DatabaseClient.getInstance();
-        return await db.exam.findMany({
-          orderBy: { createdAt: 'desc' },
-          include: {
-            class: { select: { id: true, name: true } },
-            createdBy: { select: { id: true, name: true } },
-            examSets: {
-              include: {
-                questions: {
-                  select: {
-                    subject: true,
+        const [data, count] = await Promise.all([
+          db.exam.findMany({
+            orderBy: { createdAt: 'desc' },
+            skip,
+            take: limit,
+            select: {
+              id: true,
+              name: true,
+              description: true,
+              date: true,
+              startTime: true,
+              endTime: true,
+              totalMarks: true,
+              isActive: true,
+              classId: true,
+              createdAt: true,
+              type: true,
+              allowRetake: true,
+              mcqNegativeMarking: true,
+              cqTotalQuestions: true,
+              cqRequiredQuestions: true,
+              sqTotalQuestions: true,
+              sqRequiredQuestions: true,
+              cqSubsections: true,
+              class: { select: { id: true, name: true } },
+              createdBy: { select: { id: true, name: true } },
+              // Ultra-optimized: Sampling only 5 questions to determine subject
+              examSets: {
+                take: 1, // Only check one set
+                select: {
+                  questions: {
+                    take: 5, // Sample 5 questions
+                    select: {
+                      subject: true,
+                    }
                   }
                 }
               }
-            }
-          },
-        });
+            },
+          }),
+          db.exam.count()
+        ]);
+        return [data, count];
       },
-      'Fetch all exams'
+      'Fetch exams page'
     );
 
     const examsData = exams.map((exam) => {
-      // Extract subject from questions - get the most common subject
+      // Extract subject from questions - get the most common subject from sample
       let examSubject = '';
-      const allQuestions = exam.examSets.flatMap(set => set.questions);
-      if (allQuestions.length > 0) {
+      const sampleQuestions = exam.examSets.flatMap(set => set.questions);
+      if (sampleQuestions.length > 0) {
         const subjectCounts: { [key: string]: number } = {};
-        allQuestions.forEach(q => {
+        sampleQuestions.forEach(q => {
           if (q.subject) {
             subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
           }
@@ -174,12 +220,29 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // Cache the result for 1 minute
-    DatabaseCache.set(cacheKey, examsData, 60000);
+    // Cache the result for 5 minutes
+    const responseData = {
+      exams: examsData,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
 
-    return createApiResponse(examsData);
+    DatabaseCache.set(cacheKey, responseData, 300000);
+
+    return createApiResponse(responseData, undefined, 200, {
+      cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+    });
   } catch (error) {
     console.error('Failed to fetch exams:', error);
+    if (cached) {
+      return createApiResponse(cached.data, undefined, 200, {
+        cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
+      });
+    }
     return createApiResponse(null, 'Failed to fetch exams', 500);
   }
 }

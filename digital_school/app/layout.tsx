@@ -48,7 +48,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
+
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/fonts.css" />
         <Script src="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/tikzjax.js" strategy="afterInteractive" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />

@@ -85,25 +85,22 @@ class AnalyticsService {
     if (questionType) where.type = questionType;
     if (difficulty) where.difficulty = difficulty;
 
-    // Get total questions
-    const totalQuestions = await prismadb.question.count({ where });
+    // Define promises for independent queries
+    const totalQuestionsPromise = prismadb.question.count({ where });
 
-    // Get questions by type
-    const questionsByType = await prismadb.question.groupBy({
+    const questionsByTypePromise = prismadb.question.groupBy({
       by: ['type'],
       where,
       _count: { type: true }
     });
 
-    // Get questions by subject
-    const questionsBySubject = await prismadb.question.groupBy({
+    const questionsBySubjectPromise = prismadb.question.groupBy({
       by: ['subject'],
       where,
       _count: { subject: true }
     });
 
-    // Get questions by difficulty
-    const questionsByDifficulty = await prismadb.question.groupBy({
+    const questionsByDifficultyPromise = prismadb.question.groupBy({
       by: ['difficulty'],
       where,
       _count: { difficulty: true }
@@ -111,29 +108,47 @@ class AnalyticsService {
 
     // Note: Question model doesn't have a status field, so we'll skip status grouping
 
-    // Get average marks
-    const avgMarks = await prismadb.question.aggregate({
+    const avgMarksPromise = prismadb.question.aggregate({
       where,
       _avg: { marks: true }
     });
 
-    // Get total usage
-    const totalUsage = await prismadb.question.aggregate({
+    const totalUsagePromise = prismadb.question.aggregate({
       where,
       _sum: { usageCount: true }
     });
 
-    // Get AI generated count
-    const aiGeneratedCount = await prismadb.question.count({
+    const aiGeneratedCountPromise = prismadb.question.count({
       where: { ...where, isAiGenerated: true }
     });
 
-    // Note: Question model doesn't have status field, so we'll skip approval rate calculation
-    const approvalRate = 0;
-
     // Get recent activity (last 30 days)
     const thirtyDaysAgo = subDays(new Date(), 30);
-    const recentActivity = await this.getDailyActivity(where, thirtyDaysAgo, new Date());
+    const recentActivityPromise = this.getDailyActivity(where, thirtyDaysAgo, new Date());
+
+    // Execute all in parallel
+    const [
+      totalQuestions,
+      questionsByType,
+      questionsBySubject,
+      questionsByDifficulty,
+      avgMarks,
+      totalUsage,
+      aiGeneratedCount,
+      recentActivity
+    ] = await Promise.all([
+      totalQuestionsPromise,
+      questionsByTypePromise,
+      questionsBySubjectPromise,
+      questionsByDifficultyPromise,
+      avgMarksPromise,
+      totalUsagePromise,
+      aiGeneratedCountPromise,
+      recentActivityPromise
+    ]);
+
+    // Note: Question model doesn't have status field, so we'll skip approval rate calculation
+    const approvalRate = 0;
 
     return {
       totalQuestions,
@@ -162,19 +177,18 @@ class AnalyticsService {
     }
     if (instituteId) where.instituteId = instituteId;
 
-    // Get total users
-    const totalUsers = await prismadb.user.count({ where });
+    const thirtyDaysAgo = subDays(new Date(), 30);
 
-    // Get users by role
-    const usersByRole = await prismadb.user.groupBy({
+    // Define promises
+    const totalUsersPromise = prismadb.user.count({ where });
+
+    const usersByRolePromise = prismadb.user.groupBy({
       by: ['role'],
       where,
       _count: { role: true }
     });
 
-    // Get active users (logged in within last 30 days)
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const activeUsers = await prismadb.user.count({
+    const activeUsersPromise = prismadb.user.count({
       where: {
         ...where,
         lastLoginAt: {
@@ -183,8 +197,7 @@ class AnalyticsService {
       }
     });
 
-    // Get new users (created within last 30 days)
-    const newUsers = await prismadb.user.count({
+    const newUsersPromise = prismadb.user.count({
       where: {
         ...where,
         createdAt: {
@@ -193,12 +206,10 @@ class AnalyticsService {
       }
     });
 
-    // Get user activity (last 30 days)
-    const recentActivity = await this.getDailyUserActivity(where, thirtyDaysAgo, new Date());
+    const recentActivityPromise = this.getDailyUserActivity(where, thirtyDaysAgo, new Date());
 
-    // Get top contributors
     // Simplified top contributors since Question model doesn't have status field
-    const topContributors = await prismadb.user.findMany({
+    const topContributorsPromise = prismadb.user.findMany({
       where,
       select: {
         id: true,
@@ -207,6 +218,23 @@ class AnalyticsService {
       },
       take: 10
     });
+
+    // Execute parallel
+    const [
+      totalUsers,
+      usersByRole,
+      activeUsers,
+      newUsers,
+      recentActivity,
+      topContributors
+    ] = await Promise.all([
+      totalUsersPromise,
+      usersByRolePromise,
+      activeUsersPromise,
+      newUsersPromise,
+      recentActivityPromise,
+      topContributorsPromise
+    ]);
 
     const formattedContributors = topContributors.map(user => ({
       userId: user.id,
@@ -238,40 +266,52 @@ class AnalyticsService {
     }
     if (userId) where.userId = userId;
 
-    // Get total activities
-    const totalActivities = await prismadb.aIActivity.count({ where });
+    const thirtyDaysAgo = subDays(new Date(), 30);
 
-    // Get activities by type
-    const activitiesByType = await prismadb.aIActivity.groupBy({
+    // Define promises
+    const totalActivitiesPromise = prismadb.aIActivity.count({ where });
+
+    const activitiesByTypePromise = prismadb.aIActivity.groupBy({
       by: ['activityType'],
       where,
       _count: { activityType: true }
     });
 
-    // Get success rate
-    const successfulActivities = await prismadb.aIActivity.count({
+    const successfulActivitiesPromise = prismadb.aIActivity.count({
       where: { ...where, success: true }
     });
-    const successRate = totalActivities > 0 ? (successfulActivities / totalActivities) * 100 : 0;
 
-    // Get average response time
-    const avgResponseTime = await prismadb.aIActivity.aggregate({
+    const avgResponseTimePromise = prismadb.aIActivity.aggregate({
       where: { ...where, responseTime: { not: null } },
       _avg: { responseTime: true }
     });
 
-    // Get token usage
-    const tokenUsage = await prismadb.aIActivity.aggregate({
+    const tokenUsagePromise = prismadb.aIActivity.aggregate({
       where: { ...where, tokenCost: { not: null } },
       _sum: { tokenCost: true }
     });
 
-    // Estimate cost (assuming $0.002 per 1K tokens)
-    const costEstimate = (tokenUsage._sum.tokenCost || 0) * 0.002;
+    const recentActivityPromise = this.getDailyAIActivity(where, thirtyDaysAgo, new Date());
 
-    // Get recent activity (last 30 days)
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const recentActivity = await this.getDailyAIActivity(where, thirtyDaysAgo, new Date());
+    // Execute parallel
+    const [
+      totalActivities,
+      activitiesByType,
+      successfulActivities,
+      avgResponseTime,
+      tokenUsage,
+      recentActivity
+    ] = await Promise.all([
+      totalActivitiesPromise,
+      activitiesByTypePromise,
+      successfulActivitiesPromise,
+      avgResponseTimePromise,
+      tokenUsagePromise,
+      recentActivityPromise
+    ]);
+
+    const successRate = totalActivities > 0 ? (successfulActivities / totalActivities) * 100 : 0;
+    const costEstimate = (tokenUsage._sum.tokenCost || 0) * 0.002;
 
     return {
       totalActivities,
@@ -297,32 +337,44 @@ class AnalyticsService {
     }
     if (userId) where.triggeredById = userId;
 
-    // Get total exports
-    const totalExports = await prismadb.exportJob.count({ where });
+    const thirtyDaysAgo = subDays(new Date(), 30);
 
-    // Get exports by type
-    const exportsByType = await prismadb.exportJob.groupBy({
+    // Define promises
+    const totalExportsPromise = prismadb.exportJob.count({ where });
+
+    const exportsByTypePromise = prismadb.exportJob.groupBy({
       by: ['type'],
       where,
       _count: { type: true }
     });
 
-    // Get exports by status (format)
-    const exportsByStatus = await prismadb.exportJob.groupBy({
+    const exportsByStatusPromise = prismadb.exportJob.groupBy({
       by: ['status'],
       where,
       _count: { status: true }
     });
 
-    // Get average file size
-    const avgFileSize = await prismadb.exportJob.aggregate({
+    const avgFileSizePromise = prismadb.exportJob.aggregate({
       where: { ...where, fileSize: { not: null } },
       _avg: { fileSize: true }
     });
 
-    // Get recent activity (last 30 days)
-    const thirtyDaysAgo = subDays(new Date(), 30);
-    const recentActivity = await this.getDailyExportActivity(where, thirtyDaysAgo, new Date());
+    const recentActivityPromise = this.getDailyExportActivity(where, thirtyDaysAgo, new Date());
+
+    // Execute parallel
+    const [
+      totalExports,
+      exportsByType,
+      exportsByStatus,
+      avgFileSize,
+      recentActivity
+    ] = await Promise.all([
+      totalExportsPromise,
+      exportsByTypePromise,
+      exportsByStatusPromise,
+      avgFileSizePromise,
+      recentActivityPromise
+    ]);
 
     return {
       totalExports,
@@ -463,32 +515,51 @@ class AnalyticsService {
     const now = new Date();
     const thirtyDaysAgo = subDays(now, 30);
     const sevenDaysAgo = subDays(now, 7);
+    const userWhere = instituteId ? { instituteId } : {};
 
-    // Question stats (no institute filtering for questions)
-    const totalQuestions = await prismadb.question.count();
-    const questionsThisMonth = await prismadb.question.count({
+    // Define all promises
+    const totalQuestionsPromise = prismadb.question.count();
+
+    const questionsThisMonthPromise = prismadb.question.count({
       where: { createdAt: { gte: thirtyDaysAgo } }
     });
-    const questionsThisWeek = await prismadb.question.count({
+
+    const questionsThisWeekPromise = prismadb.question.count({
       where: { createdAt: { gte: sevenDaysAgo } }
     });
 
-    // User stats
-    const userWhere = instituteId ? { instituteId } : {};
-    const totalUsers = await prismadb.user.count({ where: userWhere });
-    const activeUsers = await prismadb.user.count({
+    const totalUsersPromise = prismadb.user.count({ where: userWhere });
+
+    const activeUsersPromise = prismadb.user.count({
       where: { ...userWhere, lastLoginAt: { gte: sevenDaysAgo } }
     });
 
-    // AI stats (no institute filtering for AI activities)
-    const aiActivities = await prismadb.aIActivity.count({
+    const aiActivitiesPromise = prismadb.aIActivity.count({
       where: { createdAt: { gte: thirtyDaysAgo } }
     });
 
-    // Export stats (no institute filtering for exports)
-    const exports = await prismadb.exportJob.count({
+    const exportsPromise = prismadb.exportJob.count({
       where: { createdAt: { gte: thirtyDaysAgo } }
     });
+
+    // Execute all in parallel
+    const [
+      totalQuestions,
+      questionsThisMonth,
+      questionsThisWeek,
+      totalUsers,
+      activeUsers,
+      aiActivities,
+      exports
+    ] = await Promise.all([
+      totalQuestionsPromise,
+      questionsThisMonthPromise,
+      questionsThisWeekPromise,
+      totalUsersPromise,
+      activeUsersPromise,
+      aiActivitiesPromise,
+      exportsPromise
+    ]);
 
     return {
       questions: {

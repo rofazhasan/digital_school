@@ -181,6 +181,8 @@ model Exam {
   resultReviews         ResultReview[]
   results               Result[]
 
+  @@index([createdAt]) // Optimized for Exam List sorting
+  @@index([classId])   // Optimized for Class filtering
   @@map("exams")
 }
 
@@ -227,6 +229,8 @@ model Question {
   @@index([difficulty])
   @@index([topic])
   @@index([hasMath])
+  @@index([createdAt])   // Optimized for Dashboard Date Filters
+  @@index([createdById]) // Optimized for "My Questions"
   @@map("questions")
 }
 
@@ -419,6 +423,8 @@ model AIActivity {
   userId       String
   user         User     @relation(fields: [userId], references: [id])
 
+  @@index([createdAt])
+  @@index([userId])
   @@map("ai_activities")
 }
 
@@ -526,6 +532,7 @@ model ExportJob {
   triggeredById String
   triggeredBy   User            @relation(fields: [triggeredById], references: [id])
 
+  @@index([createdAt])
   @@map("export_jobs")
 }
 
