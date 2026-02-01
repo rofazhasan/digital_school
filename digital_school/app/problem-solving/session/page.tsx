@@ -58,7 +58,7 @@ export default function ProblemSolvingSession() {
     const [examName, setExamName] = useState<string>("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [elapsedTime, setElapsedTime] = useState(0);
+
 
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -76,13 +76,7 @@ export default function ProblemSolvingSession() {
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
-    // Timer
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setElapsedTime(prev => prev + 1);
-        }, 1000);
-        return () => clearInterval(timer);
-    }, []);
+
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);

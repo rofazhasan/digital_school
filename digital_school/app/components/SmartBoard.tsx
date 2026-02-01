@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useImperativeHandle, forwardRef, useCallback, memo } from 'react';
 
 // --- Types ---
 export type ToolType = 'pen' | 'highlighter' | 'eraser' | 'semigloss' | 'laser' | 'select' | 'move' | 'line' | 'rect' | 'circle' | 'triangle' | 'right_triangle' | 'axis' | 'cube' | 'diamond';
@@ -763,4 +763,4 @@ export function exportPathsToImage(paths: Stroke[], padding = 20, invertColors =
     return canvas.toDataURL('image/png');
 }
 
-export default SmartBoard;
+export default memo(SmartBoard);

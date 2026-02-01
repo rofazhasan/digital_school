@@ -18,7 +18,7 @@ import { useReactToPrint } from "react-to-print";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Dynamic Imports to avoid Hydration Mismatch
-import { SmartBoardRef } from "@/app/components/SmartBoard";
+import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
 
@@ -56,7 +56,7 @@ export default function ProblemSolvingSession() {
     const [examName, setExamName] = useState("");
     const [currentIndex, setCurrentIndex] = useState(0);
     const [loading, setLoading] = useState(true);
-    const [elapsedTime, setElapsedTime] = useState(0);
+
     const [showOverlay, setShowOverlay] = useState(true);
     const [annotationMode, setAnnotationMode] = useState(false); // Controls z-index of board vs overlay
 
@@ -86,21 +86,7 @@ export default function ProblemSolvingSession() {
 
     // Timer (No Timer in Review)
     // Live Clock Component (Client Only)
-    function LiveClock() {
-        const [time, setTime] = useState<Date | null>(null);
-        const [isMounted, setIsMounted] = useState(false);
 
-        useEffect(() => {
-            setIsMounted(true);
-            setTime(new Date());
-            const timer = setInterval(() => setTime(new Date()), 1000);
-            return () => clearInterval(timer);
-        }, []);
-
-        if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
-
-        return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
-    }
     // useEffect(() => {
     //     const timer = setInterval(() => {
     //         setElapsedTime(prev => prev + 1);
@@ -699,3 +685,21 @@ export default function ProblemSolvingSession() {
         </MathJaxContext >
     );
 }
+
+// Live Clock Component (Client Only)
+function LiveClock() {
+    const [time, setTime] = useState<Date | null>(null);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+        setTime(new Date());
+        const timer = setInterval(() => setTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    if (!isMounted || !time) return <span className="opacity-0">00:00:00</span>;
+
+    return <span>{time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>;
+}
+
