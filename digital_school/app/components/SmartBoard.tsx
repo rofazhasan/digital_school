@@ -624,10 +624,11 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
             ref={containerRef}
             className={`relative w-full h-full overflow-hidden touch-none ${className}`}
             style={{
-                backgroundColor: backgroundColor === 'black' ? '#0f172a' : '#ffffff',
+                backgroundColor: backgroundColor === 'transparent' ? 'transparent' : (backgroundColor === 'black' ? '#0f172a' : '#ffffff'),
                 backgroundImage: backgroundColor === 'grid' ? 'radial-gradient(#cbd5e1 1px, transparent 1px)' : undefined,
                 backgroundSize: backgroundColor === 'grid' ? '20px 20px' : undefined
             }}
+
         >
             <canvas
                 ref={canvasRef}
@@ -642,7 +643,7 @@ const SmartBoard = forwardRef<SmartBoardRef, SmartBoardProps>(({
                 className={`block`}
                 style={{ cursor: getCursor() }}
             />
-        </div>
+        </div >
     );
 });
 
