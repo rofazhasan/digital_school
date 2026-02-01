@@ -89,12 +89,12 @@ const TikZBlock = ({ code }: { code: string }) => {
                     // Check if script tag exists in DOM
                     const existingScript = document.querySelector('script[src*="tikzjax.js"]');
                     if (!existingScript) {
-                        console.warn("TikZJax script missing from DOM, injecting fallback...");
+                        console.warn("TikZJax script missing from DOM, injecting fallback from jsDelivr...");
 
                         // Inject CSS
                         if (!document.querySelector('link[href*="fonts.css"]')) {
                             const link = document.createElement("link");
-                            link.href = "https://tikzjax.com/v1/fonts.css";
+                            link.href = "https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/fonts.css";
                             link.type = "text/css";
                             link.rel = "stylesheet";
                             document.head.appendChild(link);
@@ -102,7 +102,7 @@ const TikZBlock = ({ code }: { code: string }) => {
 
                         // Inject JS
                         const libScript = document.createElement('script');
-                        libScript.src = "https://tikzjax.com/v1/tikzjax.js";
+                        libScript.src = "https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/tikzjax.js";
                         libScript.async = true;
                         document.head.appendChild(libScript);
                     }

@@ -13,6 +13,7 @@ import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
+import { SmartBoardToolbar } from "@/app/components/SmartBoardToolbar";
 
 
 // Types
@@ -52,17 +53,9 @@ export default function ProblemSolvingSession() {
     const [elapsedTime, setElapsedTime] = useState(0);
     const [showOverlay, setShowOverlay] = useState(true);
     const [annotationMode, setAnnotationMode] = useState(false);
-    const [boardTool, setBoardTool] = useState<ToolType>('pen');
-    const [boardColor, setBoardColor] = useState('#000000');
-    const [showShapesMenu, setShowShapesMenu] = useState(false);
-
     // Board State
-    const [boardSize, setBoardSize] = useState(2);
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showToolSize, setShowToolSize] = useState(false);
-    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
-    const lastToolClickTime = useRef<{ [key: string]: number }>({});
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
     // Persistence
@@ -211,43 +204,9 @@ export default function ProblemSolvingSession() {
         }
     };
 
-    const toggleTool = (t: ToolType) => {
-        const now = Date.now();
-        const lastClick = lastToolClickTime.current[t] || 0;
-
-        if (t === boardTool && (now - lastClick) < 300) {
-            // Double tap on same tool
-            if (['pen', 'eraser', 'highlighter'].includes(t)) {
-                setShowToolSize(prev => !prev);
-            }
-        } else {
-            // Single tap or switch
-            setBoardTool(t);
-            boardRef.current?.setTool(t);
-            if (t !== boardTool) setShowToolSize(false);
-        }
-        lastToolClickTime.current[t] = now;
-    };
-
-    const updateSize = (val: number) => {
-        setBoardSize(val);
-        boardRef.current?.setLineWidth(val);
-    };
-
-    const toggleBackground = () => {
+    const handleToggleBackground = () => {
         const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
         setBoardBackground(next);
-        if (next === 'black') {
-            setBoardColor('#ffffff');
-            boardRef.current?.setColor('#ffffff');
-            setBoardTool('pen');
-            boardRef.current?.setTool('pen');
-        } else {
-            setBoardColor('#000000');
-            boardRef.current?.setColor('#000000');
-            setBoardTool('pen');
-            boardRef.current?.setTool('pen');
-        }
     };
 
     const handleExportPDF = async () => {
@@ -721,126 +680,24 @@ export default function ProblemSolvingSession() {
                 </AnimatePresence>
 
                 {/* 4. FLOATING TOOLBAR */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 no-print">
+                <SmartBoardToolbar
+                    boardRef={boardRef}
+                    currentIndex={currentIndex}
+                    totalQuestions={questions.length}
+                    onPrev={handlePrev}
+                    onNext={handleNext}
+                    onExport={generateSessionReport}
+                    bgMode={boardBackground}
+                    onNavigateBg={handleToggleBackground}
+                />
 
-                    {/* Size Slider Popover (Now handled by double-tap state below) */}
 
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()}><Redo className="w-4 h-4" /></Button>
-                        <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomOut()}><ZoomOut className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.resetView()}><Layout className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomIn()}><ZoomIn className="w-4 h-4" /></Button>
-                    </div>
-
-                    <div className={`transition-all duration-300 ${isToolbarCollapsed ? 'w-12 h-12 rounded-full p-0' : 'w-auto h-auto p-2 rounded-full'} flex items-center justify-center bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 overflow-hidden`}>
-
-                        {isToolbarCollapsed ? (
-                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(false)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
-                                <Maximize2 className="w-5 h-5" />
-                            </Button>
-                        ) : (
-                            <div className="flex items-center gap-1">
-                                {/* Minimize */}
-                                <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 mr-2 -ml-1">
-                                    <Minimize2 className="w-4 h-4" />
-                                </Button>
-
-                                <Button variant="ghost" size="icon" onClick={handlePrev} disabled={currentIndex === 0} className="rounded-full hover:bg-gray-100">
-                                    <ChevronLeft className="w-5 h-5" />
-                                </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <div className="flex items-center gap-1">
-                                    <ToolBtn active={boardTool === 'move'} onClick={() => toggleTool('move')} icon={<Move className="w-5 h-5" />} tooltip="Pan" />
-                                    <ToolBtn active={boardTool === 'pen'} onClick={() => toggleTool('pen')} icon={<PenTool className="w-5 h-5" />} tooltip="Pen" />
-                                    <ToolBtn active={boardTool === 'highlighter'} onClick={() => toggleTool('highlighter')} icon={<Highlighter className="w-5 h-5" />} tooltip="Highlighter" />
-                                    <ToolBtn active={boardTool === 'eraser'} onClick={() => toggleTool('eraser')} icon={<Eraser className="w-5 h-5" />} tooltip="Eraser" />
-                                    <ToolBtn active={boardTool === 'laser'} onClick={() => toggleTool('laser')} icon={<MousePointer2 className="w-5 h-5 text-red-500" />} tooltip="Laser Pointer" />
-                                </div>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <div className="flex items-center gap-2 px-2">
-                                    {['#000000', '#FF0000', '#0000FF', '#008000', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'].map(c => (
-                                        <button
-                                            key={c}
-                                            onClick={() => {
-                                                setBoardColor(c);
-                                                boardRef.current?.setColor(c);
-                                                if (boardTool === 'eraser') {
-                                                    setBoardTool('pen');
-                                                    boardRef.current?.setTool('pen');
-                                                }
-                                            }}
-                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
-                                            style={{ backgroundColor: c }}
-                                            title={c}
-                                        />
-                                    ))}
-                                </div>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <Button variant="ghost" size="icon" onClick={toggleBackground} className="rounded-full hover:bg-gray-100">
-                                    {boardBackground === 'white' && <Sun className="w-5 h-5 text-yellow-500" />}
-                                    {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
-                                    {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
-                                    <ChevronRight className="w-5 h-5" />
-                                </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                {/* Export Button (Removed from bottom bar as it's now in top bar) */}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tool Size Slider (Conditional) */}
-                    <AnimatePresence>
-                        {showToolSize && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                                className="absolute bottom-24 bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl p-4 w-64 z-50 flex items-center gap-3"
-                            >
-                                <div className={`w-8 h-8 rounded-full border flex items-center justify-center bg-white shadow-sm font-bold text-xs`} style={{ borderColor: boardColor }}>
-                                    {boardSize}
-                                </div>
-                                <Slider
-                                    value={[boardSize]}
-                                    min={1}
-                                    max={20}
-                                    step={1}
-                                    onValueChange={([val]) => updateSize(val)}
-                                    className="flex-1"
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Hidden Container for PDF Generation */}
-                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
-                </div>
-
+                {/* Hidden Container for PDF Generation */}
+                <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
             </div>
+
         </MathJaxContext>
     );
 }
 
-const ToolBtn = ({ active, onClick, icon, tooltip }: { active: boolean, onClick: () => void, icon: React.ReactNode, tooltip: string }) => (
-    <Button
-        variant={active ? "default" : "ghost"}
-        size="icon"
-        onClick={onClick}
-        className={`rounded-full transition-all ${active ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md scale-110' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
-        title={tooltip}
-    >
-        {icon}
-    </Button>
-);
+

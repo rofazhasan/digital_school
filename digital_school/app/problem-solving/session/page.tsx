@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import SmartBoard, { SmartBoardRef, ToolType, Stroke, getPathBoundingBox, exportPathsToImage } from "@/app/components/SmartBoard";
+import { SmartBoardToolbar } from "@/app/components/SmartBoardToolbar";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
@@ -54,17 +55,9 @@ export default function ProblemSolvingSession() {
     const [loading, setLoading] = useState(true);
     const [elapsedTime, setElapsedTime] = useState(0);
 
-    // Board State
-    const [boardTool, setBoardTool] = useState<ToolType>('pen');
-    const [boardColor, setBoardColor] = useState('#000000');
-    const [boardSize, setBoardSize] = useState(2);
     const [boardBackground, setBoardBackground] = useState<'white' | 'black' | 'grid'>('white');
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [annotationMode, setAnnotationMode] = useState(false);
-    const [showToolSize, setShowToolSize] = useState(false);
-    const [isToolbarCollapsed, setIsToolbarCollapsed] = useState(false);
-    const [showShapesMenu, setShowShapesMenu] = useState(false); // New state for shapes menu
-    const lastToolClickTime = useRef<{ [key: string]: number }>({});
     const hiddenPDFContainerRef = useRef<HTMLDivElement>(null);
 
     // Persistence
@@ -247,24 +240,20 @@ export default function ProblemSolvingSession() {
         }
     };
 
-    const toggleTool = (t: ToolType) => {
-        const now = Date.now();
-        const lastClick = lastToolClickTime.current[t] || 0;
-
-        if (t === boardTool && (now - lastClick) < 300) {
-            // Double tap on same tool
-            if (['pen', 'eraser', 'highlighter'].includes(t)) {
-                setShowToolSize(prev => !prev);
-            }
-        } else {
-            // Single tap or switch
-            setBoardTool(t);
-            boardRef.current?.setTool(t);
-            if (t !== boardTool) setShowToolSize(false);
-        }
-        lastToolClickTime.current[t] = now;
+    const handleToggleBackground = () => {
+        const next = boardBackground === 'white' ? 'grid' : boardBackground === 'grid' ? 'black' : 'white';
+        setBoardBackground(next);
+        // We rely on Toolbar to react to this prop change for color contrast
     };
 
+
+    // updateSize removed - handled by Toolbar
+    // toggleBackground removed - handled by Toolbar locally or via ref
+
+
+
+    // Workaround: I will fix Toolbar in next step. For now, let's keep this file valid.
+    /*
     const updateSize = (val: number) => {
         setBoardSize(val);
         boardRef.current?.setLineWidth(val);
@@ -285,6 +274,7 @@ export default function ProblemSolvingSession() {
             boardRef.current?.setTool('pen');
         }
     };
+    */
 
     const handleExportPDF = async () => {
         const input = document.getElementById('session-workspace');
@@ -589,6 +579,12 @@ export default function ProblemSolvingSession() {
                 </div>
 
                 {/* 2. MAIN CANVAS */}
+                {/* We rely on checking background via REF or just use default. 
+                    Wait, if I don't pass backgroundColor prop, it won't update.
+                    I need to Fix Toolbar to accept props for BG. 
+                    For this step, I will replace the logic to use a ref-based approach or just re-add the state line I deleted? 
+                    I deleted line 58-68. I will restore `boardBackground` next.
+                */}
                 <div className={`absolute inset-0 transition-none ${annotationMode ? 'z-30 pointer-events-auto' : 'z-0'}`}>
                     <SmartBoard
                         ref={boardRef}
@@ -740,167 +736,26 @@ export default function ProblemSolvingSession() {
                 </AnimatePresence>
 
                 {/* 4. FLOATING TOOLBAR */}
-                <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-4 no-print">
+                <SmartBoardToolbar
+                    boardRef={boardRef}
+                    currentIndex={currentIndex}
+                    totalQuestions={questions.length}
+                    onPrev={handlePrev}
+                    onNext={handleNext}
+                    onExport={generateSessionReport}
+                    bgMode={boardBackground}
+                    onNavigateBg={handleToggleBackground}
+                />
 
-                    {/* Size Slider Popover (Now handled by double-tap state below) */}
-
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full shadow-sm border border-gray-100 scale-90 opacity-0 hover:opacity-100 transition-opacity duration-300">
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.undo()}><Undo className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.redo()}><Redo className="w-4 h-4" /></Button>
-                        <div className="w-px h-4 bg-gray-200 mx-1"></div>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomOut()}><ZoomOut className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.resetView()}><Layout className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="icon" onClick={() => boardRef.current?.zoomIn()}><ZoomIn className="w-4 h-4" /></Button>
-                    </div>
-
-                    <div className={`transition-all duration-300 ${isToolbarCollapsed ? 'w-12 h-12 rounded-full p-0' : 'w-auto h-auto p-2 rounded-full'} flex items-center justify-center bg-white/95 backdrop-blur-xl shadow-2xl shadow-indigo-900/20 border border-white/50 overflow-hidden`}>
-
-                        {isToolbarCollapsed ? (
-                            <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-full h-full rounded-full hover:bg-indigo-50 text-indigo-600">
-                                <Maximize2 className="w-5 h-5" />
-                            </Button>
-                        ) : (
-                            <div className="flex items-center gap-1">
-                                {/* Minimize */}
-                                <Button variant="ghost" size="icon" onClick={() => setIsToolbarCollapsed(true)} className="w-8 h-8 rounded-full hover:bg-gray-100 text-gray-400 mr-2 -ml-1">
-                                    <Minimize2 className="w-4 h-4" />
-                                </Button>
-
-                                <Button variant="ghost" size="icon" onClick={handlePrev} disabled={currentIndex === 0} className="rounded-full hover:bg-gray-100">
-                                    <ChevronLeft className="w-5 h-5" />
-                                </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <div className="flex items-center gap-1">
-                                    <ToolBtn active={boardTool === 'move'} onClick={() => toggleTool('move')} icon={<Move className="w-5 h-5" />} tooltip="Pan" />
-                                    <ToolBtn active={boardTool === 'pen'} onClick={() => toggleTool('pen')} icon={<PenTool className="w-5 h-5" />} tooltip="Pen" />
-                                    <ToolBtn active={boardTool === 'highlighter'} onClick={() => toggleTool('highlighter')} icon={<Highlighter className="w-5 h-5" />} tooltip="Highlighter" />
-                                    <ToolBtn active={boardTool === 'eraser'} onClick={() => toggleTool('eraser')} icon={<Eraser className="w-5 h-5" />} tooltip="Eraser" />
-                                    <ToolBtn active={boardTool === 'laser'} onClick={() => toggleTool('laser')} icon={<MousePointer2 className="w-5 h-5 text-red-500" />} tooltip="Laser Pointer" />
-                                </div>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                {/* Colors */}
-                                <div className="flex gap-2 flex-wrap max-w-[200px]">
-                                    {['#000000', '#FF0000', '#0000FF', '#008000', '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF'].map(c => (
-                                        <button
-                                            key={c}
-                                            onClick={() => {
-                                                setBoardColor(c);
-                                                boardRef.current?.setColor(c);
-                                                if (boardTool === 'eraser') {
-                                                    setBoardTool('pen');
-                                                    boardRef.current?.setTool('pen');
-                                                }
-                                            }}
-                                            className={`w-6 h-6 rounded-full border-2 transition-all ${boardColor === c ? 'border-indigo-600 scale-125 ring-2 ring-indigo-200' : 'border-gray-200 hover:scale-110'}`}
-                                            style={{ backgroundColor: c }}
-                                            title={c}
-                                        />
-                                    ))}
-                                </div>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <Button variant="ghost" size="icon" onClick={toggleBackground} className="rounded-full hover:bg-gray-100">
-                                    {boardBackground === 'white' && <Sun className="w-5 h-5 text-yellow-500" />}
-                                    {boardBackground === 'black' && <Moon className="w-5 h-5 text-indigo-400" />}
-                                    {boardBackground === 'grid' && <Grid3X3 className="w-5 h-5 text-gray-400" />}
-                                </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                <Button variant="ghost" size="icon" onClick={handleNext} disabled={currentIndex === questions.length - 1} className="rounded-full hover:bg-gray-100">
-                                    <ChevronRight className="w-5 h-5" />
-                                </Button>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                {/* Shape Tools */}
-                                <div className="relative">
-                                    <ToolBtn
-                                        active={['line', 'rect', 'circle', 'triangle', 'cube', 'axis'].includes(boardTool)}
-                                        onClick={() => setShowShapesMenu(!showShapesMenu)}
-                                        icon={<Box className="w-5 h-5 text-indigo-500" />}
-                                        tooltip="Shapes & Ruler"
-                                    />
-                                    {showShapesMenu && (
-                                        <div className="absolute bottom-full left-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-100 p-2 flex flex-col gap-2 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200">
-                                            <div className="flex gap-2">
-                                                <ToolBtn active={boardTool === 'line'} onClick={() => { setBoardTool('line'); boardRef.current?.setTool('line'); setShowShapesMenu(false); }} icon={<Ruler className="w-4 h-4" />} tooltip="Ruler (Line)" />
-                                                <ToolBtn active={boardTool === 'rect'} onClick={() => { setBoardTool('rect'); boardRef.current?.setTool('rect'); setShowShapesMenu(false); }} icon={<Square className="w-4 h-4" />} tooltip="Rectangle" />
-                                                <ToolBtn active={boardTool === 'circle'} onClick={() => { setBoardTool('circle'); boardRef.current?.setTool('circle'); setShowShapesMenu(false); }} icon={<Circle className="w-4 h-4" />} tooltip="Circle" />
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <ToolBtn active={boardTool === 'triangle'} onClick={() => { setBoardTool('triangle'); boardRef.current?.setTool('triangle'); setShowShapesMenu(false); }} icon={<Triangle className="w-4 h-4" />} tooltip="Triangle" />
-                                                <ToolBtn active={boardTool === 'cube'} onClick={() => { setBoardTool('cube'); boardRef.current?.setTool('cube'); setShowShapesMenu(false); }} icon={<Box className="w-4 h-4" />} tooltip="Cube (3D)" />
-                                                <ToolBtn active={boardTool === 'axis'} onClick={() => { setBoardTool('axis'); boardRef.current?.setTool('axis'); setShowShapesMenu(false); }} icon={<BarChart2 className="w-4 h-4" />} tooltip="XY Axis" />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="w-px h-8 bg-gray-200 mx-2"></div>
-
-                                {/* Report Button */}
-                                <Button
-                                    className="rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200 px-4"
-                                    onClick={generateSessionReport}
-                                    size="sm"
-                                >
-                                    <FileDown className="w-4 h-4 mr-2" />
-                                    Export
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Tool Size Slider (Conditional) */}
-                    <AnimatePresence>
-                        {showToolSize && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10, scale: 0.9 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 10, scale: 0.9 }}
-                                className="absolute bottom-24 bg-white/90 backdrop-blur-md border border-gray-200 shadow-xl rounded-2xl p-4 w-64 z-50 flex items-center gap-3"
-                            >
-                                <div className={`w-8 h-8 rounded-full border flex items-center justify-center bg-white shadow-sm font-bold text-xs`} style={{ borderColor: boardColor }}>
-                                    {boardSize}
-                                </div>
-                                <Slider
-                                    value={[boardSize]}
-                                    min={1}
-                                    max={20}
-                                    step={1}
-                                    onValueChange={([val]) => updateSize(val)}
-                                    className="flex-1"
-                                />
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Hidden Container for PDF Generation */}
-                    <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
-                </div>
-
+                {/* Hidden Container for PDF Generation */}
+                <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
             </div>
+
         </MathJaxContext>
     );
 }
 
-const ToolBtn = ({ active, onClick, icon, tooltip }: { active: boolean, onClick: () => void, icon: React.ReactNode, tooltip: string }) => (
-    <Button
-        variant={active ? "default" : "ghost"}
-        size="icon"
-        onClick={onClick}
-        className={`rounded-full transition-all ${active ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-md scale-110' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900'}`}
-        title={tooltip}
-    >
-        {icon}
-    </Button>
-);
+
 
 // Live Clock Component (Client Only)
 function LiveClock() {

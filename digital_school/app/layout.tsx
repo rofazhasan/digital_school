@@ -49,8 +49,8 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
-        <link rel="stylesheet" href="https://tikzjax.com/v1/fonts.css" />
-        <Script src="https://tikzjax.com/v1/tikzjax.js" strategy="afterInteractive" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/fonts.css" />
+        <Script src="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/tikzjax.js" strategy="afterInteractive" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
       <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable}`}>
