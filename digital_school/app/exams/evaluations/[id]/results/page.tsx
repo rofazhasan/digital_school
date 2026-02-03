@@ -155,7 +155,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-6">
             <div className="mb-6">
                 <Button variant="ghost" onClick={() => window.history.back()} className="mb-4 pl-0 hover:bg-transparent">
                     <ArrowLeft className="h-4 w-4 mr-2" />

@@ -243,7 +243,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         id: q.id,
         questionText: q.questionText,
         marks: q.marks,
-        modelAnswer: q.modelAnswer || q.answer
+        modelAnswer: q.modelAnswer
       }))
     };
 
@@ -679,7 +679,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           />
         </div>
 
-        <div className="relative z-10 container mx-auto p-6">
+        <div className="relative z-10 w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-6">
           {/* Notification Banner */}
           {false && reviewNotifications.length > 0 && (
             <motion.div

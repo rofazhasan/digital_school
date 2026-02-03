@@ -244,7 +244,7 @@ export default function EvaluationsPage() {
 
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-6">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Exam Evaluations</h1>

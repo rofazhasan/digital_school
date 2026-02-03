@@ -295,7 +295,7 @@ export default function ExamLayout() {
       ${isExamActive && (!isFullscreen || !isTabActive) ? 'select-none' : ''}
     `}>  {/* Sticky Header */}
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
             {/* Mobile Drawer */}
             <Sheet>
@@ -361,7 +361,7 @@ export default function ExamLayout() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
 
         {/* Left Col: Navigator (Desktop) */}
         <aside className="hidden lg:block lg:col-span-3">
