@@ -940,51 +940,53 @@ export default function ExamsPage() {
                               </div>
                             </div>
 
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => {
-                                  e.stopPropagation();
-                                  console.log("Redirecting with role:", userRole);
-                                  const role = userRole?.toUpperCase();
-                                  if (role === "SUPER_USER" || role === "ADMIN" || role === "TEACHER") {
-                                    router.push(`/exams/evaluations/${exam.id}/results`);
-                                  } else {
-                                    router.push(`/exams/results/${exam.id}`);
-                                  }
-                                }}>
-                                  <BarChart3 className="w-4 h-4 mr-2" />
-                                  View Results
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(exam.id); }}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit Exam
-                                </DropdownMenuItem>
-                                {userRole === "SUPER_USER" && !exam.isActive && (
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleApprove(exam.id); }}>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Approve Exam
+                            <div className="shrink-0">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}>
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View Details
                                   </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
-                                  className="text-red-600 focus:text-red-600"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete Exam
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                                  <DropdownMenuItem onClick={(e) => {
+                                    e.stopPropagation();
+                                    console.log("Redirecting with role:", userRole);
+                                    const role = userRole?.toUpperCase();
+                                    if (role === "SUPER_USER" || role === "ADMIN" || role === "TEACHER") {
+                                      router.push(`/exams/evaluations/${exam.id}/results`);
+                                    } else {
+                                      router.push(`/exams/results/${exam.id}`);
+                                    }
+                                  }}>
+                                    <BarChart3 className="w-4 h-4 mr-2" />
+                                    View Results
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(exam.id); }}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit Exam
+                                  </DropdownMenuItem>
+                                  {userRole === "SUPER_USER" && !exam.isActive && (
+                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleApprove(exam.id); }}>
+                                      <CheckCircle className="w-4 h-4 mr-2" />
+                                      Approve Exam
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
+                                    className="text-red-600 focus:text-red-600"
+                                  >
+                                    <Trash2 className="w-4 h-4 mr-2" />
+                                    Delete Exam
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </div>
 
                           <div className="flex flex-wrap gap-2 mt-3">
