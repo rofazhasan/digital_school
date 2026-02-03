@@ -234,6 +234,10 @@ export default function QuestionBankPage() {
   const [topicFilter, setTopicFilter] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12; // 3x4 grid fits nicely
+
   useEffect(() => {
     fetch('/api/classes')
       .then(res => res.json())
@@ -382,6 +386,17 @@ export default function QuestionBankPage() {
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, topicFilter, dateRange]);
 
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, classFilter, subjectFilter, difficultyFilter, topicFilter, dateRange]);
+
+  const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
+  const paginatedQuestions = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredQuestions.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredQuestions, currentPage]);
+
   const resetFilters = () => {
     setSearchTerm("");
     setClassFilter("all");
@@ -389,6 +404,7 @@ export default function QuestionBankPage() {
     setDifficultyFilter("all");
     setTopicFilter("");
     setDateRange(undefined);
+    setCurrentPage(1);
   };
 
   const mathJaxConfig = {
@@ -545,18 +561,50 @@ export default function QuestionBankPage() {
 
                   {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
                     : filteredQuestions.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                        {filteredQuestions.map(q => (
-                          <QuestionCard
-                            key={q.id}
-                            question={q}
-                            onEdit={handleEdit}
-                            onDelete={handleDelete}
-                            isSelected={selectedQuestions.has(q.id)}
-                            onSelect={() => toggleSelection(q.id)}
-                          />
-                        ))}
-                      </div>
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {paginatedQuestions.map(q => (
+                            <QuestionCard
+                              key={q.id}
+                              question={q}
+                              onEdit={handleEdit}
+                              onDelete={handleDelete}
+                              isSelected={selectedQuestions.has(q.id)}
+                              onSelect={() => toggleSelection(q.id)}
+                            />
+                          ))}
+                        </div>
+
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between mt-8 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+                            <span className="text-sm text-gray-500">
+                              Showing {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredQuestions.length)} of {filteredQuestions.length} questions
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={currentPage === 1}
+                              >
+                                Previous
+                              </Button>
+                              <span className="text-sm font-medium px-2">
+                                Page {currentPage} of {totalPages}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={currentPage === totalPages}
+                              >
+                                Next
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <div className="text-center py-16 text-gray-500">
                         <p className="font-semibold">No questions found</p>

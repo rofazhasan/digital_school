@@ -23,8 +23,13 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import HeroCanvas from "@/components/ui/hero-canvas";
+import dynamic from 'next/dynamic';
 import { cn } from "@/lib/utils";
+
+const HeroCanvas = dynamic(() => import('@/components/ui/hero-canvas'), {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-background/50 z-0" />
+});
 
 // --- Animation Variants ---
 const containerVariants = (stagger = 0.1) => ({

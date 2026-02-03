@@ -20,8 +20,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// Removed top-level imports for optimization
+// import html2canvas from 'html2canvas';
+// import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Types
@@ -282,6 +283,10 @@ export default function ProblemSolvingSession() {
         if (input) {
             const toastId = toast.loading("Generating PDF...");
             try {
+                // Dynamic import
+                const html2canvas = (await import('html2canvas')).default;
+                const { jsPDF } = await import('jspdf');
+
                 const canvas = await html2canvas(input, {
                     scale: 2,
                     useCORS: true,
@@ -310,6 +315,9 @@ export default function ProblemSolvingSession() {
         const toastId = toast.loading('Generating PDF Report... (This may take a moment)');
 
         try {
+            const { jsPDF } = await import('jspdf');
+            const html2canvas = (await import('html2canvas')).default;
+
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pageWidth = pdf.internal.pageSize.getWidth();
             const pageHeight = pdf.internal.pageSize.getHeight();

@@ -28,6 +28,7 @@ import {
     Camera,
     CheckCircle,
     Clock,
+    Menu,
     AlertCircle,
     Star,
     Brain,
@@ -58,6 +59,9 @@ import {
     Wifi,
     WifiOff
 } from "lucide-react";
+
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { TeacherSidebar } from "@/components/dashboard/TeacherSidebar";
 import { AppFooter } from '@/components/AppFooter';
 
 interface User {
@@ -356,6 +360,21 @@ export default function TeacherDashboardPage() {
             <div className="border-b bg-white">
                 <div className="flex justify-between items-center px-6 py-4">
                     <div className="flex items-center gap-4">
+                        <div className="md:hidden">
+                            <Sheet>
+                                <SheetTrigger asChild>
+                                    <Button variant="ghost" size="icon">
+                                        <Menu className="h-6 w-6" />
+                                    </Button>
+                                </SheetTrigger>
+                                <SheetContent side="left" className="p-0 w-72">
+                                    <TeacherSidebar
+                                        activeTab={activeTab}
+                                        setActiveTab={setActiveTab}
+                                    />
+                                </SheetContent>
+                            </Sheet>
+                        </div>
                         <div>
                             <div className="flex items-center gap-2">
                                 <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
@@ -389,97 +408,8 @@ export default function TeacherDashboardPage() {
 
             <div className="flex">
                 {/* Sidebar */}
-                <div className="w-64 bg-white border-r min-h-screen p-4">
-                    <nav className="space-y-2">
-                        <Button
-                            variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('dashboard')}
-                        >
-                            <BarChart3 className="h-4 w-4 mr-2" />
-                            Dashboard
-                        </Button>
-                        <Button
-                            variant={activeTab === 'create-questions' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => router.push('/create-question')}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Questions
-                        </Button>
-                        <Button
-                            variant={activeTab === 'question-bank' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => router.push('/question-bank')}
-                        >
-                            <BookOpen className="h-4 w-4 mr-2" />
-                            Question Bank
-                        </Button>
-                        <Button
-                            variant={activeTab === 'ai-generator' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => router.push('/teacher/ai-generator')}
-                        >
-                            <Brain className="h-4 w-4 mr-2" />
-                            AI Generator
-                        </Button>
-                        <Button
-                            variant={activeTab === 'create-exams' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('create-exams')}
-                        >
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Exams
-                        </Button>
-                        <Button
-                            variant={activeTab === 'evaluate-cq' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('evaluate-cq')}
-                        >
-                            <FileCheck className="h-4 w-4 mr-2" />
-                            Evaluate CQ
-                        </Button>
-                        <Button
-                            variant={activeTab === 'scan-sheets' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('scan-sheets')}
-                        >
-                            <Scan className="h-4 w-4 mr-2" />
-                            Scan OMR & CQ
-                        </Button>
-                        <Button
-                            variant={activeTab === 'attendance' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('attendance')}
-                        >
-                            <CheckSquare className="h-4 w-4 mr-2" />
-                            Take Attendance
-                        </Button>
-                        <Button
-                            variant={activeTab === 'analytics' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('analytics')}
-                        >
-                            <TrendingUp className="h-4 w-4 mr-2" />
-                            Class Analytics
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            className="w-full justify-start"
-                            onClick={() => router.push('/exams/results')}
-                        >
-                            <BarChart3 className="h-4 w-4 mr-2" />
-                            Exam Results
-                        </Button>
-                        <Button
-                            variant={activeTab === 'notices' ? 'default' : 'ghost'}
-                            className="w-full justify-start"
-                            onClick={() => setActiveTab('notices')}
-                        >
-                            <Bell className="h-4 w-4 mr-2" />
-                            Post Notices
-                        </Button>
-                    </nav>
+                <div className="hidden md:block w-64 bg-white border-r min-h-screen">
+                    <TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
                 </div>
 
                 {/* Main Content */}

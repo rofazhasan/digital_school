@@ -40,20 +40,27 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+};
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className="overflow-x-hidden">
       <head>
 
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/fonts.css" />
         <Script src="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/tikzjax.js" strategy="afterInteractive" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
-      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable}`}>
+      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} overflow-x-hidden`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

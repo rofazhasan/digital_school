@@ -47,6 +47,7 @@ model User {
   teacherProfile    TeacherProfile?
   institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
 
+  @@index([role]) // Optimized for User Admin List
   @@map("users")
 }
 
@@ -231,6 +232,7 @@ model Question {
   @@index([hasMath])
   @@index([createdAt])   // Optimized for Dashboard Date Filters
   @@index([createdById]) // Optimized for "My Questions"
+  @@index([classId])     // Optimized for Class Filter
   @@map("questions")
 }
 
@@ -373,6 +375,7 @@ model Result {
   student          StudentProfile  @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
+  @@index([examId]) // Optimized for Leaderboard
   @@map("results")
 }
 
@@ -623,6 +626,7 @@ model ExamSubmission {
   @@index([status])
   @@index([score])
   @@index([submittedAt])
+  @@index([examId]) // Optimized for Evaluation List
 }
 
 model ExamSubmissionDrawing {

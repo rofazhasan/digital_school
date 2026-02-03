@@ -37,6 +37,10 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     const [examName, setExamName] = useState("");
     const [results, setResults] = useState<ExamResult[]>([]);
 
+    // Pagination State
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 20;
+
     useEffect(() => {
         fetchResults();
     }, [id]);
@@ -176,69 +180,109 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                     <CardTitle>Leaderboard</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="w-[80px]">Rank</TableHead>
-                                <TableHead>Student</TableHead>
-                                <TableHead className="text-center">MCQ</TableHead>
-                                <TableHead className="text-center">CQ</TableHead>
-                                <TableHead className="text-center">SQ</TableHead>
-                                <TableHead className="text-right">Total</TableHead>
-                                <TableHead className="text-right">Percentage</TableHead>
-                                <TableHead className="text-center">Grade</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {results.length > 0 ? (
-                                results.map((result) => (
-                                    <TableRow key={result.submissionId}>
-                                        <TableCell className="font-medium">
-                                            <div className="flex items-center justify-center w-8 h-8">
-                                                {getRankIcon(result.rank)}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div>
-                                                <div className="font-medium">{result.studentName}</div>
-                                                <div className="text-xs text-gray-500">Roll: {result.roll}</div>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell className="text-center text-gray-600">{result.mcqMarks}</TableCell>
-                                        <TableCell className="text-center text-gray-600">{result.cqMarks}</TableCell>
-                                        <TableCell className="text-center text-gray-600">{result.sqMarks}</TableCell>
-                                        <TableCell className="text-right font-bold">
-                                            {result.totalObtained} <span className="text-gray-400 text-xs font-normal">/ {result.totalMarks}</span>
-                                        </TableCell>
-                                        <TableCell className="text-right text-gray-600">{result.percentage}%</TableCell>
-                                        <TableCell className="text-center">
-                                            {result.submissionStatus === 'IN_PROGRESS' ? (
-                                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 animate-pulse">
-                                                    In Progress
-                                                </Badge>
-                                            ) : (
-                                                <Badge
-                                                    className={
-                                                        result.grade === 'F' ? 'bg-red-100 text-red-800 hover:bg-red-100' :
-                                                            result.grade === 'A+' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                                                                'bg-blue-100 text-blue-800 hover:bg-blue-100'
-                                                    }
-                                                >
-                                                    {result.grade}
-                                                </Badge>
-                                            )}
-                                        </TableCell>
-                                    </TableRow>
-                                ))
-                            ) : (
-                                <TableRow>
-                                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                                        No results available yet.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                    {/* Pagination Logic */}
+                    {(() => {
+                        const totalPages = Math.ceil(results.length / itemsPerPage);
+                        const paginatedResults = results.slice(
+                            (currentPage - 1) * itemsPerPage,
+                            currentPage * itemsPerPage
+                        );
+
+                        return (
+                            <>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead className="w-[80px]">Rank</TableHead>
+                                            <TableHead>Student</TableHead>
+                                            <TableHead className="text-center">MCQ</TableHead>
+                                            <TableHead className="text-center">CQ</TableHead>
+                                            <TableHead className="text-center">SQ</TableHead>
+                                            <TableHead className="text-right">Total</TableHead>
+                                            <TableHead className="text-right">Percentage</TableHead>
+                                            <TableHead className="text-center">Grade</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {paginatedResults.length > 0 ? (
+                                            paginatedResults.map((result) => (
+                                                <TableRow key={result.submissionId}>
+                                                    <TableCell className="font-medium">
+                                                        <div className="flex items-center justify-center w-8 h-8">
+                                                            {getRankIcon(result.rank)}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div>
+                                                            <div className="font-medium">{result.studentName}</div>
+                                                            <div className="text-xs text-gray-500">Roll: {result.roll}</div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-center text-gray-600">{result.mcqMarks}</TableCell>
+                                                    <TableCell className="text-center text-gray-600">{result.cqMarks}</TableCell>
+                                                    <TableCell className="text-center text-gray-600">{result.sqMarks}</TableCell>
+                                                    <TableCell className="text-right font-bold">
+                                                        {result.totalObtained} <span className="text-gray-400 text-xs font-normal">/ {result.totalMarks}</span>
+                                                    </TableCell>
+                                                    <TableCell className="text-right text-gray-600">{result.percentage}%</TableCell>
+                                                    <TableCell className="text-center">
+                                                        {result.submissionStatus === 'IN_PROGRESS' ? (
+                                                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 animate-pulse">
+                                                                In Progress
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge
+                                                                className={
+                                                                    result.grade === 'F' ? 'bg-red-100 text-red-800 hover:bg-red-100' :
+                                                                        result.grade === 'A+' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
+                                                                            'bg-blue-100 text-blue-800 hover:bg-blue-100'
+                                                                }
+                                                            >
+                                                                {result.grade}
+                                                            </Badge>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                                                    No results available yet.
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+
+                                {/* Pagination Controls */}
+                                {totalPages > 1 && (
+                                    <div className="flex items-center justify-between mt-6 pt-4 border-t">
+                                        <div className="text-sm text-gray-500">
+                                            Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, results.length)} of {results.length} students
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                                disabled={currentPage === 1}
+                                            >
+                                                Previous
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                                disabled={currentPage === totalPages}
+                                            >
+                                                Next
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
+                        );
+                    })()}
                 </CardContent>
             </Card>
         </div>

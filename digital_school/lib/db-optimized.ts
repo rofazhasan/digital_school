@@ -11,7 +11,7 @@ const createPrismaClient = () => {
     return new PrismaClient({
         datasources: {
             db: {
-                url: process.env.DATABASE_URL,
+                url: process.env.DATABASE_URL || 'postgresql://build:build@localhost:5432/builddb',
             },
         },
         // Minimal logging - only errors and warnings

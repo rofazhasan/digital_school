@@ -15,6 +15,15 @@ const nextConfig = withPWA({
   // Fix for navigation issues in production
   experimental: {
     scrollRestoration: true,
+    optimizePackageImports: [
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-tooltip',
+      'recharts',
+      'lucide-react',
+      'framer-motion',
+      'date-fns'
+    ],
   },
   // Ensure proper client-side navigation
   trailingSlash: false,

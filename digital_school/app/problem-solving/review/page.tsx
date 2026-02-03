@@ -20,8 +20,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf';
+// Removed top-level imports for optimization
+// import html2canvas from 'html2canvas';
+// import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 // Types
@@ -275,6 +276,10 @@ export default function ReviewToSessionPort() {
         if (input) {
             const toastId = toast.loading("Generating PDF...");
             try {
+                // Dynamic Import for optimization
+                const html2canvas = (await import('html2canvas')).default;
+                const { jsPDF } = await import('jspdf');
+
                 const canvas = await html2canvas(input, {
                     scale: 2,
                     useCORS: true,
