@@ -302,8 +302,8 @@ export default function AdminUsersPage() {
             <Button onClick={() => setShowAddUser(true)} className="shadow-lg flex items-center gap-2">
               <UserPlus className="h-4 w-4" /> Add User
             </Button>
-            <Button onClick={() => router.push("/dashboard")} className="shadow-md flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4" /> Dashboard
+            <Button onClick={() => router.push("/admin/dashboard")} variant="outline" className="shadow-md flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4" /> Back to Dashboard
             </Button>
           </div>
         </div>

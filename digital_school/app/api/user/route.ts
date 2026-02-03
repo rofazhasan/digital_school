@@ -198,71 +198,80 @@ export async function DELETE(request: NextRequest) {
 
     const adminId = authData.user.id;
 
-    // Perform deletion in a transaction to handle all dependencies
-    await prismadb.$transaction(async (tx) => {
-      // 1. Reassign Content (Preserve academic assets)
-      // Assessments
-      await tx.question.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
-      await tx.exam.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
-      await tx.exam.updateMany({ where: { assignedById: id }, data: { assignedById: null } }); // Unassign exams assigned *by* this user
-      await tx.questionBank.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
-      await tx.examSet.updateMany({ where: { createdById: id }, data: { createdById: adminId } });
+    // Phase 1: Reassign Assets (Non-transactional or independent transactions to reduce lock time)
+    // We do these in parallel where possible. Failures here are non-fatal (user just won't be deleted if these fail, or we can retry).
+    // Actually, to be safe, we should ensure these succeed. But doing them outside the main tx prevents timeout.
 
-      // Educational
-      await tx.notice.updateMany({ where: { postedById: id }, data: { postedById: adminId } });
-      await tx.attendance.updateMany({ where: { teacherId: id }, data: { teacherId: adminId } }); // Maintain attendance history
+    try {
+      // Reassign Assessments
+      await Promise.all([
+        prismadb.question.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
+        prismadb.exam.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
+        prismadb.exam.updateMany({ where: { assignedById: id }, data: { assignedById: null } }),
+        prismadb.questionBank.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
+        prismadb.examSet.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
 
-      // Profiles Relations (Nullify before profile deletion to avoid constraint errors)
-      // Note: TeacherProfile deletion usually cascades to relations if configured, but we nullify to be safe/keep data
-      // Questions linked to teacher profile
-      // We can't query by teacherProfileId easily without fetching profile first, or we assume teacherProfile gets deleted and we just need to ensure Question doesn't block it.
-      // Actually, Question.teacherProfileId is optional. If we delete TeacherProfile, we rely on SetNull or manual nullify.
-      // Let's manually nullify to be safe.
-      const teacherProfile = await tx.teacherProfile.findUnique({ where: { userId: id } });
+        // Reassign Educational
+        prismadb.notice.updateMany({ where: { postedById: id }, data: { postedById: adminId } }),
+        prismadb.attendance.updateMany({ where: { teacherId: id }, data: { teacherId: adminId } }),
+
+        // Reassign Operational Dependencies
+        prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: id }, data: { assignedById: adminId } }),
+        prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: id }, data: { evaluatorId: adminId } }),
+
+        // Reassign Reviews
+        prismadb.resultReview.updateMany({ where: { reviewedById: id }, data: { reviewedById: adminId } })
+      ]);
+
+      // Nullify Profile Relations
+      const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: id } });
       if (teacherProfile) {
-        await tx.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } });
-        await tx.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } });
+        await Promise.all([
+          prismadb.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } }),
+          prismadb.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } })
+        ]);
       }
 
-      // 2. Clear Operational Dependencies
-      await tx.examEvaluationAssignment.deleteMany({ where: { evaluatorId: id } }); // Remove pending evaluations
-      await tx.examEvaluationAssignment.updateMany({ where: { assignedById: id }, data: { assignedById: adminId } });
-      await tx.examSubmissionDrawing.updateMany({ where: { evaluatorId: id }, data: { evaluatorId: adminId } });
+    } catch (err) {
+      console.error("Error reassigning assets:", err);
+      // We can choose to abort here or continue. 
+      // Aborting is safer to ensure we don't delete a user whose assets weren't reassigned.
+      return NextResponse.json({ error: 'Failed to reassign user assets. Deletion aborted.' }, { status: 500 });
+    }
 
-      // 3. Delete Personal Data & Logs
+    // Phase 2: Delete Dependencies & User (Transactional)
+    // Now the transaction is much smaller and only concerns deletion.
+    await prismadb.$transaction(async (tx) => {
+      // Clear Operational Dependencies that need deletion
+      await tx.examEvaluationAssignment.deleteMany({ where: { evaluatorId: id } });
+
+      // Delete Personal Data & Logs
       await tx.log.deleteMany({ where: { userId: id } });
       await tx.notification.deleteMany({ where: { userId: id } });
       await tx.exportJob.deleteMany({ where: { triggeredById: id } });
       await tx.aIActivity.deleteMany({ where: { userId: id } });
       await tx.billing.deleteMany({ where: { userId: id } });
-      await tx.activityAudit.updateMany({ where: { userId: id }, data: { userId: null } }); // Keep audit trail anonymous
-      await tx.badge.deleteMany({ where: { earnedById: id } }); // Delete badges earned by this user
+      await tx.activityAudit.updateMany({ where: { userId: id }, data: { userId: null } });
+      await tx.badge.deleteMany({ where: { earnedById: id } });
 
-      // Result Reviews (as reviewer)
-      await tx.resultReview.updateMany({ where: { reviewedById: id }, data: { reviewedById: adminId } });
-
-      // Chat Sessions (Must delete messages first)
+      // Chat Sessions
       const sessions = await tx.chatSession.findMany({ where: { userId: id }, select: { id: true } });
       if (sessions.length > 0) {
         await tx.chatMessage.deleteMany({ where: { sessionId: { in: sessions.map(s => s.id) } } });
         await tx.chatSession.deleteMany({ where: { userId: id } });
       }
 
-      // 4. Delete Profiles & Related Student Data
-      // If user has a student profile, we must clean up its dependencies due to lack of CASCADE in schema
+      // Delete Profiles & Related Student Data
       const studentProfile = await tx.studentProfile.findUnique({ where: { userId: id } });
       if (studentProfile) {
         const studentId = studentProfile.id;
-        // Academic Records
-        // Note: We delete these because they are strictly tied to the student's performance. 
-        // Reassigning them doesn't make sense.
         await tx.examSubmissionDrawing.deleteMany({ where: { studentId } });
         await tx.examSubmission.deleteMany({ where: { studentId } });
         await tx.result.deleteMany({ where: { studentId } });
         await tx.admitCard.deleteMany({ where: { studentId } });
         await tx.oMRSheet.deleteMany({ where: { studentId } });
         await tx.examStudentMap.deleteMany({ where: { studentId } });
-        await tx.badge.deleteMany({ where: { studentId } }); // Badges linked to student profile
+        await tx.badge.deleteMany({ where: { studentId } });
         await tx.resultReview.deleteMany({ where: { studentId } });
 
         await tx.studentProfile.delete({ where: { id: studentId } });
@@ -270,8 +279,11 @@ export async function DELETE(request: NextRequest) {
 
       await tx.teacherProfile.deleteMany({ where: { userId: id } });
 
-      // 5. Delete User
+      // Delete User
       await tx.user.delete({ where: { id } });
+    }, {
+      maxWait: 10000, // Wait max 10s to start
+      timeout: 20000  // Allow 20s for transaction to finish (default is 5s)
     });
 
     return NextResponse.json({ message: 'User deleted successfully' });
