@@ -164,6 +164,33 @@ import { Label } from "@/components/ui/label";
 
 
 import { AppFooter } from "@/components/AppFooter";
+import { ApprovalsTab, AiUsageTab, SystemLogsTab, AnalyticsTab, ProfileTab } from "@/components/dashboard/super-user-tabs";
+
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement
+);
 
 export default function SuperUserDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -543,7 +570,7 @@ export default function SuperUserDashboardPage() {
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setActiveTab('profile')}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
@@ -993,8 +1020,15 @@ export default function SuperUserDashboardPage() {
               </div>
             )}
 
-            {/* Other tabs placeholder */}
-            {activeTab !== 'overview' && activeTab !== 'settings' && (
+            {/* Tab Views */}
+            {activeTab === 'approvals' && <ApprovalsTab approvals={pendingApprovals} />}
+            {activeTab === 'ai-usage' && <AiUsageTab data={aiUsageData} />}
+            {activeTab === 'logs' && <SystemLogsTab logs={activityLogs} />}
+            {activeTab === 'analytics' && <AnalyticsTab />}
+            {activeTab === 'profile' && <ProfileTab user={user} />}
+
+            {/* Fallback for unknown tabs */}
+            {!['overview', 'settings', 'approvals', 'ai-usage', 'logs', 'analytics', 'profile'].includes(activeTab) && (
               <Card>
                 <CardHeader>
                   <CardTitle>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</CardTitle>

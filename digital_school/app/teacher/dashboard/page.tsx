@@ -63,6 +63,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { TeacherSidebar } from "@/components/dashboard/TeacherSidebar";
 import { AppFooter } from '@/components/AppFooter';
+import { CreateExamsTab } from "@/components/dashboard/teacher-tabs";
 
 interface User {
     id: string;
@@ -834,6 +835,10 @@ export default function TeacherDashboardPage() {
                                 </TabsContent>
                             </Tabs>
                         </div>
+                    )}
+
+                    {activeTab === 'create-exams' && (
+                        <CreateExamsTab />
                     )}
 
                     {activeTab === 'scan-sheets' && (

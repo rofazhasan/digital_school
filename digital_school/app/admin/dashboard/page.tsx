@@ -25,6 +25,16 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
+import {
+  AdminAnalyticsTab,
+  AttendanceTab,
+  NoticesTab,
+  BillingTab,
+  ChatTab,
+  SecurityTab,
+  AdminSettingsTab,
+  AdminAdmitCardsTab
+} from "@/components/dashboard/admin-tabs";
 
 
 
@@ -98,7 +108,7 @@ export default function AdminDashboard() {
       case 'questions':
         return 'Hi';
       case 'admit-cards':
-        return <AdmitCardsTab />;
+        return <AdminAdmitCardsTab />;
       case 'results':
         return <ResultsTab />;
       case 'attendance':
@@ -110,11 +120,11 @@ export default function AdminDashboard() {
       case 'chat':
         return <ChatTab />;
       case 'analytics':
-        return <AnalyticsTab />;
+        return <AdminAnalyticsTab />;
       case 'security':
         return <SecurityTab />;
       case 'settings':
-        return <SettingsTab />;
+        return <AdminSettingsTab />;
       default:
         return <OverviewTab />;
     }
@@ -1902,16 +1912,7 @@ function ExamsTab() {
   );
 }
 
-function AdmitCardsTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Admit Cards</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Admit cards management interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
+
 
 function ResultsTab() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -2338,83 +2339,6 @@ function ResultsTab() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function AttendanceTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Attendance Management</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Attendance management interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function NoticesTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Notices Management</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Notices management interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function BillingTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Billing Management</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Billing management interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function ChatTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Chat Support</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Chat support interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function AnalyticsTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Analytics Dashboard</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Analytics dashboard will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function SecurityTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">Security Settings</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">Security settings interface will be implemented here.</p>
-      </div>
-    </div>
-  );
-}
-
-function SettingsTab() {
-  return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-8">System Settings</h1>
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-        <p className="text-gray-600">System settings interface will be implemented here.</p>
-      </div>
     </div>
   );
 }

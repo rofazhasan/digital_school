@@ -49,6 +49,7 @@ import {
   MapPin
 } from "lucide-react";
 import { AppFooter } from "@/components/AppFooter";
+import { StudentAnalyticsTab } from "@/components/dashboard/student-tabs";
 
 interface User {
   id: string;
@@ -742,8 +743,7 @@ export default function StudentDashboardPage() {
         {activeTab === 'analytics' && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-4">Analytics</h2>
-            {/* Add analytics content here */}
-            <div className="text-muted-foreground">Analytics coming soon...</div>
+            <StudentAnalyticsTab />
           </div>
         )}
 
