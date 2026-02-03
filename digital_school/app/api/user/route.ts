@@ -182,113 +182,123 @@ export async function DELETE(request: NextRequest) {
 
     const url = new URL(request.url);
     const id = url.searchParams.get('id');
-    if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
-    // Fetch the user to be deleted
-    const userToDelete = await prismadb.user.findUnique({ where: { id } });
-    if (!userToDelete) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    // Prevent admin from deleting other admins or superusers
-    if (authData.user.role === 'ADMIN' && (userToDelete.role === 'ADMIN' || userToDelete.role === 'SUPER_USER')) {
-      return NextResponse.json({ error: 'Admins cannot delete other admins or superusers' }, { status: 403 });
+    const idsParam = url.searchParams.get('ids');
+
+    let idsToDelete: string[] = [];
+    if (idsParam) {
+      idsToDelete = idsParam.split(',').filter(Boolean);
+    } else if (id) {
+      idsToDelete = [id];
     }
-    // Prevent superuser from deleting other superusers
-    // Prevent superuser from deleting other superusers (except self, but logic above prevents that too mostly)
-    if (authData.user.role === 'SUPER_USER' && userToDelete.role === 'SUPER_USER' && authData.user.id !== userToDelete.id) {
-      return NextResponse.json({ error: 'Superusers cannot delete other superusers' }, { status: 403 });
+
+    if (idsToDelete.length === 0) {
+      return NextResponse.json({ error: 'User id(s) required' }, { status: 400 });
     }
 
     const adminId = authData.user.id;
+    const results = { success: 0, failed: 0, errors: [] as string[] };
 
-    // Phase 1: Reassign Assets (Non-transactional or independent transactions to reduce lock time)
-    // We do these in parallel where possible. Failures here are non-fatal (user just won't be deleted if these fail, or we can retry).
-    // Actually, to be safe, we should ensure these succeed. But doing them outside the main tx prevents timeout.
+    // Function to delete a single user
+    const deleteSingleUser = async (targetId: string) => {
+      // Fetch user
+      const userToDelete = await prismadb.user.findUnique({ where: { id: targetId } });
+      if (!userToDelete) throw new Error(`User ${targetId} not found`);
 
-    try {
-      // Reassign Assessments
-      await Promise.all([
-        prismadb.question.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
-        prismadb.exam.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
-        prismadb.exam.updateMany({ where: { assignedById: id }, data: { assignedById: null } }),
-        prismadb.questionBank.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
-        prismadb.examSet.updateMany({ where: { createdById: id }, data: { createdById: adminId } }),
-
-        // Reassign Educational
-        prismadb.notice.updateMany({ where: { postedById: id }, data: { postedById: adminId } }),
-        prismadb.attendance.updateMany({ where: { teacherId: id }, data: { teacherId: adminId } }),
-
-        // Reassign Operational Dependencies
-        prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: id }, data: { assignedById: adminId } }),
-        prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: id }, data: { evaluatorId: adminId } }),
-
-        // Reassign Reviews
-        prismadb.resultReview.updateMany({ where: { reviewedById: id }, data: { reviewedById: adminId } })
-      ]);
-
-      // Nullify Profile Relations
-      const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: id } });
-      if (teacherProfile) {
-        await Promise.all([
-          prismadb.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } }),
-          prismadb.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } })
-        ]);
+      // Check Permissions
+      if (authData.user.role === 'ADMIN' && (userToDelete.role === 'ADMIN' || userToDelete.role === 'SUPER_USER')) {
+        throw new Error('Admins cannot delete other admins or superusers');
+      }
+      if (authData.user.role === 'SUPER_USER' && userToDelete.role === 'SUPER_USER' && authData.user.id !== targetId) {
+        throw new Error('Superusers cannot delete other superusers');
       }
 
-    } catch (err) {
-      console.error("Error reassigning assets:", err);
-      // We can choose to abort here or continue. 
-      // Aborting is safer to ensure we don't delete a user whose assets weren't reassigned.
-      return NextResponse.json({ error: 'Failed to reassign user assets. Deletion aborted.' }, { status: 500 });
+      // Phase 1: Reassign Assets (Non-transactional)
+      try {
+        await Promise.all([
+          prismadb.question.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
+          prismadb.exam.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
+          prismadb.exam.updateMany({ where: { assignedById: targetId }, data: { assignedById: null } }),
+          prismadb.questionBank.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
+          prismadb.examSet.updateMany({ where: { createdById: targetId }, data: { createdById: adminId } }),
+          prismadb.notice.updateMany({ where: { postedById: targetId }, data: { postedById: adminId } }),
+          prismadb.attendance.updateMany({ where: { teacherId: targetId }, data: { teacherId: adminId } }),
+          prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: targetId }, data: { assignedById: adminId } }),
+          prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: targetId }, data: { evaluatorId: adminId } }),
+          prismadb.resultReview.updateMany({ where: { reviewedById: targetId }, data: { reviewedById: adminId } })
+        ]);
+
+        const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: targetId } });
+        if (teacherProfile) {
+          await Promise.all([
+            prismadb.question.updateMany({ where: { teacherProfileId: teacherProfile.id }, data: { teacherProfileId: null } }),
+            prismadb.questionBank.updateMany({ where: { teacherId: teacherProfile.id }, data: { teacherId: null } })
+          ]);
+        }
+      } catch (err) {
+        console.error(`Error reassigning assets for ${targetId}:`, err);
+        // Aborting is safer to ensure we don't delete a user whose assets weren't reassigned.
+        throw new Error(`Failed to reassign assets for ${targetId}. Deletion aborted.`);
+      }
+
+      // Phase 2: Delete Dependencies & User (Transactional)
+      await prismadb.$transaction(async (tx) => {
+        await tx.examEvaluationAssignment.deleteMany({ where: { evaluatorId: targetId } });
+        await tx.log.deleteMany({ where: { userId: targetId } });
+        await tx.notification.deleteMany({ where: { userId: targetId } });
+        await tx.exportJob.deleteMany({ where: { triggeredById: targetId } });
+        await tx.aIActivity.deleteMany({ where: { userId: targetId } });
+        await tx.billing.deleteMany({ where: { userId: targetId } });
+        await tx.activityAudit.updateMany({ where: { userId: targetId }, data: { userId: null } });
+        await tx.badge.deleteMany({ where: { earnedById: targetId } });
+
+        const sessions = await tx.chatSession.findMany({ where: { userId: targetId }, select: { id: true } });
+        if (sessions.length > 0) {
+          await tx.chatMessage.deleteMany({ where: { sessionId: { in: sessions.map(s => s.id) } } });
+          await tx.chatSession.deleteMany({ where: { userId: targetId } });
+        }
+
+        const studentProfile = await tx.studentProfile.findUnique({ where: { userId: targetId } });
+        if (studentProfile) {
+          const studentId = studentProfile.id;
+          await tx.examSubmissionDrawing.deleteMany({ where: { studentId } });
+          await tx.examSubmission.deleteMany({ where: { studentId } });
+          await tx.result.deleteMany({ where: { studentId } });
+          await tx.admitCard.deleteMany({ where: { studentId } });
+          await tx.oMRSheet.deleteMany({ where: { studentId } });
+          await tx.examStudentMap.deleteMany({ where: { studentId } });
+          await tx.badge.deleteMany({ where: { studentId } });
+          await tx.resultReview.deleteMany({ where: { studentId } });
+          await tx.studentProfile.delete({ where: { id: studentId } });
+        }
+
+        await tx.teacherProfile.deleteMany({ where: { userId: targetId } });
+        await tx.user.delete({ where: { id: targetId } });
+      }, { maxWait: 10000, timeout: 20000 });
+    };
+
+    // Iterate through IDs sequentially
+    for (const targetId of idsToDelete) {
+      try {
+        await deleteSingleUser(targetId);
+        results.success++;
+      } catch (error: any) {
+        console.error(`Error deleting user ${targetId}:`, error);
+        results.failed++;
+        results.errors.push(error.message || `Failed to delete ${targetId}`);
+      }
     }
 
-    // Phase 2: Delete Dependencies & User (Transactional)
-    // Now the transaction is much smaller and only concerns deletion.
-    await prismadb.$transaction(async (tx) => {
-      // Clear Operational Dependencies that need deletion
-      await tx.examEvaluationAssignment.deleteMany({ where: { evaluatorId: id } });
+    if (results.failed > 0 && results.success === 0) {
+      return NextResponse.json({ error: 'Failed to delete selected users', details: results.errors }, { status: 500 });
+    }
 
-      // Delete Personal Data & Logs
-      await tx.log.deleteMany({ where: { userId: id } });
-      await tx.notification.deleteMany({ where: { userId: id } });
-      await tx.exportJob.deleteMany({ where: { triggeredById: id } });
-      await tx.aIActivity.deleteMany({ where: { userId: id } });
-      await tx.billing.deleteMany({ where: { userId: id } });
-      await tx.activityAudit.updateMany({ where: { userId: id }, data: { userId: null } });
-      await tx.badge.deleteMany({ where: { earnedById: id } });
-
-      // Chat Sessions
-      const sessions = await tx.chatSession.findMany({ where: { userId: id }, select: { id: true } });
-      if (sessions.length > 0) {
-        await tx.chatMessage.deleteMany({ where: { sessionId: { in: sessions.map(s => s.id) } } });
-        await tx.chatSession.deleteMany({ where: { userId: id } });
-      }
-
-      // Delete Profiles & Related Student Data
-      const studentProfile = await tx.studentProfile.findUnique({ where: { userId: id } });
-      if (studentProfile) {
-        const studentId = studentProfile.id;
-        await tx.examSubmissionDrawing.deleteMany({ where: { studentId } });
-        await tx.examSubmission.deleteMany({ where: { studentId } });
-        await tx.result.deleteMany({ where: { studentId } });
-        await tx.admitCard.deleteMany({ where: { studentId } });
-        await tx.oMRSheet.deleteMany({ where: { studentId } });
-        await tx.examStudentMap.deleteMany({ where: { studentId } });
-        await tx.badge.deleteMany({ where: { studentId } });
-        await tx.resultReview.deleteMany({ where: { studentId } });
-
-        await tx.studentProfile.delete({ where: { id: studentId } });
-      }
-
-      await tx.teacherProfile.deleteMany({ where: { userId: id } });
-
-      // Delete User
-      await tx.user.delete({ where: { id } });
-    }, {
-      maxWait: 10000, // Wait max 10s to start
-      timeout: 20000  // Allow 20s for transaction to finish (default is 5s)
+    return NextResponse.json({
+      message: `Successfully deleted ${results.success} user(s).${results.failed > 0 ? ` Failed to delete ${results.failed}.` : ''}`,
+      results
     });
 
-    return NextResponse.json({ message: 'User deleted successfully' });
   } catch (error: any) {
     console.error('User delete error:', error);
     return NextResponse.json({ error: `Failed to delete user: ${error.message}` }, { status: 500 });
   }
-} 
+}
