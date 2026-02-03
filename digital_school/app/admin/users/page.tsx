@@ -232,23 +232,76 @@ export default function AdminUsersPage() {
     // Bulk Import Logic
     const handleBulkAdd = (file: File) => {
         setLoading(true);
+        setError(null);
         const reader = new FileReader();
-        reader.onload = async (e) => {
+
+        const processData = (data: any[]) => {
             try {
-                let usersToAdd: any[] = [];
-                if (file.name.endsWith('.csv')) {
-                    const parsed = Papa.parse(e.target?.result as string, { header: true });
-                    usersToAdd = parsed.data.filter((r: any) => r.Name && r.Role).map((r: any) => ({
-                        name: r.Name, email: r.Email, phone: r.Phone, role: r.Role, class: r.Class, section: r.Section, roll: r.Roll
-                    }));
+                // Normalize keys to lowercase
+                const normalizedData = data.map(row => {
+                    const newRow: any = {};
+                    Object.keys(row).forEach(key => {
+                        newRow[key.trim().toLowerCase()] = row[key];
+                    });
+                    return newRow;
+                });
+
+                const usersToAdd = normalizedData.filter(r => r.name && r.role && (r.email || r.phone)).map((r) => ({
+                    name: r.name,
+                    email: r.email,
+                    phone: r.phone,
+                    role: r.role.toUpperCase(), // Normalize role
+                    class: r.class,
+                    section: r.section,
+                    roll: r.roll
+                }));
+
+                if (usersToAdd.length === 0) {
+                    setError("No valid records found. Ensure columns: Name, Role, Email (or Phone).");
+                    setLoading(false);
+                    return;
                 }
-                // Basic Excel support assumed via previous logic or simpler fallback
+
                 setPreviewUsers(usersToAdd.map((u, i) => ({ ...u, id: String(i) })));
                 setShowPreview(true);
-            } catch (e) { setError("Failed to parse file"); }
-            setLoading(false);
+            } catch (err) {
+                console.error(err);
+                setError("Failed to process data.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        reader.onload = async (e) => {
+            try {
+                if (file.name.endsWith('.csv')) {
+                    Papa.parse(e.target?.result as string, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: (results) => processData(results.data)
+                    });
+                } else if (file.name.match(/\.(xlsx|xls)$/)) {
+                    const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+                    processData(json);
+                } else {
+                    setError("Unsupported file format. Use CSV or Excel.");
+                    setLoading(false);
+                }
+            } catch (e) {
+                setError("Failed to read file");
+                setLoading(false);
+            }
         }
-        reader.readAsText(file);
+
+        if (file.name.match(/\.(xlsx|xls)$/)) {
+            reader.readAsArrayBuffer(file);
+        } else {
+            reader.readAsText(file);
+        }
     };
 
     const handleConfirmBulkAdd = async () => {
