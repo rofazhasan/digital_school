@@ -84,6 +84,7 @@ import {
   X,
   Brain
 } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface User {
   id: string;
@@ -668,119 +669,104 @@ export default function SuperUserDashboardPage() {
               <div className="space-y-4 md:space-y-6">
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">Total Users</CardTitle>
-                      <Users className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg md:text-2xl font-bold">{stats?.totalUsers || 'N/A'}</div>
-                      <p className="text-xs text-muted-foreground">
-                        +{stats?.newUsers || '0'} new this week
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">Exams Today</CardTitle>
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg md:text-2xl font-bold">{stats?.examsToday || 'N/A'}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Across all classes
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">AI Usage</CardTitle>
-                      <Zap className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg md:text-2xl font-bold">{stats?.aiUsage || 'N/A'}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Tokens used this month
-                      </p>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                      <CardTitle className="text-xs md:text-sm font-medium">Pending Approvals</CardTitle>
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-lg md:text-2xl font-bold">{stats?.pendingApprovals || 'N/A'}</div>
-                      <p className="text-xs text-muted-foreground">
-                        Require your attention
-                      </p>
-                    </CardContent>
-                  </Card>
+                  {[
+                    { title: "Total Users", icon: Users, value: stats?.totalUsers, label: `+${stats?.newUsers || 0} new this week` },
+                    { title: "Exams Today", icon: Calendar, value: stats?.examsToday, label: "Across all classes" },
+                    { title: "AI Usage", icon: Zap, value: stats?.aiUsage, label: "Tokens used this month" },
+                    { title: "Pending Approvals", icon: Clock, value: stats?.pendingApprovals, label: "Require your attention" }
+                  ].map((item, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                    >
+                      <Card className="hover:shadow-lg transition-shadow duration-300 border-indigo-100/50">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                          <CardTitle className="text-xs md:text-sm font-medium">{item.title}</CardTitle>
+                          <item.icon className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent>
+                          <div className="text-lg md:text-2xl font-bold">{item.value || 'N/A'}</div>
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
                 </div>
 
                 {/* Recent Activities and Pending Approvals */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-base md:text-lg">
-                        <Activity className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                        Recent Activities
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 md:space-y-4">
-                        {(activityLogs || []).slice(0, 5).map((log) => (
-                          <div key={log.id} className="flex items-start space-x-3">
-                            <div className="w-6 h-6 md:w-8 md:h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                              {getActivityIcon(log.type)}
+                  <motion.div
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.4 }}
+                  >
+                    <Card className="h-full hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="flex items-center text-base md:text-lg">
+                          <Activity className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                          Recent Activities
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3 md:space-y-4">
+                          {(activityLogs || []).slice(0, 5).map((log) => (
+                            <div key={log.id} className="flex items-start space-x-3">
+                              <div className="w-6 h-6 md:w-8 md:h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                                {getActivityIcon(log.type)}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs md:text-sm font-medium truncate">{log.action}</p>
+                                <p className="text-xs text-muted-foreground line-clamp-2">{log.details}</p>
+                                <p className="text-xs text-muted-foreground">{log.timestamp}</p>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs md:text-sm font-medium truncate">{log.action}</p>
-                              <p className="text-xs text-muted-foreground line-clamp-2">{log.details}</p>
-                              <p className="text-xs text-muted-foreground">{log.timestamp}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="flex items-center text-base md:text-lg">
-                        <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                        Pending Approvals
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3 md:space-y-4">
-                        {(pendingApprovals || []).slice(0, 3).map((approval) => (
-                          <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs md:text-sm font-medium truncate">{approval.title}</p>
-                              <p className="text-xs text-muted-foreground">
-                                {approval.submittedBy} • {approval.submittedAt}
-                              </p>
-                              <Badge className={`text-xs ${getPriorityColor(approval.priority)}`}>
-                                {approval.priority}
-                              </Badge>
+                  <motion.div
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.5 }}
+                  >
+                    <Card className="h-full hover:shadow-md transition-shadow">
+                      <CardHeader>
+                        <CardTitle className="flex items-center text-base md:text-lg">
+                          <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                          Pending Approvals
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3 md:space-y-4">
+                          {(pendingApprovals || []).slice(0, 3).map((approval) => (
+                            <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0 hover:bg-slate-50 transition-colors">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs md:text-sm font-medium truncate">{approval.title}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {approval.submittedBy} • {approval.submittedAt}
+                                </p>
+                                <Badge className={`text-xs ${getPriorityColor(approval.priority)} mt-1`}>
+                                  {approval.priority}
+                                </Badge>
+                              </div>
+                              <div className="flex space-x-2">
+                                <Button size="sm" onClick={() => handleApproval(approval.id, 'approve')}>
+                                  <CheckCircle className="h-3 w-3 md:h-4 md:w-4" />
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={() => handleApproval(approval.id, 'reject')}>
+                                  <XCircle className="h-3 w-3 md:h-4 md:w-4" />
+                                </Button>
+                              </div>
                             </div>
-                            <div className="flex space-x-2">
-                              <Button size="sm" onClick={() => handleApproval(approval.id, 'approve')}>
-                                <CheckCircle className="h-3 w-3 md:h-4 md:w-4" />
-                              </Button>
-                              <Button size="sm" variant="outline" onClick={() => handleApproval(approval.id, 'reject')}>
-                                <XCircle className="h-3 w-3 md:h-4 md:w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
                 </div>
 
                 {/* Recent Exams */}
