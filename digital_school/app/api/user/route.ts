@@ -81,10 +81,17 @@ export async function POST(request: NextRequest) {
     for (const user of body) {
       try {
         const { name, email, phone, role, class: className, section } = user;
-        if (!name || !email || !role) throw new Error('Missing required fields');
-        // Check if user exists
-        const existing = await prismadb.user.findUnique({ where: { email } });
-        if (existing) throw new Error('User with this email already exists');
+        if (!name || (!email && !phone) || !role) throw new Error('Missing required fields: Name, Role, and either Email or Phone are required.');
+
+        // Check if user exists (by email OR phone)
+        if (email) {
+          const existingEmail = await prismadb.user.findUnique({ where: { email } });
+          if (existingEmail) throw new Error(`User with email ${email} already exists`);
+        }
+        if (phone) {
+          const existingPhone = await prismadb.user.findUnique({ where: { phone } });
+          if (existingPhone) throw new Error(`User with phone ${phone} already exists`);
+        }
         let classId = undefined;
         if (role === 'STUDENT' && className) {
           let classRecord = await prismadb.class.findFirst({ where: { name: className, section: section || '' } });
