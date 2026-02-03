@@ -98,10 +98,17 @@ export default function AdminUsersPage() {
             fetch("/api/classes").then(res => res.json()).catch(() => ({ classes: [] }))
         ])
             .then(([usersData, classesData]) => {
-                if (usersData.users) {
-                    setUsers(usersData.users);
-                } else {
-                    setError(usersData.error || "Failed to fetch users");
+                // Handle various response structures for users
+                let fetchedUsers = [];
+                if (usersData.users) fetchedUsers = usersData.users;
+                else if (usersData.data?.users) fetchedUsers = usersData.data.users;
+                else if (Array.isArray(usersData.data)) fetchedUsers = usersData.data;
+                else if (Array.isArray(usersData)) fetchedUsers = usersData;
+
+                setUsers(fetchedUsers);
+
+                if (!fetchedUsers.length && usersData.error) {
+                    setError(usersData.error);
                 }
                 if (classesData.classes) {
                     setClasses(classesData.classes);
@@ -119,10 +126,15 @@ export default function AdminUsersPage() {
         try {
             const usersResponse = await fetch('/api/user?all=true');
             const usersData = await usersResponse.json();
-            if (usersData.users) {
-                setUsers(usersData.users);
-                setSelectedIds(new Set());
-            }
+
+            let fetchedUsers = [];
+            if (usersData.users) fetchedUsers = usersData.users;
+            else if (usersData.data?.users) fetchedUsers = usersData.data.users;
+            else if (Array.isArray(usersData.data)) fetchedUsers = usersData.data;
+            else if (Array.isArray(usersData)) fetchedUsers = usersData;
+
+            setUsers(fetchedUsers);
+            setSelectedIds(new Set());
         } catch (e) {
             console.error("Failed to refresh users", e);
         } finally {

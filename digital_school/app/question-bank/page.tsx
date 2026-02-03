@@ -268,22 +268,19 @@ export default function QuestionBankPage() {
       const qData = await qRes.json();
       const qbData = await qbRes.json();
 
-      // Ensure qData is an array
-      if (Array.isArray(qData)) {
-        setQuestions(qData);
-      } else {
-        console.error('Invalid questions data received:', qData);
-        setQuestions([]);
-        toast({ variant: "destructive", title: "Error", description: "Invalid data received from server." });
-      }
+      // Ensure qData is handled correctly
+      let questionsList = [];
+      if (Array.isArray(qData)) questionsList = qData;
+      else if (Array.isArray(qData.data)) questionsList = qData.data;
+      else if (qData.data?.questions && Array.isArray(qData.data.questions)) questionsList = qData.data.questions;
+      setQuestions(questionsList);
 
-      // Ensure qbData is an array
-      if (Array.isArray(qbData)) {
-        setQuestionBanks(qbData);
-      } else {
-        console.error('Invalid question banks data received:', qbData);
-        setQuestionBanks([]);
-      }
+      // Ensure qbData is handled correctly
+      let banksList = [];
+      if (Array.isArray(qbData)) banksList = qbData;
+      else if (Array.isArray(qbData.data)) banksList = qbData.data;
+      else if (qbData.data?.questionBanks && Array.isArray(qbData.data.questionBanks)) banksList = qbData.data.questionBanks;
+      setQuestionBanks(banksList);
     } catch (err) {
       console.error('Error fetching data:', err);
       setQuestions([]);

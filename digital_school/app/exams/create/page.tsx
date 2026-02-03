@@ -188,8 +188,13 @@ export default function CreateExamPage() {
         return res.json();
       })
       .then((data) => {
-        if (data && Array.isArray(data.classes)) setClasses(data.classes);
-        else setClasses([]);
+        let fetchedClasses = [];
+        if (data && Array.isArray(data.classes)) fetchedClasses = data.classes;
+        else if (Array.isArray(data)) fetchedClasses = data;
+        else if (data && Array.isArray(data.data)) fetchedClasses = data.data;
+        else if (data && data.data?.classes && Array.isArray(data.data.classes)) fetchedClasses = data.data.classes;
+
+        setClasses(fetchedClasses);
       })
       .catch((error) => {
         console.error('Error fetching classes:', error);

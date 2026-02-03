@@ -49,8 +49,11 @@ const fetchUser = async () => {
 const fetchExams = async () => {
   const res = await fetch("/api/exams");
   const result = await res.json();
-  // Handle both array and object with data property
-  return Array.isArray(result) ? result : result.data || [];
+  // Handle array, wrapped array, or wrapped object with exams property
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.data)) return result.data;
+  if (result.data?.exams && Array.isArray(result.data.exams)) return result.data.exams;
+  return [];
 };
 
 const fetchResults = async () => {
@@ -58,8 +61,14 @@ const fetchResults = async () => {
     const res = await fetch("/api/results");
     if (!res.ok) return { results: [] };
     const result = await res.json();
-    // Handle the API response structure
-    const data = result.results || result.data || [];
+
+    // Handle various API response structures
+    let data = [];
+    if (Array.isArray(result)) data = result;
+    else if (Array.isArray(result.results)) data = result.results;
+    else if (Array.isArray(result.data)) data = result.data;
+    else if (result.data?.results && Array.isArray(result.data.results)) data = result.data.results;
+
     return { results: data };
   } catch {
     return { results: [] };
@@ -71,8 +80,14 @@ const fetchExamSubmissions = async () => {
     const res = await fetch("/api/exam-submissions");
     if (!res.ok) return { submissions: [] };
     const result = await res.json();
-    // Handle the API response structure
-    const data = result.submissions || result.data || [];
+
+    // Handle various API response structures
+    let data = [];
+    if (Array.isArray(result)) data = result;
+    else if (Array.isArray(result.submissions)) data = result.submissions;
+    else if (Array.isArray(result.data)) data = result.data;
+    else if (result.data?.submissions && Array.isArray(result.data.submissions)) data = result.data.submissions;
+
     return { submissions: data };
   } catch {
     return { submissions: [] };

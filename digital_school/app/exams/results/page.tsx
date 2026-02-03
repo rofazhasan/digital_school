@@ -195,11 +195,20 @@ export default function ExamResultsPage() {
       });
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
+        const resultsData = await resultsResponse.json();
+
         // Handle different possible data structures
-        const examResults = resultsData.examResults || resultsData.results || resultsData || [];
+        let examResults = [];
+        if (Array.isArray(resultsData)) examResults = resultsData;
+        else if (Array.isArray(resultsData.examResults)) examResults = resultsData.examResults;
+        else if (Array.isArray(resultsData.results)) examResults = resultsData.results;
+        else if (Array.isArray(resultsData.data)) examResults = resultsData.data;
+        else if (resultsData.data?.examResults && Array.isArray(resultsData.data.examResults)) examResults = resultsData.data.examResults;
+        else if (resultsData.data?.results && Array.isArray(resultsData.data.results)) examResults = resultsData.data.results;
+
         console.log('📊 API Response:', resultsData);
         console.log('📊 Processed exam results:', examResults);
-        setExamResults(Array.isArray(examResults) ? examResults : []);
+        setExamResults(examResults);
       } else {
         console.error('Failed to fetch results:', resultsResponse.status);
         toast.error('Failed to load exam results');
