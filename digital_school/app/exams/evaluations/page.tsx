@@ -393,8 +393,8 @@ export default function EvaluationsPage() {
                 )}
 
 
-                {/* Release Results - Super User or Admin or Assigned Teacher (if completed) */}
-                {(isSuperUser || isAdmin || (exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
+                {/* Release Results - Super User (Always) or Admin/Teacher (Only if COMPLETED) */}
+                {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
                   <Button
                     variant="outline"
                     size="sm"

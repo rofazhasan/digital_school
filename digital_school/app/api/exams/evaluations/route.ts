@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
 
     let exams;
 
-    if (tokenData.user.role === "SUPER_USER") {
-      // Super user sees all exams (active and inactive) with evaluation assignments
+    if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
+      // Super user and Admin sees all exams (active and inactive) with evaluation assignments
       exams = await prisma.exam.findMany({
         where: {
           ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } })
