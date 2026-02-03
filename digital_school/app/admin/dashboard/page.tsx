@@ -65,8 +65,7 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
   { id: 'overview', label: 'Overview', icon: Home, href: '#overview' },
-  { id: 'students', label: 'Students', icon: Users, href: '/admin/users' },
-  { id: 'teachers', label: 'Teachers', icon: UserCheck, href: '/admin/users' },
+  { id: 'users', label: 'Users', icon: Users, href: '/admin/users' },
   { id: 'classes', label: 'Classes', icon: GraduationCap, href: '#classes' },
   { id: 'exams', label: 'Exams', icon: FileText, href: '/exams' },
   { id: 'questions', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
