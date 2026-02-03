@@ -195,7 +195,6 @@ export default function ExamResultsPage() {
       });
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
-        const resultsData = await resultsResponse.json();
 
         // Handle different possible data structures
         let examResults = [];
