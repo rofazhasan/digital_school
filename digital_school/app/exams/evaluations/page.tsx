@@ -342,6 +342,14 @@ export default function EvaluationsPage() {
                 </div>
               </div>
 
+              {exam.publishedResults > 0 && (
+                <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-800">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Results Released</span>
+                  <span className="text-sm">({exam.publishedResults} results published)</span>
+                </div>
+              )}
+
               {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
                 <div className="bg-gray-50 p-3 rounded-lg mb-4 space-y-3">
                   <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
