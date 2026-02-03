@@ -69,6 +69,30 @@ export default function AdminUsersPage() {
     // Password Visibility State
     const [showPassword, setShowPassword] = useState(false);
 
+    // Permissions
+    const canDelete = (targetUser: User) => {
+        if (activeUserRole === 'SUPER_USER') return targetUser.id !== users.find(u => u.role === 'SUPER_USER')?.id;
+        if (activeUserRole === 'ADMIN') return targetUser.role !== 'ADMIN' && targetUser.role !== 'SUPER_USER';
+        return false;
+    };
+
+    const canEdit = (targetUser: User) => {
+        if (activeUserRole === 'SUPER_USER') return true;
+        if (activeUserRole === 'ADMIN') return targetUser.role !== 'ADMIN' && targetUser.role !== 'SUPER_USER';
+        return false;
+    };
+
+    // Route Protection
+    useEffect(() => {
+        const checkAuth = async () => {
+            // Let the existing fetch handle role loading, this is just a guard
+            if (!loading && activeUserRole && activeUserRole !== 'ADMIN' && activeUserRole !== 'SUPER_USER') {
+                router.push('/dashboard');
+            }
+        };
+        checkAuth();
+    }, [activeUserRole, loading, router]);
+
     const filteredUsers = users.filter(u =>
         (activeRole === 'ALL' || u.role === activeRole) &&
         (
@@ -489,23 +513,28 @@ export default function AdminUsersPage() {
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="group-hover:opacity-100 opacity-0 transition-opacity">
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                    <DropdownMenuItem onClick={() => { setEditUser(user); setSelectedRoleForEdit(user.role); }}>
-                                                        <Edit className="h-4 w-4 mr-2" /> Edit Details
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuSeparator />
-                                                    <DropdownMenuItem onClick={() => handleDeleteUser(user.id)} className="text-red-600 focus:text-red-600">
-                                                        <Trash2 className="h-4 w-4 mr-2" /> Delete User
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-gray-500 hover:text-blue-600 disabled:opacity-30 disabled:hover:text-gray-500"
+                                                    onClick={() => { setEditUser(user); setSelectedRoleForEdit(user.role); }}
+                                                    disabled={!canEdit(user)}
+                                                    title={!canEdit(user) ? "You cannot edit this user" : "Edit Details"}
+                                                >
+                                                    <Edit className="h-4 w-4" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-gray-500 hover:text-red-600 disabled:opacity-30 disabled:hover:text-gray-500"
+                                                    onClick={() => handleDeleteUser(user.id)}
+                                                    disabled={!canDelete(user)}
+                                                    title={!canDelete(user) ? "You cannot delete this user" : "Delete User"}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))

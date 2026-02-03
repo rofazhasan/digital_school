@@ -148,6 +148,21 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { id, name, email, role, class: className, section } = body;
     if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
+
+    // Check Permissions for Edit
+    const userToEdit = await prismadb.user.findUnique({ where: { id } });
+    if (!userToEdit) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    if (authData.user.role === 'ADMIN') {
+      if (userToEdit.role === 'ADMIN' || userToEdit.role === 'SUPER_USER') {
+        return NextResponse.json({ error: 'Admins cannot edit other admins or superusers' }, { status: 403 });
+      }
+      // Also prevent promoting someone TO Admin or Super User if you are just an Admin (optional but good practice)
+      if (role === 'ADMIN' || role === 'SUPER_USER') {
+        return NextResponse.json({ error: 'Admins cannot promote users to Admin or Super User' }, { status: 403 });
+      }
+    }
+
     // Update user
     const updatedUser = await prismadb.user.update({
       where: { id },

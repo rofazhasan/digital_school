@@ -31,7 +31,7 @@ interface Exam {
   totalStudents: number;
   submittedStudents: number;
   publishedResults: number;
-  evaluationAssignment: {
+  evaluationAssignments: Array<{
     id: string;
     status: string;
     evaluator: {
@@ -44,7 +44,7 @@ interface Exam {
       email: string;
     };
     notes: string;
-  } | null;
+  }>;
   status: string;
 }
 
@@ -70,6 +70,7 @@ export default function EvaluationsPage() {
   const [selectedEvaluator, setSelectedEvaluator] = useState<string>("");
   const [assignmentNotes, setAssignmentNotes] = useState("");
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
 
 
@@ -111,6 +112,7 @@ export default function EvaluationsPage() {
         if (response.ok) {
           const userData = await response.json();
           setIsSuperUser(userData.user.role === "SUPER_USER");
+          setIsAdmin(userData.user.role === "ADMIN");
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -340,39 +342,43 @@ export default function EvaluationsPage() {
                 </div>
               </div>
 
-              {exam.evaluationAssignment && (
-                <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                  <h4 className="font-medium text-sm mb-2">Assignment Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Evaluator:</span> {exam.evaluationAssignment.evaluator.name}
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Role:</span> {exam.evaluationAssignment.evaluator.role}
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Assigned by:</span> {exam.evaluationAssignment.assignedBy.name}
-                    </div>
-                    {exam.evaluationAssignment.notes && (
-                      <div>
-                        <span className="text-gray-600">Notes:</span> {exam.evaluationAssignment.notes}
+              {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
+                <div className="bg-gray-50 p-3 rounded-lg mb-4 space-y-3">
+                  <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
+                  {exam.evaluationAssignments.map((assignment) => (
+                    <div key={assignment.id} className="border-b border-gray-200 last:border-0 pb-2 last:pb-0 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-gray-600">Name:</span> {assignment.evaluator.name} <span className="text-xs text-gray-500">({assignment.evaluator.role})</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <Badge variant="outline" className={`ml-2 ${getStatusColor(assignment.status)}`}>
+                            {assignment.status.replace("_", " ")}
+                          </Badge>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                      {assignment.notes && <div className="text-xs text-gray-500 mt-1 italic">Note: {assignment.notes}</div>}
+                    </div>
+                  ))}
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Evaluation
-                </Button>
+              <div className="flex gap-2 flex-wrap">
+                {/* View Evaluation - Hidden for Admins unless they are also evaluators (handled by logic) */}
+                {(!isAdmin || isSuperUser) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Evaluation
+                  </Button>
+                )}
 
-                {isSuperUser && !exam.evaluationAssignment && (
+                {/* Assign Evaluator - Visible for Admin and Super User */}
+                {(isSuperUser || isAdmin) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -387,7 +393,8 @@ export default function EvaluationsPage() {
                 )}
 
 
-                {isSuperUser && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
+                {/* Release Results - Super User or Admin or Assigned Teacher (if completed) */}
+                {(isSuperUser || isAdmin || (exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
                   <Button
                     variant="outline"
                     size="sm"
