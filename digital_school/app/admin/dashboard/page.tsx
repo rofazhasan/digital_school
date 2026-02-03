@@ -271,7 +271,9 @@ export default function AdminDashboard() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {renderContent()}
+          <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
+            {renderContent()}
+          </div>
           <AppFooter />
         </div>
       </div>
@@ -282,7 +284,12 @@ export default function AdminDashboard() {
 // Overview Tab Component
 function OverviewTab() {
   return (
-    <div className="p-4 lg:p-8">
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="p-4 lg:p-8"
+    >
       <div className="mb-6 lg:mb-8">
         <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
         <p className="text-gray-600 text-sm lg:text-base">Welcome back! Here&apos;s what&apos;s happening with your school.</p>
@@ -402,7 +409,7 @@ function OverviewTab() {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
