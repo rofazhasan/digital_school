@@ -84,7 +84,7 @@ import {
   X,
   Brain
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface User {
   id: string;
@@ -654,8 +654,8 @@ export default function SuperUserDashboardPage() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 p-4 md:p-6">
-          <div className="max-w-7xl mx-auto">
+        <main className="flex-1 p-4 md:p-6 max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
+          <div>
             {/* Page Header */}
             <div className="mb-6 md:mb-8">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Super User Dashboard</h1>
@@ -664,375 +664,389 @@ export default function SuperUserDashboardPage() {
               </p>
             </div>
 
-            {/* Overview Tab */}
-            {activeTab === 'overview' && (
-              <div className="space-y-4 md:space-y-6">
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                  {[
-                    { title: "Total Users", icon: Users, value: stats?.totalUsers, label: `+${stats?.newUsers || 0} new this week` },
-                    { title: "Exams Today", icon: Calendar, value: stats?.examsToday, label: "Across all classes" },
-                    { title: "AI Usage", icon: Zap, value: stats?.aiUsage, label: "Tokens used this month" },
-                    { title: "Pending Approvals", icon: Clock, value: stats?.pendingApprovals, label: "Require your attention" }
-                  ].map((item, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                    >
-                      <Card className="hover:shadow-lg transition-shadow duration-300 border-indigo-100/50">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-xs md:text-sm font-medium">{item.title}</CardTitle>
-                          <item.icon className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                          <div className="text-lg md:text-2xl font-bold">{item.value || 'N/A'}</div>
-                          <p className="text-xs text-muted-foreground">{item.label}</p>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </div>
-
-                {/* Recent Activities and Pending Approvals */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-                  <motion.div
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.4 }}
-                  >
-                    <Card className="h-full hover:shadow-md transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="flex items-center text-base md:text-lg">
-                          <Activity className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                          Recent Activities
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3 md:space-y-4">
-                          {(activityLogs || []).slice(0, 5).map((log) => (
-                            <div key={log.id} className="flex items-start space-x-3">
-                              <div className="w-6 h-6 md:w-8 md:h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
-                                {getActivityIcon(log.type)}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs md:text-sm font-medium truncate">{log.action}</p>
-                                <p className="text-xs text-muted-foreground line-clamp-2">{log.details}</p>
-                                <p className="text-xs text-muted-foreground">{log.timestamp}</p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-
-                  <motion.div
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.5 }}
-                  >
-                    <Card className="h-full hover:shadow-md transition-shadow">
-                      <CardHeader>
-                        <CardTitle className="flex items-center text-base md:text-lg">
-                          <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                          Pending Approvals
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-3 md:space-y-4">
-                          {(pendingApprovals || []).slice(0, 3).map((approval) => (
-                            <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0 hover:bg-slate-50 transition-colors">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs md:text-sm font-medium truncate">{approval.title}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {approval.submittedBy} • {approval.submittedAt}
-                                </p>
-                                <Badge className={`text-xs ${getPriorityColor(approval.priority)} mt-1`}>
-                                  {approval.priority}
-                                </Badge>
-                              </div>
-                              <div className="flex space-x-2">
-                                <Button size="sm" onClick={() => handleApproval(approval.id, 'approve')}>
-                                  <CheckCircle className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => handleApproval(approval.id, 'reject')}>
-                                  <XCircle className="h-3 w-3 md:h-4 md:w-4" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                </div>
-
-                {/* Recent Exams */}
-                <Card>
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                      <CardTitle className="flex items-center text-base md:text-lg">
-                        <FileText className="h-4 w-4 md:h-5 md:w-5 mr-2" />
-                        Recent Exams
-                      </CardTitle>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-3 w-3 md:h-4 md:w-4 mr-2" />
-                        Download Report
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="text-xs md:text-sm">Title</TableHead>
-                            <TableHead className="text-xs md:text-sm hidden md:table-cell">Subject</TableHead>
-                            <TableHead className="text-xs md:text-sm hidden lg:table-cell">Date</TableHead>
-                            <TableHead className="text-xs md:text-sm">Type</TableHead>
-                            <TableHead className="text-xs md:text-sm">Status</TableHead>
-                            <TableHead className="text-xs md:text-sm hidden md:table-cell">Students</TableHead>
-                            <TableHead className="text-xs md:text-sm">Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(recentExams || []).map((exam) => (
-                            <TableRow key={exam.id}>
-                              <TableCell className="font-medium text-xs md:text-sm">
-                                <div>
-                                  <div className="truncate max-w-[120px] md:max-w-none">{exam.title}</div>
-                                  <div className="text-xs text-muted-foreground md:hidden">{exam.subject}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm hidden md:table-cell">{exam.subject}</TableCell>
-                              <TableCell className="text-xs md:text-sm hidden lg:table-cell">{exam.date}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className="text-xs">{exam.type}</Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={`text-xs ${getStatusColor(exam.status)}`}>
-                                  {exam.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-xs md:text-sm hidden md:table-cell">{exam.totalStudents}</TableCell>
-                              <TableCell>
-                                <div className="flex space-x-1">
-                                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                    <Eye className="h-3 w-3" />
-                                  </Button>
-                                  <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                    <Edit className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-
-            {/* Settings Tab */}
-            {activeTab === 'settings' && (
-              <div className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      <SettingsIcon className="mr-2 h-5 w-5" />
-                      Institute Settings
-                    </CardTitle>
-                    <CardDescription>
-                      Manage global settings for your institute
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center">
-                          <AlertTriangle className="mr-2 h-4 w-4 text-yellow-600" />
-                          <h3 className="font-medium text-base">Maintenance Mode</h3>
-                        </div>
-                        <p className="text-sm text-muted-foreground">
-                          When enabled, only Admins and Super Users can access the system.
-                          <br />Students and Teachers will be logged out and blocked.
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Button
-                          variant={maintenanceMode ? "destructive" : "default"}
-                          onClick={async () => {
-                            try {
-                              const newState = !maintenanceMode;
-                              const res = await fetch('/api/settings', {
-                                method: 'PATCH',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ maintenanceMode: newState })
-                              });
-
-                              if (res.ok) {
-                                const data = await res.json();
-                                setMaintenanceMode(data.maintenanceMode);
-                              }
-                            } catch (err) {
-                              console.error('Failed to toggle maintenance mode', err);
-                            }
-                          }}
+            <AnimatePresence mode="wait">
+              {activeTab === 'overview' && (
+                <motion.div
+                  key="overview"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="space-y-4 md:space-y-6">
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                      {[
+                        { title: "Total Users", icon: Users, value: stats?.totalUsers, label: `+${stats?.newUsers || 0} new this week` },
+                        { title: "Exams Today", icon: Calendar, value: stats?.examsToday, label: "Across all classes" },
+                        { title: "AI Usage", icon: Zap, value: stats?.aiUsage, label: "Tokens used this month" },
+                        { title: "Pending Approvals", icon: Clock, value: stats?.pendingApprovals, label: "Require your attention" }
+                      ].map((item, index) => (
+                        <motion.div
+                          key={index}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: index * 0.1 }}
                         >
-                          {maintenanceMode ? 'Disable Maintenance' : 'Enable Maintenance'}
-                        </Button>
-                      </div>
+                          <Card className="hover:shadow-lg transition-shadow duration-300 border-indigo-100/50">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                              <CardTitle className="text-xs md:text-sm font-medium">{item.title}</CardTitle>
+                              <item.icon className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent>
+                              <div className="text-lg md:text-2xl font-bold">{item.value || 'N/A'}</div>
+                              <p className="text-xs text-muted-foreground">{item.label}</p>
+                            </CardContent>
+                          </Card>
+                        </motion.div>
+                      ))}
                     </div>
 
-                    {/* Other settings placeholders */}
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="p-4 border rounded-lg">
-                        <h3 className="font-medium mb-2">General Information</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Update institute name, address, and contacts.</p>
-
-                        <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">Manage Info</Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>General Information</DialogTitle>
-                              <DialogDescription>Update your institute's public details.</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label>Institute Name</Label>
-                                <Input value={formData.instituteName} onChange={e => setFormData({ ...formData, instituteName: e.target.value })} />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Address</Label>
-                                <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Phone</Label>
-                                <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Email</Label>
-                                <Input value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Website</Label>
-                                <Input value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} />
-                              </div>
+                    {/* Recent Activities and Pending Approvals */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+                      <motion.div
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.4 }}
+                      >
+                        <Card className="h-full hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <CardTitle className="flex items-center text-base md:text-lg">
+                              <Activity className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                              Recent Activities
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3 md:space-y-4">
+                              {(activityLogs || []).slice(0, 5).map((log) => (
+                                <div key={log.id} className="flex items-start space-x-3">
+                                  <div className="w-6 h-6 md:w-8 md:h-8 bg-muted rounded-full flex items-center justify-center flex-shrink-0">
+                                    {getActivityIcon(log.type)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs md:text-sm font-medium truncate">{log.action}</p>
+                                    <p className="text-xs text-muted-foreground line-clamp-2">{log.details}</p>
+                                    <p className="text-xs text-muted-foreground">{log.timestamp}</p>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
-                            <DialogFooter>
-                              <Button onClick={() => handleSaveSettings('info')} disabled={isSaving}>
-                                {isSaving ? 'Saving...' : 'Save Changes'}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+
+                      <motion.div
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.5 }}
+                      >
+                        <Card className="h-full hover:shadow-md transition-shadow">
+                          <CardHeader>
+                            <CardTitle className="flex items-center text-base md:text-lg">
+                              <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                              Pending Approvals
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-3 md:space-y-4">
+                              {(pendingApprovals || []).slice(0, 3).map((approval) => (
+                                <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0 hover:bg-slate-50 transition-colors">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs md:text-sm font-medium truncate">{approval.title}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {approval.submittedBy} • {approval.submittedAt}
+                                    </p>
+                                    <Badge className={`text-xs ${getPriorityColor(approval.priority)} mt-1`}>
+                                      {approval.priority}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex space-x-2">
+                                    <Button size="sm" onClick={() => handleApproval(approval.id, 'approve')}>
+                                      <CheckCircle className="h-3 w-3 md:h-4 md:w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleApproval(approval.id, 'reject')}>
+                                      <XCircle className="h-3 w-3 md:h-4 md:w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </motion.div>
+                    </div>
+
+                    {/* Recent Exams */}
+                    <Card>
+                      <CardHeader>
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                          <CardTitle className="flex items-center text-base md:text-lg">
+                            <FileText className="h-4 w-4 md:h-5 md:w-5 mr-2" />
+                            Recent Exams
+                          </CardTitle>
+                          <Button variant="outline" size="sm">
+                            <Download className="h-3 w-3 md:h-4 md:w-4 mr-2" />
+                            Download Report
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead className="text-xs md:text-sm">Title</TableHead>
+                                <TableHead className="text-xs md:text-sm hidden md:table-cell">Subject</TableHead>
+                                <TableHead className="text-xs md:text-sm hidden lg:table-cell">Date</TableHead>
+                                <TableHead className="text-xs md:text-sm">Type</TableHead>
+                                <TableHead className="text-xs md:text-sm">Status</TableHead>
+                                <TableHead className="text-xs md:text-sm hidden md:table-cell">Students</TableHead>
+                                <TableHead className="text-xs md:text-sm">Actions</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {(recentExams || []).map((exam) => (
+                                <TableRow key={exam.id}>
+                                  <TableCell className="font-medium text-xs md:text-sm">
+                                    <div>
+                                      <div className="truncate max-w-[120px] md:max-w-none">{exam.title}</div>
+                                      <div className="text-xs text-muted-foreground md:hidden">{exam.subject}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-xs md:text-sm hidden md:table-cell">{exam.subject}</TableCell>
+                                  <TableCell className="text-xs md:text-sm hidden lg:table-cell">{exam.date}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline" className="text-xs">{exam.type}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge className={`text-xs ${getStatusColor(exam.status)}`}>
+                                      {exam.status}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-xs md:text-sm hidden md:table-cell">{exam.totalStudents}</TableCell>
+                                  <TableCell>
+                                    <div className="flex space-x-1">
+                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                                        <Eye className="h-3 w-3" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                                        <Edit className="h-3 w-3" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Settings Tab */}
+              {activeTab === 'settings' && (
+                <div className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <SettingsIcon className="mr-2 h-5 w-5" />
+                        Institute Settings
+                      </CardTitle>
+                      <CardDescription>
+                        Manage global settings for your institute
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
+                        <div className="space-y-0.5">
+                          <div className="flex items-center">
+                            <AlertTriangle className="mr-2 h-4 w-4 text-yellow-600" />
+                            <h3 className="font-medium text-base">Maintenance Mode</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            When enabled, only Admins and Super Users can access the system.
+                            <br />Students and Teachers will be logged out and blocked.
+                          </p>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            variant={maintenanceMode ? "destructive" : "default"}
+                            onClick={async () => {
+                              try {
+                                const newState = !maintenanceMode;
+                                const res = await fetch('/api/settings', {
+                                  method: 'PATCH',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ maintenanceMode: newState })
+                                });
+
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setMaintenanceMode(data.maintenanceMode);
+                                }
+                              } catch (err) {
+                                console.error('Failed to toggle maintenance mode', err);
+                              }
+                            }}
+                          >
+                            {maintenanceMode ? 'Disable Maintenance' : 'Enable Maintenance'}
+                          </Button>
+                        </div>
                       </div>
 
-                      <div className="p-4 border rounded-lg">
-                        <h3 className="font-medium mb-2">Branding</h3>
-                        <p className="text-sm text-muted-foreground mb-4">Upload logo, signature, and set colors.</p>
+                      {/* Other settings placeholders */}
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="p-4 border rounded-lg">
+                          <h3 className="font-medium mb-2">General Information</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Update institute name, address, and contacts.</p>
 
-                        <Dialog open={brandingOpen} onOpenChange={setBrandingOpen}>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">Manage Branding</Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-xl">
-                            <DialogHeader>
-                              <DialogTitle>Institute Branding</DialogTitle>
-                              <DialogDescription>Customize your institute's look and feel.</DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-6 py-4">
-                              <div className="space-y-2">
-                                <Label>Details</Label>
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div>
-                                    <Label className="text-xs">Primary Color</Label>
-                                    <div className="flex items-center gap-2 mt-1">
-                                      <input
-                                        type="color"
-                                        value={formData.primaryColor}
-                                        onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
-                                        className="h-8 w-12 cursor-pointer"
-                                      />
-                                      <Input
-                                        value={formData.primaryColor}
-                                        onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
-                                        className="h-8"
-                                      />
+                          <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">Manage Info</Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>General Information</DialogTitle>
+                                <DialogDescription>Update your institute's public details.</DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                  <Label>Institute Name</Label>
+                                  <Input value={formData.instituteName} onChange={e => setFormData({ ...formData, instituteName: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Address</Label>
+                                  <Input value={formData.address} onChange={e => setFormData({ ...formData, address: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Phone</Label>
+                                  <Input value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Email</Label>
+                                  <Input value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Website</Label>
+                                  <Input value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} />
+                                </div>
+                              </div>
+                              <DialogFooter>
+                                <Button onClick={() => handleSaveSettings('info')} disabled={isSaving}>
+                                  {isSaving ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
+
+                        <div className="p-4 border rounded-lg">
+                          <h3 className="font-medium mb-2">Branding</h3>
+                          <p className="text-sm text-muted-foreground mb-4">Upload logo, signature, and set colors.</p>
+
+                          <Dialog open={brandingOpen} onOpenChange={setBrandingOpen}>
+                            <DialogTrigger asChild>
+                              <Button variant="outline" size="sm">Manage Branding</Button>
+                            </DialogTrigger>
+                            <DialogContent className="max-w-xl">
+                              <DialogHeader>
+                                <DialogTitle>Institute Branding</DialogTitle>
+                                <DialogDescription>Customize your institute's look and feel.</DialogDescription>
+                              </DialogHeader>
+                              <div className="space-y-6 py-4">
+                                <div className="space-y-2">
+                                  <Label>Details</Label>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                      <Label className="text-xs">Primary Color</Label>
+                                      <div className="flex items-center gap-2 mt-1">
+                                        <input
+                                          type="color"
+                                          value={formData.primaryColor}
+                                          onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                          className="h-8 w-12 cursor-pointer"
+                                        />
+                                        <Input
+                                          value={formData.primaryColor}
+                                          onChange={e => setFormData({ ...formData, primaryColor: e.target.value })}
+                                          className="h-8"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label>Institute Logo</Label>
+                                  <div className="border rounded p-2">
+                                    {formData.logoUrl && <img src={formData.logoUrl} alt="Logo" className="h-10 mb-2 object-contain" />}
+                                    <div className="border border-dashed rounded p-4 text-center">
+                                      <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
+                                      <p className="text-xs text-muted-foreground">Logo upload temporarily unavailable</p>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <Label>Digital Signature</Label>
+                                  <div className="border rounded p-2">
+                                    {formData.signatureUrl && <img src={formData.signatureUrl} alt="Signature" className="h-10 mb-2 object-contain" />}
+                                    <div className="border border-dashed rounded p-4 text-center">
+                                      <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
+                                      <p className="text-xs text-muted-foreground">Signature upload temporarily unavailable</p>
                                     </div>
                                   </div>
                                 </div>
                               </div>
-
-                              <div className="space-y-2">
-                                <Label>Institute Logo</Label>
-                                <div className="border rounded p-2">
-                                  {formData.logoUrl && <img src={formData.logoUrl} alt="Logo" className="h-10 mb-2 object-contain" />}
-                                  <div className="border border-dashed rounded p-4 text-center">
-                                    <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
-                                    <p className="text-xs text-muted-foreground">Logo upload temporarily unavailable</p>
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="space-y-2">
-                                <Label>Digital Signature</Label>
-                                <div className="border rounded p-2">
-                                  {formData.signatureUrl && <img src={formData.signatureUrl} alt="Signature" className="h-10 mb-2 object-contain" />}
-                                  <div className="border border-dashed rounded p-4 text-center">
-                                    <Input type="file" accept="image/*" className="max-w-xs mx-auto mb-2" />
-                                    <p className="text-xs text-muted-foreground">Signature upload temporarily unavailable</p>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button onClick={() => handleSaveSettings('branding')} disabled={isSaving}>
-                                {isSaving ? 'Saving...' : 'Save Branding'}
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                              <DialogFooter>
+                                <Button onClick={() => handleSaveSettings('branding')} disabled={isSaving}>
+                                  {isSaving ? 'Saving...' : 'Save Branding'}
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
 
-            {/* Tab Views */}
-            {activeTab === 'approvals' && <ApprovalsTab approvals={pendingApprovals} />}
-            {activeTab === 'ai-usage' && <AiUsageTab data={aiUsageData} />}
-            {activeTab === 'logs' && <SystemLogsTab logs={activityLogs} />}
-            {activeTab === 'analytics' && <AnalyticsTab />}
-            {activeTab === 'profile' && <ProfileTab user={user} />}
 
-            {/* Fallback for unknown tabs */}
-            {!['overview', 'settings', 'approvals', 'ai-usage', 'logs', 'analytics', 'profile'].includes(activeTab) && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</CardTitle>
-                  <CardDescription>
-                    This section is under development.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    The {activeTab} functionality will be implemented soon.
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+              {/* Other Tabs with Animation */}
+              {activeTab !== 'overview' && (
+                <motion.div
+                  key={activeTab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {activeTab === 'approvals' && <ApprovalsTab approvals={pendingApprovals} />}
+                  {activeTab === 'ai-usage' && <AiUsageTab data={aiUsageData} />}
+                  {activeTab === 'logs' && <SystemLogsTab logs={activityLogs} />}
+                  {activeTab === 'analytics' && <AnalyticsTab />}
+                  {activeTab === 'profile' && <ProfileTab user={user} />}
+
+                  {!['overview', 'settings', 'approvals', 'ai-usage', 'logs', 'analytics', 'profile'].includes(activeTab) && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</CardTitle>
+                        <CardDescription>This section is under development.</CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-muted-foreground">The {activeTab} functionality will be implemented soon.</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-          <AppFooter />
         </main>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
