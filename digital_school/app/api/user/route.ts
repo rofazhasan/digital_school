@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
             name,
             email,
             phone, // Add phone to user creation
-            password: await bcrypt.hash('TempPass123!', 12), // Hash the temp password
+            password: await bcrypt.hash(user.password || 'TempPass123!', 12), // Use provided password or default
             role,
             instituteId: authData.user.instituteId,
             studentProfile: role === 'STUDENT' && classId ? {

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Upload, UserPlus, Edit, Trash2, Users, Shield, Loader2, CheckCircle, XCircle, LayoutDashboard, MoreHorizontal, Mail, Phone } from "lucide-react";
+import { Upload, UserPlus, Edit, Trash2, Users, Shield, Loader2, CheckCircle, XCircle, LayoutDashboard, MoreHorizontal, Mail, Phone, Eye, EyeOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -65,6 +65,9 @@ export default function AdminUsersPage() {
     // Form States for Add/Edit to handle conditional rendering
     const [selectedRoleForAdd, setSelectedRoleForAdd] = useState<User['role']>('STUDENT');
     const [selectedRoleForEdit, setSelectedRoleForEdit] = useState<User['role']>('STUDENT');
+
+    // Password Visibility State
+    const [showPassword, setShowPassword] = useState(false);
 
     const filteredUsers = users.filter(u =>
         (activeRole === 'ALL' || u.role === activeRole) &&
@@ -167,7 +170,7 @@ export default function AdminUsersPage() {
         }
     };
 
-    const handleAddUser = async (user: Omit<User, 'id'>) => {
+    const handleAddUser = async (user: any) => {
         try {
             setLoading(true);
             setError(null);
@@ -181,8 +184,9 @@ export default function AdminUsersPage() {
             if (response.ok) {
                 await refreshUsers();
                 setShowAddUser(false);
-                // Reset default
+                // Reset defaults
                 setSelectedRoleForAdd('STUDENT');
+                setShowPassword(false);
             } else {
                 setError(data.error || (data.results && data.results[0]?.error) || 'Failed to add user');
             }
@@ -250,10 +254,11 @@ export default function AdminUsersPage() {
                     name: r.name,
                     email: r.email,
                     phone: r.phone,
-                    role: r.role.toUpperCase(), // Normalize role
+                    role: r.role.toUpperCase(), // Normalize role to match DB Enum
                     class: r.class,
                     section: r.section,
-                    roll: r.roll
+                    roll: r.roll,
+                    password: r.password // Allow password import if present
                 }));
 
                 if (usersToAdd.length === 0) {
@@ -627,6 +632,7 @@ export default function AdminUsersPage() {
                                     email: email,
                                     phone: phone,
                                     role: formData.get('role') as User['role'],
+                                    password: formData.get('password') as string,
                                     class: formData.get('class')?.toString().split('-')[0],
                                     section: formData.get('class')?.toString().split('-')[1],
                                     roll: formData.get('roll') as string
@@ -646,6 +652,26 @@ export default function AdminUsersPage() {
                                         <Input name="phone" placeholder="+1234567890" />
                                     </div>
                                 </div>
+
+                                <div className="grid gap-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-sm font-medium">Default Password</label>
+                                        <button type="button" onClick={() => setShowPassword(!showPassword)} className="text-xs text-primary hover:underline flex items-center gap-1">
+                                            {showPassword ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+                                            {showPassword ? "Hide" : "Show"}
+                                        </button>
+                                    </div>
+                                    <div className="relative">
+                                        <Input
+                                            name="password"
+                                            type={showPassword ? "text" : "password"}
+                                            defaultValue="TempPass123!"
+                                            placeholder="Enter password"
+                                        />
+                                    </div>
+                                    <p className="text-[10px] text-gray-500">Default: TempPass123!</p>
+                                </div>
+
                                 <div className="grid gap-2">
                                     <label className="text-sm font-medium">Role</label>
                                     <select

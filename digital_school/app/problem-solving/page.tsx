@@ -28,15 +28,18 @@ const MATHJAX_CONFIG = {
 };
 
 // Types
+// Update Interface
 interface Question {
     id: string;
     questionText: string;
     type: 'MCQ' | 'CQ' | 'SQ';
     subject: string;
+    topic?: string; // Added topic
     class: { name: string };
     difficulty: string;
     marks: number;
 }
+
 
 export default function ProblemSolvingSelector() {
     const router = useRouter();
@@ -314,6 +317,12 @@ export default function ProblemSolvingSelector() {
                                                             </Badge>
                                                             <div className="text-xs font-semibold text-slate-400 flex items-center gap-1">
                                                                 <BookOpen className="w-3 h-3" /> {q.subject}
+                                                                {q.topic && (
+                                                                    <>
+                                                                        <span className="text-slate-300">•</span>
+                                                                        <span className="text-indigo-500">{q.topic}</span>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         </div>
 

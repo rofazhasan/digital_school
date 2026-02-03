@@ -116,10 +116,12 @@ export default function ExamsPage() {
     try {
       const response = await fetch("/api/user");
       if (response.ok) {
-        const data = await response.json();
-        console.log("Fetched user role:", data.user?.role); // Debug log
-        if (data.user && data.user.role) {
-          setUserRole(data.user.role);
+        const result = await response.json();
+        // Handle wrapped response
+        const user = result.user || result.data?.user;
+        console.log("Fetched user role:", user?.role);
+        if (user && user.role) {
+          setUserRole(user.role);
         }
       } else {
         console.error("Failed to fetch user role, status:", response.status);
@@ -135,8 +137,17 @@ export default function ExamsPage() {
       const response = await fetch("/api/exams");
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
-      // Handle both array and object with data property
-      const data = Array.isArray(result) ? result : result.data || [];
+
+      // Handle array, wrapped array, or wrapped object with exams property
+      let data = [];
+      if (Array.isArray(result)) {
+        data = result;
+      } else if (Array.isArray(result.data)) {
+        data = result.data;
+      } else if (result.data?.exams && Array.isArray(result.data.exams)) {
+        data = result.data.exams;
+      }
+
       setExams(data);
     } catch (error) {
       console.error("Error fetching exams:", error);
