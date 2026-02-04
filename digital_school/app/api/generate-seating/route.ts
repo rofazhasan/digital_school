@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import prisma from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,6 @@ export async function POST(req: NextRequest) {
         // Parse Inputs
         const body = await req.json();
         const { examId, classId, sectionId, hallIds, activeHalls } = body;
-        // activeHalls: array of hall IDs selected for this exam seating
 
         if (!examId || !classId) {
             return NextResponse.json({ error: "Missing Exam or Class ID" }, { status: 400 });
@@ -20,14 +19,9 @@ export async function POST(req: NextRequest) {
 
         // 1. Fetch Students
         const students = await prisma.studentProfile.findMany({
-            where: {
-                classId,
-                // If sectionId is provided/used? Schema doesn't strictly link sectionId in StudentProfile unless embedded in class or separate?
-                // StudentProfile has classId. Class model has name/section.
-                // Assuming filtering by Class ID is sufficient as Class ID is unique to a Section usually in this schema (Class has name+section unique).
-            },
-            orderBy: { roll: 'asc' }, // Default sorting
-            select: { id: true, roll: true, name: true, registrationNo: true }
+            where: { classId },
+            orderBy: { roll: 'asc' },
+            select: { id: true, roll: true, name: true, registrationNo: true, classId: true }
         });
 
         if (students.length === 0) {
@@ -43,14 +37,10 @@ export async function POST(req: NextRequest) {
         });
 
         if (halls.length === 0) {
-            // Fallback: fetch all institute halls if activeHalls not validated?
-            // Or return error "Please select halls". Let's return error.
             return NextResponse.json({ error: "No exam halls selected" }, { status: 400 });
         }
 
-        // 3. Clear Existing Allocations for this Exam (Optional: or overwrite/update?)
-        // Safer to clear for this Class+Exam combo. 
-        // But Allocations are stored by studentId, so we can upsert or delete where studentId in students.map(id)
+        // 3. Clear Existing Allocations
         const studentIds = students.map(s => s.id);
         await prisma.seatAllocation.deleteMany({
             where: {
@@ -63,23 +53,13 @@ export async function POST(req: NextRequest) {
         const allocations = [];
         let currentHallIndex = 0;
         let currentHall = halls[0];
-        let currentSeatCount = 0; // Seats used in current hall
+        let currentSeatCount = 0;
 
-        // Seat Label logic: varies by hall config?
-        // Simple: 1, 2, 3... or R1-C1-B1? 
-        // Let's use sequential "Seat 1, Seat 2..." for now, resetting per Hall.
-        // Or "H1-001".
-
-        // For stickers: We need nice labels.
-        // Let's iterate students
         for (const student of students) {
-            if (!currentHall) {
-                break; // Run out of space
-            }
+            if (!currentHall) break;
 
-            // Assign Seat
             const seatNumber = currentSeatCount + 1;
-            const seatLabel = `Seat ${seatNumber}`; // Can be fancy: HallName-SeatNo
+            const seatLabel = `Seat ${seatNumber}`;
 
             allocations.push({
                 examId,
@@ -90,9 +70,7 @@ export async function POST(req: NextRequest) {
 
             currentSeatCount++;
 
-            // Check Capacity
             if (currentSeatCount >= currentHall.capacity) {
-                // Move to next hall
                 currentHallIndex++;
                 currentHall = halls[currentHallIndex];
                 currentSeatCount = 0;
@@ -108,12 +86,15 @@ export async function POST(req: NextRequest) {
 
         // 6. Fetch Full Data for Frontend Return
         const finalAllocations = await prisma.seatAllocation.findMany({
-            where: { examId },
+            where: {
+                examId,
+                studentId: { in: studentIds }
+            },
             include: {
                 student: true,
                 hall: true
             },
-            orderBy: { seatLabel: 'asc' } // or whatever logic
+            orderBy: { seatLabel: 'asc' }
         });
 
         // Return Stats & Data
