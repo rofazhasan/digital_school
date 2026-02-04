@@ -68,6 +68,7 @@ model Institute {
   superUser    User?     @relation("InstituteSuperUser", fields: [superUserId], references: [id])
   settings     Settings?
   users        User[]    @relation("InstituteUsers")
+  examHalls    ExamHall[]
 
   @@map("institutes")
 }
@@ -97,6 +98,7 @@ model StudentProfile {
   results          Result[]
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seatAllocations  SeatAllocation[]
 
   @@map("student_profiles")
 }
@@ -181,6 +183,7 @@ model Exam {
   omrSheets             OMRSheet[]
   resultReviews         ResultReview[]
   results               Result[]
+  seatAllocations       SeatAllocation[]
 
   @@index([createdAt]) // Optimized for Exam List sorting
   @@index([classId])   // Optimized for Class filtering
@@ -688,6 +691,35 @@ model ResultReview {
 
   @@unique([examId, studentId])
   @@map("result_reviews")
+}
+
+model ExamHall {
+  id            String          @id @default(cuid())
+  name          String
+  roomNo        String?
+  capacity      Int
+  rows          Int             @default(5)
+  columns       Int             @default(4)
+  seatsPerBench Int             @default(2) 
+  instituteId   String
+  allocations   SeatAllocation[]
+  institute     Institute       @relation(fields: [instituteId], references: [id])
+
+  @@map("exam_halls")
+}
+
+model SeatAllocation {
+  id          String         @id @default(cuid())
+  examId      String
+  studentId   String
+  hallId      String
+  seatLabel   String
+  exam        Exam           @relation(fields: [examId], references: [id])
+  student     StudentProfile @relation(fields: [studentId], references: [id])
+  hall        ExamHall       @relation(fields: [hallId], references: [id])
+
+  @@unique([examId, studentId])
+  @@map("seat_allocations")
 }
 
 model Notification {
