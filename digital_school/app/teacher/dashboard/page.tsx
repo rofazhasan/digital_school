@@ -33,6 +33,7 @@ import {
     AdminSettingsTab,
     AdminAdmitCardsTab
 } from "@/components/dashboard/admin-tabs";
+import TeacherAdmitCardsTab from "@/components/dashboard/TeacherAdmitCardsTab";
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -345,7 +346,7 @@ export default function TeacherDashboard() {
                             {activeTab === 'chat' && <ChatTab />}
                             {activeTab === 'security' && <SecurityTab />}
                             {activeTab === 'settings' && <AdminSettingsTab />}
-                            {activeTab === 'admit-cards' && <AdminAdmitCardsTab />}
+                            {activeTab === 'admit-cards' && <TeacherAdmitCardsTab />}
 
                             {/* Placeholders for sections that are primarily link-based but might have inline content */}
                             {['classes', 'omr-scanner'].includes(activeTab) && (
