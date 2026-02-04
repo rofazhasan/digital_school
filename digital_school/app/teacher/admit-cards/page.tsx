@@ -115,7 +115,6 @@ export default function AdmitCardManagementPage() {
                 if (data.allocations) {
                     processData(data.allocations, data.examName, data.className);
                 } else {
-                    // Fallback if allocations missing? Should not happen with fixed API
                     toast.warning("No allocation data returned");
                 }
             } else {
@@ -169,6 +168,22 @@ export default function AdmitCardManagementPage() {
         const allAssignments = plans.flatMap(p => p.assignments);
         setSeatLabelPages(chunkArray(allAssignments, 24));
     }
+
+    // Helper to get selected exam details
+    const getExamDetails = (): ExamDetails => {
+        const exam = exams.find(e => e.id === selectedExam);
+        const cls = classes.find(c => c.id === selectedClass);
+        return {
+            id: selectedExam,
+            name: exam?.name || '',
+            date: exam?.date ? new Date(exam.date) : new Date(),
+            schoolName: 'Digital School & College', // Hardcoded for now or fetch settings
+            className: cls?.name || '',
+            eiin: '134567'
+        };
+    };
+
+    const examDetails = getExamDetails();
 
     return (
         <div className="container mx-auto p-6 space-y-6 max-w-7xl">
@@ -257,14 +272,7 @@ export default function AdmitCardManagementPage() {
                                                     <AdmitCard
                                                         key={stu.id}
                                                         student={stu}
-                                                        exam={{
-                                                            id: selectedExam,
-                                                            name: exams.find(e => e.id === selectedExam)?.name || '',
-                                                            date: new Date(),
-                                                            schoolName: 'Digital School',
-                                                            className: classes.find(c => c.id === selectedClass)?.name || '',
-                                                            eiin: '123456'
-                                                        }}
+                                                        exam={examDetails}
                                                     />
                                                 ))}
                                             </div>
@@ -280,14 +288,7 @@ export default function AdmitCardManagementPage() {
                                             <div key={i} className="w-[210mm] h-[297mm] bg-white break-after-page mb-8 print:mb-0" style={{ pageBreakAfter: 'always' }}>
                                                 <SeatPlanTemplate
                                                     assignments={plan.assignments}
-                                                    exam={{
-                                                        id: selectedExam,
-                                                        name: exams.find(e => e.id === selectedExam)?.name || '',
-                                                        date: new Date(),
-                                                        schoolName: 'Digital School',
-                                                        className: classes.find(c => c.id === selectedClass)?.name || '',
-                                                        eiin: '123456'
-                                                    }}
+                                                    exam={examDetails}
                                                     roomNumber={parseInt(plan.roomNumber) || 0}
                                                 />
                                             </div>
@@ -302,14 +303,7 @@ export default function AdmitCardManagementPage() {
                                             <div key={i} className="w-[210mm] h-[297mm] bg-white break-after-page mb-8 print:mb-0" style={{ pageBreakAfter: 'always' }}>
                                                 <AttendanceSheetTemplate
                                                     assignments={plan.assignments}
-                                                    exam={{
-                                                        id: selectedExam,
-                                                        name: exams.find(e => e.id === selectedExam)?.name || '',
-                                                        date: new Date(),
-                                                        schoolName: 'Digital School',
-                                                        className: classes.find(c => c.id === selectedClass)?.name || '',
-                                                        eiin: '123456'
-                                                    }}
+                                                    exam={examDetails}
                                                     roomNumber={parseInt(plan.roomNumber) || 0}
                                                 />
                                             </div>
@@ -326,14 +320,7 @@ export default function AdmitCardManagementPage() {
                                                     <SeatLabelTemplate
                                                         key={assignment.student.id}
                                                         assignment={assignment}
-                                                        exam={{
-                                                            id: selectedExam,
-                                                            name: exams.find(e => e.id === selectedExam)?.name || '',
-                                                            date: new Date(),
-                                                            schoolName: 'Digital School',
-                                                            className: classes.find(c => c.id === selectedClass)?.name || '',
-                                                            eiin: '123456'
-                                                        }}
+                                                        exam={examDetails}
                                                     />
                                                 ))}
                                             </div>
