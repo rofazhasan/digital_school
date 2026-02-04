@@ -79,11 +79,14 @@ export default function AdmitCardManagementPage() {
 
                 if (resExams.ok) {
                     const d = await resExams.json();
-                    setExams(d.exams || []);
+                    // Handle createApiResponse structure (d.data.exams) or direct (d.exams)
+                    const examList = d.data?.exams || d.exams || [];
+                    setExams(examList);
                 }
                 if (resClasses.ok) {
                     const d = await resClasses.json();
-                    setClasses(d.classes || []);
+                    const classList = d.data?.classes || d.classes || [];
+                    setClasses(classList);
                 }
             } catch (e) { console.error(e); }
         };
