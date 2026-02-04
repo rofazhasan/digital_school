@@ -1,286 +1,124 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import Link from "next/link";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Progress } from "@/components/ui/progress";
-
-
-
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-    BookOpen,
+    GraduationCap,
     FileText,
-    Users,
+    Calendar,
     BarChart3,
+    Bell,
     Settings,
     LogOut,
-    Plus,
-    Search,
-    Filter,
-    Upload,
-    Camera,
-    CheckCircle,
-    Clock,
+    Home,
+    BookOpen,
+    ClipboardList,
+    MessageSquare,
+    Activity,
+    Shield,
     Menu,
-    AlertCircle,
-    Star,
-    Brain,
-    Calculator,
-    Image,
-    FileCheck,
-    Bell,
-    Calendar,
-    TrendingUp,
-    Award,
-    Zap,
-    Eye,
-    Edit,
-    Trash2,
-    Download,
-    Upload as UploadIcon,
+    X,
     Scan,
-    CheckSquare,
-    XSquare,
-    MinusSquare,
-    PlusSquare,
-    FileSpreadsheet,
-    Printer,
-    QrCode,
-    Smartphone,
-    Laptop,
-    Globe,
-    Wifi,
-    WifiOff
-} from "lucide-react";
-
-import { motion, AnimatePresence } from "framer-motion";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { TeacherSidebar } from "@/components/dashboard/TeacherSidebar";
+    User,
+    ChevronDown
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
-import { CreateExamsTab } from "@/components/dashboard/teacher-tabs";
+import {
+    AdminAnalyticsTab,
+    AttendanceTab,
+    NoticesTab,
+    ChatTab,
+    SecurityTab,
+    AdminSettingsTab,
+    AdminAdmitCardsTab
+} from "@/components/dashboard/admin-tabs";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
-interface User {
+interface SidebarItem {
     id: string;
-    name: string;
-    email: string;
-    role: 'TEACHER';
-    teacherProfile?: {
-        id: string;
-        employeeId: string;
-        department: string;
-        subjects: string[];
-    };
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+    href: string;
+    badge?: number;
 }
 
-interface Evaluation {
-    id: string;
-    examName: string;
-    studentName: string;
-    subject: string;
-    totalMarks: number;
-    obtainedMarks: number;
-    status: 'pending' | 'evaluated' | 'ai_evaluated';
-    submittedAt: string;
-    evaluationType: 'manual' | 'ai';
-}
+const sidebarItems: SidebarItem[] = [
+    { id: 'overview', label: 'Overview', icon: Home, href: '#overview' },
+    // { id: 'users', label: 'Users', icon: Users, href: '/admin/users' }, // EXCLUDED FOR TEACHER
+    { id: 'classes', label: 'Classes', icon: GraduationCap, href: '#classes' },
+    { id: 'exams', label: 'Exams', icon: FileText, href: '/exams' },
+    { id: 'questions', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
+    { id: 'admit-cards', label: 'Admit Cards', icon: ClipboardList, href: '#admit-cards' },
+    { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
+    { id: 'omr-scanner', label: 'OMR Scanner', icon: Scan, href: '/omr_scanner' },
+    { id: 'attendance', label: 'Attendance', icon: Calendar, href: '#attendance' },
+    { id: 'notices', label: 'Notices', icon: Bell, href: '#notices' },
+    // { id: 'billing', label: 'Billing', icon: CreditCard, href: '#billing' }, // EXCLUDED FOR TEACHER
+    { id: 'chat', label: 'Chat Support', icon: MessageSquare, href: '#chat' },
+    { id: 'analytics', label: 'Analytics', icon: Activity, href: '#analytics' },
+    { id: 'security', label: 'Security', icon: Shield, href: '#security' },
+    { id: 'settings', label: 'Settings', icon: Settings, href: '#settings' },
+];
 
-interface Question {
-    id: string;
-    type: 'MCQ' | 'CQ';
-    subject: string;
-    topic: string;
-    difficulty: 'easy' | 'medium' | 'hard';
-    question: string;
-    options?: string[];
-    correctAnswer?: string;
-    marks: number;
-    hasImage: boolean;
-    hasMath: boolean;
-    createdAt: string;
-}
-
-interface Exam {
-    id: string;
-    name: string;
-    subject: string;
-    class: string;
-    totalMarks: number;
-    duration: number;
-    status: 'draft' | 'published' | 'ongoing' | 'completed';
-    startDate: string;
-    endDate: string;
-    totalStudents: number;
-    submittedCount: number;
-}
-
-interface Attendance {
-    id: string;
-    date: string;
-    class: string;
-    subject: string;
-    totalStudents: number;
-    presentCount: number;
-    absentCount: number;
-    lateCount: number;
-    mode: 'online' | 'offline';
-}
-
-export default function TeacherDashboardPage() {
-    const [user, setUser] = useState<User | null>(null);
-    const [activeTab, setActiveTab] = useState('dashboard');
-    const [loading, setLoading] = useState(true);
-    const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-    const [questions, setQuestions] = useState<Question[]>([]);
-    const [exams, setExams] = useState<Exam[]>([]);
-    const [attendance, setAttendance] = useState<Attendance[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterSubject, setFilterSubject] = useState('all');
-    const [aiUsageCount, setAiUsageCount] = useState(0);
-    const [evaluationSpeed, setEvaluationSpeed] = useState(0);
+export default function TeacherDashboard() {
+    const [activeTab, setActiveTab] = useState('overview');
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+    const [userMenuOpen, setUserMenuOpen] = useState(false);
     const router = useRouter();
+    const userMenuRef = useRef<HTMLDivElement>(null);
+    const [user, setUser] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+
+    // Handle click outside user menu
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+                setUserMenuOpen(false);
+            }
+        }
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
 
     useEffect(() => {
-        // Fetch current user data
         fetch('/api/user')
             .then(res => res.json())
             .then(data => {
                 if (data.user && data.user.role === 'TEACHER') {
                     setUser(data.user);
                 } else if (data.user) {
-                    // Redirect to appropriate dashboard based on role
-                    const userRole = data.user.role;
-                    let redirectUrl = '/dashboard';
-
-                    switch (userRole) {
-                        case 'SUPER_USER':
-                            redirectUrl = '/super-user/dashboard';
-                            break;
-                        case 'ADMIN':
-                            redirectUrl = '/admin/dashboard';
-                            break;
-                        case 'STUDENT':
-                            redirectUrl = '/student/dashboard';
-                            break;
-                        default:
-                            redirectUrl = '/dashboard';
+                    // Redirect if not teacher
+                    // Allow Admin/Super to view as well for testing, or redirect?
+                    // Strict redirect:
+                    if (data.user.role === 'ADMIN' || data.user.role === 'SUPER_USER') {
+                        // Admin can view teacher dashboard usually? Let's allow.
+                        setUser(data.user);
+                    } else {
+                        router.push('/dashboard');
                     }
-
-                    router.push(redirectUrl);
                 } else {
                     router.push('/login');
                 }
             })
-            .catch(() => {
-                router.push('/login');
-            })
-            .finally(() => {
-                setLoading(false);
-            });
-
-        // Load mock data
-        loadMockData();
+            .catch(() => router.push('/login'))
+            .finally(() => setLoading(false));
     }, [router]);
 
-    const loadMockData = () => {
-        // Mock evaluations
-        setEvaluations([
-            {
-                id: '1',
-                examName: 'Mid Term Physics',
-                studentName: 'Ahmed Khan',
-                subject: 'Physics',
-                totalMarks: 50,
-                obtainedMarks: 0,
-                status: 'pending',
-                submittedAt: '2025-06-28T10:30:00Z',
-                evaluationType: 'manual'
-            },
-            {
-                id: '2',
-                examName: 'Mid Term Physics',
-                studentName: 'Fatima Ali',
-                subject: 'Physics',
-                totalMarks: 50,
-                obtainedMarks: 42,
-                status: 'ai_evaluated',
-                submittedAt: '2025-06-28T09:15:00Z',
-                evaluationType: 'ai'
-            }
-        ]);
-
-        // Mock questions
-        setQuestions([
-            {
-                id: '1',
-                type: 'MCQ',
-                subject: 'Physics',
-                topic: 'Mechanics',
-                difficulty: 'medium',
-                question: 'What is the SI unit of force?',
-                options: ['Newton', 'Joule', 'Watt', 'Pascal'],
-                correctAnswer: 'Newton',
-                marks: 1,
-                hasImage: false,
-                hasMath: false,
-                createdAt: '2025-06-28T08:00:00Z'
-            },
-            {
-                id: '2',
-                type: 'CQ',
-                subject: 'Physics',
-                topic: 'Mechanics',
-                difficulty: 'hard',
-                question: 'A car accelerates from rest to 20 m/s in 5 seconds. Calculate the acceleration.',
-                marks: 5,
-                hasImage: false,
-                hasMath: true,
-                createdAt: '2025-06-28T07:30:00Z'
-            }
-        ]);
-
-        // Mock exams
-        setExams([
-            {
-                id: '1',
-                name: 'Mid Term Physics',
-                subject: 'Physics',
-                class: 'Class 11',
-                totalMarks: 50,
-                duration: 90,
-                status: 'ongoing',
-                startDate: '2025-06-28T09:00:00Z',
-                endDate: '2025-06-28T10:30:00Z',
-                totalStudents: 25,
-                submittedCount: 18
-            }
-        ]);
-
-        // Mock attendance
-        setAttendance([
-            {
-                id: '1',
-                date: '2025-06-28',
-                class: 'Class 11',
-                subject: 'Physics',
-                totalStudents: 25,
-                presentCount: 22,
-                absentCount: 2,
-                lateCount: 1,
-                mode: 'online'
-            }
-        ]);
-
-        // Mock stats
-        setAiUsageCount(15);
-        setEvaluationSpeed(85);
-    };
 
     const handleLogout = async () => {
         try {
@@ -291,885 +129,246 @@ export default function TeacherDashboardPage() {
         }
     };
 
-    const getStatusColor = (status: string) => {
-        switch (status) {
-            case 'pending':
-                return 'bg-yellow-500';
-            case 'evaluated':
-                return 'bg-green-500';
-            case 'ai_evaluated':
-                return 'bg-blue-500';
-            default:
-                return 'bg-gray-500';
-        }
-    };
-
-    const getDifficultyColor = (difficulty: string) => {
-        switch (difficulty) {
-            case 'easy':
-                return 'bg-green-500';
-            case 'medium':
-                return 'bg-yellow-500';
-            case 'hard':
-                return 'bg-red-500';
-            default:
-                return 'bg-gray-500';
-        }
-    };
-
-    const getExamStatusColor = (status: string) => {
-        switch (status) {
-            case 'draft':
-                return 'bg-gray-500';
-            case 'published':
-                return 'bg-blue-500';
-            case 'ongoing':
-                return 'bg-green-500';
-            case 'completed':
-                return 'bg-purple-500';
-            default:
-                return 'bg-gray-500';
-        }
-    };
-
-    const [instituteSettings, setInstituteSettings] = useState<any>(null);
-
-    useEffect(() => {
-        fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
-    }, []);
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary mx-auto"></div>
-                    <p className="mt-4 text-muted-foreground">Loading Teacher Dashboard...</p>
-                </div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return null;
-    }
-
-    const instituteName = instituteSettings?.instituteName || "Digital School";
-    const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
-
-    return (
-        <div className="min-h-screen bg-background">
-            {/* Header */}
-            <div className="border-b bg-white">
-                <div className="flex justify-between items-center px-6 py-4">
-                    <div className="flex items-center gap-4">
-                        <div className="md:hidden">
-                            <Sheet>
-                                <SheetTrigger asChild>
-                                    <Button variant="ghost" size="icon">
-                                        <Menu className="h-6 w-6" />
-                                    </Button>
-                                </SheetTrigger>
-                                <SheetContent side="left" className="p-0 w-72">
-                                    <TeacherSidebar
-                                        activeTab={activeTab}
-                                        setActiveTab={setActiveTab}
-                                    />
-                                </SheetContent>
-                            </Sheet>
+    const Sidebar = () => (
+        <div className={`fixed inset-y-0 left-0 z-50 bg-white border-r transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col shadow-sm`}>
+            <div className="h-16 flex items-center justify-between px-4 border-b">
+                {!sidebarCollapsed && (
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                            DS
                         </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
-                                <h1 className="text-2xl font-bold">{instituteName} Teacher Dashboard</h1>
-                            </div>
-                            <p className="text-muted-foreground">
-                                Welcome back, {user.name} • {user.teacherProfile?.department}
-                            </p>
-                        </div>
-                        <Badge className="bg-blue-500 text-white">
-                            <BookOpen className="h-4 w-4 mr-1" />
-                            TEACHER
-                        </Badge>
+                        <span className="font-bold text-xl text-gray-800">Digital<span className="text-blue-600">School</span></span>
                     </div>
-                    <div className="flex items-center gap-4">
-                        <Badge variant="outline" className="flex items-center gap-1">
-                            <Brain className="h-3 w-3" />
-                            AI Usage: {aiUsageCount}
-                        </Badge>
-                        <Badge variant="outline" className="flex items-center gap-1">
-                            <Zap className="h-3 w-3" />
-                            Speed: {evaluationSpeed}%
-                        </Badge>
-                        <Button variant="outline" onClick={handleLogout}>
-                            <LogOut className="h-4 w-4 mr-2" />
+                )}
+                {sidebarCollapsed && (
+                    <div className="w-full flex justify-center">
+                        <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
+                            DS
+                        </div>
+                    </div>
+                )}
+                <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden md:flex text-gray-400 hover:text-gray-600">
+                    {sidebarCollapsed ? <ChevronDown className="h-5 w-5 rotate-[-90deg]" /> : <Menu className="h-5 w-5" />}
+                </Button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto py-6 space-y-1 custom-scrollbar">
+                {sidebarItems.map((item) => (
+                    <div key={item.id} className="px-3">
+                        <div
+                            onClick={() => {
+                                if (item.href.startsWith('/')) {
+                                    router.push(item.href);
+                                } else {
+                                    setActiveTab(item.id);
+                                }
+                            }}
+                            className={`
+                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group
+                  ${activeTab === item.id && !item.href.startsWith('/')
+                                    ? 'bg-blue-50 text-blue-700'
+                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
+                `}
+                        >
+                            <div className={`
+                    p-1.5 rounded-md transition-colors
+                    ${activeTab === item.id && !item.href.startsWith('/') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-white group-hover:shadow-sm'}
+                `}>
+                                <item.icon className="w-5 h-5" />
+                            </div>
+                            {!sidebarCollapsed && (
+                                <>
+                                    <span className="font-medium text-sm flex-1">{item.label}</span>
+                                    {item.badge && (
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200">
+                                            {item.badge}
+                                        </Badge>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="p-4 border-t bg-gray-50/50">
+                {!sidebarCollapsed ? (
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border-2 border-white shadow-sm">
+                            {user?.name?.[0] || 'T'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-gray-900 truncate">{user?.name || 'Teacher'}</p>
+                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="flex justify-center">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs" title={user?.name}>
+                            {user?.name?.[0]}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
+    const MobileSidebar = () => (
+        <div className={`fixed inset-0 z-50 bg-black/50 transition-opacity md:hidden ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileSidebarOpen(false)}>
+            <div className={`absolute inset-y-0 left-0 w-64 bg-white shadow-xl transition-transform transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={(e) => e.stopPropagation()}>
+                <div className="h-16 flex items-center justify-between px-4 border-b bg-gray-50/50">
+                    <span className="font-bold text-xl text-gray-800">Menu</span>
+                    <Button variant="ghost" size="icon" onClick={() => setMobileSidebarOpen(false)}>
+                        <X className="h-5 w-5" />
+                    </Button>
+                </div>
+                <div className="overflow-y-auto py-4 space-y-1 h-[calc(100vh-64px)]">
+                    {sidebarItems.map((item) => (
+                        <div key={item.id} className="px-3">
+                            <div
+                                onClick={() => {
+                                    if (item.href.startsWith('/')) {
+                                        router.push(item.href);
+                                    } else {
+                                        setActiveTab(item.id);
+                                        setMobileSidebarOpen(false);
+                                    }
+                                }}
+                                className={`
+                      w-full flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors
+                      ${activeTab === item.id && !item.href.startsWith('/')
+                                        ? 'bg-blue-50 text-blue-700 font-medium'
+                                        : 'text-gray-600 hover:bg-gray-50'}
+                    `}
+                            >
+                                <item.icon className="w-5 h-5" />
+                                <span>{item.label}</span>
+                            </div>
+                        </div>
+                    ))}
+                    <div className="px-3 mt-4 pt-4 border-t">
+                        <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" onClick={handleLogout}>
+                            <LogOut className="w-5 h-5 mr-3" />
                             Logout
                         </Button>
                     </div>
                 </div>
             </div>
+        </div>
+    );
 
-            <div className="flex">
-                {/* Sidebar */}
-                <div className="hidden md:block w-64 bg-white border-r min-h-screen">
-                    <TeacherSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-                </div>
+    if (loading) return <div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
 
-                {/* Main Content */}
-                <div className="flex-1 p-6 max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
+    return (
+        <div className="min-h-screen bg-gray-50/30 font-sans text-gray-900">
+            <Sidebar />
+            <MobileSidebar />
+
+            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} flex flex-col min-h-screen`}>
+                {/* Top Header */}
+                <header className="h-16 bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8">
+                    <div className="flex items-center gap-4">
+                        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileSidebarOpen(true)}>
+                            <Menu className="h-5 w-5" />
+                        </Button>
+                        <div>
+                            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 px-1">
+                                {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
+                            </h1>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="relative" ref={userMenuRef}>
+                            <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm" className="rounded-full h-9 w-9 p-0 border shadow-sm">
+                                        <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                                            {user?.name?.[0] || 'T'}
+                                        </div>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuLabel>
+                                        <div className="flex flex-col space-y-1">
+                                            <p className="text-sm font-medium leading-none">{user?.name}</p>
+                                            <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                                        </div>
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => setActiveTab('settings')}>
+                                        <Settings className="mr-2 h-4 w-4" />
+                                        <span>Settings</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={handleLogout}>
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        <span>Log out</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+                    </div>
+                </header>
+
+                {/* Dashboard Content */}
+                <main className="flex-1 p-4 md:p-8 max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
                     <AnimatePresence mode="wait">
                         <motion.div
                             key={activeTab}
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.3 }}
+                            transition={{ duration: 0.2 }}
+                            className="w-full"
                         >
-                            {activeTab === 'dashboard' && (
+                            {activeTab === 'overview' && (
                                 <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                         <Card>
                                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                                <CardTitle className="text-sm font-medium">Pending Evaluations</CardTitle>
-                                                <Clock className="h-4 w-4 text-muted-foreground" />
+                                                <CardTitle className="text-sm font-medium">Coming Soon</CardTitle>
+                                                <Activity className="h-4 w-4 text-muted-foreground" />
                                             </CardHeader>
                                             <CardContent>
-                                                <div className="text-2xl font-bold">
-                                                    {evaluations.filter(e => e.status === 'pending').length}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Need your attention
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                                <CardTitle className="text-sm font-medium">AI Evaluations</CardTitle>
-                                                <Brain className="h-4 w-4 text-muted-foreground" />
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="text-2xl font-bold">
-                                                    {evaluations.filter(e => e.status === 'ai_evaluated').length}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    AI-assisted grading
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                                <CardTitle className="text-sm font-medium">Total Questions</CardTitle>
-                                                <FileText className="h-4 w-4 text-muted-foreground" />
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="text-2xl font-bold">{questions.length}</div>
-                                                <p className="text-xs text-muted-foreground">
-                                                    In your question bank
-                                                </p>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Recent Evaluations</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-4">
-                                                    {evaluations.slice(0, 5).map((evaluation) => (
-                                                        <div key={evaluation.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                                            <div>
-                                                                <p className="font-medium">{evaluation.studentName}</p>
-                                                                <p className="text-sm text-muted-foreground">{evaluation.examName}</p>
-                                                            </div>
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge className={getStatusColor(evaluation.status)}>
-                                                                    {evaluation.status.replace('_', ' ')}
-                                                                </Badge>
-                                                                {evaluation.evaluationType === 'ai' && (
-                                                                    <Brain className="h-4 w-4 text-blue-500" />
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Active Exams</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-4">
-                                                    {exams.filter(e => e.status === 'ongoing').map((exam) => (
-                                                        <div key={exam.id} className="p-3 border rounded-lg">
-                                                            <div className="flex justify-between items-start mb-2">
-                                                                <div>
-                                                                    <p className="font-medium">{exam.name}</p>
-                                                                    <p className="text-sm text-muted-foreground">{exam.class}</p>
-                                                                </div>
-                                                                <Badge className={getExamStatusColor(exam.status)}>
-                                                                    {exam.status}
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="flex justify-between text-sm">
-                                                                <span>Submitted: {exam.submittedCount}/{exam.totalStudents}</span>
-                                                                <span>{exam.totalMarks} marks</span>
-                                                            </div>
-                                                            <Progress
-                                                                value={(exam.submittedCount / exam.totalStudents) * 100}
-                                                                className="mt-2"
-                                                            />
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                <div className="text-2xl font-bold">Overview</div>
+                                                <p className="text-xs text-muted-foreground">Detailed stats coming soon</p>
                                             </CardContent>
                                         </Card>
                                     </div>
                                 </div>
                             )}
 
-                            {activeTab === 'create-questions' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Create Questions</h2>
-                                        <Button onClick={() => router.push('/teacher/create-question')}>
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            New Question
-                                        </Button>
-                                    </div>
+                            {activeTab === 'analytics' && <AdminAnalyticsTab />}
+                            {activeTab === 'attendance' && <AttendanceTab />}
+                            {activeTab === 'notices' && <NoticesTab />}
+                            {activeTab === 'chat' && <ChatTab />}
+                            {activeTab === 'security' && <SecurityTab />}
+                            {activeTab === 'settings' && <AdminSettingsTab />}
+                            {activeTab === 'admit-cards' && <AdminAdmitCardsTab />}
 
-                                    <Tabs defaultValue="mcq" className="w-full">
-                                        <TabsList className="grid w-full grid-cols-2">
-                                            <TabsTrigger value="mcq">MCQ Question</TabsTrigger>
-                                            <TabsTrigger value="cq">CQ Question</TabsTrigger>
-                                        </TabsList>
-                                        <TabsContent value="mcq" className="space-y-4">
-                                            <Card>
-                                                <CardHeader>
-                                                    <CardTitle>Multiple Choice Question</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <Label htmlFor="subject">Subject</Label>
-                                                            <Select>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select subject" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="physics">Physics</SelectItem>
-                                                                    <SelectItem value="chemistry">Chemistry</SelectItem>
-                                                                    <SelectItem value="mathematics">Mathematics</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Label htmlFor="difficulty">Difficulty</Label>
-                                                            <Select>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select difficulty" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="easy">Easy</SelectItem>
-                                                                    <SelectItem value="medium">Medium</SelectItem>
-                                                                    <SelectItem value="hard">Hard</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <Label htmlFor="question">Question</Label>
-                                                        <Input placeholder="Enter your question..." />
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <Label>Options</Label>
-                                                            <div className="space-y-2">
-                                                                <Input placeholder="Option A" />
-                                                                <Input placeholder="Option B" />
-                                                                <Input placeholder="Option C" />
-                                                                <Input placeholder="Option D" />
-                                                            </div>
-                                                        </div>
-                                                        <div>
-                                                            <Label htmlFor="correct-answer">Correct Answer</Label>
-                                                            <Select>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select correct answer" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="a">A</SelectItem>
-                                                                    <SelectItem value="b">B</SelectItem>
-                                                                    <SelectItem value="c">C</SelectItem>
-                                                                    <SelectItem value="d">D</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex gap-4">
-                                                        <Button variant="outline">
-                                                            <Image className="h-4 w-4 mr-2" />
-                                                            Add Image
-                                                        </Button>
-                                                        <Button variant="outline">
-                                                            <Calculator className="h-4 w-4 mr-2" />
-                                                            Add Math
-                                                        </Button>
-                                                    </div>
-                                                    <Button className="w-full">Create MCQ Question</Button>
-                                                </CardContent>
-                                            </Card>
-                                        </TabsContent>
-                                        <TabsContent value="cq" className="space-y-4">
-                                            <Card>
-                                                <CardHeader>
-                                                    <CardTitle>Creative Question</CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div>
-                                                            <Label htmlFor="subject">Subject</Label>
-                                                            <Select>
-                                                                <SelectTrigger>
-                                                                    <SelectValue placeholder="Select subject" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    <SelectItem value="physics">Physics</SelectItem>
-                                                                    <SelectItem value="chemistry">Chemistry</SelectItem>
-                                                                    <SelectItem value="mathematics">Mathematics</SelectItem>
-                                                                </SelectContent>
-                                                            </Select>
-                                                        </div>
-                                                        <div>
-                                                            <Label htmlFor="marks">Marks</Label>
-                                                            <Input type="number" placeholder="Enter marks" />
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <Label htmlFor="question">Question</Label>
-                                                        <Input placeholder="Enter your question..." />
-                                                    </div>
-                                                    <div className="flex gap-4">
-                                                        <Button variant="outline">
-                                                            <Image className="h-4 w-4 mr-2" />
-                                                            Add Image
-                                                        </Button>
-                                                        <Button variant="outline">
-                                                            <Calculator className="h-4 w-4 mr-2" />
-                                                            Add Math
-                                                        </Button>
-                                                    </div>
-                                                    <Button className="w-full">Create CQ Question</Button>
-                                                </CardContent>
-                                            </Card>
-                                        </TabsContent>
-                                    </Tabs>
+                            {/* Placeholders for sections that are primarily link-based but might have inline content */}
+                            {['classes', 'omr-scanner'].includes(activeTab) && (
+                                <div className="flex flex-col items-center justify-center h-64 text-center">
+                                    <div className="p-4 rounded-full bg-blue-50 text-blue-500 mb-4">
+                                        <Settings className="w-8 h-8" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold text-gray-900">Module Loaded</h3>
+                                    <p className="text-gray-500 max-w-sm mt-2">
+                                        This module is either integrated via navigation links or currently under development for the Teacher view.
+                                    </p>
+                                    <Button className="mt-4" onClick={() => router.push('/dashboard')}>
+                                        Return to Dashboard
+                                    </Button>
                                 </div>
                             )}
 
-                            {activeTab === 'question-bank' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Question Bank</h2>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                placeholder="Search questions..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="w-64"
-                                            />
-                                            <Select value={filterSubject} onValueChange={setFilterSubject}>
-                                                <SelectTrigger className="w-32">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">All</SelectItem>
-                                                    <SelectItem value="physics">Physics</SelectItem>
-                                                    <SelectItem value="chemistry">Chemistry</SelectItem>
-                                                    <SelectItem value="mathematics">Mathematics</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/teacher/create-question')}>
-                                            <CardHeader>
-                                                <CardTitle className="flex items-center gap-2">
-                                                    <Plus className="w-5 h-5" />
-                                                    Create Question
-                                                </CardTitle>
-                                                <CardDescription>
-                                                    Create new questions with rich text, math, and image support
-                                                </CardDescription>
-                                            </CardHeader>
-                                        </Card>
-
-                                        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/teacher/question-bank')}>
-                                            <CardHeader>
-                                                <CardTitle className="flex items-center gap-2">
-                                                    <BookOpen className="w-5 h-5" />
-                                                    Question Bank
-                                                </CardTitle>
-                                                <CardDescription>
-                                                    Manage and organize your question collection with advanced filtering
-                                                </CardDescription>
-                                            </CardHeader>
-                                        </Card>
-
-                                        <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => router.push('/teacher/ai-generator')}>
-                                            <CardHeader>
-                                                <CardTitle className="flex items-center gap-2">
-                                                    <Brain className="w-5 h-5" />
-                                                    AI Generator
-                                                </CardTitle>
-                                                <CardDescription>
-                                                    Generate questions using AI with Gemini Flash 1.5
-                                                </CardDescription>
-                                            </CardHeader>
-                                        </Card>
-
-                                        {questions.map((question) => (
-                                            <Card key={question.id} className="hover:shadow-lg transition-shadow">
-                                                <CardHeader>
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <CardTitle className="text-lg">{question.type}</CardTitle>
-                                                            <CardDescription>{question.subject} • {question.topic}</CardDescription>
-                                                        </div>
-                                                        <Badge className={getDifficultyColor(question.difficulty)}>
-                                                            {question.difficulty}
-                                                        </Badge>
-                                                    </div>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <p className="text-sm mb-4 line-clamp-3">{question.question}</p>
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex gap-2">
-                                                            {question.hasImage && <Image className="h-4 w-4 text-blue-500" />}
-                                                            {question.hasMath && <Calculator className="h-4 w-4 text-green-500" />}
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <Button variant="outline" size="sm">
-                                                                <Eye className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button variant="outline" size="sm">
-                                                                <Edit className="h-4 w-4" />
-                                                            </Button>
-                                                            <Button variant="outline" size="sm">
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'evaluate-cq' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Evaluate CQ Papers</h2>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline">
-                                                <Brain className="h-4 w-4 mr-2" />
-                                                AI Evaluation
-                                            </Button>
-                                            <Button variant="outline">
-                                                <Upload className="h-4 w-4 mr-2" />
-                                                Bulk Upload
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <Tabs defaultValue="pending" className="w-full">
-                                        <TabsList className="grid w-full grid-cols-3">
-                                            <TabsTrigger value="pending">Pending ({evaluations.filter(e => e.status === 'pending').length})</TabsTrigger>
-                                            <TabsTrigger value="evaluated">Evaluated ({evaluations.filter(e => e.status === 'evaluated').length})</TabsTrigger>
-                                            <TabsTrigger value="ai">AI Evaluated ({evaluations.filter(e => e.status === 'ai_evaluated').length})</TabsTrigger>
-                                        </TabsList>
-                                        <TabsContent value="pending" className="space-y-4">
-                                            {evaluations.filter(e => e.status === 'pending').map((evaluation) => (
-                                                <Card key={evaluation.id}>
-                                                    <CardHeader>
-                                                        <div className="flex justify-between items-start">
-                                                            <div>
-                                                                <CardTitle>{evaluation.studentName}</CardTitle>
-                                                                <CardDescription>{evaluation.examName} • {evaluation.subject}</CardDescription>
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <Button size="sm">
-                                                                    <Brain className="h-4 w-4 mr-2" />
-                                                                    AI Evaluate
-                                                                </Button>
-                                                                <Button size="sm" variant="outline">
-                                                                    <Edit className="h-4 w-4 mr-2" />
-                                                                    Manual
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    </CardHeader>
-                                                    <CardContent>
-                                                        <div className="grid grid-cols-2 gap-4">
-                                                            <div>
-                                                                <Label>Question 1 (5 marks)</Label>
-                                                                <div className="mt-2 p-3 border rounded bg-gray-50">
-                                                                    <p className="text-sm">Student's answer will appear here...</p>
-                                                                </div>
-                                                                <div className="mt-2 flex gap-2">
-                                                                    <Input type="number" placeholder="Marks" className="w-20" />
-                                                                    <Button size="sm">Save</Button>
-                                                                </div>
-                                                            </div>
-                                                            <div>
-                                                                <Label>Question 2 (5 marks)</Label>
-                                                                <div className="mt-2 p-3 border rounded bg-gray-50">
-                                                                    <p className="text-sm">Student's answer will appear here...</p>
-                                                                </div>
-                                                                <div className="mt-2 flex gap-2">
-                                                                    <Input type="number" placeholder="Marks" className="w-20" />
-                                                                    <Button size="sm">Save</Button>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </CardContent>
-                                                </Card>
-                                            ))}
-                                        </TabsContent>
-                                    </Tabs>
-                                </div>
-                            )}
-
-                            {activeTab === 'create-exams' && (
-                                <CreateExamsTab />
-                            )}
-
-                            {activeTab === 'scan-sheets' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Scan OMR & CQ Sheets</h2>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline">
-                                                <Camera className="h-4 w-4 mr-2" />
-                                                Webcam
-                                            </Button>
-                                            <Button variant="outline">
-                                                <Upload className="h-4 w-4 mr-2" />
-                                                Upload Files
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>OMR Scanner</CardTitle>
-                                                <CardDescription>Scan multiple choice answer sheets</CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                                                    <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-                                                    <p className="text-lg font-medium mb-2">Drop OMR sheets here</p>
-                                                    <p className="text-sm text-muted-foreground mb-4">
-                                                        or click to browse files
-                                                    </p>
-                                                    <Link href="/omr_scanner">
-                                                        <Button>Open OMR Scanner</Button>
-                                                    </Link>
-                                                </div>
-                                                <div className="mt-4">
-                                                    <h4 className="font-medium mb-2">Recent Scans</h4>
-                                                    <div className="space-y-2">
-                                                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                                            <span className="text-sm">OMR_Class11_Physics_001.pdf</span>
-                                                            <Badge className="bg-green-500">Processed</Badge>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>CQ Scanner</CardTitle>
-                                                <CardDescription>Scan creative question answer sheets</CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="border border-dashed rounded-lg p-6 text-center">
-                                                    <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                                                    <p className="text-sm font-medium">Upload CQ Sheets</p>
-                                                    <p className="text-xs text-muted-foreground mb-4">Upload creative question answer sheets for evaluation</p>
-                                                    <Input type="file" multiple accept=".pdf,.jpg,.jpeg,.png" className="max-w-xs mx-auto" />
-                                                    <p className="text-xs text-muted-foreground mt-2">(File upload module under maintenance)</p>
-                                                </div>
-                                                <div className="mt-4">
-                                                    <h4 className="font-medium mb-2">Recent Scans</h4>
-                                                    <div className="space-y-2">
-                                                        <div className="flex justify-between items-center p-2 bg-gray-50 rounded">
-                                                            <span className="text-sm">CQ_Class11_Physics_001.pdf</span>
-                                                            <Badge className="bg-yellow-500">Pending</Badge>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'attendance' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Take Attendance</h2>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline">
-                                                <Globe className="h-4 w-4 mr-2" />
-                                                Online Mode
-                                            </Button>
-                                            <Button variant="outline">
-                                                <WifiOff className="h-4 w-4 mr-2" />
-                                                Offline Mode
-                                            </Button>
-                                            <Button variant="outline">
-                                                <Download className="h-4 w-4 mr-2" />
-                                                Export
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Today's Attendance</CardTitle>
-                                                <CardDescription>Class 11 • Physics</CardDescription>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-3">
-                                                    {Array.from({ length: 5 }, (_, i) => (
-                                                        <div key={i} className="flex justify-between items-center p-3 border rounded">
-                                                            <div>
-                                                                <p className="font-medium">Student {i + 1}</p>
-                                                                <p className="text-sm text-muted-foreground">Roll: {1001 + i}</p>
-                                                            </div>
-                                                            <div className="flex gap-1">
-                                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                                    <CheckSquare className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                                    <XSquare className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button size="sm" variant="outline" className="h-8 w-8 p-0">
-                                                                    <MinusSquare className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                <div className="mt-4 flex justify-between items-center">
-                                                    <div className="text-sm">
-                                                        <span className="text-green-600">Present: 3</span> •
-                                                        <span className="text-red-600"> Absent: 1</span> •
-                                                        <span className="text-yellow-600"> Late: 1</span>
-                                                    </div>
-                                                    <Button>Save Attendance</Button>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Attendance History</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-3">
-                                                    {attendance.map((record) => (
-                                                        <div key={record.id} className="flex justify-between items-center p-3 border rounded">
-                                                            <div>
-                                                                <p className="font-medium">{record.date}</p>
-                                                                <p className="text-sm text-muted-foreground">{record.class} • {record.subject}</p>
-                                                            </div>
-                                                            <div className="text-right">
-                                                                <p className="text-sm">{record.presentCount}/{record.totalStudents}</p>
-                                                                <Badge variant="outline" className="text-xs">
-                                                                    {record.mode}
-                                                                </Badge>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'analytics' && (
-                                <div className="space-y-6">
-                                    <h2 className="text-2xl font-bold">Class Analytics</h2>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Performance Overview</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-4">
-                                                    <div>
-                                                        <div className="flex justify-between text-sm mb-1">
-                                                            <span>Class Average</span>
-                                                            <span>75%</span>
-                                                        </div>
-                                                        <Progress value={75} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-sm mb-1">
-                                                            <span>Pass Rate</span>
-                                                            <span>92%</span>
-                                                        </div>
-                                                        <Progress value={92} />
-                                                    </div>
-                                                    <div>
-                                                        <div className="flex justify-between text-sm mb-1">
-                                                            <span>Attendance</span>
-                                                            <span>88%</span>
-                                                        </div>
-                                                        <Progress value={88} />
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Recent Activity</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                                                        <div>
-                                                            <p className="text-sm font-medium">Exam completed</p>
-                                                            <p className="text-xs text-muted-foreground">2 hours ago</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                                                        <div>
-                                                            <p className="text-sm font-medium">AI evaluation used</p>
-                                                            <p className="text-xs text-muted-foreground">4 hours ago</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                                                        <div>
-                                                            <p className="text-sm font-medium">Question created</p>
-                                                            <p className="text-xs text-muted-foreground">1 day ago</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader>
-                                                <CardTitle>Badges Earned</CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <Award className="h-5 w-5 text-yellow-500" />
-                                                        <div>
-                                                            <p className="text-sm font-medium">Fast Evaluator</p>
-                                                            <p className="text-xs text-muted-foreground">Complete 50 evaluations</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        <Brain className="h-5 w-5 text-blue-500" />
-                                                        <div>
-                                                            <p className="text-sm font-medium">AI Pioneer</p>
-                                                            <p className="text-xs text-muted-foreground">Use AI evaluation 10 times</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 opacity-50">
-                                                        <Star className="h-5 w-5 text-gray-400" />
-                                                        <div>
-                                                            <p className="text-sm font-medium">Question Master</p>
-                                                            <p className="text-xs text-muted-foreground">Create 100 questions</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'notices' && (
-                                <div className="space-y-6">
-                                    <div className="flex justify-between items-center">
-                                        <h2 className="text-2xl font-bold">Post Notices</h2>
-                                        <Button>
-                                            <Plus className="h-4 w-4 mr-2" />
-                                            New Notice
-                                        </Button>
-                                    </div>
-
-                                    <Card>
-                                        <CardHeader>
-                                            <CardTitle>Create Notice</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-4">
-                                            <div>
-                                                <Label htmlFor="title">Title</Label>
-                                                <Input placeholder="Enter notice title..." />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="content">Content</Label>
-                                                <Input placeholder="Enter notice content..." />
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <Label htmlFor="class">Class</Label>
-                                                    <Select>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select class" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="class11">Class 11</SelectItem>
-                                                            <SelectItem value="class12">Class 12</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                                <div>
-                                                    <Label htmlFor="priority">Priority</Label>
-                                                    <Select>
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Select priority" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="low">Low</SelectItem>
-                                                            <SelectItem value="medium">Medium</SelectItem>
-                                                            <SelectItem value="high">High</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                            <Button className="w-full">Post Notice</Button>
-                                        </CardContent>
-                                    </Card>
-                                </div>
-                            )}
                         </motion.div>
                     </AnimatePresence>
-                </div>
+                </main>
+
+                <AppFooter />
             </div>
-            <AppFooter />
-        </div >
+        </div>
     );
 }
