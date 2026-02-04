@@ -147,9 +147,10 @@ export default function OnlineExamsPage() {
       // (or modify to assume global if that's the requirement, but user said "seeing all exams" is a bug).
       if (!exam.classId || exam.classId !== userClassId) return false;
 
-      // 2. Date Filter
-      const examDate = new Date(exam.date);
-      if (examDate >= cutoffDate) return false; // Hide future exams beyond T+2
+      // 2. Date Filter - REMOVED
+      // User requested to see all approved exams even if they are in the future ("don't hide these only say that exam not started")
+      // const examDate = new Date(exam.date);
+      // if (examDate >= cutoffDate) return false; 
 
       return true;
     });
