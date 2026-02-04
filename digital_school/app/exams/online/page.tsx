@@ -138,8 +138,14 @@ export default function OnlineExamsPage() {
     cutoffDate.setHours(0, 0, 0, 0);
 
     return examList.filter(exam => {
-      // 1. Class Filter
-      if (exam.classId !== userClassId) return false;
+      // 0. Active Status Filter (Critical)
+      if (!exam.isActive) return false;
+
+      // 1. Class Filter - STRICT
+      // If exam is assigned to a class, it must match user's class.
+      // If exam is NOT assigned to a class (undefined/null), assume it's NOT for this student 
+      // (or modify to assume global if that's the requirement, but user said "seeing all exams" is a bug).
+      if (!exam.classId || exam.classId !== userClassId) return false;
 
       // 2. Date Filter
       const examDate = new Date(exam.date);
