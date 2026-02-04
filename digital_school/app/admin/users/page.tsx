@@ -771,6 +771,96 @@ export default function AdminUsersPage() {
                 </Dialog>
             )}
 
+            {/* Bulk Import Dialog */}
+            <Dialog open={showBulkAdd} onOpenChange={setShowBulkAdd}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Bulk Import Users</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex flex-col gap-4 text-center p-6 border-2 border-dashed rounded-lg bg-gray-50/50">
+                        <Upload className="h-10 w-10 mx-auto text-gray-400" />
+                        <div className="space-y-1">
+                            <h3 className="font-medium text-sm">Upload CSV or Excel File</h3>
+                            <p className="text-xs text-muted-foreground">
+                                Supported formats: .csv, .xlsx, .xls
+                            </p>
+                        </div>
+                        <Input
+                            type="file"
+                            accept=".csv, .xlsx, .xls"
+                            className="max-w-xs mx-auto text-xs"
+                            onChange={(e) => {
+                                if (e.target.files?.[0]) {
+                                    handleBulkAdd(e.target.files[0]);
+                                }
+                            }}
+                        />
+                        <div className="text-xs text-left space-y-2 mt-4 bg-blue-50 p-3 rounded text-blue-800">
+                            <p className="font-semibold">Expected Columns:</p>
+                            <ul className="list-disc pl-4 space-y-1">
+                                <li><strong>Name</strong> (Required)</li>
+                                <li><strong>Role</strong> (Required: Student, Teacher, Admin)</li>
+                                <li><strong>Email</strong> or <strong>Phone</strong> (At least one required)</li>
+                                <li><strong>Class</strong> & <strong>Section</strong> (For Students)</li>
+                                <li><strong>Roll</strong> (For Students)</li>
+                                <li><strong>Password</strong> (Optional)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Preview Dialog */}
+            <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle>Preview Import Data ({previewUsers.length} users)</DialogTitle>
+                    </DialogHeader>
+                    <div className="flex-1 overflow-auto border rounded-md">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Name</TableHead>
+                                    <TableHead>Role</TableHead>
+                                    <TableHead>Email/Phone</TableHead>
+                                    <TableHead>Class Info</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {previewUsers.map((u, i) => (
+                                    <TableRow key={i}>
+                                        <TableCell>{u.name}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{u.role}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <div className="text-xs">
+                                                {u.email && <div>{u.email}</div>}
+                                                {u.phone && <div>{u.phone}</div>}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {u.role === 'STUDENT' ? (
+                                                <span className="text-xs">
+                                                    {u.class}-{u.section} (Roll: {u.roll})
+                                                </span>
+                                            ) : '-'}
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setShowPreview(false)}>Cancel</Button>
+                        <Button onClick={handleConfirmBulkAdd} disabled={loading}>
+                            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Confirm Import
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }
