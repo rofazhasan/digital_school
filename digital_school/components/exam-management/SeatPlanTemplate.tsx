@@ -1,67 +1,87 @@
 import React from 'react';
-import { SeatAssignment, ExamDetails } from '@/utils/exam-management';
-
-interface SeatPlanProps {
-    assignments: SeatAssignment[];
-    exam: ExamDetails;
-    roomNumber: number;
-}
+import { SeatPlanProps } from '@/utils/exam-management';
 
 export const SeatPlanTemplate = ({ assignments, exam, roomNumber }: SeatPlanProps) => {
+    // Group by Bench (C-R) to visualize "Real Benches"
+    const benches: Record<string, typeof assignments> = {};
+    assignments.forEach(a => {
+        // Extract C and R
+        const m = a.seatNumber.match(/C(\d+)-R(\d+)/);
+        if (m) {
+            const key = `R${m[2]}-C${m[1]}`; // Key by Row-Col
+            if (!benches[key]) benches[key] = [];
+            benches[key].push(a);
+        }
+    });
+
+    // Sort Benches Spatially: Row 1 (C1, C2...) -> Row 2...
+    const sortedBenchKeys = Object.keys(benches).sort((a, b) => {
+        const [rA, cA] = a.replace('R', '').split('-C').map(Number);
+        const [rB, cB] = b.replace('R', '').split('-C').map(Number);
+        if (rA !== rB) return rA - rB;
+        return cA - cB;
+    });
+
+    // Calculate Max Cols dynamically
+    let maxCol = 1;
+    sortedBenchKeys.forEach(k => {
+        const c = parseInt(k.split('-C')[1]);
+        if (c > maxCol) maxCol = c;
+    });
+
     return (
-        <div className="w-full h-full p-8 bg-white text-black font-serif relative">
+        <div className="h-full flex flex-col p-6 font-sans">
             {/* Header */}
-            <div className="text-center mb-6 border-b-2 border-black pb-4">
-                <h1 className="text-2xl font-bold uppercase mb-1">{exam.schoolName}</h1>
-                <h2 className="text-xl font-semibold mb-2">Exam Seat Plan | পরীক্ষার আসন পরিকল্পনা</h2>
-
-                <div className="flex justify-between items-center text-sm font-bold border-t border-dashed border-black pt-2 mt-2 px-8">
-                    <span>Exam: {exam.name}</span>
-                    <span>Class: {exam.className}</span>
-                    <span>Hall/Room: {roomNumber.toString().padStart(2, '0')}</span>
-                    <span>Date: {new Date(exam.date).toLocaleDateString()}</span>
+            <div className="border-b-2 border-black pb-2 mb-4 flex justify-between items-end">
+                <div>
+                    <h1 className="text-2xl font-black uppercase tracking-wider">{exam.schoolName}</h1>
+                    <div className="text-sm font-bold mt-1">SEAT PLAN / ROOM: {roomNumber}</div>
+                </div>
+                <div className="text-right">
+                    <div className="text-xs font-bold bg-black text-white px-2 py-1 inline-block mb-1">
+                        {new Date().toLocaleDateString()}
+                    </div>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="w-full">
-                <table className="w-full border-collapse border border-black">
-                    <thead>
-                        <tr className="bg-slate-100">
-                            <th className="border border-black px-2 py-2 w-16 text-center">Seat</th>
-                            <th className="border border-black px-2 py-2 w-20 text-center">Roll</th>
-                            <th className="border border-black px-4 py-2 text-left">Student Name</th>
-                            <th className="border border-black px-2 py-2 w-32 text-center">Reg. No</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {assignments.map((item, index) => (
-                            <tr key={item.student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                                <td className="border border-black px-2 py-2 text-center font-bold text-lg">{item.seatNumber}</td>
-                                <td className="border border-black px-2 py-2 text-center font-bold">{item.student.roll}</td>
-                                <td className="border border-black px-4 py-2">{item.student.name}</td>
-                                <td className="border border-black px-2 py-2 text-center font-mono">{item.student.registrationId}</td>
-                            </tr>
-                        ))}
-                        {/* Fill empty rows if needed to maintain layout? Not necessary for dynamic, but good for consistent look */}
-                    </tbody>
-                </table>
+            {/* Room Grid - Benches */}
+            <div className="grid gap-6 content-start" style={{ gridTemplateColumns: `repeat(${maxCol}, minmax(0, 1fr))` }}>
+                {sortedBenchKeys.map((key) => {
+                    const benchSeats = benches[key];
+                    // Sort seats in bench (S1, S2)
+                    benchSeats.sort((a, b) => a.seatNumber.localeCompare(b.seatNumber));
+
+                    const [row, col] = key.replace('R', '').split('-C');
+
+                    return (
+                        <div key={key} className="border-2 border-slate-800 bg-slate-50 p-2 flex flex-col gap-2 rounded-sm shadow-sm">
+                            <div className="text-[10px] font-bold text-center uppercase text-slate-400 tracking-widest mb-1 border-b border-slate-200">
+                                Bench R{row}-C{col}
+                            </div>
+                            <div className="flex gap-2">
+                                {benchSeats.map((assignment, idx) => (
+                                    <div key={idx} className="flex-1 border border-slate-300 bg-white p-2 min-w-[60px] flex flex-col items-center justify-center text-center">
+                                        <div className="text-2xl font-black leading-none mb-1">
+                                            {assignment.seatNumber.match(/S(\d+)/)?.[1] || '?'}
+                                        </div>
+                                        <div className="text-[9px] font-bold uppercase leading-tight truncate w-full">
+                                            {assignment.student.className}
+                                        </div>
+                                        <div className="text-sm font-bold font-mono">
+                                            {assignment.student.roll}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                })}
             </div>
 
-            {/* Footer */}
-            <div className="mt-12 flex justify-between items-end px-8">
-                <div className="text-center">
-                    <div className="w-48 border-b border-black mb-1"></div>
-                    <p className="font-bold">Invigilator Signature</p>
-                </div>
-                <div className="text-center">
-                    <div className="w-48 border-b border-black mb-1"></div>
-                    <p className="font-bold">Head Teacher Signature</p>
-                </div>
-            </div>
-
-            <div className="absolute bottom-8 left-0 w-full text-center text-xs text-slate-500">
-                Generated by DigitalSchool Examination Committee
+            {/* Footer Summary */}
+            <div className="mt-auto pt-4 border-t-2 border-black flex justify-between items-center text-xs font-bold">
+                <div>Invigilator Signature: _______________________</div>
+                <div>Total Candidates: {assignments.length}</div>
             </div>
         </div>
     );

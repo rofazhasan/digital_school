@@ -4,6 +4,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { cleanupMath } from '@/lib/utils';
+import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
 
 // --- TYPES ---
 interface MCQ {
@@ -58,9 +59,11 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
   return res;
 }
 
-// Helper to render text with react-latex
+// Helper to render text with diagrams support
 const Text = ({ children }: { children: string }) => (
-  <UniversalMathJax inline dynamic>{cleanupMath(children)}</UniversalMathJax>
+  <UniversalMathJax inline dynamic>
+    <TextWithFBDs text={cleanupMath(children)} />
+  </UniversalMathJax>
 );
 
 // Main QuestionPaper component (forwardRef for printing)

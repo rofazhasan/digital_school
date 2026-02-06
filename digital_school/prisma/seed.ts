@@ -4,9 +4,9 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seed...');
+  console.log('🌱 Starting ROBUST database seed...');
 
-  // Create default institute
+  // 1. Create Default Institute
   let institute = await prisma.institute.findFirst({
     where: { name: "Elite School & College" }
   });
@@ -22,331 +22,234 @@ async function main() {
       }
     });
   }
-
   console.log('✅ Institute ready:', institute.name);
 
-  // Hash password
   const hashedPassword = await bcrypt.hash('password123', 12);
 
-  // Create super user
-  let superUser = await prisma.user.findFirst({
-    where: { email: "admin@eliteschool.edu.bd" }
-  });
-
+  // 2. Super User (1)
+  const superUserEmail = "superuser@school.com";
+  let superUser = await prisma.user.findUnique({ where: { email: superUserEmail } });
   if (!superUser) {
     superUser = await prisma.user.create({
       data: {
         name: "Super Admin",
-        email: "admin@eliteschool.edu.bd",
+        email: superUserEmail,
         password: hashedPassword,
         role: 'SUPER_USER',
         instituteId: institute.id,
         isActive: true,
       }
     });
-  }
-
-  console.log('✅ Super user ready:', superUser.email);
-
-  // Update institute with super user
-  await prisma.institute.update({
-    where: { id: institute.id },
-    data: { superUserId: superUser.id }
-  });
-
-  // Create a class
-  let class1 = await prisma.class.findFirst({
-    where: { 
-      name: "Class 10",
-      section: "A",
-      instituteId: institute.id
-    }
-  });
-
-  if (!class1) {
-    class1 = await prisma.class.create({
-      data: {
-        name: "Class 10",
-        section: "A",
-        instituteId: institute.id,
-      }
+    // Link to institute
+    await prisma.institute.update({
+      where: { id: institute.id },
+      data: { superUserId: superUser.id }
     });
   }
+  console.log('✅ Super User ready:', superUser.email);
 
-  console.log('✅ Class ready:', class1.name, class1.section);
-
-  // Create 5 students
-  const students = [];
-  const studentNames = [
-    "Ahmed Rahman",
-    "Fatima Khan", 
-    "Mohammed Ali",
-    "Aisha Begum",
-    "Omar Hassan"
-  ];
-
-  for (let i = 0; i < 5; i++) {
-    let studentUser = await prisma.user.findFirst({
-      where: { email: `student${i + 1}@test.com` }
-    });
-
-    if (!studentUser) {
-      studentUser = await prisma.user.create({
+  // 3. Admins (3)
+  for (let i = 1; i <= 3; i++) {
+    const email = `admin${i}@school.com`;
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (!exists) {
+      await prisma.user.create({
         data: {
-          name: studentNames[i],
-          email: `student${i + 1}@test.com`,
+          name: `Admin User ${i}`,
+          email,
           password: hashedPassword,
-          role: 'STUDENT',
+          role: 'ADMIN',
           instituteId: institute.id,
-          isActive: true,
+          isActive: true
         }
       });
     }
+  }
+  console.log('✅ 3 Admins ready');
 
-    let studentProfile = await prisma.studentProfile.findFirst({
-      where: { userId: studentUser.id }
-    });
-
-    if (!studentProfile) {
-      studentProfile = await prisma.studentProfile.create({
+  // 4. Teachers (10)
+  for (let i = 1; i <= 10; i++) {
+    const email = `teacher${i}@school.com`;
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (!exists) {
+      await prisma.user.create({
         data: {
-          userId: studentUser.id,
-          classId: class1.id,
-          roll: `10A${String(i + 1).padStart(2, '0')}`,
-          registrationNo: `2024${String(i + 1).padStart(4, '0')}`,
-          guardianName: `Guardian of ${studentNames[i]}`,
-          guardianPhone: `+880-1${String(i + 1).padStart(9, '0')}`,
-          guardianEmail: `guardian${i + 1}@test.com`,
-          address: `Address ${i + 1}, Rangpur, Bangladesh`,
+          name: `Teacher User ${i}`,
+          email,
+          password: hashedPassword,
+          role: 'TEACHER',
+          instituteId: institute.id,
+          isActive: true
         }
       });
     }
-
-    students.push({ user: studentUser, profile: studentProfile });
-    console.log(`✅ Student ${i + 1} ready:`, studentUser.email);
   }
+  console.log('✅ 10 Teachers ready');
 
-  // Create questions (10 MCQ, 5 CQ, 5 SQ)
-  const questions = [];
+  // 5. Classes (3)
+  const classesData = [
+    { name: "Class 8", section: "A" },
+    { name: "Class 9", section: "A" },
+    { name: "Class 10", section: "A" }
+  ];
+  const classes = [];
 
-  // 10 MCQ Questions
-  const mcqQuestions = [
-    {
-      questionText: "What is the capital of Bangladesh?",
-      modelAnswer: "Dhaka",
-      options: ["Dhaka", "Chittagong", "Sylhet", "Rangpur"],
-      marks: 1,
-      difficulty: "EASY"
-    },
-    {
-      questionText: "Which is the largest river in Bangladesh?",
-      modelAnswer: "Padma",
-      options: ["Padma", "Meghna", "Jamuna", "Brahmaputra"],
-      marks: 1,
-      difficulty: "EASY"
-    },
-    {
-      questionText: "What is 2 + 2?",
-      modelAnswer: "4",
-      options: ["3", "4", "5", "6"],
-      marks: 1,
-      difficulty: "EASY"
-    },
-    {
-      questionText: "Which planet is closest to the Sun?",
-      modelAnswer: "Mercury",
-      options: ["Venus", "Mercury", "Earth", "Mars"],
-      marks: 1,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "What is the chemical symbol for gold?",
-      modelAnswer: "Au",
-      options: ["Ag", "Au", "Fe", "Cu"],
-      marks: 1,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "Who wrote 'Romeo and Juliet'?",
-      modelAnswer: "William Shakespeare",
-      options: ["Charles Dickens", "William Shakespeare", "Jane Austen", "Mark Twain"],
-      marks: 1,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "What is the square root of 16?",
-      modelAnswer: "4",
-      options: ["2", "4", "8", "16"],
-      marks: 1,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "Which year did Bangladesh gain independence?",
-      modelAnswer: "1971",
-      options: ["1969", "1970", "1971", "1972"],
-      marks: 1,
-      difficulty: "HARD"
-    },
-    {
-      questionText: "What is the largest ocean on Earth?",
-      modelAnswer: "Pacific Ocean",
-      options: ["Atlantic Ocean", "Indian Ocean", "Pacific Ocean", "Arctic Ocean"],
-      marks: 1,
-      difficulty: "HARD"
-    },
-    {
-      questionText: "What is the chemical formula for water?",
-      modelAnswer: "H2O",
-      options: ["CO2", "H2O", "O2", "N2"],
-      marks: 1,
-      difficulty: "HARD"
+  for (const c of classesData) {
+    let cls = await prisma.class.findFirst({
+      where: { name: c.name, section: c.section, instituteId: institute.id }
+    });
+    if (!cls) {
+      cls = await prisma.class.create({
+        data: {
+          name: c.name,
+          section: c.section,
+          instituteId: institute.id
+        }
+      });
     }
+    classes.push(cls);
+  }
+  console.log('✅ 3 Classes ready');
+
+  // 6. Students (200+)
+  // Distribute 210 students across 3 classes (70 each)
+  let studentCount = 0;
+  for (let cIndex = 0; cIndex < classes.length; cIndex++) {
+    const cls = classes[cIndex];
+    const startRoll = (cIndex + 8) * 1000; // 8000, 9000, 10000 base
+
+    for (let i = 1; i <= 70; i++) {
+      const email = `student_${cls.name.replace(" ", "")}_${i}@school.com`.toLowerCase();
+      const exists = await prisma.user.findUnique({ where: { email } });
+
+      let userId = exists?.id;
+
+      if (!exists) {
+        const u = await prisma.user.create({
+          data: {
+            name: `Student ${cls.name} ${i}`,
+            email,
+            password: hashedPassword,
+            role: 'STUDENT',
+            instituteId: institute.id,
+            isActive: true
+          }
+        });
+        userId = u.id;
+      }
+
+      // Profile
+      if (userId) {
+        const roll = String(startRoll + i);
+        const prof = await prisma.studentProfile.findFirst({ where: { userId } });
+        if (!prof) {
+          await prisma.studentProfile.create({
+            data: {
+              userId,
+              classId: cls.id,
+              roll: roll,
+              registrationNo: `REG-${roll}`,
+              guardianName: `Parent of ${i}`,
+              guardianPhone: `017000000${String(i).padStart(2, '0')}`,
+              address: `Rangpur City`
+            }
+          });
+        }
+      }
+      studentCount++;
+    }
+  }
+  console.log(`✅ ${studentCount} Students ready`);
+
+  // 7. Exams (3)
+  const examTypes = ['Half Yearly', 'Final', 'Test'];
+  const examDates = [
+    new Date('2025-06-15T10:00:00Z'),
+    new Date('2025-12-10T10:00:00Z'),
+    new Date('2026-03-20T10:00:00Z')
   ];
 
-  // 5 CQ Questions
-  const cqQuestions = [
-    {
-      questionText: "Explain the process of photosynthesis in detail. Include the role of chlorophyll and the chemical equation.",
-      modelAnswer: "Photosynthesis is the process by which plants convert light energy into chemical energy...",
-      marks: 5,
-      difficulty: "HARD"
-    },
-    {
-      questionText: "Discuss the causes and effects of climate change. Provide examples and potential solutions.",
-      modelAnswer: "Climate change refers to long-term shifts in global weather patterns...",
-      marks: 5,
-      difficulty: "HARD"
-    },
-    {
-      questionText: "Analyze the impact of social media on modern society. Consider both positive and negative aspects.",
-      modelAnswer: "Social media has revolutionized how people communicate and interact...",
-      marks: 5,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "Describe the water cycle and explain how it maintains Earth's water balance.",
-      modelAnswer: "The water cycle is a continuous process that circulates water through the Earth's systems...",
-      marks: 5,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "Compare and contrast democracy and dictatorship as forms of government.",
-      modelAnswer: "Democracy and dictatorship represent two fundamentally different approaches to governance...",
-      marks: 5,
-      difficulty: "HARD"
+  for (let i = 0; i < 3; i++) {
+    // Create exam for Class 10 (Targeting one class for seeding robustly)
+    const targetClass = classes[2]; // Class 10
+    const examName = `${examTypes[i]} Exam ${targetClass.name}`;
+
+    let exam = await prisma.exam.findFirst({ where: { name: examName } });
+    if (!exam) {
+      exam = await prisma.exam.create({
+        data: {
+          name: examName,
+          description: `Standard ${examTypes[i]} Examination`,
+          date: examDates[i],
+          startTime: examDates[i],
+          endTime: new Date(examDates[i].getTime() + 3 * 60 * 60 * 1000), // 3 hours
+          duration: 180,
+          type: 'OFFLINE', // or MIXED
+          totalMarks: 100,
+          passMarks: 33,
+          isActive: true,
+          classId: targetClass.id,
+          createdById: superUser.id
+        }
+      });
     }
-  ];
+    console.log(`✅ Exam '${examName}' ready`);
 
-  // 5 SQ Questions
-  const sqQuestions = [
-    {
-      questionText: "What is the main function of the heart?",
-      modelAnswer: "The heart pumps blood throughout the body to deliver oxygen and nutrients to cells.",
-      marks: 2,
-      difficulty: "EASY"
-    },
-    {
-      questionText: "Name three renewable energy sources.",
-      modelAnswer: "Solar energy, wind energy, and hydroelectric power are renewable energy sources.",
-      marks: 2,
-      difficulty: "EASY"
-    },
-    {
-      questionText: "What is the difference between weather and climate?",
-      modelAnswer: "Weather refers to short-term atmospheric conditions, while climate refers to long-term weather patterns.",
-      marks: 2,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "Explain the concept of gravity.",
-      modelAnswer: "Gravity is a force that attracts objects toward each other, with strength depending on mass and distance.",
-      marks: 2,
-      difficulty: "MEDIUM"
-    },
-    {
-      questionText: "What are the three branches of government in a democracy?",
-      modelAnswer: "The three branches are executive, legislative, and judicial.",
-      marks: 2,
-      difficulty: "EASY"
+    // 8. Questions (Add some sample questions to this exam context if needed, 
+    // but usually Questions are in QuestionBank. Let's add 5 Questions to Bank linked to Class 10)
+    if (i === 0) { // Only do once to avoid spam
+      const subjects = ['Physics', 'Chemistry', 'Math'];
+      for (const sub of subjects) {
+        await prisma.question.create({
+          data: {
+            type: 'MCQ',
+            subject: sub,
+            questionText: `Sample MCQ for ${sub}?`,
+            modelAnswer: 'Option A',
+            options: ['Option A', 'Option B', 'Option C', 'Option D'],
+            marks: 1,
+            difficulty: 'MEDIUM',
+            classId: targetClass.id,
+            createdById: superUser.id,
+            topic: 'General'
+          }
+        });
+        await prisma.question.create({
+          data: {
+            type: 'CQ',
+            subject: sub,
+            questionText: `Explain a concept in ${sub}.`,
+            modelAnswer: 'Detailed answer...',
+            marks: 10,
+            difficulty: 'HARD',
+            classId: targetClass.id,
+            createdById: superUser.id,
+            topic: 'Theory'
+          }
+        });
+      }
+      console.log(`✅ Sample Questions for ${targetClass.name} ready`);
     }
-  ];
-
-  // Create MCQ questions
-  for (let i = 0; i < mcqQuestions.length; i++) {
-    const q = mcqQuestions[i];
-    const question = await prisma.question.create({
-      data: {
-        type: 'MCQ',
-        subject: 'General Knowledge',
-        questionText: q.questionText,
-        modelAnswer: q.modelAnswer,
-        options: q.options,
-        marks: q.marks,
-        difficulty: q.difficulty,
-        classId: class1.id,
-        createdById: superUser.id,
-        tags: ['mcq', 'general'],
-        topic: 'General Knowledge',
-      }
-    });
-    questions.push(question);
-    console.log(`✅ MCQ Question ${i + 1} created`);
   }
 
-  // Create CQ questions
-  for (let i = 0; i < cqQuestions.length; i++) {
-    const q = cqQuestions[i];
-    const question = await prisma.question.create({
+  // 9. Exam Halls
+  let hall = await prisma.examHall.findFirst({ where: { name: "Main Hall A" } });
+  if (!hall) {
+    hall = await prisma.examHall.create({
       data: {
-        type: 'CQ',
-        subject: 'General Knowledge',
-        questionText: q.questionText,
-        modelAnswer: q.modelAnswer,
-        marks: q.marks,
-        difficulty: q.difficulty,
-        classId: class1.id,
-        createdById: superUser.id,
-        tags: ['cq', 'essay'],
-        topic: 'General Knowledge',
+        name: "Main Hall A",
+        roomNo: "101",
+        capacity: 100,
+        rows: 10,
+        columns: 5,
+        seatsPerBench: 2,
+        instituteId: institute.id
       }
     });
-    questions.push(question);
-    console.log(`✅ CQ Question ${i + 1} created`);
   }
+  console.log('✅ Exam Hall "Main Hall A" ready');
 
-  // Create SQ questions
-  for (let i = 0; i < sqQuestions.length; i++) {
-    const q = sqQuestions[i];
-    const question = await prisma.question.create({
-      data: {
-        type: 'SQ',
-        subject: 'General Knowledge',
-        questionText: q.questionText,
-        modelAnswer: q.modelAnswer,
-        marks: q.marks,
-        difficulty: q.difficulty,
-        classId: class1.id,
-        createdById: superUser.id,
-        tags: ['sq', 'short'],
-        topic: 'General Knowledge',
-      }
-    });
-    questions.push(question);
-    console.log(`✅ SQ Question ${i + 1} created`);
-  }
-
-  console.log('🎉 Database seeding completed!');
-  console.log('\n📋 Test Accounts:');
-  console.log('Super User: admin@eliteschool.edu.bd / password123');
-  console.log('\n📋 Students:');
-  students.forEach((student, i) => {
-    console.log(`Student ${i + 1}: ${student.user.email} / password123`);
-  });
-  console.log('\n📊 Questions Created:');
-  console.log(`- ${mcqQuestions.length} MCQ Questions`);
-  console.log(`- ${cqQuestions.length} CQ Questions`);
-  console.log(`- ${sqQuestions.length} SQ Questions`);
-  console.log(`- Total: ${questions.length} Questions`);
+  console.log('🎉 ROBUST SEEDING COMPLETE!');
 }
 
 main()
@@ -356,4 +259,4 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
-  }); 
+  });

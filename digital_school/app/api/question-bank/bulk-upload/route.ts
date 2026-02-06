@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from "@/lib/db";
+import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 
 // Define locally to avoid import issues with agent's linter
 type QuestionType = 'MCQ' | 'CQ' | 'SQ';
@@ -134,6 +135,12 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             if (data.subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
         }
 
+        // Process inline FBDs from all text fields (questionText, options, modelAnswer, subQuestions)
+        const { processedData, fbds } = processQuestionWithInlineFBDs(data);
+
+        // Merge processed data back
+        Object.assign(data, processedData);
+
         return {
             isValid: true,
             data,
@@ -248,6 +255,7 @@ export async function POST(req: NextRequest) {
                         options: q.options || undefined,
                         subQuestions: q.subQuestions || undefined,
                         modelAnswer: q.modelAnswer,
+                        fbd: q.fbd || undefined,
                         createdById: creator.id,
                         hasMath: q.questionText.includes('\\') || (!!q.modelAnswer && q.modelAnswer.includes('\\'))
                     });

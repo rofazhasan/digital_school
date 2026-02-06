@@ -6,7 +6,23 @@ export async function GET() {
   try {
     const prismadb = await getDatabaseClient();
     const classes = await prismadb.class.findMany({
-      select: { id: true, name: true, section: true },
+      select: {
+        id: true,
+        name: true,
+        section: true,
+        _count: {
+          select: { students: true }
+        },
+        institute: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            address: true,
+            logoUrl: true
+          }
+        }
+      },
       orderBy: [{ name: 'asc' }, { section: 'asc' }],
     });
     return NextResponse.json({ classes });

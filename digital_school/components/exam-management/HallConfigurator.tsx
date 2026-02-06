@@ -23,12 +23,22 @@ interface HallConfiguratorProps {
     onHallsUpdate?: () => void;
     selectedHalls?: string[];
     onSelectionChange?: (ids: string[]) => void;
+    onCapacityChange?: (capacity: number) => void;
 }
 
-export default function HallConfigurator({ onHallsUpdate, selectedHalls = [], onSelectionChange }: HallConfiguratorProps) {
+export default function HallConfigurator({ onHallsUpdate, selectedHalls = [], onSelectionChange, onCapacityChange }: HallConfiguratorProps) {
     const [halls, setHalls] = useState<ExamHall[]>([]);
     const [loading, setLoading] = useState(false);
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+
+    // Calculate capacity whenever selectedHalls or halls changes
+    useEffect(() => {
+        if (onCapacityChange) {
+            const selected = halls.filter(h => selectedHalls.includes(h.id));
+            const total = selected.reduce((sum, h) => sum + h.capacity, 0);
+            onCapacityChange(total);
+        }
+    }, [selectedHalls, halls, onCapacityChange]);
 
     // Form State
     const [newHall, setNewHall] = useState({

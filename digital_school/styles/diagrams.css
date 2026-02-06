@@ -1,0 +1,243 @@
+/**
+ * Responsive Diagram Styles
+ * Ensures diagrams render perfectly on all screen sizes
+ */
+
+/* Container for diagrams */
+.fbd-diagram-container {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin: 1rem 0;
+    padding: 0.5rem;
+    background: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* SVG responsive wrapper */
+.fbd-diagram-wrapper {
+    display: inline-block;
+    position: relative;
+    width: 100%;
+    vertical-align: middle;
+}
+
+.fbd-diagram-wrapper svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Mobile optimization (< 640px) */
+@media (max-width: 640px) {
+    .fbd-diagram-container {
+        padding: 0.25rem;
+        margin: 0.5rem 0;
+    }
+
+    .fbd-diagram-wrapper svg {
+        max-width: 100%;
+        width: 100%;
+    }
+
+    /* Scale down text in diagrams for mobile */
+    .fbd-diagram-wrapper svg text {
+        font-size: 0.85em;
+    }
+}
+
+/* Tablet optimization (640px - 1024px) */
+@media (min-width: 640px) and (max-width: 1024px) {
+    .fbd-diagram-container {
+        max-width: 95%;
+    }
+}
+
+/* Desktop optimization (> 1024px) */
+@media (min-width: 1024px) {
+    .fbd-diagram-container {
+        max-width: 90%;
+    }
+}
+
+/* Print styles */
+@media print {
+    .fbd-diagram-container {
+        break-inside: avoid;
+        page-break-inside: avoid;
+        box-shadow: none;
+        border: 1px solid #e5e7eb;
+    }
+
+    .fbd-diagram-wrapper svg {
+        max-width: 100%;
+    }
+
+    /* Print-specific diagram sizing */
+    .fbd-inline-diagram {
+        margin: 0.5rem auto;
+        max-width: 90%;
+    }
+
+    .fbd-inline-diagram svg {
+        max-height: 250px;
+        page-break-inside: avoid;
+    }
+
+    /* Ensure diagrams don't break across pages */
+    .question-block,
+    .cq-question,
+    .sq-question {
+        page-break-inside: avoid;
+    }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .fbd-diagram-container {
+        background: #1f2937;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    }
+}
+
+/* Inline diagrams (within text) */
+.inline-diagram {
+    display: inline-block;
+    vertical-align: middle;
+    margin: 0 0.5rem;
+}
+
+.inline-diagram svg {
+    max-height: 2em;
+    width: auto;
+}
+
+/* Exam-specific inline diagrams */
+.fbd-inline-diagram {
+    width: 100%;
+    max-width: 100%;
+    margin: 1.5rem auto;
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(to bottom, #ffffff, #fafbfc);
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.fbd-inline-diagram svg {
+    max-width: 100%;
+    height: auto;
+    max-height: 400px;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.05));
+}
+
+/* Mobile optimization for exam diagrams */
+@media (max-width: 640px) {
+    .fbd-inline-diagram {
+        margin: 1rem auto;
+        padding: 0.75rem;
+    }
+
+    .fbd-inline-diagram svg {
+        max-height: 300px;
+    }
+}
+
+/* Tablet optimization for exam diagrams */
+@media (min-width: 640px) and (max-width: 1024px) {
+    .fbd-inline-diagram svg {
+        max-height: 350px;
+    }
+}
+
+/* Grid layout for multiple diagrams */
+.diagram-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+@media (max-width: 640px) {
+    .diagram-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Combination diagrams */
+.combination-diagram {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.combination-diagram svg {
+    min-width: 600px;
+    max-width: 100%;
+}
+
+@media (max-width: 640px) {
+    .combination-diagram svg {
+        min-width: 100%;
+    }
+}
+
+/* Loading state */
+.diagram-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    background: #f9fafb;
+    border-radius: 8px;
+}
+
+.diagram-loading::after {
+    content: "Loading diagram...";
+    color: #6b7280;
+    font-size: 0.875rem;
+}
+
+/* Error state */
+.diagram-error {
+    padding: 1rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    border-radius: 8px;
+    color: #991b1b;
+    font-size: 0.875rem;
+}
+
+/* Accessibility */
+.fbd-diagram-wrapper[role="img"] {
+    outline: none;
+}
+
+.fbd-diagram-wrapper:focus-visible {
+    outline: 2px solid #3b82f6;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .fbd-diagram-container {
+        border: 2px solid #000;
+    }
+
+    .fbd-diagram-wrapper svg {
+        filter: contrast(1.2);
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .fbd-diagram-wrapper svg * {
+        animation: none !important;
+        transition: none !important;
+    }
+}

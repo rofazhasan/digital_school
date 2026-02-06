@@ -9,6 +9,7 @@ import { X, Check, AlertCircle, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
+import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
 
 interface QuestionCardProps {
   disabled?: boolean;
@@ -88,7 +89,9 @@ const MCQOption = memo(({
       {/* Option Text */}
       <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
         <div className="min-w-0">
-          <MathJax inline dynamic>{cleanupMath(label || "")}</MathJax>
+          <MathJax inline dynamic>
+            <TextWithFBDs text={cleanupMath(label || "")} />
+          </MathJax>
         </div>
         {/* @ts-ignore */}
         {option?.image && (
@@ -187,7 +190,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
           {/* Question Text */}
           <div className="prose prose-indigo max-w-none text-gray-800 text-lg md:text-xl font-medium leading-relaxed mb-8">
-            <MathJax dynamic inline>{cleanupMath(text || "")}</MathJax>
+            <MathJax dynamic inline>
+              <TextWithFBDs text={cleanupMath(text || "")} />
+            </MathJax>
           </div>
 
           {/* Inputs */}

@@ -8,63 +8,108 @@ interface AttendanceSheetProps {
 }
 
 export const AttendanceSheetTemplate = ({ assignments, exam, roomNumber }: AttendanceSheetProps) => {
-    return (
-        <div className="w-full h-full p-8 bg-white text-black font-serif relative">
-            {/* Header */}
-            <div className="text-center mb-6 border-b-2 border-black pb-4">
-                <h1 className="text-2xl font-bold uppercase mb-1">{exam.schoolName}</h1>
-                <h2 className="text-xl font-semibold mb-2">Exam Attendance Sheet | পরীক্ষার উপস্থিতি তালিকা</h2>
+    // Sort assignments Spatially (Row -> Column -> Seat) to match walking path
+    const sortedAssignments = [...assignments].sort((a, b) => {
+        // Parse "C1-R1-S1" from "Seat X (C1-R1-S1)" or just "C1-R1-S1"
+        const parse = (s: string) => {
+            const m = s.match(/C(\d+)-R(\d+)-S(\d+)/);
+            if (!m) return { c: 999, r: 999, s: 999 };
+            return { c: parseInt(m[1]), r: parseInt(m[2]), s: parseInt(m[3]) };
+        };
+        const pA = parse(a.seatNumber);
+        const pB = parse(b.seatNumber);
 
-                <div className="flex justify-between items-center text-sm font-bold border-t border-dashed border-black pt-2 mt-2 px-8">
-                    <span>Exam: {exam.name}</span>
-                    <span>Class: {exam.className}</span>
-                    <span>Hall: {roomNumber.toString().padStart(2, '0')}</span>
-                    <span>Date: {new Date(exam.date).toLocaleDateString()}</span>
+        // Sort: Row Asc (Front to Back), then Col Asc (Left to Right), then Seat
+        if (pA.r !== pB.r) return pA.r - pB.r;
+        if (pA.c !== pB.c) return pA.c - pB.c;
+        return pA.s - pB.s;
+    });
+
+    return (
+        <div className="w-full h-full p-2 bg-white text-slate-900 font-sans relative flex flex-col">
+            {/* Ultra-Compact Header */}
+            <div className="border-b-2 border-black pb-1 mb-1 flex justify-between items-end">
+                <div>
+                    <h1 className="text-lg font-black uppercase tracking-tight leading-none">{exam.schoolName}</h1>
+                    <div className="text-xs font-bold uppercase mt-1 flex gap-4">
+                        <span>{exam.name}</span>
+                        <span>•</span>
+                        <span>{new Date(exam.date).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>Hall {roomNumber.toString().padStart(2, '0')}</span>
+                    </div>
+                </div>
+                <div className="text-right">
+                    <div className="text-[10px] font-mono font-bold bg-slate-100 px-2 py-1 border border-slate-300 rounded">
+                        {assignments[0]?.student.className || 'Class N/A'}
+                    </div>
                 </div>
             </div>
 
-            {/* Table */}
-            <div className="w-full">
-                <table className="w-full border-collapse border border-black text-sm">
+            {/* Matrix Table */}
+            <div className="flex-1 overflow-hidden">
+                <table className="w-full border-collapse border border-slate-900 text-[10px]">
                     <thead>
-                        <tr className="bg-slate-100">
-                            <th className="border border-black px-2 py-2 w-12 text-center">Seat</th>
-                            <th className="border border-black px-2 py-2 w-16 text-center">Roll</th>
-                            <th className="border border-black px-3 py-2 text-left">Student Name</th>
-                            <th className="border border-black px-2 py-2 w-24 text-center">Reg. No</th>
-                            <th className="border border-black px-2 py-2 w-32 text-center">Signature</th>
-                            <th className="border border-black px-2 py-2 w-32 text-center">Remarks</th>
+                        <tr className="bg-slate-100 text-slate-900 h-6">
+                            <th className="border border-slate-500 w-12 text-center uppercase">Seat</th>
+                            <th className="border border-slate-500 w-16 text-center uppercase">Roll</th>
+                            <th className="border border-slate-500 px-2 text-left uppercase">Candidate Identity</th>
+                            <th className="border border-slate-500 w-40 text-center uppercase">Student Signature</th>
+                            <th className="border border-slate-500 w-32 text-center uppercase">Invigilator Signature</th>
+                            <th className="border border-slate-500 w-24 text-center uppercase">Remarks</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {assignments.map((item, index) => (
-                            <tr key={item.student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                                <td className="border border-black px-2 py-3 text-center font-bold">{item.seatNumber}</td>
-                                <td className="border border-black px-2 py-3 text-center font-bold">{item.student.roll}</td>
-                                <td className="border border-black px-3 py-3">{item.student.name}</td>
-                                <td className="border border-black px-2 py-3 text-center font-mono">{item.student.registrationId}</td>
-                                <td className="border border-black px-2 py-3"></td> {/* Signature Space */}
-                                <td className="border border-black px-2 py-3"></td> {/* Remarks Space */}
+                        {sortedAssignments.map((assignment, idx) => (
+                            <tr key={idx} className="h-8 hover:bg-slate-50">
+                                <td className="border border-slate-400 text-center font-bold">
+                                    {assignment.seatNumber.replace('Seat ', '').replace('R', '').replace('C', '-').replace('S', '')}
+                                </td>
+                                <td className="border border-slate-400 text-center font-mono font-bold text-xs">
+                                    {assignment.student.roll}
+                                </td>
+                                <td className="border border-slate-400 px-2 align-middle">
+                                    <div className="font-bold truncate leading-none mb-0.5">{assignment.student.name}</div>
+                                    <div className="font-mono text-[9px] text-slate-500">Reg: {assignment.student.registrationId}</div>
+                                </td>
+                                <td className="border border-slate-400"></td>
+                                <td className="border border-slate-400"></td>
+                                <td className="border border-slate-400"></td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
             </div>
 
-            {/* Footer */}
-            <div className="mt-12 flex justify-between items-end px-8">
-                <div className="text-center">
-                    <div className="w-48 border-b border-black mb-1"></div>
-                    <p className="font-bold">Invigilator Signature</p>
+            {/* High-Efficiency Summary Block */}
+            <div className="mt-auto pt-2 border-t-2 border-black flex items-start gap-4 text-xs font-bold">
+                <div className="flex-1 grid grid-cols-4 gap-2 border border-slate-900 p-2">
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase text-slate-500">Total</span>
+                        <span className="text-xl">{assignments.length}</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase text-slate-500">Present</span>
+                        <span className="text-xl text-green-700">_____</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase text-slate-500">Absent</span>
+                        <span className="text-xl text-red-600">_____</span>
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[9px] uppercase text-slate-500">Expelled</span>
+                        <span className="text-xl text-red-900">_____</span>
+                    </div>
                 </div>
-                <div className="text-center">
-                    <div className="w-48 border-b border-black mb-1"></div>
-                    <p className="font-bold">Head Teacher Signature</p>
+
+                <div className="flex-1 flex flex-col justify-end text-right gap-4">
+                    <div className="border-b border-black w-48 ml-auto"></div>
+                    <div className="uppercase text-[9px] tracking-widest text-slate-500">Controller of Examinations</div>
                 </div>
             </div>
 
-            <div className="absolute bottom-8 left-0 w-full text-center text-xs text-slate-500">
-                Generated by DigitalSchool Examination Committee
+            <div className="absolute bottom-1 left-2 text-[8px] text-slate-300 uppercase">
+                Generated via Integrated Logistics Framework • {new Date().toISOString().split('T')[0]}
             </div>
         </div>
     );

@@ -45,7 +45,10 @@ model User {
   resultReviews     ResultReview[]             @relation("ResultReviewer")
   studentProfile    StudentProfile?
   teacherProfile    TeacherProfile?
-  institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
+  admissionReviews  AdmissionApplication[] @relation("AdmissionReviewer")
+  createdInvoices   Invoice[]              @relation("InvoiceCreator")
+  collectedPayments Payment[]              @relation("PaymentCollector")
+  institute         Institute?             @relation("InstituteUsers", fields: [instituteId], references: [id])
 
   @@index([role]) // Optimized for User Admin List
   @@map("users")
@@ -99,6 +102,8 @@ model StudentProfile {
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   seatAllocations  SeatAllocation[]
+  admissionApp     AdmissionApplication?
+  invoices         Invoice[]
 
   @@map("student_profiles")
 }
@@ -137,6 +142,8 @@ model Class {
   questions    Question[]       @relation("ClassQuestions")
   students     StudentProfile[]
   notices      Notice[]         @relation("NoticeToClasses")
+  admissionApplications AdmissionApplication[]
+  feeStructures FeeStructure[]
 
   @@unique([name, section, instituteId])
   @@map("classes")
@@ -215,6 +222,7 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
+  fbd                    Json?                    // Free Body Diagram data
   answerLatex            String?
   difficultyDetail       String?
   questionLatex          String?
@@ -855,4 +863,273 @@ enum QuestionStatus {
   APPROVED
   NEEDS_REVIEW
   DRAFT
+}
+
+
+// ============================================
+// SCHOOL MANAGEMENT SYSTEM MODELS
+// ============================================
+
+model AdmissionApplication {
+  id                String   @id @default(cuid())
+  applicationNo     String   @unique // AUTO-2026-0001
+  
+  // Student Info
+  studentName       String
+  dateOfBirth       DateTime
+  gender            String
+  bloodGroup        String?
+  photo             String?
+  
+  // Parent Info
+  fatherName        String
+  motherName        String
+  guardianPhone     String
+  guardianEmail     String?
+  address           String
+  
+  // Academic Info
+  previousSchool    String?
+  previousClass     String?
+  previousGPA       Float?
+  
+  // Application Details
+  applyingForClass  String
+  applyingForClassId String?
+  class             Class?   @relation(fields: [applyingForClassId], references: [id])
+  
+  // Documents
+  birthCertificate  String?
+  previousMarksheet String?
+  transferCertificate String?
+  
+  // Status
+  status            AdmissionStatus @default(PENDING)
+  appliedAt         DateTime @default(now())
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  reviewer          User?    @relation("AdmissionReviewer", fields: [reviewedBy], references: [id])
+  
+  // Test Score (if entrance exam)
+  testScore         Float?
+  testDate          DateTime?
+  
+  // Admission
+  admittedAt        DateTime?
+  studentId         String?  @unique
+  student           StudentProfile? @relation(fields: [studentId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([appliedAt])
+  @@map("admission_applications")
+}
+
+model FeeStructure {
+  id          String   @id @default(cuid())
+  name        String   // "Class 10 - Annual Fee"
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  
+  // Fee Components
+  tuitionFee  Float    @default(0)
+  admissionFee Float   @default(0)
+  examFee     Float    @default(0)
+  libraryFee  Float    @default(0)
+  labFee      Float    @default(0)
+  sportsFee   Float    @default(0)
+  transportFee Float   @default(0)
+  otherFees   Float    @default(0)
+  
+  totalAmount Float    // Auto-calculated
+  
+  // Payment Schedule
+  frequency   FeeFrequency @default(ANNUAL)
+  dueDay      Int?     // Day of month for payment
+  
+  // Discounts
+  siblingDiscount Float @default(0) // Percentage
+  meritDiscount   Float @default(0) // Percentage
+  
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  invoices    Invoice[]
+
+  @@map("fee_structures")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique // INV-2026-00001
+  
+  // Student Reference
+  studentId       String
+  student         StudentProfile @relation(fields: [studentId], references: [id])
+  
+  // Fee Details
+  feeStructureId  String
+  feeStructure    FeeStructure @relation(fields: [feeStructureId], references: [id])
+  
+  // Amounts
+  subtotal        Float
+  discount        Float    @default(0)
+  lateFee         Float    @default(0)
+  totalAmount     Float
+  paidAmount      Float    @default(0)
+  balanceAmount   Float    // totalAmount - paidAmount
+  
+  // Dates
+  issueDate       DateTime @default(now())
+  dueDate         DateTime
+  
+  // Status
+  status          InvoiceStatus @default(PENDING)
+  
+  // Verification
+  qrCode          String   @unique // Unique hash for QR verification
+  verificationUrl String   // Public URL to verify
+  
+  // Metadata
+  notes           String?
+  createdBy       String?
+  creator         User?    @relation("InvoiceCreator", fields: [createdBy], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  payments        Payment[]
+
+  @@index([status])
+  @@index([studentId])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  receiptNumber   String   @unique // RCP-2026-00001
+  
+  // Invoice Reference
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  
+  // Payment Details
+  amount          Float
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime @default(now())
+  
+  // Transaction Details
+  transactionId   String?  // For online payments
+  bankReference   String?
+  
+  // Status
+  status          PaymentStatus @default(COMPLETED)
+  
+  // Verification
+  qrCode          String   @unique // Receipt QR code
+  verificationUrl String
+  
+  // Metadata
+  notes           String?
+  collectedBy     String?
+  collector       User?    @relation("PaymentCollector", fields: [collectedBy], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([paymentDate])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model VerifiableDocument {
+  id            String   @id @default(cuid())
+  documentType  DocumentType
+  documentNumber String  @unique
+  
+  // Reference (polymorphic)
+  referenceId   String   // Invoice ID, Certificate ID, etc.
+  referenceType String   // "INVOICE", "CERTIFICATE", "ADMIT_CARD"
+  
+  // Verification Data
+  qrHash        String   @unique
+  verificationUrl String
+  issuedDate    DateTime @default(now())
+  expiryDate    DateTime?
+  
+  // Status
+  isValid       Boolean  @default(true)
+  revokedAt     DateTime?
+  revokedBy     String?
+  
+  // Metadata
+  metadata      Json?    // Additional data
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([qrHash])
+  @@index([documentNumber])
+  @@map("verifiable_documents")
+}
+
+// ============================================
+// ENUMS FOR SCHOOL MANAGEMENT
+// ============================================
+
+enum AdmissionStatus {
+  PENDING
+  UNDER_REVIEW
+  TEST_SCHEDULED
+  TEST_COMPLETED
+  ACCEPTED
+  REJECTED
+  ADMITTED
+}
+
+enum FeeFrequency {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  ANNUAL
+  ONE_TIME
+}
+
+enum InvoiceStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+  CARD
+  UPI
+  MOBILE_BANKING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DocumentType {
+  INVOICE
+  RECEIPT
+  CERTIFICATE
+  ADMIT_CARD
+  ID_CARD
+  TRANSFER_CERTIFICATE
+  ADMISSION_LETTER
 }

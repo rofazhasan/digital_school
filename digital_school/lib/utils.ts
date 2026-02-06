@@ -44,30 +44,37 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
 /**
  * Ensures text uses inline math delimiters to prevent unwanted new lines and centering.
  * Replaces $$...$$ with $...$ and \[...\] with \(...\)
+ * Also wraps Bangla/Unicode text in \text{} for proper rendering in LaTeX tables
  * @param text - The text containing math to clean up
- * @returns Cleaned text with inline math delimiters
+ * @returns Cleaned text with inline math delimiters and Bangla support
  */
 export function cleanupMath(text: string | null | undefined): string {
   if (!text) return "";
 
-  // 1. Strip $$ wrapping TikZ environments (user requirement: "tikz code will be in $$ $$")
-  // We use a regex that handles newlines and optional spaces
-  let cleaned = text.replace(/\$\$\s*(\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\})\s*\$\$/g, '$1');
+  let processed = text;
 
-  // 2. Protect TikZ blocks from further processing
-  // We split by the TikZ block to separate "math text" from "tikz code"
-  const tikzRegex = /(\\begin\{tikzpicture\}[\s\S]*?\\end\{tikzpicture\})/g;
-  const parts = cleaned.split(tikzRegex);
+  // Convert display math ($$...$$) to inline math ($...$)
+  // Convert LaTeX display delimiters (\[...\]) to inline (\(...\))
+  processed = processed
+    .replace(/\$\$/g, '$')  // $$ -> $
+    .replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)'); // \[ -> \(, \] -> \)
 
-  return parts.map(part => {
-    if (part.startsWith("\\begin{tikzpicture}")) {
-      // Return TikZ code exactly as is (no replacement of internal symbols)
-      return part;
-    } else {
-      // Process standard text/math
-      return part
-        .replace(/\$\$/g, '$') // $$ -> $
-        .replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)'); // \[ -> \(
-    }
-  }).join(""); // Rejoin
+  // Process Bangla text in tables (array, tabular environments)
+  // This wraps Bangla Unicode characters in \text{} for proper rendering
+  const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
+
+  processed = processed.replace(tableRegex, (match) => {
+    // Wrap Bangla text (Unicode range U+0980 to U+09FF) in \text{}
+    // But only if it's not already wrapped
+    return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (banglaText) => {
+      // Check if already wrapped in \text{}
+      const beforeText = match.substring(0, match.indexOf(banglaText));
+      if (beforeText.endsWith('\\text{')) {
+        return banglaText; // Already wrapped
+      }
+      return `\\text{${banglaText}}`;
+    });
+  });
+
+  return processed;
 }

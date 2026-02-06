@@ -46,6 +46,7 @@ import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
+import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
 
 interface LiveStudent {
   id: string;
@@ -737,14 +738,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div className="flex-grow space-y-2">
                               <div className="prose prose-sm max-w-none">
-                                <MathJax inline>{cleanupMath(q.text)}</MathJax>
+                                <MathJax inline>
+                                  <TextWithFBDs text={cleanupMath(q.text)} />
+                                </MathJax>
                               </div>
 
                               {hasAnswer ? (
                                 <div className="mt-3 p-3 bg-white rounded border border-blue-100">
                                   <p className="text-xs font-semibold text-gray-500 mb-1">Student Answer:</p>
                                   <div className="text-sm font-medium text-blue-800">
-                                    <MathJax inline>{cleanupMath(String(ans))}</MathJax>
+                                    <MathJax inline>
+                                      <TextWithFBDs text={cleanupMath(String(ans))} />
+                                    </MathJax>
                                   </div>
                                 </div>
                               ) : (
@@ -763,7 +768,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="flex items-start">
                                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                         <div className="flex-1">
-                                          <MathJax inline>{cleanupMath(opt.text || String(opt))}</MathJax>
+                                          <MathJax inline>
+                                            <TextWithFBDs text={cleanupMath(opt.text || String(opt))} />
+                                          </MathJax>
                                           {opt.image && (
                                             <div className="mt-1">
                                               <img src={opt.image} alt="Option" className="max-h-20 rounded border bg-white object-contain" />
@@ -1065,6 +1072,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
+    // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
+    const previousMarks = currentStudent.answers[`${questionId}_marks`] || 0;
+
+    if (exam && currentStudent) {
+      const updatedExam = { ...exam };
+      const studentIndex = updatedExam.submissions.findIndex(s => s.student.id === currentStudent.student.id);
+      if (studentIndex !== -1) {
+        updatedExam.submissions[studentIndex] = {
+          ...updatedExam.submissions[studentIndex],
+          answers: {
+            ...updatedExam.submissions[studentIndex].answers,
+            [`${questionId}_marks`]: marks
+          }
+        };
+        setExam(updatedExam);
+      }
+    }
+
     try {
       const response = await fetch(`/api/exams/evaluations/${id}/grade`, {
         method: 'POST',
@@ -1078,48 +1103,65 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         })
       });
 
-      if (response.ok) {
-        toast.success("Marks updated successfully");
-
-        // Update local state immediately for better UX
+      if (!response.ok) {
+        // Revert optimistic update on error
         if (exam && currentStudent) {
-          const updatedExam = { ...exam };
-          const studentIndex = updatedExam.submissions.findIndex(s => s.student.id === currentStudent.student.id);
+          const revertedExam = { ...exam };
+          const studentIndex = revertedExam.submissions.findIndex(s => s.student.id === currentStudent.student.id);
           if (studentIndex !== -1) {
-            updatedExam.submissions[studentIndex] = {
-              ...updatedExam.submissions[studentIndex],
+            revertedExam.submissions[studentIndex] = {
+              ...revertedExam.submissions[studentIndex],
               answers: {
-                ...updatedExam.submissions[studentIndex].answers,
-                [`${questionId}_marks`]: marks
+                ...revertedExam.submissions[studentIndex].answers,
+                [`${questionId}_marks`]: previousMarks
               }
             };
-            setExam(updatedExam);
+            setExam(revertedExam);
           }
         }
-
-        // Check if this student has a pending review request and mark it as under review
-        const studentReview = reviewRequests.find(r => r.studentId === currentStudent.student.id);
-        if (studentReview && studentReview.status === 'PENDING') {
-          try {
-            await fetch(`/api/exams/evaluations/${id}/review-requests/${studentReview.id}/mark-under-review`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' }
-            });
-            fetchReviewRequests(); // Refresh review requests
-          } catch (error) {
-            console.error('Error marking review as under review:', error);
-          }
-        }
-
-        // Also refresh data from server to ensure consistency
-        fetchExamData(currentStudent.student.id);
-      } else {
-        toast.error("Failed to update marks");
+        toast.error("Failed to update marks. Please try again.");
+        return;
       }
+
+      // Success - no toast to avoid delays, UI already updated optimistically
+
+      // Check if this student has a pending review request and mark it as under review
+      const studentReview = reviewRequests.find(r => r.studentId === currentStudent.student.id);
+      if (studentReview && studentReview.status === 'PENDING') {
+        try {
+          await fetch(`/api/exams/evaluations/${id}/review-requests/${studentReview.id}/mark-under-review`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          fetchReviewRequests(); // Refresh review requests
+        } catch (error) {
+          console.error('Error marking review as under review:', error);
+        }
+      }
+
+      // Also refresh data from server to ensure consistency
+      fetchExamData(currentStudent.student.id);
     } catch (error) {
       console.error("Error updating marks:", error);
-      toast.error("Failed to update marks");
+
+      // Revert optimistic update on error
+      if (exam && currentStudent) {
+        const revertedExam = { ...exam };
+        const studentIndex = revertedExam.submissions.findIndex(s => s.student.id === currentStudent.student.id);
+        if (studentIndex !== -1) {
+          revertedExam.submissions[studentIndex] = {
+            ...revertedExam.submissions[studentIndex],
+            answers: {
+              ...revertedExam.submissions[studentIndex].answers,
+              [`${questionId}_marks`]: previousMarks
+            }
+          };
+          setExam(revertedExam);
+        }
+      }
+
+      toast.error("Failed to update marks. Please try again.");
     }
   };
 
@@ -2320,57 +2362,88 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       </Badge>
                                     </div>
                                   ) : (
-                                    <div className="flex items-center gap-4">
+                                    <div className="flex flex-col gap-3">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-600">Marks:</span>
-                                        <Input
-                                          type="number"
-                                          min="0"
-                                          max={currentQuestion.marks}
-                                          value={currentStudent.answers[`${currentQuestion.id}_marks`] || 0}
-                                          onChange={(e) => {
-                                            updateMarks(currentQuestion.id, parseInt(e.target.value) || 0);
-                                          }}
-                                          className="w-20"
-                                          disabled={!canEditMarks()}
-                                        />
-                                        <span className="text-sm text-gray-600">/ {currentQuestion.marks}</span>
+                                        <span className="text-sm font-medium text-gray-700">Quick Grade:</span>
+                                        <span className="text-xs text-gray-500">/ {currentQuestion.marks}</span>
                                         {canEditMarks() ? (
                                           <Badge className="bg-green-100 text-green-800 text-xs">
                                             ✏️ Editable
                                           </Badge>
                                         ) : (
                                           <Badge className="bg-gray-100 text-gray-800 text-xs">
-                                            🔒 Read Only
+                                            🔒 Locked
                                           </Badge>
                                         )}
                                       </div>
 
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                          if (Array.isArray(currentAnswer) && currentAnswer.length > 0) {
-                                            const firstImg = currentAnswer[0];
-                                            const imgSrc = typeof firstImg === 'string' ? firstImg : firstImg.preview || firstImg.url || firstImg.src;
-                                            setCurrentImage(imgSrc);
-                                            setCurrentImageIndex(0);
-                                            setShowDrawingTool(true);
-                                          }
-                                        }}
-                                        disabled={!canEditMarks()}
-                                        title={
-                                          !canEditMarks()
-                                            ? "Cannot edit marks. Student evaluation is completed or no review request exists."
-                                            : "Draw annotations on student's answer"
-                                        }
-                                      >
-                                        <PenTool className="h-4 w-4 mr-2" />
-                                        Draw on Answer
-                                      </Button>
+                                      {/* Quick-click buttons for marks */}
+                                      <div className="flex flex-wrap gap-2">
+                                        {Array.from({ length: currentQuestion.marks + 1 }, (_, i) => i).map((mark) => {
+                                          const currentMarks = currentStudent.answers[`${currentQuestion.id}_marks`] || 0;
+                                          const isSelected = currentMarks === mark;
+
+                                          return (
+                                            <button
+                                              key={mark}
+                                              onClick={() => updateMarks(currentQuestion.id, mark)}
+                                              disabled={!canEditMarks()}
+                                              className={`
+                                                px-4 py-2 rounded-lg font-semibold text-sm transition-all
+                                                ${isSelected
+                                                  ? 'bg-indigo-600 text-white shadow-md scale-105 ring-2 ring-indigo-300'
+                                                  : 'bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600'
+                                                }
+                                                ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
+                                                min-w-[3rem]
+                                              `}
+                                            >
+                                              {mark}
+                                            </button>
+                                          );
+                                        })}
+                                      </div>
+
+                                      {/* Current marks display */}
+                                      <div className="flex items-center gap-2 text-sm">
+                                        <span className="text-gray-600">Current:</span>
+                                        <Badge className={
+                                          (currentStudent.answers[`${currentQuestion.id}_marks`] || 0) === currentQuestion.marks
+                                            ? 'bg-green-100 text-green-800'
+                                            : (currentStudent.answers[`${currentQuestion.id}_marks`] || 0) === 0
+                                              ? 'bg-red-100 text-red-800'
+                                              : 'bg-yellow-100 text-yellow-800'
+                                        }>
+                                          {currentStudent.answers[`${currentQuestion.id}_marks`] || 0} / {currentQuestion.marks}
+                                        </Badge>
+                                      </div>
                                     </div>
                                   )}
                                 </div>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    if (Array.isArray(currentAnswer) && currentAnswer.length > 0) {
+                                      const firstImg = currentAnswer[0];
+                                      const imgSrc = typeof firstImg === 'string' ? firstImg : firstImg.preview || firstImg.url || firstImg.src;
+                                      setCurrentImage(imgSrc);
+                                      setCurrentImageIndex(0);
+                                      setShowDrawingTool(true);
+                                    }
+                                  }}
+                                  disabled={!canEditMarks()}
+                                  title={
+                                    !canEditMarks()
+                                      ? "Cannot edit marks. Student evaluation is completed or no review request exists."
+                                      : "Draw annotations on student's answer"
+                                  }
+                                  className="mt-4"
+                                >
+                                  <PenTool className="h-4 w-4 mr-2" />
+                                  Draw on Answer
+                                </Button>
 
                                 {/* Review Period Mark Editing Notice */}
                                 {(() => {

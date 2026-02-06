@@ -55,9 +55,6 @@ export default function RootLayout({
   return (
     <html lang="en" className="overflow-x-hidden">
       <head>
-
-        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/fonts.css" />
-        <Script src="https://cdn.jsdelivr.net/npm/@rod2ik/tikzjax/dist/tikzjax.js" strategy="afterInteractive" />
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
       <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} overflow-x-hidden`}>

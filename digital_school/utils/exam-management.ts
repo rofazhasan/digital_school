@@ -7,6 +7,8 @@ export interface Student {
     roll: string;
     registrationId: string;
     classId: string;
+    className?: string; // e.g. "Class 8"
+    examId?: string; // Linked exam for this student
     sectionId?: string;
     gender?: string;
     // Allocation info (joined)
@@ -35,12 +37,16 @@ export interface SeatAssignment {
 export interface RoomPlan {
     roomNumber: string;
     hallName: string;
+    className?: string; // For attendance splitting
     assignments: SeatAssignment[];
 }
 
-/**
- * Sorts students by class, section, then roll.
- */
+export interface SeatPlanProps {
+    assignments: SeatAssignment[];
+    exam: ExamDetails;
+    roomNumber: number;
+}
+
 export const sortStudents = (students: Student[]): Student[] => {
     return [...students].sort((a, b) => {
         const rollA = parseInt(a.roll) || 0;

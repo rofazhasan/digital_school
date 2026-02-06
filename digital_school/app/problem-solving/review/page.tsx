@@ -24,6 +24,7 @@ const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolb
 // import html2canvas from 'html2canvas';
 // import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
+import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
 
 // Types
 interface Question {
@@ -412,7 +413,9 @@ export default function ReviewToSessionPort() {
                             {/* Content Area */}
                             <div className={`p-8 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                                 <h3 className={`text-2xl font-semibold leading-relaxed max-w-4xl tracking-tight ${isDark ? 'text-indigo-50' : 'text-slate-900'}`}>
-                                    <UniversalMathJax inline dynamic>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
+                                    <UniversalMathJax inline dynamic>
+                                        <TextWithFBDs text={cleanupMath(currentQ.questionText)} />
+                                    </UniversalMathJax>
                                 </h3>
 
                                 <div className="mt-10 space-y-4">
@@ -484,7 +487,9 @@ export default function ReviewToSessionPort() {
 
                                                         <div className="flex-1 flex flex-col z-10">
                                                             <span className={`text-lg leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
-                                                                <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                                                                <UniversalMathJax inline dynamic>
+                                                                    <TextWithFBDs text={cleanupMath(opt.text)} />
+                                                                </UniversalMathJax>
                                                             </span>
 
                                                             {/* Student Answer Indicator (Persistent) */}
