@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     });
     // Map results to desired format
     const mapped = results.map(r => ({
+      examId: r.examId,
       examTitle: r.exam?.name || '',
       subject: r.exam?.description || '',
       mcqMarks: r.mcqMarks,

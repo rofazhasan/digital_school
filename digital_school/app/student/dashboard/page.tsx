@@ -78,6 +78,7 @@ interface Exam {
   time: string;
   type: 'ONLINE' | 'OFFLINE' | 'MIXED';
   status: 'UPCOMING' | 'ACTIVE' | 'COMPLETED';
+  totalMarks: number;
 }
 
 interface Result {
@@ -142,21 +143,8 @@ export default function StudentDashboardPage() {
               const userClassId = data.user.studentProfile?.classId;
 
               if (userClassId && Array.isArray(examData)) {
-                const now = new Date();
-                const cutoffDate = new Date();
-                cutoffDate.setDate(now.getDate() + 3);
-                cutoffDate.setHours(0, 0, 0, 0);
-
-                filtered = examData.filter((exam: any) => {
-                  // Class Filter
-                  if (exam.classId !== userClassId) return false;
-
-                  // Date Filter (Past + Next 2 days)
-                  const examDate = new Date(exam.date);
-                  if (examDate >= cutoffDate) return false;
-
-                  return true;
-                });
+                // Show all exams for the student's class
+                filtered = examData.filter((exam: any) => exam.classId === userClassId);
               }
               if (isMounted) setExams(filtered);
             })
@@ -656,13 +644,7 @@ export default function StudentDashboardPage() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        {[
-                          { rank: 1, name: 'Sarah Johnson', score: 95, isCurrent: false },
-                          { rank: 2, name: 'Mike Chen', score: 92, isCurrent: false },
-                          { rank: 3, name: user.name, score: 85, isCurrent: true },
-                          { rank: 4, name: 'Emma Wilson', score: 83, isCurrent: false },
-                          { rank: 5, name: 'Alex Brown', score: 80, isCurrent: false }
-                        ].map((student) => (
+                        {(analytics?.leaderboard || []).length > 0 ? analytics.leaderboard.map((student: any) => (
                           <div
                             key={student.rank}
                             className={`flex items-center justify-between p-3 rounded-lg transition-all ${student.isCurrent
@@ -685,7 +667,11 @@ export default function StudentDashboardPage() {
                             </div>
                             <span className="font-bold text-sm tracking-tight">{student.score}%</span>
                           </div>
-                        ))}
+                        )) : (
+                          <div className="py-8 text-center text-muted-foreground text-sm">
+                            No leaderboard data available yet.
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
@@ -764,10 +750,30 @@ export default function StudentDashboardPage() {
                           </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-6">
-                          <div className="flex items-center gap-2 mb-6 text-sm text-gray-600 dark:text-gray-300">
+                          <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
                             <Calendar className="w-4 h-4 text-primary" />
-                            <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }) : ''}</span>
+                            <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
                           </div>
+
+                          {/* Marks & Rank Section */}
+                          {(() => {
+                            const result = results.find((r: any) => r.examId === exam.id);
+                            if (result) {
+                              return (
+                                <div className="grid grid-cols-2 gap-2 mb-4">
+                                  <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg text-center">
+                                    <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Marks</div>
+                                    <div className="text-lg font-bold text-blue-700 dark:text-blue-300">{result.total} / {exam.totalMarks}</div>
+                                  </div>
+                                  <div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg text-center">
+                                    <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">Rank</div>
+                                    <div className="text-lg font-bold text-amber-700 dark:text-amber-300">#{result.rank || '-'}</div>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })()}
 
                           <div className="flex space-x-2">
                             {exam.type === 'ONLINE' ? (

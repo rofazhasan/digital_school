@@ -77,7 +77,45 @@ export async function GET(req: NextRequest) {
         const currentRank = latestResult?.rank || '-';
 
         // 4. Badges
-        const badges = studentProfile.badges;
+        const badges = studentProfile.badges.map(b => ({
+            ...b,
+            icon: b.type === 'EXCELLENCE' ? '🏆' : b.type === 'ACHIEVEMENT' ? '🏅' : b.type === 'MILESTONE' ? '🎯' : '⭐',
+            earnedAt: b.issuedDate
+        }));
+
+        // 5. Leaderboard (Class-wide)
+        // Fetch all students in the same class to calculate standings
+        const classStudents = await prisma.studentProfile.findMany({
+            where: { classId: studentProfile.classId },
+            include: {
+                user: { select: { name: true } },
+                results: true
+            }
+        });
+
+        const leaderboard = classStudents.map(student => {
+            const studentResults = student.results;
+            const totalScore = studentResults.reduce((acc, r) => acc + r.total, 0);
+            const totalCount = studentResults.length;
+
+            // Calculate a score that combines total performance
+            // For now, using average percentage if results exist, otherwise 0
+            let avgScore = 0;
+            if (totalCount > 0) {
+                const totalPossible = studentResults.length * 100; // Simplified assumption: each exam is 100 max for leaderboard purposes
+                avgScore = (totalScore / totalPossible) * 100;
+            }
+
+            return {
+                rank: 0, // Will be set after sorting
+                name: student.user.name,
+                score: Math.round(avgScore),
+                isCurrent: student.id === studentProfile.id
+            };
+        })
+            .sort((a, b) => b.score - a.score)
+            .map((entry, index) => ({ ...entry, rank: index + 1 }))
+            .slice(0, 10); // Return top 10 for more depth
 
         return NextResponse.json({
             analytics: {
@@ -94,7 +132,8 @@ export async function GET(req: NextRequest) {
                     grade: calculateGrade(averagePercentage)
                 },
                 rank: currentRank,
-                totalStudents: studentProfile.class.capacity // Approximate
+                totalStudents: classStudents.length,
+                leaderboard
             },
             badges
         });
