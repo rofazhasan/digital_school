@@ -273,8 +273,10 @@ export async function middleware(request: NextRequest) {
 
   // Handle public routes
   if (ROUTE_PERMISSIONS.public.some(route => pathMatches(route, pathname))) {
+    const reason = request.nextUrl.searchParams.get('reason');
     // If user is authenticated and trying to access login/signup, redirect to dashboard
-    if (userData && (pathname === '/login' || pathname === '/signup')) {
+    // EXCEPTION: Allow access if there's a session-related reason (like mismatch/expiry)
+    if (userData && (pathname === '/login' || pathname === '/signup') && !reason) {
       const redirectUrl = getDefaultRedirectUrl(userData.role);
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }

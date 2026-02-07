@@ -46,19 +46,25 @@ export default function LoginPage() {
         const reason = searchParams.get('reason');
         const info = searchParams.get('info');
 
-        if (reason === 'session_invalidated' && info) {
-            try {
-                const decoded = JSON.parse(atob(info));
-                setSessionAlert(decoded);
+        if (reason === 'session_invalidated' || reason === 'session_expired') {
+            // Clear the session cookie to prevent middleware redirect loops 
+            // and ensure a clean login state
+            document.cookie = 'session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
 
-                // Auto-fadeOut after 6 seconds
-                const timer = setTimeout(() => {
-                    setSessionAlert(null);
-                }, 6000);
+            if (reason === 'session_invalidated' && info) {
+                try {
+                    const decoded = JSON.parse(atob(info));
+                    setSessionAlert(decoded);
 
-                return () => clearTimeout(timer);
-            } catch (e) {
-                console.error('Failed to decode session info');
+                    // Auto-fadeOut after 6 seconds
+                    const timer = setTimeout(() => {
+                        setSessionAlert(null);
+                    }, 6000);
+
+                    return () => clearTimeout(timer);
+                } catch (e) {
+                    console.error('Failed to decode session info');
+                }
             }
         }
     }, [searchParams]);
