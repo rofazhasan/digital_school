@@ -16,9 +16,15 @@ export default async function Layout({
     const sessionToken = (await cookies()).get('session-token')?.value;
 
     if (sessionToken) {
-        const { status } = await validateSession(sessionToken);
+        const { status, lastSessionInfo } = await validateSession(sessionToken);
         if (status === 'mismatch') {
-            redirect('/login?reason=session_invalidated');
+            const info = lastSessionInfo as any || {};
+            const encodedInfo = Buffer.from(JSON.stringify({
+                device: info.device || 'Unknown',
+                ip: info.ip || 'Unknown',
+                time: info.time || new Date().toISOString()
+            })).toString('base64');
+            redirect(`/login?reason=session_invalidated&info=${encodedInfo}`);
         }
     }
 

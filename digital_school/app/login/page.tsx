@@ -18,8 +18,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Eye, EyeOff, Loader2, AlertCircle, LogIn, Home, Mail, Phone } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ControllerRenderProps } from 'react-hook-form';
+import { useSearchParams } from 'next/navigation';
 
 const loginSchema = z.object({
     identifier: z.string().min(1, { message: 'Email or phone number is required.' }),
@@ -35,9 +36,32 @@ export default function LoginPage() {
     const [mounted, setMounted] = useState(false);
     const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
 
+    const [sessionAlert, setSessionAlert] = useState<{ device: string, ip: string, time: string } | null>(null);
+    const searchParams = useSearchParams();
+
     useEffect(() => {
         setMounted(true);
-    }, []);
+
+        // Handle session invalidated reason
+        const reason = searchParams.get('reason');
+        const info = searchParams.get('info');
+
+        if (reason === 'session_invalidated' && info) {
+            try {
+                const decoded = JSON.parse(atob(info));
+                setSessionAlert(decoded);
+
+                // Auto-fadeOut after 6 seconds
+                const timer = setTimeout(() => {
+                    setSessionAlert(null);
+                }, 6000);
+
+                return () => clearTimeout(timer);
+            } catch (e) {
+                console.error('Failed to decode session info');
+            }
+        }
+    }, [searchParams]);
 
     const form = useForm<TLoginSchema>({
         resolver: zodResolver(loginSchema),
@@ -140,6 +164,37 @@ export default function LoginPage() {
                         </CardHeader>
 
                         <CardContent className="space-y-6">
+                            <AnimatePresence>
+                                {sessionAlert && (
+                                    <motion.div
+                                        initial={{ opacity: 0, height: 0 }}
+                                        animate={{ opacity: 1, height: 'auto' }}
+                                        exit={{ opacity: 0, height: 0 }}
+                                        className="overflow-hidden"
+                                    >
+                                        <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-xl p-4 mb-4 space-y-2 text-sm shadow-sm">
+                                            <div className="flex items-center gap-2 text-red-600 dark:text-red-400 font-bold">
+                                                <AlertCircle className="w-4 h-4" />
+                                                New Login Detected
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                                <div>
+                                                    <span className="font-semibold block uppercase text-[10px]">Device</span>
+                                                    <span className="text-foreground truncate block">{sessionAlert.device}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="font-semibold block uppercase text-[10px]">IP Address</span>
+                                                    <span className="text-foreground block">{sessionAlert.ip}</span>
+                                                </div>
+                                                <div className="col-span-2">
+                                                    <span className="font-semibold block uppercase text-[10px]">Time</span>
+                                                    <span className="text-foreground block">{new Date(sessionAlert.time).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
                             {/* Login Method Toggle */}
                             <div className="grid grid-cols-2 gap-2 p-1 bg-muted rounded-lg">
                                 <Button
