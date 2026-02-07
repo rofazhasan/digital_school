@@ -14,28 +14,28 @@ if (typeof File === 'undefined') {
     public slice: (start?: number, end?: number, contentType?: string) => File;
 
     constructor(
-      bits: ArrayBuffer | ArrayBufferView | Blob | string | Array<string>,
+      bits: ArrayBuffer | ArrayBufferView | Blob | string | any[],
       name: string,
       options?: { type?: string; lastModified?: number }
     ) {
       this.name = name;
       this.type = options?.type || 'application/octet-stream';
       this.lastModified = options?.lastModified || Date.now();
-      
+
       // Handle different input types
       if (typeof bits === 'string') {
         this.size = new TextEncoder().encode(bits).length;
-        this.arrayBuffer = async () => new TextEncoder().encode(bits).buffer;
+        this.arrayBuffer = async () => new TextEncoder().encode(bits).buffer as any;
       } else if (bits instanceof ArrayBuffer) {
         this.size = bits.byteLength;
-        this.arrayBuffer = async () => bits;
+        this.arrayBuffer = async () => bits as any;
       } else if (ArrayBuffer.isView(bits)) {
         this.size = bits.byteLength;
-        this.arrayBuffer = async () => bits.buffer.slice(bits.byteOffset, bits.byteOffset + bits.byteLength);
+        this.arrayBuffer = async () => bits.buffer.slice(bits.byteOffset, bits.byteOffset + bits.byteLength) as any;
       } else if (Array.isArray(bits)) {
         const combined = bits.join('');
         this.size = new TextEncoder().encode(combined).length;
-        this.arrayBuffer = async () => new TextEncoder().encode(combined).buffer;
+        this.arrayBuffer = async () => new TextEncoder().encode(combined).buffer as any;
       } else {
         this.size = 0;
         this.arrayBuffer = async () => new ArrayBuffer(0);
@@ -52,7 +52,7 @@ if (typeof File === 'undefined') {
       };
 
       this.slice = (start = 0, end = this.size, contentType = this.type) => {
-        return new File([this], this.name, { type: contentType, lastModified: this.lastModified });
+        return new File([this] as any, this.name, { type: contentType, lastModified: this.lastModified });
       };
     }
   } as any;
@@ -94,4 +94,4 @@ if (typeof File === 'undefined') {
   }
 }
 
-export {}; 
+export { }; 

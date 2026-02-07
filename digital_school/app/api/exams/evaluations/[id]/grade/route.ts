@@ -64,7 +64,7 @@ export async function POST(
     let cqMarks = 0;
     let sqMarks = 0;
     const answers = updatedAnswers as Record<string, unknown>;
-    
+
     // Get the question to determine if it's CQ or SQ
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
@@ -72,16 +72,16 @@ export async function POST(
         examSets: true
       }
     });
-    
+
     // Find the question in exam sets
     // let questionType = 'CQ'; // Default to CQ
     if (exam?.examSets) {
       for (const examSet of exam.examSets) {
         if (examSet.questionsJson) {
-          const questions = typeof examSet.questionsJson === 'string' 
-            ? JSON.parse(examSet.questionsJson) 
+          const questions = typeof examSet.questionsJson === 'string'
+            ? JSON.parse(examSet.questionsJson)
             : examSet.questionsJson;
-          
+
           const question = questions.find((q: Record<string, unknown>) => q.id === questionId);
           if (question) {
             // questionType = question.type?.toUpperCase() || 'CQ';
@@ -90,21 +90,21 @@ export async function POST(
         }
       }
     }
-    
+
     // Calculate marks by type (excluding MCQ which will be auto-graded)
     for (const key in answers) {
       if (key.endsWith('_marks') && typeof answers[key] === 'number') {
         const qId = key.replace('_marks', '');
-        
+
         // Determine question type for this specific question
         let qType = 'CQ';
         if (exam?.examSets) {
           for (const examSet of exam.examSets) {
             if (examSet.questionsJson) {
-              const questions = typeof examSet.questionsJson === 'string' 
-                ? JSON.parse(examSet.questionsJson) 
+              const questions = typeof examSet.questionsJson === 'string'
+                ? JSON.parse(examSet.questionsJson)
                 : examSet.questionsJson;
-              
+
               const q = questions.find((q: Record<string, unknown>) => q.id === qId);
               if (q) {
                 qType = (q.type as string)?.toUpperCase() || 'CQ';
@@ -113,7 +113,7 @@ export async function POST(
             }
           }
         }
-        
+
         // Skip MCQ questions as they will be auto-graded
         if (qType === 'SQ') {
           sqMarks += answers[key] as number;
@@ -125,7 +125,7 @@ export async function POST(
         // MCQ questions are handled separately in auto-grading
       }
     }
-    
+
     // Also calculate MCQ marks from auto-graded questions
     // First, get the student's assigned exam set
     const studentExamMap = await prisma.examStudentMap.findFirst({
@@ -144,18 +144,18 @@ export async function POST(
       });
 
       if (assignedExamSet?.questionsJson) {
-        const questions = typeof assignedExamSet.questionsJson === 'string' 
-          ? JSON.parse(assignedExamSet.questionsJson) 
+        const questions = typeof assignedExamSet.questionsJson === 'string'
+          ? JSON.parse(assignedExamSet.questionsJson)
           : assignedExamSet.questionsJson;
-        
+
         for (const question of questions) {
           if (question.type?.toUpperCase() === 'MCQ') {
             const studentAnswer = answers[question.id];
             if (studentAnswer) {
-              const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+              const normalize = (s: unknown) => String(s || '').trim().toLowerCase().normalize();
               const userAns = normalize(studentAnswer);
               let isCorrect = false;
-              
+
               // Enhanced MCQ answer comparison logic
               if (question.options && Array.isArray(question.options)) {
                 // Check if student answer matches any option marked as correct
@@ -165,16 +165,16 @@ export async function POST(
                   isCorrect = userAns === correctOptionText;
                 }
               }
-              
+
               // Fallback: Check if there's a direct correctAnswer field
               if (!isCorrect && question.correctAnswer) {
                 const correctAnswer = question.correctAnswer;
-                
+
                 if (typeof correctAnswer === 'number') {
                   isCorrect = userAns === normalize(String(correctAnswer));
                 } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
                   // Handle object format (e.g., {text: "answer"})
-                  isCorrect = userAns === normalize((correctAnswer as Record<string, unknown>).text || String(correctAnswer));
+                  isCorrect = userAns === normalize(String((correctAnswer as Record<string, unknown>).text || String(correctAnswer)));
                 } else if (Array.isArray(correctAnswer)) {
                   // Handle array format (e.g., ["answer1", "answer2"])
                   isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
@@ -183,13 +183,13 @@ export async function POST(
                   isCorrect = userAns === normalize(String(correctAnswer));
                 }
               }
-              
+
               // Final fallback: use question.correct
               if (!isCorrect && question.correct) {
                 const correctAns = normalize(String(question.correct));
                 isCorrect = userAns === correctAns;
               }
-            
+
               console.log(`MCQ Question ${question.id}:`, {
                 userAnswer: userAns,
                 correctAnswer: question.correct,
@@ -197,14 +197,14 @@ export async function POST(
                 questionMarks: question.marks,
                 previousMcqMarks: mcqMarks
               });
-              
+
               if (isCorrect) {
                 mcqMarks += question.marks;
                 totalScore += question.marks;
                 console.log(`✅ MCQ marks awarded: +${question.marks}, Total MCQ: ${mcqMarks}, Total Score: ${totalScore}`);
               } else {
                 // Apply negative marking for wrong answers
-                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                if (exam && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                   const negativeMarks = (question.marks * exam.mcqNegativeMarking) / 100;
                   mcqMarks -= negativeMarks;
                   totalScore -= negativeMarks;
@@ -220,7 +220,7 @@ export async function POST(
     }
 
     console.log(`📊 Final Results - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalScore}`);
-    
+
     await prisma.examSubmission.update({
       where: {
         studentId_examId: {
@@ -236,40 +236,40 @@ export async function POST(
     });
 
     console.log(`💾 Saving Result - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalScore}`);
-    
+
     try {
-          // Update or create Result record
-    const result = await prisma.result.upsert({
-      where: {
-        studentId_examId: {
+      // Update or create Result record
+      const result = await prisma.result.upsert({
+        where: {
+          studentId_examId: {
+            studentId,
+            examId
+          }
+        },
+        update: {
+          total: totalScore,
+          mcqMarks: mcqMarks,
+          cqMarks: cqMarks,
+          sqMarks: sqMarks,
+          isPublished: false
+        },
+        create: {
           studentId,
-          examId
+          examId,
+          total: totalScore,
+          mcqMarks: mcqMarks,
+          cqMarks: cqMarks,
+          sqMarks: sqMarks,
+          isPublished: false
         }
-      },
-      update: {
-        total: totalScore,
-        mcqMarks: mcqMarks,
-        cqMarks: cqMarks,
-        sqMarks: sqMarks,
-        isPublished: false
-      },
-      create: {
-        studentId,
-        examId,
-        total: totalScore,
-        mcqMarks: mcqMarks,
-        cqMarks: cqMarks,
-        sqMarks: sqMarks,
-        isPublished: false
-      }
-    });
-      
+      });
+
       console.log(`✅ Result saved successfully:`, {
         id: result.id,
         mcqMarks: result.mcqMarks,
         total: result.total
       });
-      
+
       // Verify the result was saved correctly
       const savedResult = await (prisma.result as any).findUnique({
         where: {
@@ -279,12 +279,12 @@ export async function POST(
           }
         }
       });
-      
+
       console.log(`🔍 Verification - Saved result:`, {
         mcqMarks: savedResult?.mcqMarks,
         total: savedResult?.total
       });
-      
+
     } catch (error) {
       console.error(`❌ Error saving result:`, error);
       throw error;

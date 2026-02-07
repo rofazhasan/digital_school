@@ -1,59 +1,22 @@
 {
-    "version": "6.0",
-    "total_presets": 301,
-    "system_logic": {
-        "syntax": "##PRESET:name(params)##",
-        "nested_syntax": "##COMBINE:MODE:details[preset1(...), preset2(...)]##",
-        "parameter_types": [
-            "number",
-            "boolean",
-            "string",
-            "hex_color"
-        ],
-        "visual_standards": {
-            "aesthetics": "World-Class / Professional / Technical",
-            "features": [
-                "3D Shading (grad-cell-3d)",
-                "Vector Glow (filter: url(#vector-glow))",
-                "High-Visibility Arrow Markers (url(#arrowhead))",
-                "Glassmorphism (url(#glass-grad))",
-                "Universal Responsiveness (viewBox, preserveAspectRatio)"
-            ],
-            "typography": [
-                "Inter",
-                "Kalpurush (Bengali)",
-                "MathJax support"
-            ]
-        },
-        "legacy_syntax": {
-            "structure": "##ELEMENT | ELEMENT | ...##",
-            "description": "Legacy FBD construction using pipe-separated definitions.",
-            "elements": {
-                "point": "P<id>(x,y)",
-                "force": "F<id>@P<ref>(mag, angle, label, type)",
-                "moment": "M<id>@P<ref>(mag, label)"
-            }
+    "version": "9.0",
+    "total_presets": 358,
+    "intent": "Master System Prompt for AI-Driven Scientific Diagram Generation",
+    "ai_guidance": {
+        "core_principle": "Deliver professional, technical, and bilingual diagrams using high-level presets or hybrid FBD syntax.",
+        "parsing_rule": "Always wrap diagrams in ##PRESET:name(args)##. Multiple diagrams can be joined with pipes: ##PRESET:A | PRESET:B##.",
+        "parameter_philosophy": "Params are flexible. (radius=50) is equivalent to (50). Use named params for AI clarity.",
+        "typography": "Supports Inter (EN), Kalpurush (BN), and STIX Two Math (LaTeX symbols like \\theta, \\pi, \\Delta)."
+    },
+    "composition_framework": {
+        "modes": {
+            "SERIES": "##COMBINE:SERIES[p1, p2]## - Horizontal sequence with flow arrows.",
+            "PARALLEL": "##COMBINE:PARALLEL[p1, p2]## - Vertical stack with index labels.",
+            "GRID": "##COMBINE:GRID:cols[p1, p2, p3]## - Matrix layout (e.g., GRID:2).",
+            "COMPARE": "##COMBINE:COMPARE[Label1|p1, Label2|p2]## - Side-by-side comparison."
         }
     },
-    "combination_layouts": {
-        "SERIES": {
-            "syntax": "##COMBINE:SERIES[...]##",
-            "description": "Horizontal with arrows."
-        },
-        "PARALLEL": {
-            "syntax": "##COMBINE:PARALLEL[...]##",
-            "description": "Vertical with index numbers."
-        },
-        "GRID": {
-            "syntax": "##COMBINE:GRID:cols[...]##",
-            "description": "Matrix layout (e.g., GRID:2)."
-        },
-        "COMPARE": {
-            "syntax": "##COMBINE:COMPARE[L1|p1, L2|p2]##",
-            "description": "Side-by-side with labels."
-        }
-    },
-    "presets": {
+    "library": {
         "physics": {
             "mechanics": [
                 "incline",
@@ -68,29 +31,13 @@
                 "lever",
                 "atwood"
             ],
-            "compound": [
-                "spring-projectile",
-                "spring-pendulum",
-                "double-pendulum",
-                "incline-spring",
-                "coupled-oscillators",
-                "projectile-drag",
-                "conical-pendulum"
-            ],
             "environments": [
-                "pendulum-air",
                 "pendulum-water",
                 "pendulum-fire",
-                "pendulum-vacuum",
-                "projectile-air",
                 "projectile-water",
                 "projectile-fire",
-                "projectile-vacuum",
-                "freefall-air",
                 "freefall-water",
-                "freefall-fire",
-                "freefall-vacuum",
-                "medium-comparison"
+                "freefall-fire"
             ],
             "electricity": [
                 "circuit-series",
@@ -99,82 +46,36 @@
                 "capacitor",
                 "inductor",
                 "battery",
-                "ammeter",
-                "voltmeter",
-                "diode",
-                "led",
                 "ac-source",
                 "dc-source",
-                "galvanometer",
-                "rheostat",
-                "potentiometer",
-                "transistor-npn",
-                "transistor-pnp",
-                "zener-diode"
+                "mosfet",
+                "op-amp"
             ],
             "waves_optics": [
                 "wave-transverse",
-                "wave-longitudinal",
                 "wave-standing",
                 "ray-diagram",
                 "lens-convex",
                 "lens-concave",
-                "mirror-convex",
-                "mirror-concave",
-                "mirror-plane",
                 "prism",
-                "telescope",
-                "microscope",
-                "diffraction-grating",
                 "laser",
-                "fiber-optic"
+                "double-slit"
             ],
             "thermodynamics": [
                 "pv-diagram",
                 "carnot-cycle",
-                "heat-engine",
-                "refrigerator",
                 "phase-diagram",
                 "maxwell-distribution",
                 "isothermal",
-                "adiabatic",
-                "isobaric",
-                "isochoric"
+                "adiabatic"
             ],
             "modern": [
                 "bohr-model",
                 "energy-levels",
                 "photoelectric",
-                "nuclear-decay-alpha",
-                "nuclear-decay-beta",
-                "nuclear-decay-gamma",
                 "nuclear-fission",
                 "nuclear-fusion",
-                "quantum-tunneling"
-            ],
-            "advanced": [
-                "multi-contact",
-                "complex-incline",
-                "incline-pulley",
-                "three-body",
-                "circular-motion"
-            ],
-            "semiconductors": [
-                "mosfet",
-                "jfet",
-                "bjt-amplifier",
-                "op-amp",
-                "and-gate",
-                "or-gate",
-                "not-gate",
-                "nand-gate",
-                "nor-gate",
-                "xor-gate",
-                "sr-flipflop",
-                "jk-flipflop",
-                "d-flipflop",
-                "555-timer",
-                "voltage-regulator"
+                "schrodinger-equation"
             ]
         },
         "chemistry": {
@@ -184,63 +85,25 @@
                 "flask-conical",
                 "burette",
                 "funnel",
-                "reaction",
                 "titration",
                 "distillation"
             ],
-            "molecular": [
+            "molecular_3d": [
                 "atom",
                 "molecule",
                 "molecule-water",
                 "molecule-co2",
-                "molecule-ch4"
-            ],
-            "organic": [
                 "methane",
-                "ethane",
-                "propane",
-                "butane",
-                "ethene",
-                "propene",
-                "ethyne",
-                "toluene",
-                "phenol",
-                "ethanol",
-                "acetic-acid",
-                "acetone",
                 "benzene",
                 "glucose",
-                "amino-acid"
-            ],
-            "biochemistry": [
-                "glycine",
-                "alanine",
-                "glucose-ring",
-                "fructose",
-                "polyethylene",
-                "pvc",
                 "caffeine",
-                "aspirin",
-                "dopamine",
-                "serotonin",
-                "cholesterol",
-                "vitamin-c",
-                "nucleotide",
-                "fatty-acid",
-                "steroid"
+                "aspirin"
             ],
-            "inorganic": [
+            "structure": [
                 "nacl-crystal",
                 "diamond-structure",
                 "graphite-structure",
-                "octahedral-complex",
-                "tetrahedral-complex",
-                "ammonia",
-                "sulfuric-acid",
-                "phosphoric-acid",
-                "carbonate-ion",
-                "nitrate-ion",
-                "ammonium-ion"
+                "octahedral-complex"
             ]
         },
         "biology": {
@@ -251,150 +114,64 @@
                 "atp",
                 "enzyme-substrate"
             ],
-            "cells": [
-                "plant-cell",
-                "animal-cell",
-                "mitochondria",
-                "chloroplast",
-                "dna-replication",
-                "transcription",
-                "translation",
-                "neuron",
-                "heart"
-            ],
             "anatomy": [
                 "eye",
                 "ear",
+                "heart",
+                "neuron",
+                "nephron",
                 "digestive-system",
                 "respiratory-system",
-                "circulatory-system",
-                "skeletal-system",
-                "muscular-system",
-                "nervous-system",
-                "kidney",
-                "liver",
-                "skin-layers",
-                "tooth",
-                "alveoli",
-                "nephron"
+                "skeletal-system"
             ],
-            "plants": [
-                "flower-structure",
+            "botany": [
                 "leaf-structure",
+                "flower-structure",
                 "root-system",
                 "photosynthesis",
-                "stem-cross-section",
-                "seed-structure",
-                "stomata",
-                "xylem-phloem",
-                "germination",
-                "transpiration"
+                "stomata"
             ]
         },
         "mathematics": {
             "shapes": [
-                "axes-2d",
                 "triangle",
-                "triangle-equilateral",
-                "triangle-right",
-                "triangle-isosceles",
                 "circle",
                 "rectangle",
-                "square",
                 "pentagon",
                 "hexagon",
-                "octagon",
-                "trapezoid",
-                "rhombus",
-                "parallelogram",
-                "ellipse-shape",
                 "cube",
                 "sphere",
                 "cylinder",
-                "cone",
-                "pyramid"
+                "cone"
             ],
-            "graphs": [
+            "graphs_advanced": [
                 "graph-sine",
-                "graph-cosine",
-                "graph-tangent",
                 "graph-exponential",
-                "graph-logarithm",
-                "graph-absolute",
                 "vector",
                 "parabola",
                 "hyperbola",
-                "ellipse-graph",
-                "circle-graph",
-                "modular"
+                "polar-coordinates",
+                "vector-3d",
+                "matrix-2x2"
             ]
         },
-        "advanced_mixed": [
-            "double-slit",
-            "compton-scattering",
-            "bragg-diffraction",
-            "faraday-law",
-            "lenz-law",
-            "parametric-curve",
-            "polar-coordinates",
-            "vector-3d",
-            "matrix-2x2",
-            "determinant",
-            "ohms-law-triangle",
-            "kirchhoff-current",
-            "kirchhoff-voltage",
-            "snells-law",
-            "doppler-effect",
-            "youngs-modulus",
-            "hookes-law",
-            "bernoulli-equation",
-            "archimedes-principle",
-            "coulombs-law",
-            "gauss-law",
-            "ampere-law",
-            "maxwell-equations",
-            "wave-equation",
-            "schrodinger-equation",
-            "heisenberg-uncertainty",
-            "pauli-exclusion",
-            "relativity-e-mc2",
-            "lorentz-factor",
-            "black-hole",
-            "big-bang",
-            "standard-model"
+        "logic_gates": [
+            "and-gate",
+            "or-gate",
+            "not-gate",
+            "nand-gate",
+            "nor-gate",
+            "xor-gate",
+            "jk-flipflop",
+            "555-timer"
         ]
     },
-    "parameter_specifications": {
-        "incline": {
-            "params": [
-                "angle:number=30",
-                "mass:number=1",
-                "showForces:boolean=true"
-            ],
-            "description": "Block on incline with forces."
-        },
-        "circuit-series": {
-            "params": [
-                "voltage:number=12",
-                "R1:number=100",
-                "R2:number=100"
-            ],
-            "description": "Series circuit with two resistors."
-        },
-        "beaker": {
-            "params": [
-                "capacity:number=250",
-                "fillLevel:number=150",
-                "liquidColor:hex=#3498DB"
-            ],
-            "description": "Lab beaker with fluid."
-        },
-        "cell": {
-            "params": [
-                "type:string=animal",
-                "showLabels:boolean=true"
-            ],
-            "description": "Biological cell model."
+    "customization_syntax": {
+        "hybrid": "##PRESET:name(args) | ELEMENT:type(params)##",
+        "elements": {
+            "force": "F<id>@P<ref>(mag, angle, label, type)",
+            "point": "P<id>(x, y, label, type)",
+            "moment": "M<id>@P<ref>(mag, label, direction)"
         }
     }
 }

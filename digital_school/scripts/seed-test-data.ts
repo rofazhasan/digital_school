@@ -161,11 +161,11 @@ async function main() {
         const classStudentCount = Math.min(studentsPerClass, CONFIG.STUDENTS_COUNT - students.length);
 
         for (let j = 0; j < classStudentCount; j++) {
-            const studentNum = students.length + 1;
-            const email = `student${studentNum}@test.com`;
+            const studentNum: number = students.length + 1;
+            const email: string = `student${studentNum}@test.com`;
 
             // Check if student already exists
-            let user = await prisma.user.findUnique({ where: { email } });
+            let user: any = await prisma.user.findUnique({ where: { email } });
 
             if (!user) {
                 user = await prisma.user.create({
@@ -178,18 +178,25 @@ async function main() {
                     },
                 });
 
-                const studentProfile = await prisma.studentProfile.create({
-                    data: {
-                        userId: user.id,
-                        classId: classRecord.id,
-                        roll: `${j + 1}`.padStart(3, '0'),
-                        registrationNo: `REG-2026-${studentNum.toString().padStart(5, '0')}`,
-                        guardianName: `Guardian ${studentNum}`,
-                        guardianPhone: `+8801${(1000000000 + studentNum).toString().slice(1)}`,
-                        guardianEmail: `guardian${studentNum}@test.com`,
-                        address: `${studentNum} Test Address, Dhaka`,
-                    },
+                // Check if student profile exists
+                let studentProfile: any = await prisma.studentProfile.findFirst({
+                    where: { userId: user.id }
                 });
+
+                if (!studentProfile) {
+                    studentProfile = await prisma.studentProfile.create({
+                        data: {
+                            userId: user.id,
+                            classId: classRecord.id,
+                            roll: `${j + 1}`.padStart(3, '0'),
+                            registrationNo: `REG-2026-${studentNum.toString().padStart(5, '0')}`,
+                            guardianName: `Guardian ${studentNum}`,
+                            guardianPhone: `+8801${(1000000000 + studentNum).toString().slice(1)}`,
+                            guardianEmail: `guardian${studentNum}@test.com`,
+                            address: `${studentNum} Test Address, Dhaka`,
+                        },
+                    });
+                }
 
                 students.push(studentProfile);
             } else {

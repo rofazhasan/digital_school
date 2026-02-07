@@ -15,30 +15,30 @@ import { Prisma } from '@prisma/client';
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json();
-        
+
         // Validate the request body
         const validatedData = signupSchema.parse(body);
-        
+
         // Check if user already exists by email (if email is provided)
         if (validatedData.email) {
             const existingUserByEmail = await prismadb.user.findUnique({
-            where: { email: validatedData.email }
-        });
-        
+                where: { email: validatedData.email }
+            });
+
             if (existingUserByEmail) {
-            return NextResponse.json(
-                { message: 'User with this email already exists.' },
-                { status: 400 }
-            );
+                return NextResponse.json(
+                    { message: 'User with this email already exists.' },
+                    { status: 400 }
+                );
             }
         }
-        
+
         // Check if user already exists by phone (if phone is provided)
         if (validatedData.phone) {
             const existingUserByPhone = await prismadb.user.findUnique({
                 where: { phone: validatedData.phone }
             });
-            
+
             if (existingUserByPhone) {
                 return NextResponse.json(
                     { message: 'User with this phone number already exists.' },
@@ -46,10 +46,10 @@ export async function POST(request: NextRequest) {
                 );
             }
         }
-        
+
         // Hash the password
         const hashedPassword = await bcrypt.hash(validatedData.password, 12);
-        
+
         // Create user data
         const userData: Prisma.UserCreateInput = {
             name: validatedData.name,
@@ -65,7 +65,7 @@ export async function POST(request: NextRequest) {
         if (validatedData.phone && validatedData.phone.trim() !== '') {
             userData.phone = validatedData.phone.trim();
         }
-        
+
         // Add student-specific fields if role is STUDENT
         if (validatedData.role === UserRole.STUDENT) {
             try {
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
                         section: validatedData.section!,
                     }
                 });
-                
+
                 if (!classRecord) {
                     // Create a default institute if none exists
                     let institute = await prismadb.institute.findFirst();
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
                             }
                         });
                     }
-                    
+
                     classRecord = await prismadb.class.create({
                         data: {
                             name: validatedData.class!,
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
                         }
                     });
                 }
-                
+
                 userData.studentProfile = {
                     create: {
                         roll: validatedData.roll!.toString(), // Convert to string as per schema
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
                 );
             }
         }
-        
+
         // Add teacher-specific fields if role is TEACHER
         if (validatedData.role === UserRole.TEACHER) {
             userData.teacherProfile = {
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
                 }
             };
         }
-        
+
         // Create the user
         const user = await prismadb.user.create({
             data: userData,
@@ -135,38 +135,43 @@ export async function POST(request: NextRequest) {
                 teacherProfile: validatedData.role === UserRole.TEACHER,
             }
         });
-        
+
         // Remove password from response
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
-        
+
         return NextResponse.json(
-            { 
+            {
                 message: 'User created successfully.',
-                user: userWithoutPassword 
+                user: userWithoutPassword
             },
             { status: 201 }
         );
-        
+
     } catch (error: unknown) {
         console.error('Signup error:', error);
-        
+
         if (error instanceof Error && error.name === 'ZodError') {
+            // ZodError has an 'errors' property
+            const zodError = error as any; // Safe cast if we know name is ZodError
             return NextResponse.json(
-                { message: 'Validation failed.', errors: (error as { errors: unknown[] }).errors },
+                { message: 'Validation failed.', errors: zodError.errors },
                 { status: 400 }
             );
         }
-        
-        // Handle Prisma-specific errors
-        if (typeof error === 'object' && error !== null && 'code' in error && (error as { code: unknown }).code === 'P2002') {
-            const field = ((error as { meta: { target: unknown[] } }).meta as { target: string[] })?.target?.[0];
+
+        // Handle Prisma-specific errors safely
+        // P2002: Unique constraint failed
+        const prismaError = error as any;
+        if (prismaError && typeof prismaError === 'object' && prismaError.code === 'P2002') {
+            const target = prismaError.meta?.target;
+            const field = Array.isArray(target) ? target[0] : 'field';
             return NextResponse.json(
                 { message: `A user with this ${field} already exists.` },
                 { status: 400 }
             );
         }
-        
+
         return NextResponse.json(
             { message: 'Internal server error. Please try again.' },
             { status: 500 }

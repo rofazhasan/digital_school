@@ -24,7 +24,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download, AlertTriangle, ArrowRight, FileText } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download, AlertTriangle, ArrowRight, FileText, Sparkles } from "lucide-react";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
@@ -39,6 +40,7 @@ type Question = {
   modelAnswer?: string | null; class: { id: string; name: string }; createdBy: { id: string; name: string };
   questionBanks: QuestionBank[]; createdAt: string; isAiGenerated?: boolean;
   images?: string[];
+  isForPractice?: boolean;
 };
 
 // Enhanced types for AI generated questions
@@ -346,6 +348,25 @@ export default function QuestionBankPage() {
     }
   };
 
+  const handleTogglePractice = async (id: string, isForPractice: boolean) => {
+    // Optimistic Update
+    setQuestions(prev => prev.map(q => q.id === id ? { ...q, isForPractice } : q));
+
+    try {
+      const res = await fetch('/api/questions/toggle-practice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questionId: id, isForPractice })
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      toast({ title: "Updated", description: `Question is now ${isForPractice ? 'visible' : 'hidden'} in PracPerfect.` });
+    } catch (error) {
+      // Revert
+      setQuestions(prev => prev.map(q => q.id === id ? { ...q, isForPractice: !isForPractice } : q));
+      toast({ variant: "destructive", title: "Error", description: "Failed to update status." });
+    }
+  };
+
   const handleFormSave = (savedQuestion: Question) => {
     setQuestions(prev => {
       const exists = prev.some(q => q.id === savedQuestion.id);
@@ -568,6 +589,7 @@ export default function QuestionBankPage() {
                               onDelete={handleDelete}
                               isSelected={selectedQuestions.has(q.id)}
                               onSelect={() => toggleSelection(q.id)}
+                              onTogglePractice={handleTogglePractice}
                             />
                           ))}
                         </div>
@@ -643,14 +665,15 @@ const QuestionCard: React.FC<{
   onDelete: (id: string) => void;
   isSelected?: boolean;
   onSelect?: () => void;
-}> = ({ question, onEdit, onDelete, isSelected, onSelect }) => {
+  onTogglePractice?: (id: string, current: boolean) => void;
+}> = ({ question, onEdit, onDelete, isSelected, onSelect, onTogglePractice }) => {
   const difficultyColors: Record<Difficulty, string> = {
     EASY: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
     MEDIUM: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
     HARD: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
   };
   return (
-    <Card className="flex flex-col hover:shadow-lg transition-shadow duration-300">
+    <Card className={`flex flex-col hover:shadow-lg transition-all duration-300 ${question.isForPractice ? 'ring-2 ring-indigo-500/20' : ''}`}>
       <CardHeader className="pb-4">
         <div className="flex justify-between items-start gap-2">
           <div className="flex items-start gap-3 w-full">
@@ -662,6 +685,13 @@ const QuestionCard: React.FC<{
               />
             )}
             <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                {question.isForPractice && (
+                  <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-[10px] h-5 px-1.5 gap-1">
+                    <Sparkles className="w-3 h-3" /> Practice Ready
+                  </Badge>
+                )}
+              </div>
               <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
                 <UniversalMathJax>{question.questionText || ''}</UniversalMathJax>
               </CardTitle>
@@ -743,9 +773,21 @@ const QuestionCard: React.FC<{
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-end gap-2 pt-4">
-        <Button variant="ghost" size="sm" onClick={() => onEdit(question)}><Edit className="h-4 w-4 mr-2" /> Edit</Button>
-        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-400" onClick={() => onDelete(question.id)}><Trash2 className="h-4 w-4 mr-2" /> Delete</Button>
+      <CardFooter className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 pt-3 mt-auto border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center space-x-2">
+          <Switch
+            checked={question.isForPractice || false}
+            onCheckedChange={(c) => onTogglePractice && onTogglePractice(question.id, c)}
+            id={`practice-mode-${question.id}`}
+          />
+          <Label htmlFor={`practice-mode-${question.id}`} className="text-xs text-muted-foreground font-normal cursor-pointer">
+            PracPerfect
+          </Label>
+        </div>
+        <div className="flex gap-1">
+          <Button variant="ghost" size="sm" className="h-8" onClick={() => onEdit(question)}><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit</Button>
+          <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => onDelete(question.id)}><Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete</Button>
+        </div>
       </CardFooter>
     </Card>
   );

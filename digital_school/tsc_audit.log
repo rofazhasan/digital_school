@@ -1,0 +1,33 @@
+app/api/exams/results/[id]/download-individual/route.ts(104,9): error TS18046: 'error' is of type 'unknown'.
+app/api/exams/results/[id]/download-individual/route.ts(108,9): error TS18046: 'error' is of type 'unknown'.
+app/api/exams/results/[id]/route.ts(365,69): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; studentId: string; examId: string; examSubmissionId: string | null; mcqMarks: number; cqMarks: number; sqMarks: number; total: number; ... 5 more ...; publishedAt: Date | null; }'.
+app/api/exams/results/[id]/route.ts(504,52): error TS2339: Property 'status' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; studentId: string; examId: string; examSubmissionId: string | null; mcqMarks: number; cqMarks: number; sqMarks: number; total: number; ... 5 more ...; publishedAt: Date | null; }'.
+app/api/exams/results/[id]/route.ts(505,97): error TS2339: Property 'suspensionReason' does not exist on type '{ id: string; createdAt: Date; updatedAt: Date; studentId: string; examId: string; examSubmissionId: string | null; mcqMarks: number; cqMarks: number; sqMarks: number; total: number; ... 5 more ...; publishedAt: Date | null; }'.
+app/api/fee-structures/route.ts(3,10): error TS2305: Module '"@/lib/auth"' has no exported member 'authOptions'.
+app/api/health/route.ts(7,58): error TS2339: Property 'healthCheck' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/health/route.ts(23,30): error TS7053: Element implicitly has an 'any' type because expression of type '"connectionCount"' can't be used to index type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+  Property 'connectionCount' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/invoices/route.ts(3,10): error TS2305: Module '"@/lib/auth"' has no exported member 'authOptions'.
+app/api/payments/route.ts(3,10): error TS2305: Module '"@/lib/auth"' has no exported member 'authOptions'.
+app/api/test-optimized/route.ts(8,56): error TS2339: Property 'executeWithConnection' does not exist on type 'PrismaClient<PrismaClientOptions, never, DefaultArgs>'.
+app/api/test-optimized/route.ts(8,85): error TS7006: Parameter 'db' implicitly has an 'any' type.
+app/exams/evaluations/[id]/page.tsx(1688,50): error TS2339: Property 'questionText' does not exist on type 'Question'.
+app/exams/evaluations/[id]/page.tsx(1701,42): error TS2339: Property 'title' does not exist on type 'Exam'.
+components/ui/calendar.tsx(58,17): error TS2353: Object literal may only specify known properties, and 'IconLeft' does not exist in type 'Partial<CustomComponents>'.
+scripts/cleanup-broken-images.ts(34,38): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(o: {}): string[]', gave the following error.
+    Argument of type 'JsonValue' is not assignable to parameter of type '{}'.
+      Type 'null' is not assignable to type '{}'.
+  Overload 2 of 2, '(o: object): string[]', gave the following error.
+    Argument of type 'JsonValue' is not assignable to parameter of type 'object'.
+      Type 'null' is not assignable to type 'object'.
+scripts/cleanup-broken-images.ts(38,35): error TS18047: 'answers' is possibly 'null'.
+scripts/cleanup-broken-images.ts(38,35): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'string | number | boolean | JsonObject | JsonArray'.
+  No index signature with a parameter of type 'string' was found on type 'string | number | boolean | JsonObject | JsonArray'.
+scripts/cleanup-broken-images.ts(43,32): error TS18047: 'answers' is possibly 'null'.
+scripts/cleanup-broken-images.ts(43,32): error TS7053: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type 'string | number | boolean | JsonObject | JsonArray'.
+  No index signature with a parameter of type 'string' was found on type 'string | number | boolean | JsonObject | JsonArray'.
+scripts/seed-test-data.ts(164,19): error TS7022: 'studentNum' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+scripts/seed-test-data.ts(165,19): error TS7022: 'email' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+scripts/seed-test-data.ts(168,17): error TS7022: 'user' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+scripts/seed-test-data.ts(181,23): error TS7022: 'studentProfile' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.

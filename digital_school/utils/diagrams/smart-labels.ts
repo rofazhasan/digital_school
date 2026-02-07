@@ -17,7 +17,7 @@ export interface SmartLabel {
 /**
  * Add smart labels to forces
  */
-export function addForceLabels(force: FBDForce, showValue: boolean = true, showCoordinates: boolean = false): SmartLabel[] {
+export function addForceLabels(force: FBDForce, point: FBDPoint, showValue: boolean = true, showCoordinates: boolean = false): SmartLabel[] {
     const labels: SmartLabel[] = [];
 
     // Main force label with value
@@ -30,16 +30,16 @@ export function addForceLabels(force: FBDForce, showValue: boolean = true, showC
                 text: value && unit ? `${name} = ${value}${unit}` : force.label,
                 value: value ? parseFloat(value) : undefined,
                 unit: unit || 'N',
-                position: { x: force.x, y: force.y },
+                position: { x: point.x, y: point.y },
                 type: 'force',
-                color: getForceColor(force.type),
+                color: getForceColor(force.type || 'applied'), // Check for type existence
             });
         } else {
             labels.push({
                 text: force.label,
-                position: { x: force.x, y: force.y },
+                position: { x: point.x, y: point.y },
                 type: 'force',
-                color: getForceColor(force.type),
+                color: getForceColor(force.type || 'applied'),
             });
         }
     }
@@ -47,8 +47,8 @@ export function addForceLabels(force: FBDForce, showValue: boolean = true, showC
     // Coordinate label
     if (showCoordinates) {
         labels.push({
-            text: `(${force.x.toFixed(0)}, ${force.y.toFixed(0)})`,
-            position: { x: force.x, y: force.y + 20 },
+            text: `(${point.x.toFixed(0)}, ${point.y.toFixed(0)})`,
+            position: { x: point.x, y: point.y + 20 },
             type: 'coordinate',
             color: '#6b7280',
         });

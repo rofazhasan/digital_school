@@ -6,19 +6,19 @@
 import { createRadialGradient, createShadowFilter } from '../common/gradients';
 
 export interface BiologyComponentOptions {
-    width?: number;
-    height?: number;
-    showLabel?: boolean;
-    showDetails?: boolean;
+  width?: number;
+  height?: number;
+  showLabel?: boolean;
+  showDetails?: boolean;
 }
 
 /**
  * Create professional animal cell with organelles
  */
 export function createAnimalCell(options: BiologyComponentOptions = {}): string {
-    const { width = 220, height = 220, showLabel = true, showDetails = true } = options;
+  const { width = 220, height = 220, showLabel = true, showDetails = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" 
          class="biology-cell" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -97,10 +97,10 @@ export function createAnimalCell(options: BiologyComponentOptions = {}): string 
         
         <!-- Ribosomes (small dots on ER) -->
         ${[
-                [60, 120], [70, 118], [80, 122], [90, 120],
-                [60, 130], [70, 128], [80, 132],
-                [130, 120], [140, 118], [150, 122], [160, 120]
-            ].map(([x, y]) => `
+        [60, 120], [70, 118], [80, 122], [90, 120],
+        [60, 130], [70, 128], [80, 132],
+        [130, 120], [140, 118], [150, 122], [160, 120]
+      ].map(([x, y]) => `
           <circle cx="${x}" cy="${y}" r="2" fill="#2C3E50"/>
         `).join('')}
         
@@ -153,9 +153,9 @@ export function createAnimalCell(options: BiologyComponentOptions = {}): string 
  * Create professional DNA double helix
  */
 export function createDNA(options: BiologyComponentOptions = {}): string {
-    const { width = 120, height = 200, showLabel = true } = options;
+  const { width = 120, height = 200, showLabel = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" 
          class="biology-dna" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -181,17 +181,17 @@ export function createDNA(options: BiologyComponentOptions = {}): string {
       
       <!-- Base pairs (rungs) -->
       ${Array.from({ length: 10 }, (_, i) => {
-        const y = 20 + i * 18;
-        const leftX = 30 + 10 * Math.sin((i * Math.PI) / 2.5);
-        const rightX = 90 - 10 * Math.sin((i * Math.PI) / 2.5);
-        const bases = ['A-T', 'T-A', 'G-C', 'C-G'];
-        const basePair = bases[i % 4];
-        const colors = {
-            'A': '#27AE60', 'T': '#E74C3C',
-            'G': '#F39C12', 'C': '#3498DB'
-        };
+    const y = 20 + i * 18;
+    const leftX = 30 + 10 * Math.sin((i * Math.PI) / 2.5);
+    const rightX = 90 - 10 * Math.sin((i * Math.PI) / 2.5);
+    const bases = ['A-T', 'T-A', 'G-C', 'C-G'];
+    const basePair = bases[i % 4];
+    const colors: Record<string, string> = {
+      'A': '#27AE60', 'T': '#E74C3C',
+      'G': '#F39C12', 'C': '#3498DB'
+    };
 
-        return `
+    return `
           <!-- Base pair line -->
           <line x1="${leftX}" y1="${y}" x2="${rightX}" y2="${y}" 
                 stroke="#95A5A6" stroke-width="2.5" opacity="0.8"/>
@@ -208,7 +208,7 @@ export function createDNA(options: BiologyComponentOptions = {}): string {
                   fill="#2C3E50" text-anchor="middle">${basePair}</text>
           ` : ''}
         `;
-    }).join('')}
+  }).join('')}
       
       ${showLabel ? `
         <!-- DNA label -->
@@ -225,9 +225,9 @@ export function createDNA(options: BiologyComponentOptions = {}): string {
  * Create professional mitochondria
  */
 export function createMitochondria(options: BiologyComponentOptions = {}): string {
-    const { width = 100, height = 60, showLabel = true } = options;
+  const { width = 100, height = 60, showLabel = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" 
          class="biology-mitochondria" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -248,12 +248,12 @@ export function createMitochondria(options: BiologyComponentOptions = {}): strin
       
       <!-- Cristae (inner folds) -->
       ${[0, 1, 2, 3, 4, 5, 6].map(i => {
-        const x = 15 + i * 12;
-        return `
+    const x = 15 + i * 12;
+    return `
           <path d="M ${x},30 Q ${x + 3},20 ${x + 6},30 Q ${x + 9},40 ${x + 12},30" 
                 stroke="#D35400" stroke-width="1.8" fill="none"/>
         `;
-    }).join('')}
+  }).join('')}
       
       <!-- Matrix (inner space) -->
       <ellipse cx="50" cy="30" rx="35" ry="15" fill="#F39C12" opacity="0.3"/>

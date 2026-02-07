@@ -489,207 +489,209 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* Content Area */}
-        {monitorViewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredData.map(student => (
-              <Card
-                key={student.id}
-                className={`cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 
-                  ${student.status === 'IN_PROGRESS'
-                    ? 'border-l-4 border-l-blue-500'
-                    : 'border-l-4 border-l-green-500 bg-green-50/10'}`}
-                onClick={() => {
-                  setSelectedLiveStudent(student);
-                  setIsLiveModalOpen(true);
-                }}
-              >
-                <CardContent className="p-5 space-y-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md shrink-0
-                            ${student.status === 'IN_PROGRESS'
-                          ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                          : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
-                        {student.studentName.substring(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
-                        <p className="text-xs text-gray-500 font-mono">Roll: {student.roll}</p>
-                      </div>
-                    </div>
-
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      className="h-8 w-8 rounded-full shadow-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shrink-0"
-                      title="Open Review Session"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const questions = liveStats?.defaultQuestions || [];
-                        if (!questions.length) return toast.error("No questions found");
-
-                        const sessionData = questions.map((q: any) => {
-                          const ans = student.answers ? student.answers[q.id] : null;
-                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                          let userIdx = null;
-
-                          if (ans !== undefined && ans !== null) {
-                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                            const isCorrect = correctOpt && (
-                              (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
-                              (ans === correctOpt.text)
-                            );
-                            status = isCorrect ? 'correct' : 'wrong';
-                            if (q.type === 'MCQ' && q.options) {
-                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
-                            }
-                          }
-                          return { ...q, status, userAnswer: userIdx };
-                        });
-
-                        const sessionPayload = {
-                          questions: sessionData,
-                          examName: liveStats?.examName || "Review Session"
-                        };
-                        localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
-                        toast.success("Opening Review Session...");
-                        window.open('/problem-solving/session?mode=review', '_blank');
-                      }}
-                    >
-                      <MonitorPlay className="w-4 h-4 ml-0.5" />
-                    </Button>
-                  </div>
-
-                  {/* Stats Grid inside Card */}
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-gray-50 p-2 rounded border border-gray-100">
-                      <span className="text-gray-400 block mb-1">Answered</span>
-                      <span className="font-semibold text-gray-700">{student.answered} / {student.totalQuestions}</span>
-                    </div>
-                    <div className="bg-gray-50 p-2 rounded border border-gray-100">
-                      <span className="text-gray-400 block mb-1">Score</span>
-                      <span className="font-semibold text-primary">{student.score}</span>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar */}
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-medium">
-                      <span className="text-gray-500">Progress</span>
-                      <span className={student.progress === 100 ? "text-green-600" : "text-blue-600"}>{student.progress}%</span>
-                    </div>
-                    <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
-                      <div
-                        className={`h-full rounded-full transition-all duration-700 ease-out flex items-center justify-end
-                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}
-                        style={{ width: `${student.progress}%` }}
-                      >
-                        {/* Shimmer effect */}
-                        <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 border-t flex justify-between items-center text-[11px]">
-                    <Badge variant="outline" className={`border-none ${student.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
-                      {student.status === 'IN_PROGRESS' ? '● In Progress' : '✓ Client-Submitted'}
-                    </Badge>
-                    <span className="text-gray-400">
-                      {new Date(student.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          /* List View */
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              <div className="col-span-4">Student</div>
-              <div className="col-span-2 text-center">Status</div>
-              <div className="col-span-3">Progress</div>
-              <div className="col-span-2 text-center">Score</div>
-              <div className="col-span-1">Action</div>
-            </div>
-            <div className="divide-y divide-gray-100">
+        {
+          monitorViewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredData.map(student => (
-                <div key={student.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 transition-colors">
-                  <div className="col-span-4 flex items-center gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
-                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}>
-                      {student.studentName.substring(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm text-gray-900">{student.studentName}</p>
-                      <p className="text-xs text-gray-500">Roll: {student.roll} • {student.className}</p>
-                    </div>
-                  </div>
-                  <div className="col-span-2 flex justify-center">
-                    <Badge variant="secondary" className={`${student.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                      {student.status === 'IN_PROGRESS' ? 'Working' : 'Submitted'}
-                    </Badge>
-                  </div>
-                  <div className="col-span-3">
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${student.progress}%` }} />
+                <Card
+                  key={student.id}
+                  className={`cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 
+                  ${student.status === 'IN_PROGRESS'
+                      ? 'border-l-4 border-l-blue-500'
+                      : 'border-l-4 border-l-green-500 bg-green-50/10'}`}
+                  onClick={() => {
+                    setSelectedLiveStudent(student);
+                    setIsLiveModalOpen(true);
+                  }}
+                >
+                  <CardContent className="p-5 space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md shrink-0
+                            ${student.status === 'IN_PROGRESS'
+                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
+                            : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
+                          {student.studentName.substring(0, 2).toUpperCase()}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-bold text-gray-900 truncate">{student.studentName}</p>
+                          <p className="text-xs text-gray-500 font-mono">Roll: {student.roll}</p>
+                        </div>
                       </div>
-                      <span className="text-xs font-medium w-8 text-right">{student.progress}%</span>
-                    </div>
-                  </div>
-                  <div className="col-span-2 text-center text-sm font-medium">
-                    {student.score}
-                  </div>
-                  <div className="col-span-1 flex gap-1 justify-end">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
-                      title="Open Review Session"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const questions = liveStats?.defaultQuestions || [];
-                        if (!questions.length) return toast.error("No questions found");
 
-                        const sessionData = questions.map((q: any) => {
-                          const ans = student.answers ? student.answers[q.id] : null;
-                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                          let userIdx = null;
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-8 w-8 rounded-full shadow-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shrink-0"
+                        title="Open Review Session"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const questions = liveStats?.defaultQuestions || [];
+                          if (!questions.length) return toast.error("No questions found");
 
-                          if (ans !== undefined && ans !== null) {
-                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                            const isCorrect = correctOpt && (
-                              (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
-                              (ans === correctOpt.text)
-                            );
-                            status = isCorrect ? 'correct' : 'wrong';
+                          const sessionData = questions.map((q: any) => {
+                            const ans = student.answers ? student.answers[q.id] : null;
+                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                            let userIdx = null;
 
-                            if (q.type === 'MCQ' && q.options) {
-                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                            if (ans !== undefined && ans !== null) {
+                              const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                              const isCorrect = correctOpt && (
+                                (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
+                                (ans === correctOpt.text)
+                              );
+                              status = isCorrect ? 'correct' : 'wrong';
+                              if (q.type === 'MCQ' && q.options) {
+                                userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                              }
                             }
-                          }
-                          return { ...q, status, userAnswer: userIdx };
-                        });
-                        const sessionPayload = {
-                          questions: sessionData,
-                          examName: liveStats?.examName || "Review Session"
-                        };
-                        localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
-                        window.open('/problem-solving/session?mode=review', '_blank');
-                      }}
-                    >
-                      <MonitorPlay className="w-4 h-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }} className="h-8 w-8 p-0">
-                      <Maximize2 className="w-4 h-4 text-gray-400" />
-                    </Button>
-                  </div>
-                </div>
+                            return { ...q, status, userAnswer: userIdx };
+                          });
+
+                          const sessionPayload = {
+                            questions: sessionData,
+                            examName: liveStats?.examName || "Review Session"
+                          };
+                          localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
+                          toast.success("Opening Review Session...");
+                          window.open('/problem-solving/session?mode=review', '_blank');
+                        }}
+                      >
+                        <MonitorPlay className="w-4 h-4 ml-0.5" />
+                      </Button>
+                    </div>
+
+                    {/* Stats Grid inside Card */}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                        <span className="text-gray-400 block mb-1">Answered</span>
+                        <span className="font-semibold text-gray-700">{student.answered} / {student.totalQuestions}</span>
+                      </div>
+                      <div className="bg-gray-50 p-2 rounded border border-gray-100">
+                        <span className="text-gray-400 block mb-1">Score</span>
+                        <span className="font-semibold text-primary">{student.score}</span>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-gray-500">Progress</span>
+                        <span className={student.progress === 100 ? "text-green-600" : "text-blue-600"}>{student.progress}%</span>
+                      </div>
+                      <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden shadow-inner">
+                        <div
+                          className={`h-full rounded-full transition-all duration-700 ease-out flex items-center justify-end
+                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}
+                          style={{ width: `${student.progress}%` }}
+                        >
+                          {/* Shimmer effect */}
+                          <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-2 border-t flex justify-between items-center text-[11px]">
+                      <Badge variant="outline" className={`border-none ${student.status === 'IN_PROGRESS' ? 'bg-blue-50 text-blue-700' : 'bg-green-50 text-green-700'}`}>
+                        {student.status === 'IN_PROGRESS' ? '● In Progress' : '✓ Client-Submitted'}
+                      </Badge>
+                      <span className="text-gray-400">
+                        {new Date(student.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            /* List View */
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div className="col-span-4">Student</div>
+                <div className="col-span-2 text-center">Status</div>
+                <div className="col-span-3">Progress</div>
+                <div className="col-span-2 text-center">Score</div>
+                <div className="col-span-1">Action</div>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {filteredData.map(student => (
+                  <div key={student.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-gray-50 transition-colors">
+                    <div className="col-span-4 flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
+                           ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}>
+                        {student.studentName.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm text-gray-900">{student.studentName}</p>
+                        <p className="text-xs text-gray-500">Roll: {student.roll} • {student.className}</p>
+                      </div>
+                    </div>
+                    <div className="col-span-2 flex justify-center">
+                      <Badge variant="secondary" className={`${student.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
+                        {student.status === 'IN_PROGRESS' ? 'Working' : 'Submitted'}
+                      </Badge>
+                    </div>
+                    <div className="col-span-3">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${student.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${student.progress}%` }} />
+                        </div>
+                        <span className="text-xs font-medium w-8 text-right">{student.progress}%</span>
+                      </div>
+                    </div>
+                    <div className="col-span-2 text-center text-sm font-medium">
+                      {student.score}
+                    </div>
+                    <div className="col-span-1 flex gap-1 justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
+                        title="Open Review Session"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const questions = liveStats?.defaultQuestions || [];
+                          if (!questions.length) return toast.error("No questions found");
+
+                          const sessionData = questions.map((q: any) => {
+                            const ans = student.answers ? student.answers[q.id] : null;
+                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                            let userIdx = null;
+
+                            if (ans !== undefined && ans !== null) {
+                              const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                              const isCorrect = correctOpt && (
+                                (typeof ans === 'number' && q.options[ans]?.text === correctOpt.text) ||
+                                (ans === correctOpt.text)
+                              );
+                              status = isCorrect ? 'correct' : 'wrong';
+
+                              if (q.type === 'MCQ' && q.options) {
+                                userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                              }
+                            }
+                            return { ...q, status, userAnswer: userIdx };
+                          });
+                          const sessionPayload = {
+                            questions: sessionData,
+                            examName: liveStats?.examName || "Review Session"
+                          };
+                          localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
+                          window.open('/problem-solving/session?mode=review', '_blank');
+                        }}
+                      >
+                        <MonitorPlay className="w-4 h-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }} className="h-8 w-8 p-0">
+                        <Maximize2 className="w-4 h-4 text-gray-400" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
+        }
 
 
         {/* Detailed View Modal */}
@@ -797,7 +799,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </div >
     );
   };
 
@@ -1685,7 +1687,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           }
 
                           // normalize questionText
-                          const questionText = q.questionText || q.text || "Question text missing";
+                          const questionText = (q as any).questionText || q.text || "Question text missing";
 
                           return {
                             ...q,
@@ -1698,7 +1700,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                         // Store as object with Metadata
                         const payload = {
-                          examName: exam.title || "Exam Review",
+                          examName: exam.name || "Exam Review",
                           questions: sessionData
                         };
 
@@ -2294,7 +2296,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
                                                 <div className="flex-1">
                                                   <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                    <MathJax inline dynamic>{optText}</MathJax>
+                                                    <MathJax>{optText}</MathJax>
                                                   </span>
                                                   {opt.image && (
                                                     <div className="mt-1">

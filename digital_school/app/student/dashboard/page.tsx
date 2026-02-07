@@ -47,7 +47,8 @@ import {
   Mail,
   Phone,
   MapPin,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppFooter } from "@/components/AppFooter";
@@ -131,31 +132,23 @@ export default function StudentDashboardPage() {
           if (isMounted) setUser(data.user);
           // Fetch exams after user is loaded
           // Fetch exams after user is loaded
-          fetch('/api/exams')
+          fetch('/api/exams?limit=100')
             .then(res => res.json())
             .then(resData => {
               // Handle both array and { data: [] } format
-              const examData = Array.isArray(resData) ? resData : (resData.data || []);
+              const examData = Array.isArray(resData) ? resData : (resData.exams || resData.data || []);
 
               let filtered = [];
               const userClassId = data.user.studentProfile?.classId;
 
               if (userClassId && Array.isArray(examData)) {
-                const now = new Date();
-                const cutoffDate = new Date();
-                cutoffDate.setDate(now.getDate() + 3);
-                cutoffDate.setHours(0, 0, 0, 0);
-
                 filtered = examData.filter((exam: any) => {
                   // Class Filter
-                  if (exam.classId !== userClassId) return false;
-
-                  // Date Filter (Past + Next 2 days)
-                  const examDate = new Date(exam.date);
-                  if (examDate >= cutoffDate) return false;
-
-                  return true;
+                  return exam.classId === userClassId;
                 });
+
+                // Sort by date (descending - newest/upcoming first)
+                filtered.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
               }
               if (isMounted) setExams(filtered);
             })
@@ -301,6 +294,7 @@ export default function StudentDashboardPage() {
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Home },
                   { id: 'exams', label: 'Exams', icon: FileText },
+                  { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
                   { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
                   { id: 'analytics', label: 'Analytics', icon: TrendingUp },
                   { id: 'notices', label: 'Notices', icon: Bell }

@@ -222,10 +222,10 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
-  fbd                    Json?                    // Free Body Diagram data
   answerLatex            String?
   difficultyDetail       String?
   questionLatex          String?
+  isForPractice          Boolean                  @default(false)
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
   class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])

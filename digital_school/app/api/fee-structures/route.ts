@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from "@/lib/auth-options";
 import prisma from '@/lib/prisma';
 
 // GET /api/fee-structures - List fee structures
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
-        if (!session?.user || !['ADMIN', 'SUPER_USER'].includes(session.user.role)) {
+        if (!session?.user || !['ADMIN', 'SUPER_USER'].includes((session.user as any).role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 

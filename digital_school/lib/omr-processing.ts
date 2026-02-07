@@ -133,7 +133,7 @@ async function findQuadAnchors(image: any) {
 function warpPerspective(image: any, anchors: any, outW: number, outH: number) {
     const out = image.clone().resize({ w: outW, h: outH });
     // Fill white
-    out.scan(0, 0, outW, outH, function (x: number, y: number, idx: number) {
+    out.scan(0, 0, outW, outH, function (this: any, x: number, y: number, idx: number) {
         this.bitmap.data[idx + 0] = 255;
         this.bitmap.data[idx + 1] = 255;
         this.bitmap.data[idx + 2] = 255;

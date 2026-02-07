@@ -30,17 +30,19 @@ async function cleanupBrokenImages() {
                 }
             }
 
-            // Check all keys for image URLs
-            const keys = Object.keys(answers);
+            // Safely cast answers to a record for key iteration
+            const answersRecord = (answers || {}) as Record<string, any>;
+            const keys = Object.keys(answersRecord);
+
             for (const key of keys) {
                 // Check if it's an image key (ends with _image or _images)
                 if (key.endsWith('_image') || key.endsWith('_images')) {
-                    const value = answers[key];
+                    const value = answersRecord[key];
 
                     // Check if it's a Cloudinary URL
                     if (typeof value === 'string' && value.includes('cloudinary.com')) {
                         console.log(`Found image URL in submission ${submission.id}: ${key}`);
-                        delete answers[key];
+                        delete answersRecord[key];
                         modified = true;
                         totalCleaned++;
                     }

@@ -113,21 +113,30 @@ export async function GET(
       }
     });
 
-    // Get all results for this exam to calculate rank
-    const allResults = await db.result.findMany({
-      where: { examId },
-      orderBy: { total: 'desc' }
-    });
+    // Optimized: Parallelize independent queries
+    const studentTotal = result?.total || 0;
 
-    const rank = allResults.findIndex(r => r.studentId === user.studentProfile!.id) + 1;
+    const [stats, rankCount] = await Promise.all([
+      db.result.aggregate({
+        where: { examId },
+        _count: { _all: true },
+        _avg: { total: true },
+        _max: { total: true },
+        _min: { total: true }
+      }),
+      result ? db.result.count({
+        where: {
+          examId,
+          total: { gt: studentTotal }
+        }
+      }) : Promise.resolve(-1)
+    ]);
 
-    // Calculate statistics with safe defaults
-    const totalStudents = allResults.length;
-    const averageScore = totalStudents > 0
-      ? allResults.reduce((sum, r) => sum + (r.total || 0), 0) / totalStudents
-      : 0;
-    const highestScore = totalStudents > 0 ? Math.max(...allResults.map(r => r.total || 0)) : 0;
-    const lowestScore = totalStudents > 0 ? Math.min(...allResults.map(r => r.total || 0)) : 0;
+    const totalStudents = stats._count._all;
+    const averageScore = stats._avg.total || 0;
+    const highestScore = stats._max.total || 0;
+    const lowestScore = stats._min.total || 0;
+    const rank = result ? rankCount + 1 : 0;
 
     // Parse questions from exam set
     let questions = [];
@@ -362,7 +371,7 @@ export async function GET(
     let grade = result?.grade || 'F';
 
     // Check if student is suspended (either from submission or result)
-    const isSuspended = submission.exceededQuestionLimit || result?.status === 'SUSPENDED';
+    const isSuspended = submission.exceededQuestionLimit || (result as any)?.status === 'SUSPENDED';
 
     // If suspended, give zero marks in all sections
     if (isSuspended) {
@@ -501,12 +510,13 @@ export async function GET(
         comment: result.comment,
         isPublished: result.isPublished || false,
         publishedAt: result.publishedAt,
-        status: isSuspended ? 'SUSPENDED' : result.status,
-        suspensionReason: isSuspended ? 'Student answered more questions than allowed' : result.suspensionReason
+        status: isSuspended ? 'SUSPENDED' : (result as any).status,
+        suspensionReason: isSuspended ? 'Student answered more questions than allowed' : (result as any).suspensionReason
       } : null,
       reviewRequest: reviewRequest ? {
         id: reviewRequest.id,
-        status: reviewRequest.status,
+        status: (result as any).status || 'PUBLISHED',
+        suspensionReason: (result as any).suspensionReason,
         studentComment: reviewRequest.studentComment,
         evaluatorComment: reviewRequest.evaluatorComment,
         requestedAt: reviewRequest.requestedAt,

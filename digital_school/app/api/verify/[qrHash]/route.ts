@@ -4,9 +4,10 @@ import prisma from '@/lib/prisma';
 // GET /api/verify/[qrHash] - Public verification endpoint
 export async function GET(
     request: NextRequest,
-    { params }: { params: { qrHash: string } }
+    props: { params: Promise<{ qrHash: string }> }
 ) {
     try {
+        const params = await props.params;
         const { qrHash } = params;
 
         if (!qrHash) {

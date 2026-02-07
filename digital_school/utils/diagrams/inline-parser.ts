@@ -2,6 +2,10 @@ import { getPreset, parseCombination } from './index';
 import { parseExcelFBD } from '../fbd/excel-parser';
 import { renderFBDToSVG } from '../fbd/svg-renderer';
 
+const DIAGRAM_BLOCK_REGEX = /##(.*?)##/g;
+const SIZE_REGEX = /\[size:(small|medium|large|tiny)\]/;
+const COMBINE_REGEX = /^COMBINE:(.*?)\[(.*?)\]$/;
+
 /**
  * Parses text and replaces diagram syntax with SVG strings.
  * Unified parser for:
@@ -12,13 +16,13 @@ import { renderFBDToSVG } from '../fbd/svg-renderer';
 export function parseDiagramsInText(text: string): string {
     if (!text) return '';
 
-    // Use a single generic regex to capture all ##...## blocks
-    return text.replace(/##(.*?)##/g, (match, content) => {
+    // Use pre-compiled regex for O(n) scanning
+    return text.replace(DIAGRAM_BLOCK_REGEX, (match, content) => {
         let trimmedContent = content.trim();
 
         // Check for size qualifier: [size:small], [size:medium], [size:large]
         let sizeStyle = '';
-        const sizeMatch = trimmedContent.match(/\[size:(small|medium|large|tiny)\]/);
+        const sizeMatch = trimmedContent.match(SIZE_REGEX);
         if (sizeMatch) {
             const size = sizeMatch[1];
             trimmedContent = trimmedContent.replace(sizeMatch[0], '').trim();
@@ -35,7 +39,7 @@ export function parseDiagramsInText(text: string): string {
                 const combinePart = parts[0];
                 const fbdParts = parts.slice(1).join(' | ');
 
-                const combineMatch = combinePart.match(/^COMBINE:(.*?)\[(.*?)\]$/);
+                const combineMatch = combinePart.match(COMBINE_REGEX);
                 if (combineMatch) {
                     const [, mode, args] = combineMatch;
                     const syntax = `${mode}:${args}`;
@@ -78,10 +82,22 @@ export function parseDiagramsInText(text: string): string {
 
                     if (presetFn) {
                         const args = argsStr ? argsStr.split(',').map((a: string) => {
-                            const val = a.trim();
+                            let val = a.trim();
+
+                            // Detect and strip named parameters like "radius=5" or "angle:30"
+                            if (val.includes('=') || val.includes(':')) {
+                                const parts = val.split(/[=:]/);
+                                val = parts[parts.length - 1].trim();
+                            }
+
                             if (val === 'true') return true;
                             if (val === 'false') return false;
-                            if (!isNaN(Number(val)) && val !== '') return Number(val);
+
+                            // Clean numeric strings (remove stray units or non-numeric baggage)
+                            const numericVal = parseFloat(val);
+                            if (!isNaN(numericVal) && String(numericVal) === val.replace(/[^0-9.-]/g, '')) {
+                                return numericVal;
+                            }
                             return val;
                         }) : [];
 

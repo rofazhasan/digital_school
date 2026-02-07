@@ -13,8 +13,9 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-export async function GET(request: NextRequest, context: { params: { id: string } }) {
-  const { id: examId } = await context.params;
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const { id: examId } = params;
   // Fetch exam with sets and questionsJson
   const exam = await prismadb.exam.findUnique({
     where: { id: examId },

@@ -17,12 +17,13 @@ async function generateCatalog() {
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f8fafc; color: #1e293b; padding: 2rem; }
         h1 { text-align: center; color: #0f172a; margin-bottom: 2rem; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 2rem; }
-        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 1.5rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; }
-        .card h3 { margin-top: 0; color: #334155; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem; font-size: 1.1rem; }
-        .diagram-container { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 300px; background: #fafafa; border-radius: 8px; border: 1px inset #f1f5f9; overflow: hidden; margin-top: 1rem; }
-        .diagram-container svg { max-width: 100%; height: auto; }
-        .meta { font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 2rem; align-items: start; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); padding: 1.5rem; border: 1px solid #e2e8f0; display: flex; flex-direction: column; height: auto; transition: transform 0.2s; }
+        .card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .card h3 { margin-top: 0; color: #334155; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem; font-size: 1.1rem; word-break: break-all; }
+        .diagram-container { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; background: #fafafa; border-radius: 8px; border: 1px inset #f1f5f9; margin-top: 1rem; padding: 1rem; }
+        .diagram-container svg { width: 100%; height: auto; display: block; border-radius: 4px; }
+        .meta { font-size: 0.8rem; color: #64748b; margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: 0.5rem; }
     </style>
 </head>
 <body>

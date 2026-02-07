@@ -180,7 +180,7 @@ Hot gas effects:
 - 4 Free fall variants (air, water, fire, vacuum)
 - 1 Comparison diagram
 
-**Total System: 72 presets** (59 previous + 13 environment)
+**Total System: 354 presets** (including 13 environment variants)
 
 Perfect for teaching:
 - Drag force effects

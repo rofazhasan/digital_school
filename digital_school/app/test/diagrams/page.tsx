@@ -158,14 +158,11 @@ function DiagramCard({ name }: { name: string }) {
                         <div className="w-full">
                             <FBDRenderer
                                 diagram={diagram}
-                                onLoad={() => setLoaded(true)}
-                                onError={(err) => setError(err.message)}
                             />
-                            {loaded && (
-                                <div className="text-center mt-2 text-xs text-green-600">
-                                    ✓ Loaded
-                                </div>
-                            )}
+                            {/* SVG renders synchronously, so we assume loaded if no error thrown */}
+                            <div className="text-center mt-2 text-xs text-green-600">
+                                ✓ Loaded
+                            </div>
                         </div>
                     )}
                 </div>

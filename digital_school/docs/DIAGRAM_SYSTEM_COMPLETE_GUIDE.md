@@ -1,9 +1,9 @@
 # 📐 Complete Diagram System Documentation
-## Digital School Platform - 300 Scientific Diagrams
+## Digital School Platform - 358+ Scientific Diagrams
 
-**Version:** 5.0  
+**Version:** 9.0  
 **Last Updated:** February 7, 2026  
-**Total Diagrams:** **354 Presets** + Unlimited Combinations  
+**Total Diagrams:** **358+ Presets** + Unlimited Combinations  
 **Subjects:** Physics, Chemistry, Biology, Mathematics, Interdisciplinary
 
 ---
@@ -30,12 +30,13 @@ The Diagram System is a **powerful inline diagram rendering engine** that conver
 
 ### Why Use It?
 
-✅ **World-Class Aesthetics** - 3D shading, glowing vectors, and professional technical styling  
+✅ **World-Class Aesthetics** - 3D shading, flowing vectors, professional technical styling, and semi-realistic apparatus  
 ✅ **Fast** - Renders instantly, no external image loading  
 ✅ **Lightweight** - Pure SVG, no heavy dependencies  
 ✅ **Universal Responsiveness** - Auto-scales across all devices and contexts  
 ✅ **Print-Optimized** - Perfectly adjusted for high-quality paper output  
 ✅ **Accessible** - Fully compatible with screen readers and MathJax
+✅ **Scientific Fidelity** - 3D molecular structures and environmental mediums (Water/Fire)  
 
 ### Basic Syntax
 
@@ -182,6 +183,11 @@ utils/diagrams/
 - **Purpose:** Display diagrams in the UI
 - **Features:** Responsive sizing, error handling, fallback UI
 
+#### 5. **Scientific Visual Standards** (New)
+- **3D Molecular Rendering:** Atoms are now rendered as 3D shaded spheres with element-specific gradients. Bonds include depth-aware lighting.
+- **Environmental Context:** Physics scenarios (Pendulum, Projectile, etc.) now feature ambient visual backgrounds for mediums like **Water** (wave overlays) and **Fire** (heat gradients).
+- **Circuit Standards:** AC circuits now use the standard sine-wave source symbol (`~`), and DC circuits use an upgraded professional battery symbol with polarity.
+
 ---
 
 ## 📊 Complete Diagram Catalog
@@ -190,13 +196,12 @@ utils/diagrams/
 
 | Category | Count | Percentage |
 |----------|-------|------------|
-| **Physics** | 75 | 24.9% |
-| **Chemistry** | 60 | 19.9% |
-| **Biology** | 52 | 17.3% |
-| **Mathematics** | 56 | 18.6% |
-| **Interdisciplinary** | 50 | 16.6% |
-| **Utilities** | 8 | 2.7% |
-| **TOTAL** | **301** | **100%** |
+| **Physics** | 134 | 37.8% |
+| **Chemistry** | 64 | 18.1% |
+| **Biology** | 43 | 12.1% |
+| **Mathematics** | 63 | 17.8% |
+| **Interdisciplinary** | 50 | 14.2% |
+| **TOTAL** | **354** | **100%** |
 
 ---
 
@@ -259,6 +264,7 @@ utils/diagrams/
 |--------|--------|----------------|-------------|
 | **Series Circuit** | `series(10,5,2)` | `[—R—R—]` | V=10V, R1=5Ω, R2=2Ω |
 | **Parallel Circuit** | `parallel(10,5,2)` | `[—∥—]` | V=10V, R1=5Ω, R2=2Ω |
+| **LRC Series** | `lrc-series(AC)` | `[~ R L C]` | **New AC Source Symbol** |
 | **RC Circuit** | `rc-circuit(10,100,0.001)` | `[—R—∥—]` | R=10Ω, C=100μF |
 | **RL Circuit** | `rl-circuit(10,0.5,2)` | `[—R—⊙⊙—]` | R=10Ω, L=0.5H |
 | **RLC Circuit** | `rlc-circuit(10,0.5,100)` | `[—R—⊙⊙—∥—]` | Series RLC |
@@ -357,7 +363,8 @@ utils/diagrams/
 | **Ethane** | `ethane()` | `[C₂H₆]` | Staggered conformation |
 | **Ethene** | `ethene()` | `[C₂H₄]` | Double bond, planar |
 | **Ethyne** | `ethyne()` | `[C₂H₂]` | Triple bond, linear |
-| **Benzene** | `benzene()` | `[⬡]` | Aromatic ring |
+| **Acetic Acid** | `acetic-acid()` | `[3D CH₃COOH]` | **World-Class 3D Rendering** |
+| **Benzene** | `benzene()` | `[⬡]` | Aromatic ring with 3D nodes |
 | **Cyclohexane** | `cyclohexane(chair)` | `[⬡]` | Chair conformation |
 | **Glucose** | `glucose(alpha)` | `[⬡-OH]` | α-D-glucose |
 | **Amino Acid** | `amino-acid(glycine)` | `[H₂N-CH₂-COOH]` | Glycine structure |

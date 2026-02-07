@@ -63,6 +63,12 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
     }
 
     return `<svg width="100%" height="auto" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" class="fbd-diagram responsive-svg" id="${id}" style="max-width: ${width}px; background-color: ${diagram.backgroundColor || 'transparent'};">
+        <style>
+            .fbd-diagram text { 
+                font-family: 'Inter', 'Kalpurush', 'SolaimanLipi', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            }
+            .fbd-diagram .math-label { font-family: 'STIX Two Math', 'Latin Modern Math', serif; font-style: italic; }
+        </style>
         ${svgContent}
     </svg>`;
 }
@@ -83,24 +89,31 @@ function renderAxes(w: number, h: number, color: string): string {
 }
 
 function renderBody(body: FBDBody): string {
+    const centerX = Number(body.centerX) || 0;
+    const centerY = Number(body.centerY) || 0;
+    const width = Number(body.width) || 0;
+    const height = Number(body.height) || 0;
+    const radius = Number(body.radius) || 0;
+    const angle = Number(body.angle) || 0;
+
     const style = `fill="${body.fill || '#e2e8f0'}" stroke="${body.stroke || '#475569'}" stroke-width="2"`;
-    const rotate = body.angle ? `transform="rotate(${body.angle}, ${body.centerX}, ${body.centerY})"` : '';
+    const rotate = angle ? `transform="rotate(${angle}, ${centerX}, ${centerY})"` : '';
 
     let content = '';
     switch (body.type) {
         case 'rectangle':
-            content = `<rect x="${body.centerX - (body.width || 0) / 2}" y="${body.centerY - (body.height || 0) / 2}" 
-                             width="${body.width}" height="${body.height}" ${style} />`;
+            content = `<rect x="${centerX - width / 2}" y="${centerY - height / 2}" 
+                             width="${width}" height="${height}" ${style} />`;
             break;
         case 'circle':
-            content = `<circle cx="${body.centerX}" cy="${body.centerY}" r="${body.radius}" ${style} />`;
+            content = `<circle cx="${centerX}" cy="${centerY}" r="${radius}" ${style} />`;
             break;
         case 'triangle':
-            const r = body.radius || (body.width ? body.width / 2 : 20);
+            const r = radius || (width ? width / 2 : 20);
             const h = r * Math.sqrt(3);
-            const p1 = `${body.centerX},${body.centerY - r}`;
-            const p2 = `${body.centerX - h / 2},${body.centerY + r / 2}`;
-            const p3 = `${body.centerX + h / 2},${body.centerY + r / 2}`;
+            const p1 = `${centerX},${centerY - r}`;
+            const p2 = `${centerX - h / 2},${centerY + r / 2}`;
+            const p3 = `${centerX + h / 2},${centerY + r / 2}`;
             content = `<polygon points="${p1} ${p2} ${p3}" ${style} />`;
             break;
     }
@@ -109,56 +122,42 @@ function renderBody(body: FBDBody): string {
 }
 
 function renderPoint(point: FBDPoint): string {
+    const x = Number(point.x) || 0;
+    const y = Number(point.y) || 0;
+
     // Render a small dot or specific symbol for supports
     if (point.type === 'fixed') {
         // Draw a small cross or hatch
-        return `<circle cx="${point.x}" cy="${point.y}" r="3" fill="#000" />
-                <path d="M${point.x - 5},${point.y} L${point.x + 5},${point.y} M${point.x},${point.y - 5} L${point.x},${point.y + 5}" stroke="#000" stroke-width="1"/>`;
+        return `<circle cx="${x}" cy="${y}" r="3" fill="#000" />
+                <path d="M${x - 5},${y} L${x + 5},${y} M${x},${y - 5} L${x},${y + 5}" stroke="#000" stroke-width="1"/>`;
     }
     // Default dot
-    return `<circle cx="${point.x}" cy="${point.y}" r="2" fill="#000" />
-            ${point.label ? `<text x="${point.x + 5}" y="${point.y - 5}" font-size="12" font-family="sans-serif">${point.label}</text>` : ''}`;
+    return `<circle cx="${x}" cy="${y}" r="2" fill="#000" />
+            ${point.label ? `<text x="${x + 5}" y="${y - 5}" font-size="12">${point.label}</text>` : ''}`;
 }
 
 function renderForce(force: FBDForce, point: FBDPoint, config: any): string {
-    const angleRad = (force.angle * Math.PI) / 180;
-    // Standard force length if magnitude is abstract, or scale it
-    // For FBDs, magnitude often determines length relative to others
-    // Let's use a base scale factor
-    const length = force.magnitude > 0 ? force.magnitude * 2 : 60; // Heuristic
+    const px = Math.round(Number(point.x) || 0);
+    const py = Math.round(Number(point.y) || 0);
+    const magnitude = Number(force.magnitude) || 0;
+    const angle = Number(force.angle) || 0;
 
-    // BUT usually 'magnitude' in our builder is implicitly the length in pixels for some presets
-    // Let's trust the 'magnitude' is pixels for now if > 20, else scale it
-    const len = force.magnitude < 20 ? force.magnitude * 10 : force.magnitude;
+    const angleRad = (angle * Math.PI) / 180;
 
-    // Coordinate system: SVG y is down.
-    // Mathematical angle is usually CCW from X-axis.
-    // So x = len * cos(theta), y = -len * sin(theta) (because y is flipped)
-    // However, our data might assume specialized angle logic.
-    // Checking mechanics.ts: 
-    // .addForce('tension', 'm1', 80, 90, 'T', 'tension') -> 90 degrees usually means UP
-    // cos(90)=0, sin(90)=1. y should decrease.
-    // So endY = startY - len * sin(theta)
+    // Scale it: Trust magnitude is pixels if > 20, else scale it
+    const len = magnitude < 20 ? magnitude * 10 : magnitude;
 
     const dx = len * Math.cos(angleRad);
     const dy = -len * Math.sin(angleRad); // Invert Y for SVG coords
 
-    const endX = point.x + dx;
-    const endY = point.y + dy;
+    const endX = px + dx;
+    const endY = py + dy;
 
     const color = force.color || config.forceColors[force.type || 'applied'] || '#000';
 
-    // Arrowhead logic
-    const headSize = 10;
-    const angleFromX = Math.atan2(dy, dx);
-    const x1 = endX - headSize * Math.cos(angleFromX - Math.PI / 6);
-    const y1 = endY - headSize * Math.sin(angleFromX - Math.PI / 6);
-    const x2 = endX - headSize * Math.cos(angleFromX + Math.PI / 6);
-    const y2 = endY - headSize * Math.sin(angleFromX + Math.PI / 6);
-
     return `
         <g class="force-vector" filter="url(#vector-glow)">
-            <line x1="${point.x}" y1="${point.y}" x2="${endX}" y2="${endY}" 
+            <line x1="${px}" y1="${py}" x2="${endX}" y2="${endY}" 
                   stroke="${color}" stroke-width="2.5" stroke-linecap="round"
                   marker-end="url(#arrowhead)" />
             ${force.label ? renderLabel(endX, endY, force.label, color, angleRad) : ''}
@@ -167,8 +166,9 @@ function renderForce(force: FBDForce, point: FBDPoint, config: any): string {
 }
 
 function renderMoment(moment: FBDMoment, point: FBDPoint): string {
-    // Curved arrow around point
-    const r = moment.radius || 30;
+    const px = Number(point.x) || 0;
+    const py = Number(point.y) || 0;
+    const r = Number(moment.radius) || 30;
     // CW or CCW
     // Draw an arc of ~270 degrees
     // Start angle depends on direction
@@ -194,16 +194,44 @@ function renderMoment(moment: FBDMoment, point: FBDPoint): string {
 }
 
 function renderLabel(x: number, y: number, text: string, color: string, angleRad: number): string {
-    // Offset label slightly away from arrow tip
+    const lx = Number(x) || 0;
+    const ly = Number(y) || 0;
     const offset = 15;
-    const lx = x + offset * Math.cos(angleRad);
-    const ly = y - offset * Math.sin(angleRad); // Remember Y flip
-    return `<text x="${lx}" y="${ly}" fill="${color}" font-size="14" font-family="serif" font-style="italic" text-anchor="middle" dominant-baseline="middle">${parseMathLabel(text)}</text>`;
+    const fx = lx + offset * Math.cos(angleRad);
+    const fy = ly - offset * Math.sin(angleRad);
+
+    const isMath = text.includes('$') || text.includes('\\') || text.includes('_') || text.includes('^');
+    const className = isMath ? 'math-label' : 'bilingual-label';
+
+    return `<text x="${fx}" y="${fy}" fill="${color}" font-size="14" font-family="serif" font-style="italic" text-anchor="middle" dominant-baseline="middle" class="${className}">${parseMathLabel(text)}</text>`;
 }
 
 // Convert some basic math syntax to unicode/SVG tspan
 function parseMathLabel(text: string): string {
-    // basic subscript: m1 -> m<tspan..>1</tspan>
-    return text.replace(/_(\w+)/g, '<tspan baseline-shift="sub" font-size="0.7em">$1</tspan>')
-        .replace(/\^(\w+)/g, '<tspan baseline-shift="super" font-size="0.7em">$1</tspan>');
+    if (!text) return '';
+
+    // 1. Clean up delimiters
+    let cleanText = text.replace(/\$+/g, '').trim();
+
+    // 2. Map common LaTeX symbols to Unicode
+    const symbolMap: Record<string, string> = {
+        '\\theta': 'θ', '\\pi': 'π', '\\alpha': 'α', '\\beta': 'β',
+        '\\gamma': 'γ', '\\Delta': 'Δ', '\\mu': 'μ', '\\Omega': 'Ω',
+        '\\phi': 'ϕ', '\\rho': 'ρ', '\\sigma': 'σ', '\\tau': 'τ',
+        '\\omega': 'ω', '\\lambda': 'λ', '\\epsilon': 'ε',
+        '\\infty': '∞', '\\approx': '≈', '\\pm': '±', '\\times': '×',
+        '\\cdot': '·', '\\degree': '°', '\\deg': '°', '\\nabla': '∇',
+        '\\partial': '∂', '\\sqrt': '√', '\\sum': 'Σ', '\\int': '∫'
+    };
+
+    Object.entries(symbolMap).forEach(([latex, unicode]) => {
+        const escapedLatex = latex.replace(/\\/g, '\\\\');
+        cleanText = cleanText.replace(new RegExp(escapedLatex, 'g'), unicode);
+    });
+
+    // 3. Handle basic subscript/superscript with tspan
+    // Note: We use baseline-shift which is widely supported in SVG
+    return cleanText
+        .replace(/_\{?(\w+)\}?/g, '<tspan baseline-shift="sub" font-size="0.7em" class="math-sub">$1</tspan>')
+        .replace(/\^\{?(\w+)\}?/g, '<tspan baseline-shift="super" font-size="0.7em" class="math-sup">$1</tspan>');
 }

@@ -9,19 +9,19 @@ import { type MechanicalComponentOptions } from './components';
  * Create simple pendulum
  */
 export function createPendulum(
-    angle: number = 30,
-    options: MechanicsComponentOptions = {}
+  angle: number = 30,
+  options: MechanicalComponentOptions = {}
 ): string {
-    const { width = 140, height = 160, showLabel = true } = options;
+  const { width = 140, height = 160, showLabel = true } = options;
 
-    const length = 100;
-    const pivotX = width / 2;
-    const pivotY = 20;
-    const angleRad = (angle * Math.PI) / 180;
-    const bobX = pivotX + length * Math.sin(angleRad);
-    const bobY = pivotY + length * Math.cos(angleRad);
+  const length = 100;
+  const pivotX = width / 2;
+  const pivotY = 20;
+  const angleRad = (angle * Math.PI) / 180;
+  const bobX = pivotX + length * Math.sin(angleRad);
+  const bobY = pivotY + length * Math.cos(angleRad);
 
-    return `
+  return `
     <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
          class="pendulum" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -74,22 +74,22 @@ export function createPendulum(
 /**
  * Create projectile motion trajectory
  */
-export function createProjectile(options: MechanicsComponentOptions = {}): string {
-    const { width = 220, height = 140, showLabel = true } = options;
+export function createProjectile(options: MechanicalComponentOptions = {}): string {
+  const { width = 220, height = 140, showLabel = true } = options;
 
-    // Parabolic trajectory
-    const points = Array.from({ length: 50 }, (_, i) => {
-        const t = i / 50;
-        const x = 20 + t * 180;
-        const y = height - 20 - (100 * t - 80 * t * t);
-        return { x, y };
-    });
+  // Parabolic trajectory
+  const points = Array.from({ length: 50 }, (_, i) => {
+    const t = i / 50;
+    const x = 20 + t * 180;
+    const y = height - 20 - (100 * t - 80 * t * t);
+    return { x, y };
+  });
 
-    const pathData = points.map(({ x, y }, i) =>
-        i === 0 ? `M ${x},${y}` : `L ${x},${y}`
-    ).join(' ');
+  const pathData = points.map(({ x, y }, i) =>
+    i === 0 ? `M ${x},${y}` : `L ${x},${y}`
+  ).join(' ');
 
-    return `
+  return `
     <svg width="${width}" height="${height + 30}" viewBox="0 0 ${width} ${height + 30}" 
          class="projectile" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -108,10 +108,10 @@ export function createProjectile(options: MechanicsComponentOptions = {}): strin
       
       <!-- Projectile at different positions -->
       ${[0, 0.25, 0.5, 0.75].map(t => {
-        const idx = Math.floor(t * (points.length - 1));
-        const { x, y } = points[idx];
-        return `<circle cx="${x}" cy="${y}" r="4" fill="#E74C3C" opacity="${1 - t * 0.5}"/>`;
-    }).join('')}
+    const idx = Math.floor(t * (points.length - 1));
+    const { x, y } = points[idx];
+    return `<circle cx="${x}" cy="${y}" r="4" fill="#E74C3C" opacity="${1 - t * 0.5}"/>`;
+  }).join('')}
       
       <!-- Initial velocity vector -->
       <line x1="20" y1="${height - 20}" x2="60" y2="${height - 60}" 
@@ -134,13 +134,13 @@ export function createProjectile(options: MechanicsComponentOptions = {}): strin
 /**
  * Create circular motion diagram
  */
-export function createCircularMotion(options: MechanicsComponentOptions = {}): string {
-    const { width = 160, height = 160, showLabel = true } = options;
-    const cx = width / 2;
-    const cy = height / 2;
-    const radius = 50;
+export function createCircularMotion(options: MechanicalComponentOptions = {}): string {
+  const { width = 160, height = 160, showLabel = true } = options;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = 50;
 
-    return `
+  return `
     <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
          class="circular-motion" xmlns="http://www.w3.org/2000/svg">
       <defs>
@@ -194,12 +194,12 @@ export function createCircularMotion(options: MechanicsComponentOptions = {}): s
  * Create collision diagram
  */
 export function createCollision(
-    type: 'elastic' | 'inelastic' = 'elastic',
-    options: MechanicsComponentOptions = {}
+  type: 'elastic' | 'inelastic' = 'elastic',
+  options: MechanicalComponentOptions = {}
 ): string {
-    const { width = 200, height = 100, showLabel = true } = options;
+  const { width = 200, height = 100, showLabel = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height + 30}" viewBox="0 0 ${width} ${height + 30}" 
          class="collision" xmlns="http://www.w3.org/2000/svg">
       <defs>
