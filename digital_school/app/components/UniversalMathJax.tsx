@@ -6,6 +6,14 @@ import { cleanupMath } from "@/lib/utils";
 
 import { parseDiagramsInText } from "@/utils/diagrams/inline-parser";
 
+declare global {
+    interface Window {
+        MathJax?: {
+            typesetPromise: (elements: HTMLElement[]) => Promise<void>;
+        };
+    }
+}
+
 interface UniversalMathJaxProps {
     children: React.ReactNode;
     inline?: boolean;
@@ -29,10 +37,19 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
     const contentWithDiagrams = parseDiagramsInText(content);
 
     // If diagrams were found, we need to render HTML inside MathJax
+    // And ensure MathJax processes the math inside it
+    const mathRef = React.useRef<HTMLDivElement>(null);
+
+    React.useEffect(() => {
+        if (content !== contentWithDiagrams && mathRef.current && window.MathJax && window.MathJax.typesetPromise) {
+            window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
+        }
+    }, [contentWithDiagrams]);
+
     if (content !== contentWithDiagrams) {
         return (
             <MathJax inline={inline} dynamic={dynamic}>
-                <span dangerouslySetInnerHTML={{ __html: contentWithDiagrams }} />
+                <span ref={mathRef} dangerouslySetInnerHTML={{ __html: contentWithDiagrams }} />
             </MathJax>
         );
     }

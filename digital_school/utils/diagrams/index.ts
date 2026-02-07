@@ -668,6 +668,10 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'black-hole': createBlackHole,
     'big-bang': createBigBang,
     'standard-model': createStandardModel,
+
+    // ===== ALIASES (Backward Compatibility) =====
+    'graph-parabola': createParabola,
+    'graph-circle': createCircleGraph,
 };
 
 /**
