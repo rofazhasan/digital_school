@@ -57,6 +57,7 @@ export default function AdminUsersPage() {
     const router = useRouter();
     const [importSummary, setImportSummary] = useState<{ success: number; fail: number } | null>(null);
     const [classes, setClasses] = useState<Array<{ id: string; name: string; section: string }>>([]);
+    const [selectedClass, setSelectedClass] = useState<string>("ALL");
     const [activeUserRole, setActiveUserRole] = useState<'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | null>(null);
 
     // Bulk Selection State
@@ -95,6 +96,7 @@ export default function AdminUsersPage() {
 
     const filteredUsers = users.filter(u =>
         (activeRole === 'ALL' || u.role === activeRole) &&
+        (selectedClass === 'ALL' || (u.class === selectedClass.split(' - ')[0] && u.section === selectedClass.split(' - ')[1])) &&
         (
             u.name.toLowerCase().includes(search.toLowerCase()) ||
             (u.email && u.email.toLowerCase().includes(search.toLowerCase())) ||
@@ -108,7 +110,13 @@ export default function AdminUsersPage() {
     const totalPages = Math.ceil(filteredUsers.length / pageSize) || 1;
     const paginatedUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
 
-    useEffect(() => { setPage(1); setSelectedIds(new Set()); }, [search, activeRole]);
+    useEffect(() => {
+        setPage(1);
+        setSelectedIds(new Set());
+        if (activeRole !== 'STUDENT' && activeRole !== 'ALL') {
+            setSelectedClass('ALL');
+        }
+    }, [search, activeRole]);
 
     useEffect(() => {
         setLoading(true);
@@ -444,6 +452,23 @@ export default function AdminUsersPage() {
                                 <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedIds.size})
                             </Button>
                         )}
+
+                        {/* Class Filter Dropdown */}
+                        {(activeRole === 'ALL' || activeRole === 'STUDENT') && (
+                            <select
+                                value={selectedClass}
+                                onChange={(e) => setSelectedClass(e.target.value)}
+                                className="flex h-10 w-full md:w-[200px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                <option value="ALL">All Classes</option>
+                                {classes.map((cls) => (
+                                    <option key={cls.id} value={`${cls.name} - ${cls.section}`}>
+                                        {cls.name} - {cls.section}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
+
                         <Input
                             value={search}
                             onChange={e => setSearch(e.target.value)}
