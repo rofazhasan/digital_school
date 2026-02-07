@@ -16,7 +16,8 @@ import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 // @ts-ignore
-import confetti from "canvas-confetti";
+// import confetti from "canvas-confetti"; // Dynamic import used instead
+
 
 // Dynamic Imports for Canvas
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
@@ -130,7 +131,7 @@ export default function PracPerfectSessionPage() {
         setSelectedOption(idx);
     };
 
-    const handleCheckAnswer = () => {
+    const handleCheckAnswer = async () => {
         if (selectedOption === null) return;
 
         const currentQ = questions[currentIndex];
@@ -158,6 +159,7 @@ export default function PracPerfectSessionPage() {
 
         if (isRight) {
             setScore(s => s + 1);
+            const confetti = (await import("canvas-confetti")).default;
             confetti({
                 particleCount: 100,
                 spread: 70,
