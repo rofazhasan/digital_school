@@ -45,6 +45,7 @@ export default function PracPerfectPage() {
     // Filters
     const [filterSubject, setFilterSubject] = useState<string>("all");
     const [filterType, setFilterType] = useState<string>("all");
+    const [filterTopic, setFilterTopic] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
@@ -74,9 +75,10 @@ export default function PracPerfectPage() {
     const filteredQuestions = questions.filter(q => {
         const matchSubject = filterSubject === "all" || q.subject === filterSubject;
         const matchType = filterType === "all" || q.type === filterType;
+        const matchTopic = filterTopic === "all" || q.topic === filterTopic;
         const matchSearch = q.questionText.toLowerCase().includes(searchTerm.toLowerCase()) ||
             q.topic?.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchSubject && matchType && matchSearch;
+        return matchSubject && matchType && matchTopic && matchSearch;
     });
 
     const toggleSelection = (id: string) => {
@@ -99,6 +101,11 @@ export default function PracPerfectPage() {
     };
 
     const uniqueSubjects = Array.from(new Set(questions.map(q => q.subject))).filter(Boolean);
+    const uniqueTopics = Array.from(new Set(
+        questions
+            .filter(q => filterSubject === "all" || q.subject === filterSubject)
+            .map(q => q.topic)
+    )).filter(Boolean);
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
@@ -164,6 +171,16 @@ export default function PracPerfectPage() {
                                             <SelectItem value="MCQ">MCQ</SelectItem>
                                             <SelectItem value="CQ">CQ</SelectItem>
                                             <SelectItem value="SQ">SQ</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <Select
+                                        value={filterTopic}
+                                        onValueChange={setFilterTopic}
+                                    >
+                                        <SelectTrigger className="w-[160px]"><SelectValue placeholder="Topic" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Topics</SelectItem>
+                                            {uniqueTopics.map(t => <SelectItem key={t} value={t!}>{t}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                     <div className="flex bg-slate-100 p-1 rounded-md">

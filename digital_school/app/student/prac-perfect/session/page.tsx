@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
     Clock, ArrowLeft, CheckCircle, XCircle, AlertCircle,
-    ChevronLeft, ChevronRight, RotateCcw, Flag, ArrowRight, Eye
+    ChevronLeft, ChevronRight, RotateCcw, Flag, ArrowRight, Eye, Sparkles
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -66,7 +66,9 @@ export default function PracPerfectSessionPage() {
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isChecked, setIsChecked] = useState(false);
     const [isCorrect, setIsCorrect] = useState(false);
-    const [score, setScore] = useState(0);
+    const [score, setScore] = useState(0); // Correct count
+    const [wrongCount, setWrongCount] = useState(0);
+    const [showSummary, setShowSummary] = useState(false);
 
     // Overlay State
     const [showQuestion, setShowQuestion] = useState(true);
@@ -112,18 +114,16 @@ export default function PracPerfectSessionPage() {
         setSelectedOption(null);
         setIsChecked(false);
         setIsCorrect(false);
-        // Clear board? Optional. Maybe keep scratchpad? 
-        // Usually students want a fresh board.
-        // boardRef.current?.clear(); 
-        // Let's clear it for now to avoid confusion.
         if (boardRef.current) {
-            // boardRef.current.clear(); // Need to implement clear or just leave it
+            // boardRef.current.clear(); 
         }
     }, [currentIndex]);
 
     const formatTime = (sec: number) => {
-        const m = Math.floor(sec / 60);
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
         const s = sec % 60;
+        if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
@@ -136,19 +136,13 @@ export default function PracPerfectSessionPage() {
         if (selectedOption === null) return;
 
         const currentQ = questions[currentIndex];
-        // Parse options if they are stored as JSON string in some legacy cases, but mostly they are JSON object
-        // The API returns them as is.
-        // Assuming modelAnswer holds the correct index or letter ("A", "B"... or "0", "1"...)
-        // Let's assume modelAnswer is "0", "1", etc or "A", "B".
 
         // Logic to normalize answer checking
         let correctIdx = -1;
         if (currentQ.modelAnswer) {
-            // Try to parse if it's a number
             const num = parseInt(currentQ.modelAnswer);
             if (!isNaN(num)) correctIdx = num;
             else {
-                // Map A->0, B->1 etc
                 const map: any = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 };
                 const normalizedAnswer = currentQ.modelAnswer.trim().toUpperCase();
                 if (map[normalizedAnswer] !== undefined) correctIdx = map[normalizedAnswer];
@@ -165,11 +159,13 @@ export default function PracPerfectSessionPage() {
             confetti({
                 particleCount: 100,
                 spread: 70,
-                origin: { y: 0.6 }
+                origin: { y: 0.6 },
+                colors: ['#4f46e5', '#818cf8', '#6366f1']
             });
             toast.success("Correct Answer! 🎉");
         } else {
-            toast.error("Incorrect. Try to learn from this!");
+            setWrongCount(w => w + 1);
+            toast.error("Incorrect. Let's learn from the explanation!");
         }
     };
 
@@ -177,9 +173,8 @@ export default function PracPerfectSessionPage() {
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(c => c + 1);
         } else {
-            // Finish
-            toast.success(`Session Complete! Score: ${score}/${questions.length}`);
-            router.push("/student/prac-perfect");
+            // Finish session - show summary instead of instant redirect
+            setShowSummary(true);
         }
     };
 
@@ -330,11 +325,26 @@ export default function PracPerfectSessionPage() {
                                 {/* Explanation Reveal */}
                                 {isChecked && (
                                     <div className={`p-5 rounded-2xl border-2 animate-in fade-in slide-in-from-top-2 shadow-xl ${isCorrect ? 'bg-green-500/5 border-green-500/20 text-green-900 dark:text-green-300' : 'bg-amber-500/5 border-amber-500/20 text-amber-900 dark:text-amber-300'}`}>
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
-                                                {isCorrect ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                                        <div className="flex items-center justify-between gap-2 mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                    {isCorrect ? <CheckCircle className="w-5 h-5" /> : <XCircle className="w-5 h-5" />}
+                                                </div>
+                                                <span className="font-fancy font-black text-base">{isCorrect ? 'Excellent! Correct Answer.' : 'Not quite right...'}</span>
                                             </div>
-                                            <span className="font-fancy font-black text-base">{isCorrect ? 'Excellent! Correct Answer.' : 'Not quite right...'}</span>
+                                            {!isCorrect && (
+                                                <Badge className="bg-green-600 text-white border-0 font-bold px-3 py-1">
+                                                    Correct Answer: {(() => {
+                                                        const correctIdx = (() => {
+                                                            if (!currentQ.modelAnswer) return -1;
+                                                            const num = parseInt(currentQ.modelAnswer);
+                                                            if (!isNaN(num)) return num;
+                                                            return { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 }[currentQ.modelAnswer.trim().toUpperCase()] ?? -1;
+                                                        })();
+                                                        return String.fromCharCode(65 + correctIdx);
+                                                    })()}
+                                                </Badge>
+                                            )}
                                         </div>
 
                                         {/* Get explanation from the correct option if available */}
@@ -357,7 +367,7 @@ export default function PracPerfectSessionPage() {
                                                             </div>
                                                         );
                                                     }
-                                                    return !isCorrect ? <p className="opacity-80 italic">Use the smart board to figure out the solution!</p> : null;
+                                                    return !isCorrect ? <p className="opacity-80 italic">Analyze the solution and try again!</p> : null;
                                                 })()}
                                             </div>
                                         )}
@@ -368,8 +378,55 @@ export default function PracPerfectSessionPage() {
                     </div>
                 )}
 
+                {/* 5. SESSION SUMMARY MODAL */}
+                {showSummary && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 font-fancy">
+                        <Card className="w-full max-w-md bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-center text-white">
+                                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-4">
+                                    <Sparkles className="w-10 h-10 text-white" />
+                                </div>
+                                <h2 className="text-3xl font-black">Practice Session Complete!</h2>
+                                <p className="opacity-80 mt-2 font-medium">You've finished all questions in this set.</p>
+                            </div>
+
+                            <div className="p-8 space-y-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="p-4 rounded-2xl bg-green-50 border border-green-100 text-center">
+                                        <div className="text-green-600 font-black text-3xl mb-1">{score}</div>
+                                        <div className="text-xs font-bold text-green-700 uppercase tracking-widest">Correct</div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-center">
+                                        <div className="text-red-600 font-black text-3xl mb-1">{wrongCount}</div>
+                                        <div className="text-xs font-bold text-red-700 uppercase tracking-widest">Wrong</div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center">
+                                        <div className="text-slate-600 font-black text-3xl mb-1">
+                                            {questions.length - (score + wrongCount)}
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-700 uppercase tracking-widest">Not Answered</div>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-center">
+                                        <div className="text-indigo-600 font-black text-3xl mb-1">{questions.length}</div>
+                                        <div className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Total Q</div>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2">
+                                    <Button
+                                        onClick={() => router.push('/student/prac-perfect')}
+                                        className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-lg font-bold shadow-xl shadow-indigo-200 transition-all hover:scale-[1.02]"
+                                    >
+                                        Back to Practice Hub <ArrowRight className="w-5 h-5 ml-2" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
                 {/* Toggle Question Visibility Button (if hidden) */}
-                {!showQuestion && (
+                {!showQuestion && !showSummary && (
                     <div className="absolute top-20 left-4 z-40">
                         <Button onClick={() => setShowQuestion(true)} className="shadow-lg rounded-full px-4" size="sm">
                             <Eye className="w-4 h-4 mr-2" /> Show Question
