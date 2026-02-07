@@ -90,7 +90,40 @@ export default function PracPerfectSessionPage() {
                 const data = await res.json();
 
                 if (data.questions && data.questions.length > 0) {
-                    setQuestions(data.questions);
+                    // 1. Process and Shuffle Questions
+                    const shuffledQuestions = [...data.questions].sort(() => Math.random() - 0.5);
+
+                    const processedQuestions = shuffledQuestions.map(q => {
+                        if (q.type === 'MCQ' && Array.isArray(q.options)) {
+                            // Identify correct option index/letter
+                            let correctIdx = -1;
+                            if (q.modelAnswer) {
+                                const num = parseInt(q.modelAnswer);
+                                if (!isNaN(num)) correctIdx = num;
+                                else {
+                                    const map: any = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 };
+                                    const normalizedAnswer = q.modelAnswer.trim().toUpperCase();
+                                    if (map[normalizedAnswer] !== undefined) correctIdx = map[normalizedAnswer];
+                                }
+                            }
+
+                            // Map options to objects with isCorrect flag
+                            const processedOptions = q.options.map((opt: any, idx: number) => {
+                                const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
+                                return {
+                                    ...optObj,
+                                    isCorrect: idx === correctIdx
+                                };
+                            });
+
+                            // Shuffle Options
+                            const shuffledOptions = [...processedOptions].sort(() => Math.random() - 0.5);
+                            return { ...q, options: shuffledOptions };
+                        }
+                        return q;
+                    });
+
+                    setQuestions(processedQuestions);
                 } else {
                     toast.error("Failed to load questions");
                     router.push("/student/prac-perfect");
@@ -136,21 +169,9 @@ export default function PracPerfectSessionPage() {
         if (selectedOption === null) return;
 
         const currentQ = questions[currentIndex];
+        const isRight = currentQ.options && currentQ.options[selectedOption]?.isCorrect;
 
-        // Logic to normalize answer checking
-        let correctIdx = -1;
-        if (currentQ.modelAnswer) {
-            const num = parseInt(currentQ.modelAnswer);
-            if (!isNaN(num)) correctIdx = num;
-            else {
-                const map: any = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 };
-                const normalizedAnswer = currentQ.modelAnswer.trim().toUpperCase();
-                if (map[normalizedAnswer] !== undefined) correctIdx = map[normalizedAnswer];
-            }
-        }
-
-        const isRight = selectedOption === correctIdx;
-        setIsCorrect(isRight);
+        setIsCorrect(!!isRight);
         setIsChecked(true);
 
         if (isRight) {
@@ -266,9 +287,7 @@ export default function PracPerfectSessionPage() {
 
                                             let stateClass = "";
                                             if (isChecked) {
-                                                const correctLetter = currentQ.modelAnswer?.trim().toUpperCase();
-                                                const currentLetter = String.fromCharCode(65 + idx);
-                                                const isThisCorrect = (idx === parseInt(currentQ.modelAnswer || "-1")) || (currentLetter === correctLetter);
+                                                const isThisCorrect = opt.isCorrect;
 
                                                 if (idx === selectedOption && isCorrect) stateClass = "bg-green-500/10 border-green-500 text-green-900 dark:text-green-300 ring-2 ring-green-500/20 shadow-green-100"; // Selected & Correct
                                                 else if (idx === selectedOption && !isCorrect) stateClass = "bg-red-500/10 border-red-500 text-red-900 dark:text-red-300 ring-2 ring-red-500/20 shadow-red-100"; // Selected & Wrong
@@ -335,13 +354,8 @@ export default function PracPerfectSessionPage() {
                                             {!isCorrect && (
                                                 <Badge className="bg-green-600 text-white border-0 font-bold px-3 py-1">
                                                     Correct Answer: {(() => {
-                                                        const correctIdx = (() => {
-                                                            if (!currentQ.modelAnswer) return -1;
-                                                            const num = parseInt(currentQ.modelAnswer);
-                                                            if (!isNaN(num)) return num;
-                                                            return { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 }[currentQ.modelAnswer.trim().toUpperCase()] ?? -1;
-                                                        })();
-                                                        return String.fromCharCode(65 + correctIdx);
+                                                        const correctIdx = currentQ.options?.findIndex((o: any) => o.isCorrect) ?? -1;
+                                                        return correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : "?";
                                                     })()}
                                                 </Badge>
                                             )}
@@ -351,11 +365,7 @@ export default function PracPerfectSessionPage() {
                                         {Array.isArray(currentQ.options) && (
                                             <div className="text-explanation font-fancy">
                                                 {(() => {
-                                                    const correctOpt = currentQ.options.find((o: any, i: number) => {
-                                                        const correctLetter = currentQ.modelAnswer?.trim().toUpperCase();
-                                                        const currentLetter = String.fromCharCode(65 + i);
-                                                        return (i === parseInt(currentQ.modelAnswer || "-1")) || (currentLetter === correctLetter);
-                                                    });
+                                                    const correctOpt = currentQ.options.find((o: any) => o.isCorrect);
 
                                                     if (correctOpt?.explanation) {
                                                         return (
