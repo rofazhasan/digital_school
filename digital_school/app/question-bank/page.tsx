@@ -34,7 +34,7 @@ type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
   id: string; type: QuestionType; subject: string; topic?: string | null; marks: number; difficulty: Difficulty;
-  questionText: string; questionLatex?: string | null; hasMath: boolean;
+  questionText: string; hasMath: boolean;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
   modelAnswer?: string | null; class: { id: string; name: string }; createdBy: { id: string; name: string };
@@ -57,7 +57,7 @@ type GeneratedQuestion = {
   topic?: string;
   class: { id: string; name: string };
   hasMath?: boolean;
-  questionLatex?: string;
+
 };
 
 // Add this at the top of your project (e.g., types/react-latex.d.ts):
@@ -1669,7 +1669,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                           {((q.subQuestions || []) || []).map((sq, i) => (
                             <li key={i} className="space-y-2">
                               <div>
-                                {q.hasMath && q.questionLatex ? <UniversalMathJax inline>{cleanupMath(q.questionLatex)}</UniversalMathJax> : q.questionText}
+                                {q.hasMath ? <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax> : q.questionText}
                                 <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
                               </div>
                               {sq.modelAnswer && (

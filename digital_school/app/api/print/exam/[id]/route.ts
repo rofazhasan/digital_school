@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
               options: true,
               subQuestions: true,
               modelAnswer: true,
-              difficultyDetail: true,
+
             }
           },
         },
@@ -132,14 +132,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         },
         select: {
           id: true,
-          difficultyDetail: true
+
         }
       });
 
       dbQuestions.forEach(q => {
-        if (q.difficultyDetail) {
-          questionDetailsMap.set(q.id, q.difficultyDetail);
-        }
+
       });
     } catch (error) {
       console.error("Error fetching question details:", error);
@@ -166,7 +164,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       }
 
       // Extract explanation from correct option if not found at top level
-      let explanation = questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation;
+      let explanation = questionDetailsMap.get(q.id) || q.explanation;
 
       if (!explanation && Array.isArray(q.options)) {
         const correctOpt = q.options.find((opt: any) => opt.isCorrect);

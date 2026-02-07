@@ -222,9 +222,6 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
-  answerLatex            String?
-  difficultyDetail       String?
-  questionLatex          String?
   isForPractice          Boolean                  @default(false)
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]

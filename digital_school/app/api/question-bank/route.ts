@@ -213,7 +213,7 @@ async function handleAIGeneration(body: any) {
             type: "OBJECT",
             properties: {
                 questionText: { type: "STRING", description: "The main text of the question." },
-                questionLatex: { type: "STRING", description: "LaTeX for math equations. Empty string if none." },
+
                 marks: { type: "NUMBER", description: "Marks for the question." },
                 ...(questionType === 'MCQ' && {
                     options: {
@@ -294,7 +294,7 @@ ${includeAnswers ? '- Provide comprehensive \'modelAnswer\' with detailed soluti
 MATHEMATICAL CONTENT AND FORMATTING:
 - For any mathematical content, use proper LaTeX notation
 - Common examples: $x^2 + y^2 = z^2$, $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, $\\int_{a}^{b} f(x) dx$
-- If no mathematical content, set 'questionLatex' to empty string
+
 
 TABLES AND DATA:
 - When presenting data in tables, use LaTeX table syntax:
@@ -332,7 +332,7 @@ Generate questions that will challenge students appropriately for ${difficulty} 
         const text = result.candidates[0].content.parts[0].text;
         const generatedQuestions = JSON.parse(text);
         const finalQuestions = generatedQuestions.map((q: any) => ({
-            ...q, type: questionType, subject, topic, difficulty, isAiGenerated: true, hasMath: !!q.questionLatex,
+            ...q, type: questionType, subject, topic, difficulty, isAiGenerated: true, hasMath: !!q.questionText.match(/[\$\\]/),
         }));
         return NextResponse.json({ questions: finalQuestions });
     } catch (error) {

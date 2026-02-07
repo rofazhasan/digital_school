@@ -200,14 +200,12 @@ export async function GET(
           },
           select: {
             id: true,
-            difficultyDetail: true
+
           }
         });
 
         dbQuestions.forEach(q => {
-          if (q.difficultyDetail) {
-            questionDetailsMap.set(q.id, q.difficultyDetail);
-          }
+
         });
       } catch (error) {
         console.error("Error fetching question details:", error);
@@ -435,7 +433,7 @@ export async function GET(
         }
 
         // Extract explanation: DB > Question Level > Option Level
-        let explanation = questionDetailsMap.get(q.id) || q.difficultyDetail || q.explanation;
+        let explanation = questionDetailsMap.get(q.id) || q.explanation;
 
         if (!explanation && Array.isArray(q.options)) {
           const correctOpt = q.options.find((opt: any) => opt.isCorrect);
