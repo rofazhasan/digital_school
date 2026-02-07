@@ -33,6 +33,7 @@ interface Question {
     topic?: string;
     difficulty: string;
     marks: number;
+    images?: string[];
 }
 
 export default function PracPerfectPage() {
@@ -211,10 +212,11 @@ export default function PracPerfectPage() {
                                                     <div className="flex-1 space-y-2">
                                                         <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
                                                             <Badge variant="outline">{q.subject}</Badge>
+                                                            {q.topic && <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100">{q.topic}</Badge>}
                                                             <Badge className={q.difficulty === 'HARD' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}>{q.difficulty}</Badge>
                                                         </div>
                                                         <div className="text-sm font-medium text-slate-800 line-clamp-3">
-                                                            <MathJax inline dynamic><UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax></MathJax>
+                                                            <UniversalMathJax inline dynamic>{q.questionText}</UniversalMathJax>
                                                         </div>
                                                     </div>
                                                 </div>

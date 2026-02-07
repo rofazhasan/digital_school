@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
                 marks: true,
                 options: true,
                 modelAnswer: true, // Used for answer checking
+                images: true, // For rendering diagrams
                 // explanation: true, // Field does not exist in schema, omit for now or use another field if available
                 class: {
                     select: { name: true }

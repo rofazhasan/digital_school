@@ -45,6 +45,7 @@ interface Question {
     topic?: string;
     options?: any[]; // Array of strings or objects depending on parsing
     modelAnswer?: string; // Correct option index/value
+    images?: string[];
 }
 
 export default function PracPerfectSessionPage() {
@@ -148,8 +149,9 @@ export default function PracPerfectSessionPage() {
             if (!isNaN(num)) correctIdx = num;
             else {
                 // Map A->0, B->1 etc
-                const map: any = { 'A': 0, 'B': 1, 'C': 2, 'D': 3 };
-                if (map[currentQ.modelAnswer] !== undefined) correctIdx = map[currentQ.modelAnswer];
+                const map: any = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4 };
+                const normalizedAnswer = currentQ.modelAnswer.trim().toUpperCase();
+                if (map[normalizedAnswer] !== undefined) correctIdx = map[normalizedAnswer];
             }
         }
 
@@ -232,9 +234,16 @@ export default function PracPerfectSessionPage() {
                             <div className="p-5 space-y-4">
                                 {/* Question Header */}
                                 <div className="flex items-start justify-between gap-4">
-                                    <Badge variant="outline" className={`${isDark ? 'border-slate-600 text-slate-300' : ''}`}>
-                                        {currentQ.subject}
-                                    </Badge>
+                                    <div className="flex flex-wrap gap-2">
+                                        <Badge variant="outline" className={`${isDark ? 'border-slate-600 text-slate-300' : ''}`}>
+                                            {currentQ.subject}
+                                        </Badge>
+                                        {currentQ.topic && (
+                                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100">
+                                                {currentQ.topic}
+                                            </Badge>
+                                        )}
+                                    </div>
                                     <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-50 hover:opacity-100" onClick={() => setShowQuestion(false)}>
                                         <ChevronLeft className="w-4 h-4" />
                                     </Button>
@@ -242,8 +251,17 @@ export default function PracPerfectSessionPage() {
 
                                 {/* Question Text */}
                                 <div className={`text-base font-medium leading-relaxed ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
-                                    <UniversalMathJax>{cleanupMath(currentQ.questionText)}</UniversalMathJax>
+                                    <UniversalMathJax dynamic>{currentQ.questionText}</UniversalMathJax>
                                 </div>
+
+                                {/* Diagram Images */}
+                                {Array.isArray(currentQ.images) && currentQ.images.length > 0 && (
+                                    <div className="space-y-2 mt-2">
+                                        {currentQ.images.map((img: string, i: number) => (
+                                            <img key={i} src={img} alt="Question Diagram" className="rounded-lg border border-slate-200 max-w-full h-auto shadow-sm" />
+                                        ))}
+                                    </div>
+                                )}
 
                                 {/* Options (MCQ) */}
                                 {currentQ.type === 'MCQ' && Array.isArray(currentQ.options) && (
@@ -253,9 +271,13 @@ export default function PracPerfectSessionPage() {
 
                                             let stateClass = "";
                                             if (isChecked) {
+                                                const correctLetter = currentQ.modelAnswer?.trim().toUpperCase();
+                                                const currentLetter = String.fromCharCode(65 + idx);
+                                                const isThisCorrect = (idx === parseInt(currentQ.modelAnswer || "-1")) || (currentLetter === correctLetter);
+
                                                 if (idx === selectedOption && isCorrect) stateClass = "bg-green-100 border-green-500 text-green-900"; // Selected & Correct
                                                 else if (idx === selectedOption && !isCorrect) stateClass = "bg-red-100 border-red-500 text-red-900"; // Selected & Wrong
-                                                else if (currentQ.modelAnswer && (idx === parseInt(currentQ.modelAnswer) || (['A', 'B', 'C', 'D'][idx] === currentQ.modelAnswer))) {
+                                                else if (isThisCorrect) {
                                                     stateClass = "bg-green-50 border-green-300 text-green-800 ring-2 ring-green-500/20"; // Reveal Correct
                                                 }
                                             } else {
@@ -271,10 +293,10 @@ export default function PracPerfectSessionPage() {
                                                     className={`w-full text-left p-3 rounded-lg border transition-all flex items-start gap-3 ${stateClass}`}
                                                 >
                                                     <div className="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold opacity-70">
-                                                        {['A', 'B', 'C', 'D'][idx]}
+                                                        {String.fromCharCode(65 + idx)}
                                                     </div>
                                                     <div className="text-sm pt-0.5">
-                                                        <UniversalMathJax inline>{cleanupMath(optText)}</UniversalMathJax>
+                                                        <UniversalMathJax inline dynamic>{optText}</UniversalMathJax>
                                                     </div>
                                                 </button>
                                             );
@@ -304,12 +326,35 @@ export default function PracPerfectSessionPage() {
                                 </div>
 
                                 {/* Explanation Reveal */}
-                                {isChecked && !isCorrect && (
-                                    <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg flex items-start gap-2 text-sm text-amber-800 animate-in fade-in slide-in-from-top-2">
-                                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                                        <div>
-                                            <span className="font-bold">Incorrect.</span> Try solving it on the canvas!
+                                {isChecked && (
+                                    <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 shadow-sm ${isCorrect ? 'bg-green-50 border-green-100 text-green-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            {isCorrect ? <CheckCircle className="w-5 h-5 text-green-600" /> : <AlertCircle className="w-5 h-5 text-amber-600" />}
+                                            <span className="font-bold text-sm">{isCorrect ? 'Correct!' : 'Incorrect'}</span>
                                         </div>
+
+                                        {/* Get explanation from the correct option if available */}
+                                        {Array.isArray(currentQ.options) && (
+                                            <div className="text-sm">
+                                                {(() => {
+                                                    const correctOpt = currentQ.options.find((o: any, i: number) => {
+                                                        const correctLetter = currentQ.modelAnswer?.trim().toUpperCase();
+                                                        const currentLetter = String.fromCharCode(65 + i);
+                                                        return (i === parseInt(currentQ.modelAnswer || "-1")) || (currentLetter === correctLetter);
+                                                    });
+
+                                                    if (correctOpt?.explanation) {
+                                                        return (
+                                                            <div className="mt-2 pt-2 border-t border-current/10">
+                                                                <div className="font-bold mb-1 text-xs opacity-70 uppercase tracking-wider">Explanation:</div>
+                                                                <UniversalMathJax dynamic>{correctOpt.explanation}</UniversalMathJax>
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return !isCorrect ? <p className="opacity-80">Try to solve it on the canvas and understand the logic!</p> : null;
+                                                })()}
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
