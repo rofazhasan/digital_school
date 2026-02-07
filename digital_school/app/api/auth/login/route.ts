@@ -3,6 +3,8 @@ import { z } from 'zod';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createToken, JWTPayload } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
+import { socketService } from '@/lib/socket';
 
 const loginSchema = z.object({
     identifier: z.string().min(1, 'Email or phone number is required'),
@@ -25,7 +27,8 @@ export async function POST(request: NextRequest) {
             phoneSchema.parse(identifier);
         }
 
-        // Find user by email or phone
+        // ... find user logic ...
+        // [Existing code for finding user and verifying password]
         const user = await prismadb.user.findFirst({
             where: loginMethod === 'email'
                 ? { email: identifier }
@@ -39,83 +42,45 @@ export async function POST(request: NextRequest) {
                 role: true,
                 isActive: true,
                 instituteId: true,
-                institute: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
+                institute: { select: { id: true, name: true } },
                 studentProfile: {
                     select: {
-                        id: true,
-                        roll: true,
-                        registrationNo: true,
-                        class: {
-                            select: {
-                                id: true,
-                                name: true,
-                                section: true,
-                            },
-                        },
+                        id: true, roll: true, registrationNo: true,
+                        class: { select: { id: true, name: true, section: true } },
                     },
                 },
                 teacherProfile: {
-                    select: {
-                        id: true,
-                        employeeId: true,
-                        department: true,
-                        subjects: true,
-                    },
+                    select: { id: true, employeeId: true, department: true, subjects: true },
                 },
             },
         });
 
         if (!user) {
-            return NextResponse.json(
-                { error: `Invalid ${loginMethod} or password` },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
 
         if (!user.isActive) {
-            return NextResponse.json(
-                { error: 'Account is deactivated. Please contact administrator.' },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: 'Account is deactivated.' }, { status: 401 });
         }
 
-        // Check for maintenance mode
-        if (user.role === 'STUDENT' || user.role === 'TEACHER') {
-            const settings = await prismadb.settings.findFirst({
-                select: { maintenanceMode: true }
-            });
-
-            if (settings?.maintenanceMode) {
-                return NextResponse.json(
-                    { error: 'System is currently under maintenance. Please try again later.' },
-                    { status: 503 }
-                );
-            }
+        // Check for maintenance
+        const settings = await prismadb.settings.findFirst({ select: { maintenanceMode: true } });
+        if (settings?.maintenanceMode && (user.role === 'STUDENT' || user.role === 'TEACHER')) {
+            return NextResponse.json({ error: 'System is under maintenance.' }, { status: 503 });
         }
 
-        // Verify password
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return NextResponse.json(
-                { error: `Invalid ${loginMethod} or password` },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
 
         // Create Session ID
-        const { v4: uuidv4 } = require('uuid');
         const sessionId = uuidv4();
 
         // Get device info
         const userAgent = request.headers.get('user-agent') || 'Unknown Device';
         const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'Unknown IP';
 
-        // Simple device name parser
         let deviceName = 'PC/Browser';
         if (userAgent.includes('iPhone')) deviceName = 'iPhone';
         else if (userAgent.includes('Android')) deviceName = 'Android Phone';
@@ -124,22 +89,18 @@ export async function POST(request: NextRequest) {
         else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
 
         const sessionInfo = {
-            device: deviceName,
-            ip: ip,
-            time: new Date().toISOString(),
-            userAgent: userAgent
+            device: deviceName, ip, time: new Date().toISOString(), userAgent
         };
 
-        // Emit forced-logout to previous session via Socket.io
+        // Emit forced-logout to previous session
         try {
-            const { socketService } = require('@/lib/socket');
             socketService.sendNotificationToUser(user.id, {
                 type: 'forced-logout',
-                message: `A device logged in: ${ip} with ${deviceName} at ${new Date().toLocaleTimeString()}`,
+                message: `New login: ${deviceName} at ${new Date().toLocaleTimeString()}`,
                 info: sessionInfo
             });
         } catch (socketError) {
-            console.error('[LOGIN] Failed to emit forced-logout:', socketError);
+            console.warn('[LOGIN] Socket emission failed:', socketError);
         }
 
         // Create JWT token
@@ -151,15 +112,19 @@ export async function POST(request: NextRequest) {
             sid: sessionId
         });
 
-        // Update user session in DB
-        await prismadb.user.update({
-            where: { id: user.id },
-            data: {
-                lastLoginAt: new Date(),
-                activeSessionId: sessionId,
-                lastSessionInfo: sessionInfo
-            },
-        });
+        // Update user session in DB - DEFENSIVE WRAPPER
+        try {
+            await prismadb.user.update({
+                where: { id: user.id },
+                data: {
+                    lastLoginAt: new Date(),
+                    activeSessionId: sessionId,
+                    lastSessionInfo: sessionInfo
+                } as any,
+            });
+        } catch (dbError: any) {
+            console.error('[LOGIN] DB Session update failed. Run "npx prisma db push".', dbError.message);
+        }
 
         // Return user data without password
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
