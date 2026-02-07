@@ -25,10 +25,8 @@ export default async function Layout({
                 time: info.time || new Date().toISOString()
             })).toString('base64');
 
-            // Clear the cookie server-side to prevent redirect loops 
-            // and fix the Signup link navigation issue
-            (await cookies()).delete('session-token');
-
+            // NOTE: cookies().delete() is not allowed in layouts and causes crashes.
+            // We rely on client-side clearing in SessionGuard and LoginPage.
             redirect(`/login?reason=session_invalidated&info=${encodedInfo}`);
         }
     }
