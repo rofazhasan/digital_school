@@ -369,6 +369,30 @@ export default function AdminUsersPage() {
         return '/dashboard';
     };
 
+    const downloadSampleCSV = () => {
+        const headers = ["Name", "Role", "Email", "Phone", "Class", "Section", "Roll", "Password"];
+        const rows = [
+            ["John Doe", "STUDENT", "john@example.com", "", "10", "A", "1", "Pass123!"],
+            ["Jane Smith", "TEACHER", "jane@example.com", "1234567890", "", "", "", "Pass456!"],
+            ["Admin User", "ADMIN", "admin@example.com", "", "", "", "", "AdminPass789!"]
+        ];
+
+        const csvContent = [
+            headers.join(","),
+            ...rows.map(row => row.join(","))
+        ].join("\n");
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", "user_import_sample.csv");
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
 
     return (
         <div className="min-h-screen bg-gray-50/50 p-6 md:p-8 flex flex-col items-center">
@@ -805,6 +829,14 @@ export default function AdminUsersPage() {
                                 <li><strong>Roll</strong> (For Students)</li>
                                 <li><strong>Password</strong> (Optional)</li>
                             </ul>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={downloadSampleCSV}
+                                className="text-xs gap-2"
+                            >
+                                <Upload className="h-3 w-3 rotate-180" /> Download Sample CSV
+                            </Button>
                         </div>
                     </div>
                 </DialogContent>
