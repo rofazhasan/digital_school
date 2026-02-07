@@ -61,7 +61,7 @@ export async function validateSession(token: string) {
           institute: { select: { id: true, name: true } },
           studentProfile: {
             select: {
-              id: true, roll: true, registrationNo: true,
+              id: true, classId: true, roll: true, registrationNo: true,
               class: { select: { id: true, name: true, section: true } },
             },
           },
