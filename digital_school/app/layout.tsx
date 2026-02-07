@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Tiro_Bangla } from "next/font/google"; // Import Tiro_Bangla
+import { Inter, JetBrains_Mono, Tiro_Bangla, Outfit, Hind_Siliguri } from "next/font/google"; // Import Outfit and Hind_Siliguri
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
@@ -18,6 +18,17 @@ const tiroBangla = Tiro_Bangla({
   weight: '400',
   subsets: ['bengali'],
   variable: '--font-tiro-bangla',
+});
+
+const outfit = Outfit({
+  subsets: ['latin'],
+  variable: '--font-outfit',
+});
+
+const hindSiliguri = Hind_Siliguri({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['bengali'],
+  variable: '--font-hind-siliguri',
 });
 
 
@@ -57,7 +68,7 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
-      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} overflow-x-hidden`}>
+      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} ${outfit.variable} ${hindSiliguri.variable} overflow-x-hidden`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>

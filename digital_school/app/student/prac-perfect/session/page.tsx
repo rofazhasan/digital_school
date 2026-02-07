@@ -190,7 +190,7 @@ export default function PracPerfectSessionPage() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
 
                 {/* 1. TOP BAR (Floating) */}
                 <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-50 pointer-events-none">
@@ -229,43 +229,43 @@ export default function PracPerfectSessionPage() {
 
                 {/* 3. QUESTION CARD (Draggable/Fixed Overlay) */}
                 {showQuestion && (
-                    <div className="absolute top-20 left-4 md:left-8 w-[90vw] md:w-[450px] max-h-[calc(100vh-160px)] z-40 overflow-y-auto">
-                        <Card className={`shadow-2xl border-0 ring-1 ring-slate-900/5 ${isDark ? 'bg-slate-800/90 text-white' : 'bg-white/95 backdrop-blur'}`}>
-                            <div className="p-5 space-y-4">
+                    <div className="absolute top-24 left-4 md:left-10 w-[95vw] md:w-[500px] max-h-[calc(100vh-180px)] z-40 overflow-y-auto custom-scrollbar">
+                        <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-slate-900/5 ${isDark ? 'bg-slate-900/80 text-white' : 'bg-white/80 text-slate-900'} transition-all duration-500`}>
+                            <div className="p-6 space-y-6">
                                 {/* Question Header */}
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex flex-wrap gap-2">
-                                        <Badge variant="outline" className={`${isDark ? 'border-slate-600 text-slate-300' : ''}`}>
+                                        <Badge variant="outline" className={`font-fancy font-bold px-3 py-1 ${isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'bg-indigo-50/50 text-indigo-700 border-indigo-100'}`}>
                                             {currentQ.subject}
                                         </Badge>
                                         {currentQ.topic && (
-                                            <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100">
+                                            <Badge variant="secondary" className="font-fancy bg-indigo-500/10 text-indigo-700 border-indigo-100/50 px-3 py-1 font-bold">
                                                 {currentQ.topic}
                                             </Badge>
                                         )}
                                     </div>
-                                    <Button variant="ghost" size="sm" className="h-6 w-6 p-0 opacity-50 hover:opacity-100" onClick={() => setShowQuestion(false)}>
-                                        <ChevronLeft className="w-4 h-4" />
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-opacity" onClick={() => setShowQuestion(false)}>
+                                        <ChevronLeft className="w-5 h-5" />
                                     </Button>
                                 </div>
 
                                 {/* Question Text */}
-                                <div className={`text-base font-medium leading-relaxed ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
+                                <div className={`text-question font-fancy font-medium leading-relaxed tracking-tight ${isDark ? 'text-slate-100' : 'text-slate-800'}`}>
                                     <UniversalMathJax dynamic>{currentQ.questionText}</UniversalMathJax>
                                 </div>
 
                                 {/* Diagram Images */}
                                 {Array.isArray(currentQ.images) && currentQ.images.length > 0 && (
-                                    <div className="space-y-2 mt-2">
+                                    <div className="space-y-4 mt-2">
                                         {currentQ.images.map((img: string, i: number) => (
-                                            <img key={i} src={img} alt="Question Diagram" className="rounded-lg border border-slate-200 max-w-full h-auto shadow-sm" />
+                                            <img key={i} src={img} alt="Question Diagram" className="rounded-xl border border-slate-200/50 max-w-full h-auto shadow-md mx-auto" />
                                         ))}
                                     </div>
                                 )}
 
                                 {/* Options (MCQ) */}
                                 {currentQ.type === 'MCQ' && Array.isArray(currentQ.options) && (
-                                    <div className="space-y-2 mt-4">
+                                    <div className="space-y-3 mt-6">
                                         {currentQ.options.map((opt: any, idx: number) => {
                                             const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || JSON.stringify(opt));
 
@@ -275,14 +275,16 @@ export default function PracPerfectSessionPage() {
                                                 const currentLetter = String.fromCharCode(65 + idx);
                                                 const isThisCorrect = (idx === parseInt(currentQ.modelAnswer || "-1")) || (currentLetter === correctLetter);
 
-                                                if (idx === selectedOption && isCorrect) stateClass = "bg-green-100 border-green-500 text-green-900"; // Selected & Correct
-                                                else if (idx === selectedOption && !isCorrect) stateClass = "bg-red-100 border-red-500 text-red-900"; // Selected & Wrong
+                                                if (idx === selectedOption && isCorrect) stateClass = "bg-green-500/10 border-green-500 text-green-900 dark:text-green-300 ring-2 ring-green-500/20 shadow-green-100"; // Selected & Correct
+                                                else if (idx === selectedOption && !isCorrect) stateClass = "bg-red-500/10 border-red-500 text-red-900 dark:text-red-300 ring-2 ring-red-500/20 shadow-red-100"; // Selected & Wrong
                                                 else if (isThisCorrect) {
-                                                    stateClass = "bg-green-50 border-green-300 text-green-800 ring-2 ring-green-500/20"; // Reveal Correct
+                                                    stateClass = "bg-green-50/50 border-green-400 text-green-800 dark:text-green-400 ring-4 ring-green-500/10"; // Reveal Correct
+                                                } else {
+                                                    stateClass = "opacity-50 grayscale-[0.2]";
                                                 }
                                             } else {
-                                                if (idx === selectedOption) stateClass = "bg-indigo-50 border-indigo-500 text-indigo-900 ring-1 ring-indigo-500";
-                                                else stateClass = "hover:bg-slate-50 border-slate-200 text-slate-700";
+                                                if (idx === selectedOption) stateClass = "bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 ring-4 ring-indigo-500/20 shadow-lg -translate-y-0.5";
+                                                else stateClass = "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-slate-200/60 dark:border-slate-700 text-slate-700 dark:text-slate-300";
                                             }
 
                                             return (
@@ -290,12 +292,12 @@ export default function PracPerfectSessionPage() {
                                                     key={idx}
                                                     onClick={() => handleOptionSelect(idx)}
                                                     disabled={isChecked}
-                                                    className={`w-full text-left p-3 rounded-lg border transition-all flex items-start gap-3 ${stateClass}`}
+                                                    className={`premium-option w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 shadow-sm ${stateClass}`}
                                                 >
-                                                    <div className="flex-shrink-0 w-6 h-6 rounded-full border flex items-center justify-center text-xs font-bold opacity-70">
+                                                    <div className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-black transition-colors ${idx === selectedOption ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-100/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                                         {String.fromCharCode(65 + idx)}
                                                     </div>
-                                                    <div className="text-sm pt-0.5">
+                                                    <div className="text-option font-fancy font-medium pt-1">
                                                         <UniversalMathJax inline dynamic>{optText}</UniversalMathJax>
                                                     </div>
                                                 </button>
@@ -305,10 +307,10 @@ export default function PracPerfectSessionPage() {
                                 )}
 
                                 {/* Actions */}
-                                <div className="pt-4 flex gap-3">
+                                <div className="pt-6 flex gap-3">
                                     {!isChecked ? (
                                         <Button
-                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white"
+                                            className="w-full h-12 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all font-fancy"
                                             disabled={selectedOption === null}
                                             onClick={handleCheckAnswer}
                                         >
@@ -316,26 +318,28 @@ export default function PracPerfectSessionPage() {
                                         </Button>
                                     ) : (
                                         <Button
-                                            className="w-full"
+                                            className="w-full h-12 text-base font-bold rounded-xl shadow-md transition-all font-fancy"
                                             variant={currentIndex === questions.length - 1 ? "default" : "outline"}
                                             onClick={handleNext}
                                         >
-                                            {currentIndex === questions.length - 1 ? "Finish Session" : "Next Question"} <ArrowRight className="w-4 h-4 ml-2" />
+                                            {currentIndex === questions.length - 1 ? "Finish Session" : "Next Question"} <ArrowRight className="w-5 h-5 ml-2" />
                                         </Button>
                                     )}
                                 </div>
 
                                 {/* Explanation Reveal */}
                                 {isChecked && (
-                                    <div className={`p-4 rounded-xl border animate-in fade-in slide-in-from-top-2 shadow-sm ${isCorrect ? 'bg-green-50 border-green-100 text-green-800' : 'bg-amber-50 border-amber-100 text-amber-800'}`}>
-                                        <div className="flex items-center gap-2 mb-2">
-                                            {isCorrect ? <CheckCircle className="w-5 h-5 text-green-600" /> : <AlertCircle className="w-5 h-5 text-amber-600" />}
-                                            <span className="font-bold text-sm">{isCorrect ? 'Correct!' : 'Incorrect'}</span>
+                                    <div className={`p-5 rounded-2xl border-2 animate-in fade-in slide-in-from-top-2 shadow-xl ${isCorrect ? 'bg-green-500/5 border-green-500/20 text-green-900 dark:text-green-300' : 'bg-amber-500/5 border-amber-500/20 text-amber-900 dark:text-amber-300'}`}>
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center ${isCorrect ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
+                                                {isCorrect ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                                            </div>
+                                            <span className="font-fancy font-black text-base">{isCorrect ? 'Excellent! Correct Answer.' : 'Not quite right...'}</span>
                                         </div>
 
                                         {/* Get explanation from the correct option if available */}
                                         {Array.isArray(currentQ.options) && (
-                                            <div className="text-sm">
+                                            <div className="text-explanation font-fancy">
                                                 {(() => {
                                                     const correctOpt = currentQ.options.find((o: any, i: number) => {
                                                         const correctLetter = currentQ.modelAnswer?.trim().toUpperCase();
@@ -345,13 +349,15 @@ export default function PracPerfectSessionPage() {
 
                                                     if (correctOpt?.explanation) {
                                                         return (
-                                                            <div className="mt-2 pt-2 border-t border-current/10">
-                                                                <div className="font-bold mb-1 text-xs opacity-70 uppercase tracking-wider">Explanation:</div>
-                                                                <UniversalMathJax dynamic>{correctOpt.explanation}</UniversalMathJax>
+                                                            <div className="mt-3 pt-4 border-t border-current/10">
+                                                                <div className="font-fancy font-black mb-2 text-xs opacity-70 uppercase tracking-[0.1em]">Explanation Details</div>
+                                                                <div className="leading-relaxed opacity-90 italic decoration-indigo-500/30 underline-offset-4">
+                                                                    <UniversalMathJax dynamic>{correctOpt.explanation}</UniversalMathJax>
+                                                                </div>
                                                             </div>
                                                         );
                                                     }
-                                                    return !isCorrect ? <p className="opacity-80">Try to solve it on the canvas and understand the logic!</p> : null;
+                                                    return !isCorrect ? <p className="opacity-80 italic">Use the smart board to figure out the solution!</p> : null;
                                                 })()}
                                             </div>
                                         )}
