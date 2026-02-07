@@ -1,0 +1,113 @@
+
+> digital_school@0.1.0 build
+> npx prisma generate && next build
+
+Environment variables loaded from .env
+Prisma schema loaded from prisma/schema.prisma
+
+✔ Generated Prisma Client (v6.10.1) to ./node_modules/@prisma/client in 115ms
+
+Start by importing your Prisma Client (See: https://pris.ly/d/importing-client)
+
+Tip: Want to turn off tips and other hints? https://pris.ly/tip-4-nohints
+
+ ⚠ Mismatching @next/swc version, detected: 15.5.7 while Next.js is on 15.5.11. Please ensure these match
+   ▲ Next.js 15.5.11
+   - Environments: .env
+   - Experiments (use with caution):
+     ✓ scrollRestoration
+     · optimizePackageImports
+
+   Creating an optimized production build ...
+> [PWA] Compile server
+> [PWA] Compile server
+> [PWA] Compile client (static)
+> [PWA] Auto register service worker with: /Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next-pwa/register.js
+> [PWA] Service worker: /Users/md.rofazhasanrafiu/coding/digital_school/digital_school/public/sw.js
+> [PWA]   url: /sw.js
+> [PWA]   scope: /
+ ✓ Compiled successfully in 7.2s
+   Skipping validation of types
+   Skipping linting
+   Collecting page data ...
+   Generating static pages (0/90) ...
+   Generating static pages (22/90) 
+   Generating static pages (44/90) 
+   Generating static pages (67/90) 
+Example 1: {
+  "id": "custom-diagram",
+  "width": 600,
+  "height": 400,
+  "points": [
+    {
+      "id": "center",
+      "x": 300,
+      "y": 200,
+      "label": "O"
+    }
+  ],
+  "forces": [
+    {
+      "id": "f1",
+      "pointId": "center",
+      "magnitude": 80,
+      "angle": 0,
+      "label": "F₁",
+      "type": "applied"
+    },
+    {
+      "id": "f2",
+      "pointId": "center",
+      "magnitude": 60,
+      "angle": 90,
+      "label": "F₂",
+      "type": "applied"
+    },
+    {
+      "id": "f3",
+      "pointId": "center",
+      "magnitude": 70,
+      "angle": 180,
+      "label": "F₃",
+      "type": "applied"
+    },
+    {
+      "id": "f4",
+      "pointId": "center",
+      "magnitude": 50,
+      "angle": 270,
+      "label": "mg",
+      "type": "weight"
+    }
+  ],
+  "moments": [],
+  "showAxes": true,
+  "showGrid": false,
+  "showAngles": true,
+  "body": {
+    "type": "point",
+    "centerX": 300,
+    "centerY": 200
+  },
+  "customSVG": "<svg width=\"100%\" height=\"auto\" viewBox=\"0 0 600 400\" preserveAspectRatio=\"xMidYMid meet\" xmlns=\"http://www.w3.org/2000/svg\" class=\"fbd-diagram responsive-svg\" id=\"custom-diagram\" style=\"max-width: 600px; background-color: transparent;\">\n        <style>\n            .fbd-diagram text { \n                font-family: 'Inter', 'Kalpurush', 'SolaimanLipi', -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif; \n            }\n            .fbd-diagram .math-label { font-family: 'STIX Two Math', 'Latin Modern Math', serif; font-style: italic; }\n        </style>\n        \n  <defs>\n    <!-- 3D Sphere/Cell Gradient -->\n    <radialGradient id=\"grad-cell-3d\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#ffffff\" stop-opacity=\"0.8\" />\n      <stop offset=\"100%\" stop-color=\"#3498db\" stop-opacity=\"0.9\" />\n    </radialGradient>\n\n    <!-- Generic Sphere (White/Gray) - Hydrogen -->\n    <radialGradient id=\"grad-sphere-white\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#ffffff\" />\n      <stop offset=\"100%\" stop-color=\"#94a3b8\" />\n    </radialGradient>\n\n    <!-- Carbon (Black/Gray) -->\n    <radialGradient id=\"grad-sphere-black\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#475569\" />\n      <stop offset=\"100%\" stop-color=\"#0f172a\" />\n    </radialGradient>\n\n    <!-- Oxygen (Red) -->\n    <radialGradient id=\"grad-sphere-red\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#fca5a5\" />\n      <stop offset=\"100%\" stop-color=\"#b91c1c\" />\n    </radialGradient>\n\n    <!-- Nitrogen (Blue) -->\n    <radialGradient id=\"grad-sphere-blue\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#93c5fd\" />\n      <stop offset=\"100%\" stop-color=\"#1d4ed8\" />\n    </radialGradient>\n\n    <!-- Sulfur (Yellow) -->\n    <radialGradient id=\"grad-sphere-yellow\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#fde047\" />\n      <stop offset=\"100%\" stop-color=\"#ca8a04\" />\n    </radialGradient>\n\n    <!-- Chlorine (Green) -->\n    <radialGradient id=\"grad-sphere-green\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#86efac\" />\n      <stop offset=\"100%\" stop-color=\"#15803d\" />\n    </radialGradient>\n\n    <!-- Generic Metal (Silver/Metallic) -->\n    <linearGradient id=\"grad-metal\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">\n      <stop offset=\"0%\" stop-color=\"#f1f5f9\" />\n      <stop offset=\"50%\" stop-color=\"#cbd5e1\" />\n      <stop offset=\"100%\" stop-color=\"#64748b\" />\n    </linearGradient>\n\n    <!-- Charge Positive (Red Glow) -->\n    <radialGradient id=\"grad-charge-pos\" cx=\"30%\" cy=\"30%\" r=\"70%\">\n      <stop offset=\"0%\" stop-color=\"#fca5a5\" />\n      <stop offset=\"100%\" stop-color=\"#ef4444\" />\n    </radialGradient>\n\n    <!-- Charge Negative (Blue Glow) -->\n    <radialGradient id=\"grad-charge-neg\" cx=\"30%\" cy=\"30%\" r=\"70%\">\n      <stop offset=\"0%\" stop-color=\"#93c5fd\" />\n      <stop offset=\"100%\" stop-color=\"#3b82f6\" />\n    </radialGradient>\n\n    <!-- Generic 3D Sphere (Gray) -->\n    <radialGradient id=\"grad-sphere\" cx=\"30%\" cy=\"30%\" r=\"70%\" fx=\"30%\" fy=\"30%\">\n      <stop offset=\"0%\" stop-color=\"#e2e8f0\" />\n      <stop offset=\"100%\" stop-color=\"#475569\" />\n    </radialGradient>\n\n    <!-- Bio Organic Gradient -->\n    <radialGradient id=\"grad-bio-soft\" cx=\"50%\" cy=\"50%\" r=\"50%\">\n      <stop offset=\"0%\" stop-color=\"#a8e063\" />\n      <stop offset=\"100%\" stop-color=\"#56ab2f\" />\n    </radialGradient>\n\n    <!-- DNA Helix Glow -->\n    <filter id=\"dna-glow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">\n      <feGaussianBlur stdDeviation=\"1.5\" result=\"blur\" />\n      <feComposite in=\"SourceGraphic\" in2=\"blur\" operator=\"over\" />\n    </filter>\n\n    <!-- Paper/Technical Grid Filter -->\n    <pattern id=\"minorGrid\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\">\n      <path d=\"M 10 0 L 0 0 0 10\" fill=\"none\" stroke=\"#f1f5f9\" stroke-width=\"0.5\"/>\n    </pattern>\n    <pattern id=\"majorGrid\" width=\"50\" height=\"50\" patternUnits=\"userSpaceOnUse\">\n      <path d=\"M 50 0 L 0 0 0 50\" fill=\"none\" stroke=\"#e2e8f0\" stroke-width=\"1\"/>\n    </pattern>\n\n    <!-- Professional Shadow -->\n    <filter id=\"soft-shadow\" x=\"-10%\" y=\"-10%\" width=\"120%\" height=\"120%\">\n      <feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"2\" />\n      <feOffset dx=\"1\" dy=\"1\" result=\"offsetblur\" />\n      <feComponentTransfer>\n        <feFuncA type=\"linear\" slope=\"0.3\" />\n      </feComponentTransfer>\n      <feMerge>\n        <feMergeNode />\n        <feMergeNode in=\"SourceGraphic\" />\n      </feMerge>\n    </filter>\n\n    <!-- Glassmorphism Effect -->\n    <linearGradient id=\"glass-grad\" x1=\"0%\" y1=\"0%\" x2=\"100%\" y2=\"100%\">\n      <stop offset=\"0%\" stop-color=\"rgba(255,255,255,0.4)\" />\n      <stop offset=\"100%\" stop-color=\"rgba(255,255,255,0.1)\" />\n    </linearGradient>\n\n    <!-- Professional Arrow Markers (High Visibility) -->\n    <marker id=\"arrowhead\" markerWidth=\"10\" markerHeight=\"7\" \n            refX=\"9\" refY=\"3.5\" orient=\"auto\">\n      <polygon points=\"0 0, 10 3.5, 0 7\" fill=\"context-stroke\" />\n    </marker>\n    \n    <marker id=\"arrowhead-heavy\" markerWidth=\"6\" markerHeight=\"6\" \n            refX=\"5\" refY=\"3\" orient=\"auto\">\n      <path d=\"M0,0 L6,3 L0,6 Z\" fill=\"context-stroke\" />\n    </marker>\n\n    <!-- Vector Glow for visibility -->\n    <filter id=\"vector-glow\" x=\"-20%\" y=\"-20%\" width=\"140%\" height=\"140%\">\n      <feGaussianBlur stdDeviation=\"0.8\" result=\"blur\" />\n      <feFlood flood-color=\"white\" flood-opacity=\"0.5\" result=\"glowColor\" />\n      <feComposite in=\"glowColor\" in2=\"blur\" operator=\"in\" result=\"softGlow\" />\n      <feMerge>\n        <feMergeNode in=\"softGlow\" />\n        <feMergeNode in=\"SourceGraphic\" />\n      </feMerge>\n    </filter>\n  </defs>\n<circle cx=\"300\" cy=\"200\" r=\"2\" fill=\"#000\" />\n            <text x=\"305\" y=\"195\" font-size=\"12\">O</text>\n        <g class=\"force-vector\" filter=\"url(#vector-glow)\">\n            <line x1=\"300\" y1=\"200\" x2=\"380\" y2=\"200\" \n                  stroke=\"#F59E0B\" stroke-width=\"2.5\" stroke-linecap=\"round\"\n                  marker-end=\"url(#arrowhead)\" />\n            <text x=\"395\" y=\"200\" fill=\"#F59E0B\" font-size=\"14\" font-family=\"serif\" font-style=\"italic\" text-anchor=\"middle\" dominant-baseline=\"middle\" class=\"bilingual-label\">F₁</text>\n        </g>\n    \n        <g class=\"force-vector\" filter=\"url(#vector-glow)\">\n            <line x1=\"300\" y1=\"200\" x2=\"300\" y2=\"140\" \n                  stroke=\"#F59E0B\" stroke-width=\"2.5\" stroke-linecap=\"round\"\n                  marker-end=\"url(#arrowhead)\" />\n            <text x=\"300\" y=\"125\" fill=\"#F59E0B\" font-size=\"14\" font-family=\"serif\" font-style=\"italic\" text-anchor=\"middle\" dominant-baseline=\"middle\" class=\"bilingual-label\">F₂</text>\n        </g>\n    \n        <g class=\"force-vector\" filter=\"url(#vector-glow)\">\n            <line x1=\"300\" y1=\"200\" x2=\"230\" y2=\"200\" \n                  stroke=\"#F59E0B\" stroke-width=\"2.5\" stroke-linecap=\"round\"\n                  marker-end=\"url(#arrowhead)\" />\n            <text x=\"215\" y=\"200\" fill=\"#F59E0B\" font-size=\"14\" font-family=\"serif\" font-style=\"italic\" text-anchor=\"middle\" dominant-baseline=\"middle\" class=\"bilingual-label\">F₃</text>\n        </g>\n    \n        <g class=\"force-vector\" filter=\"url(#vector-glow)\">\n            <line x1=\"300\" y1=\"200\" x2=\"300\" y2=\"250\" \n                  stroke=\"#3B82F6\" stroke-width=\"2.5\" stroke-linecap=\"round\"\n                  marker-end=\"url(#arrowhead)\" />\n            <text x=\"300\" y=\"265\" fill=\"#3B82F6\" font-size=\"14\" font-family=\"serif\" font-style=\"italic\" text-anchor=\"middle\" dominant-baseline=\"middle\" class=\"bilingual-label\">mg</text>\n        </g>\n    \n    </svg>"
+}
+ ⨯ useSearchParams() should be wrapped in a suspense boundary at page "/login". Read more: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+    at g (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/.next/server/chunks/3114.js:2:6482)
+    at m (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/.next/server/chunks/3114.js:10:28229)
+    at B (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/.next/server/app/login/page.js:2:9264)
+    at n3 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:82831)
+    at n6 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:84601)
+    at n5 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:104801)
+    at n7 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:102219)
+    at n8 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:83183)
+    at n6 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:84647)
+    at n6 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:101560)
+    at n5 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:104801)
+    at n7 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:102219)
+    at ia (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:108211)
+    at ie (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:106833)
+    at n5 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:105079)
+    at n7 (/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:2:102219)
+Error occurred prerendering page "/login". Read more: https://nextjs.org/docs/messages/prerender-error
+Export encountered an error on /login/page: /login, exiting the build.
+ ⨯ Next.js build worker exited with code: 1 and signal: null

@@ -21,6 +21,7 @@ import { Eye, EyeOff, Loader2, AlertCircle, LogIn, Home, Mail, Phone } from 'luc
 import { motion, AnimatePresence } from 'framer-motion';
 import { ControllerRenderProps } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 
 const loginSchema = z.object({
     identifier: z.string().min(1, { message: 'Email or phone number is required.' }),
@@ -29,7 +30,7 @@ const loginSchema = z.object({
 
 type TLoginSchema = z.infer<typeof loginSchema>;
 
-export default function LoginPage() {
+function LoginContent() {
     const [error, setError] = useState<string | null>(null);
     const [isPending, startTransition] = useTransition();
     const [showPassword, setShowPassword] = useState(false);
@@ -318,5 +319,20 @@ export default function LoginPage() {
                 </motion.div>
             </main>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+                <div className="flex items-center space-x-2">
+                    <Loader2 className="h-6 w-6 animate-spin" />
+                    <span className="text-sm text-muted-foreground">Loading...</span>
+                </div>
+            </div>
+        }>
+            <LoginContent />
+        </Suspense>
     );
 }

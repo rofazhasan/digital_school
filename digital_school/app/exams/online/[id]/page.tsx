@@ -2,10 +2,11 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import ExamLayout from "./ExamLayout";
 import { ExamContextProvider } from "./ExamContext";
 
-export default function OnlineExamPage({ params }: { params: Promise<{ id: string }> }) {
+function ExamPageContent({ params }: { params: Promise<{ id: string }> }) {
   const [exam, setExam] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,7 +55,7 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
     };
 
     loadExam();
-  }, [params, router]);
+  }, [params, router, searchParams]);
 
   if (loading) {
     return (
@@ -92,5 +93,18 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
     <ExamContextProvider exam={exam}>
       <ExamLayout />
     </ExamContextProvider>
+  );
+}
+
+export default function OnlineExamPage({ params }: { params: Promise<{ id: string }> }) {
+  return (
+    <Suspense fallback={
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mb-4"></div>
+        <div className="text-lg text-gray-700">Loading exam environment...</div>
+      </div>
+    }>
+      <ExamPageContent params={params} />
+    </Suspense>
   );
 }
