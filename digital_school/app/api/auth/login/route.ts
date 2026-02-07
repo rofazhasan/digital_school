@@ -107,18 +107,58 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Create Session ID
+        const { v4: uuidv4 } = require('uuid');
+        const sessionId = uuidv4();
+
+        // Get device info
+        const userAgent = request.headers.get('user-agent') || 'Unknown Device';
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'Unknown IP';
+
+        // Simple device name parser
+        let deviceName = 'PC/Browser';
+        if (userAgent.includes('iPhone')) deviceName = 'iPhone';
+        else if (userAgent.includes('Android')) deviceName = 'Android Phone';
+        else if (userAgent.includes('iPad')) deviceName = 'iPad';
+        else if (userAgent.includes('Macintosh')) deviceName = 'Mac';
+        else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
+
+        const sessionInfo = {
+            device: deviceName,
+            ip: ip,
+            time: new Date().toISOString(),
+            userAgent: userAgent
+        };
+
+        // Emit forced-logout to previous session via Socket.io
+        try {
+            const { socketService } = require('@/lib/socket');
+            socketService.sendNotificationToUser(user.id, {
+                type: 'forced-logout',
+                message: `A device logged in: ${ip} with ${deviceName} at ${new Date().toLocaleTimeString()}`,
+                info: sessionInfo
+            });
+        } catch (socketError) {
+            console.error('[LOGIN] Failed to emit forced-logout:', socketError);
+        }
+
         // Create JWT token
         const token = await createToken({
             userId: user.id,
             email: user.email || '',
             role: user.role as JWTPayload['role'],
             instituteId: user.instituteId || undefined,
+            sid: sessionId
         });
 
-        // Update last login time
+        // Update user session in DB
         await prismadb.user.update({
             where: { id: user.id },
-            data: { lastLoginAt: new Date() },
+            data: {
+                lastLoginAt: new Date(),
+                activeSessionId: sessionId,
+                lastSessionInfo: sessionInfo
+            },
         });
 
         // Return user data without password

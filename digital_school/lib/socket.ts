@@ -59,7 +59,11 @@ class SocketService {
     });
 
     this.io.on('connection', (socket) => {
-      console.log(`User connected: ${socket.data.user.userId}`);
+      const userId = socket.data.user.userId;
+      console.log(`User connected: ${userId}`);
+
+      // Join personal room for private notifications (like forced logout)
+      socket.join(`user-${userId}`);
 
       // Join question collaboration room
       socket.on('join-question-session', async (data) => {
@@ -129,7 +133,7 @@ class SocketService {
 
   private async joinQuestionSession(socket: any, questionId: string, userId: string, userName: string) {
     const sessionId = `question-${questionId}`;
-    
+
     // Join the room
     socket.join(sessionId);
 
@@ -185,7 +189,7 @@ class SocketService {
 
   private async leaveQuestionSession(socket: any, questionId: string, userId: string) {
     const sessionId = `question-${questionId}`;
-    
+
     // Leave the room
     socket.leave(sessionId);
 
@@ -325,12 +329,17 @@ class SocketService {
     return session?.participants || [];
   }
 
-  // Send notification to specific user
+  // Send notification to specific user (securely via room)
   sendNotificationToUser(userId: string, notification: any) {
-    this.io?.emit('notification', {
+    this.io?.to(`user-${userId}`).emit('notification', {
       userId,
       ...notification
     });
+
+    // Specifically handle forced logout for convenience
+    if (notification.type === 'forced-logout') {
+      this.io?.to(`user-${userId}`).emit('forced-logout', notification);
+    }
   }
 
   // Broadcast to all connected users

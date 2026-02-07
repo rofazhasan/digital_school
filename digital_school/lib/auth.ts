@@ -14,6 +14,7 @@ export interface JWTPayload {
   email: string;
   role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
   instituteId?: string;
+  sid: string;
   iat: number;
   exp: number;
 }
@@ -25,7 +26,7 @@ export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Pro
     .setIssuedAt()
     .setExpirationTime('24h')
     .sign(JWT_SECRET);
-  
+
   return token;
 }
 
@@ -35,7 +36,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
     });
-    
+
     return payload as unknown as JWTPayload;
   } catch (error) {
     console.error('Token verification failed:', error);
@@ -57,6 +58,7 @@ export async function getUserFromToken(token: string) {
         name: true,
         role: true,
         isActive: true,
+        activeSessionId: true,
         instituteId: true,
         institute: {
           select: {
@@ -93,6 +95,12 @@ export async function getUserFromToken(token: string) {
       return null;
     }
 
+    // Single session validation
+    if (user.activeSessionId !== payload.sid) {
+      console.warn(`[AUTH] Session mismatch for user ${user.id}. Expected ${user.activeSessionId}, got ${payload.sid}`);
+      return null;
+    }
+
     return {
       ...user,
       role: user.role as JWTPayload['role'],
@@ -118,7 +126,7 @@ export async function getTokenFromRequest(req: NextRequest): Promise<{
         return { user, token };
       }
     }
-    
+
     // Check for session token in cookies
     const sessionToken = req.cookies.get('session-token')?.value;
     if (sessionToken) {
@@ -127,7 +135,7 @@ export async function getTokenFromRequest(req: NextRequest): Promise<{
         return { user, token: sessionToken };
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error getting token from request:', error);
@@ -140,11 +148,11 @@ export async function getCurrentUser() {
   try {
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('session-token')?.value;
-    
+
     if (!sessionToken) {
       return null;
     }
-    
+
     return await getUserFromToken(sessionToken);
   } catch (error) {
     console.error('Error getting current user:', error);
@@ -180,7 +188,7 @@ export function hasPermission(
     TEACHER: 2,
     STUDENT: 1,
   };
-  
+
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }
 
@@ -196,12 +204,12 @@ export function canAccessRoute(
     '/student': ['SUPER_USER', 'ADMIN', 'TEACHER', 'STUDENT'],
     '/dashboard': ['SUPER_USER', 'ADMIN', 'TEACHER', 'STUDENT'],
   };
-  
+
   for (const [routePrefix, allowedRoles] of Object.entries(routePermissions)) {
     if (route.startsWith(routePrefix)) {
       return allowedRoles.includes(userRole);
     }
   }
-  
+
   return true; // Default to allowing access
 } 

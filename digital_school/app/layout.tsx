@@ -7,6 +7,7 @@ import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { NavigationWrapper } from "@/components/ui/navigation-wrapper";
 import Script from "next/script";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
+import SessionGuard from "@/components/SessionGuard";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -73,6 +74,7 @@ export default function RootLayout({
           <SessionProviderWrapper>
             <NavigationWrapper>
               <MaintenanceGuard>
+                <SessionGuard />
                 {children}
                 <Toaster />
               </MaintenanceGuard>
