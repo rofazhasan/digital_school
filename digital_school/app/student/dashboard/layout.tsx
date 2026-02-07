@@ -1,14 +1,26 @@
 import type { Metadata } from "next";
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { validateSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
     title: "Student Dashboard | Digital School",
     description: "Manage your exams and view progress",
 };
 
-export default function Layout({
+export default async function Layout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const sessionToken = (await cookies()).get('session-token')?.value;
+
+    if (sessionToken) {
+        const { status } = await validateSession(sessionToken);
+        if (status === 'mismatch') {
+            redirect('/login?reason=session_invalidated');
+        }
+    }
+
     return <>{children}</>;
 }

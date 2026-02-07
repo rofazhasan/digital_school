@@ -44,10 +44,10 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
-// Get user from token (for API routes - includes database query)
-export async function getUserFromToken(token: string) {
+// Validate session status
+export async function validateSession(token: string) {
   const payload = await verifyToken(token);
-  if (!payload) return null;
+  if (!payload) return { status: 'invalid' };
 
   try {
     const user = await prismadb.user.findUnique({
@@ -59,6 +59,7 @@ export async function getUserFromToken(token: string) {
         role: true,
         isActive: true,
         activeSessionId: true,
+        lastSessionInfo: true,
         instituteId: true,
         institute: {
           select: {
@@ -92,23 +93,36 @@ export async function getUserFromToken(token: string) {
     });
 
     if (!user || !user.isActive) {
-      return null;
+      return { status: 'invalid' };
     }
 
     // Single session validation
-    if (user.activeSessionId !== payload.sid) {
-      console.warn(`[AUTH] Session mismatch for user ${user.id}. Expected ${user.activeSessionId}, got ${payload.sid}`);
-      return null;
+    if ((user as any).activeSessionId !== payload.sid) {
+      return {
+        status: 'mismatch',
+        user,
+        lastSessionInfo: (user as any).lastSessionInfo
+      };
     }
 
     return {
-      ...user,
-      role: user.role as JWTPayload['role'],
+      status: 'valid',
+      user: {
+        ...user,
+        role: user.role as JWTPayload['role'],
+      } as any
     };
   } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
+    console.error('Error validating session:', error);
+    return { status: 'error' };
   }
+}
+
+// Get user from token (for API routes - includes database query)
+export async function getUserFromToken(token: string) {
+  const { status, user } = await validateSession(token);
+  if (status === 'valid') return user;
+  return null;
 }
 
 // Get token from request (for API routes - includes database query)

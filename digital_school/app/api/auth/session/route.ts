@@ -1,20 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTokenFromRequest } from '@/lib/auth';
+import { validateSession } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
     try {
-        const tokenData = await getTokenFromRequest(req);
-
-        if (!tokenData) {
-            return NextResponse.json({ authenticated: false }, { status: 401 });
+        const sessionToken = req.cookies.get('session-token')?.value;
+        if (!sessionToken) {
+            return NextResponse.json({ authenticated: false, status: 'no_token' }, { status: 401 });
         }
 
-        return NextResponse.json({
-            authenticated: true,
-            user: tokenData.user,
-            sid: tokenData.user.activeSessionId // Return the sid from the DB for client-side comparison
-        });
+        const { status, user, lastSessionInfo } = await validateSession(sessionToken);
+
+        if (status === 'valid' && user) {
+            return NextResponse.json({
+                authenticated: true,
+                status: 'valid',
+                user: user,
+                sid: (user as any).activeSessionId
+            });
+        }
+
+        if (status === 'mismatch') {
+            return NextResponse.json({
+                authenticated: false,
+                status: 'mismatched',
+                lastSessionInfo: lastSessionInfo
+            }, { status: 401 });
+        }
+
+        return NextResponse.json({ authenticated: false, status: 'invalid' }, { status: 401 });
     } catch (error) {
+        console.error('[SESSION_API] Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
