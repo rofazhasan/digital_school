@@ -25,7 +25,14 @@ import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Switch } from "@/components/ui/switch";
-import { PlusCircle, Trash2, Edit, Save, X, Bot, Wand2, Loader2, Search, ChevronsUpDown, Check, BrainCircuit, BookCopy, Library, FilterX, Upload, FileSpreadsheet, Download, AlertTriangle, ArrowRight, FileText, Sparkles } from "lucide-react";
+import {
+  Plus, Search, Filter, MoreVertical, Edit, Trash2, Copy,
+  CheckCircle2, XCircle, FileText, Upload, X, Loader2,
+  PlusCircle, Wand2, Eye, EyeOff, CheckSquare,
+  BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
+  Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
+  Download, Save, AlertTriangle
+} from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
@@ -348,6 +355,34 @@ export default function QuestionBankPage() {
     }
   };
 
+  const handleBulkPractice = async (isForPractice: boolean) => {
+    const action = isForPractice ? "add to practice" : "remove from practice";
+    if (!window.confirm(`Are you sure you want to ${action} for ${selectedQuestions.size} questions?`)) return;
+
+    const ids = Array.from(selectedQuestions);
+    try {
+      const res = await fetch('/api/question-bank', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids, isForPractice })
+      });
+
+      if (!res.ok) throw new Error("Failed to update");
+
+      toast({ title: "Success", description: `Updated ${ids.length} questions.` });
+
+      // Optimistic update
+      setQuestions(prev => prev.map(q =>
+        ids.includes(q.id) ? { ...q, isForPractice } : q
+      ));
+
+      setSelectedQuestions(new Set());
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "Error", description: `Could not ${action} for selected questions.` });
+    }
+  };
+
   const handleTogglePractice = async (id: string, isForPractice: boolean) => {
     // Optimistic Update
     setQuestions(prev => prev.map(q => q.id === id ? { ...q, isForPractice } : q));
@@ -570,9 +605,19 @@ export default function QuestionBankPage() {
                         </Label>
                       </div>
                       {selectedQuestions.size > 0 && (
-                        <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
-                          <Trash2 className="h-4 w-4 mr-2" /> Delete Selected ({selectedQuestions.size})
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(true)} className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20">
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Add to Practice ({selectedQuestions.size})
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(false)} className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
+                            <XCircle className="h-4 w-4 mr-2" />
+                            Remove Practice ({selectedQuestions.size})
+                          </Button>
+                          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete Selected ({selectedQuestions.size})
+                          </Button>
+                        </div>
                       )}
                     </div>
                   )}

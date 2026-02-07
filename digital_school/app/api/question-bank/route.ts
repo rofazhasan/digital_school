@@ -197,6 +197,35 @@ export async function DELETE(request: Request) {
     }
 }
 
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { ids, isForPractice } = body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
+        }
+
+        if (typeof isForPractice !== 'boolean') {
+            return NextResponse.json({ error: "isForPractice must be a boolean" }, { status: 400 });
+        }
+
+        const updated = await prisma.question.updateMany({
+            where: { id: { in: ids } },
+            data: { isForPractice }
+        });
+
+        return NextResponse.json({
+            message: "Questions updated successfully",
+            count: updated.count
+        });
+
+    } catch (error) {
+        console.error("Failed to bulk update questions:", error);
+        return NextResponse.json({ error: "Failed to bulk update questions" }, { status: 500 });
+    }
+}
+
 async function handleAIGeneration(body: any) {
     const validation = aiGenerationSchema.safeParse(body);
     if (!validation.success) return NextResponse.json({ error: "Invalid AI generation request", details: validation.error.flatten() }, { status: 400 });
