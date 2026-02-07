@@ -277,6 +277,39 @@
 } */
 
 /* Specific overrides for common components that might have their own fonts */
+/* Diagram Responsiveness & Print Styles */
+.responsive-svg {
+  display: block;
+  margin: 1.5rem auto;
+  height: auto !important;
+  transition: transform 0.2s ease;
+}
+
+.mcq-option .responsive-svg {
+  margin: 0.5rem 0;
+  max-width: 140px !important;
+  /* Compact look in options */
+}
+
+@media print {
+  .responsive-svg {
+    max-width: 320px !important;
+    /* Prevents oversized diagrams in print */
+    page-break-inside: avoid;
+    margin: 1rem auto;
+  }
+
+  .mcq-option .responsive-svg {
+    max-width: 120px !important;
+  }
+
+  /* Optimize Spacing */
+  .fbd-diagram {
+    max-height: 4cm;
+    object-fit: contain;
+  }
+}
+
 .font-exam-online button,
 .font-exam-online input,
 .font-exam-online textarea,

@@ -46,7 +46,7 @@ import { toast } from "sonner";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
-import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 interface LiveStudent {
   id: string;
@@ -739,7 +739,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                             <div className="flex-grow space-y-2">
                               <div className="prose prose-sm max-w-none">
                                 <MathJax inline>
-                                  <TextWithFBDs text={cleanupMath(q.text)} />
+                                  <UniversalMathJax inline>{cleanupMath(q.text)}</UniversalMathJax>
                                 </MathJax>
                               </div>
 
@@ -748,7 +748,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   <p className="text-xs font-semibold text-gray-500 mb-1">Student Answer:</p>
                                   <div className="text-sm font-medium text-blue-800">
                                     <MathJax inline>
-                                      <TextWithFBDs text={cleanupMath(String(ans))} />
+                                      <UniversalMathJax inline>{cleanupMath(String(ans))}</UniversalMathJax>
                                     </MathJax>
                                   </div>
                                 </div>
@@ -769,7 +769,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                         <div className="flex-1">
                                           <MathJax inline>
-                                            <TextWithFBDs text={cleanupMath(opt.text || String(opt))} />
+                                            <UniversalMathJax inline>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
                                           </MathJax>
                                           {opt.image && (
                                             <div className="mt-1">

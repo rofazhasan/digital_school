@@ -30,10 +30,10 @@ export function createTransverseWave(id: string, wavelength: number = 100, ampli
         pathData += ` L ${50 + x} ${y}`;
     }
 
-    elements.push(`<path d="${pathData}" fill="none" stroke="#2563eb" stroke-width="3"/>`);
-    elements.push(`<line x1="50" y1="${height / 2}" x2="550" y2="${height / 2}" stroke="#999" stroke-width="1" stroke-dasharray="5,5"/>`);
-    elements.push(`<text x="300" y="30" font-size="14" text-anchor="middle" fill="#333">Transverse Wave</text>`);
-    elements.push(`<text x="300" y="180" font-size="12" text-anchor="middle" fill="#666">λ = ${wavelength}</text>`);
+    elements.push(`<path d="${pathData}" fill="none" stroke="#3498db" stroke-width="2.5" filter="url(#vector-glow)"/>`);
+    elements.push(`<line x1="50" y1="${height / 2}" x2="550" y2="${height / 2}" stroke="#94a3b8" stroke-width="1" stroke-dasharray="5,5"/>`);
+    elements.push(`<text x="300" y="30" font-size="14" font-weight="bold" text-anchor="middle" fill="#1e293b">Transverse Wave</text>`);
+    elements.push(`<text x="300" y="180" font-size="12" text-anchor="middle" fill="#64748b" font-style="italic">λ = ${wavelength}nm</text>`);
 
     return createWaveDiagram(id, width, height, elements);
 }
@@ -50,9 +50,9 @@ export function createLongitudinalWave(id: string): FBDDiagram {
         elements.push(`<line x1="${50 + x}" y1="50" x2="${50 + x}" y2="100" stroke="#2563eb" stroke-width="${1 + density * 2}"/>`);
     }
 
-    elements.push(`<text x="300" y="30" font-size="14" text-anchor="middle" fill="#333">Longitudinal Wave</text>`);
-    elements.push(`<text x="150" y="130" font-size="11" fill="#666">Compression</text>`);
-    elements.push(`<text x="400" y="130" font-size="11" fill="#666">Rarefaction</text>`);
+    elements.push(`<text x="300" y="30" font-size="14" font-weight="bold" text-anchor="middle" fill="#1e293b">Longitudinal Wave</text>`);
+    elements.push(`<text x="150" y="130" font-size="11" fill="#ef4444" font-weight="600">Compression</text>`);
+    elements.push(`<text x="400" y="130" font-size="11" fill="#3b82f6" font-weight="600">Rarefaction</text>`);
 
     return createWaveDiagram(id, width, height, elements);
 }

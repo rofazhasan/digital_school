@@ -18,7 +18,7 @@ import {
 import { toast } from "sonner";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
-import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 const MATHJAX_CONFIG = {
     loader: { load: ["input/tex", "output/chtml"] },
@@ -329,7 +329,9 @@ export default function ProblemSolvingSelector() {
 
                                                         <h4 className="text-slate-800 font-medium leading-relaxed pr-6 line-clamp-3">
                                                             <MathJax inline dynamic>
-                                                                <TextWithFBDs text={cleanupMath(q.questionText)} />
+                                                                <MathJax inline dynamic>
+                                                                    <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax>
+                                                                </MathJax>
                                                             </MathJax>
                                                         </h4>
                                                     </div>

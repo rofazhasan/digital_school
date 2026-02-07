@@ -125,6 +125,14 @@ import {
     createCircularMotionForces,
 } from './physics/advanced';
 
+import {
+    createCoulombsLaw,
+    createAmpereLaw,
+    createLenzLaw,
+    createGaussLaw,
+    createFaradayLaw,
+} from './physics/electromagnetism';
+
 // Chemistry imports
 import {
     createBeaker,
@@ -257,9 +265,6 @@ import {
 
 // Advanced mathematics diagrams
 import {
-    createParabola,
-    createHyperbola,
-    createEllipse,
     createCircleGraph,
     createModularGraph,
 } from './mathematics/graphs';
@@ -283,13 +288,16 @@ import {
     createAbsoluteValue,
 } from './mathematics/advanced';
 
+import {
+    createParabola,
+    createHyperbola,
+} from './svg-components/mathematics/graphs';
+
 // Advanced mixed subject diagrams
 import {
     createDoubleSlit,
     createCompton,
     createBraggDiffraction,
-    createFaradayLaw,
-    createLenzLaw,
     createParametric,
     createPolar,
     createVector3D,
@@ -304,9 +312,6 @@ import {
     createHookesLaw,
     createBernoulli,
     createArchimedesPrinciple,
-    createCoulombsLaw,
-    createGaussLaw,
-    createAmpereLaw,
     createMaxwellEquations,
     createWaveEquation,
     createSchrodinger,
@@ -317,7 +322,43 @@ import {
     createBlackHole,
     createBigBang,
     createStandardModel,
+
 } from './advanced_mixed';
+
+import {
+    createCubic,
+    createReciprocal,
+    createEllipse,
+} from './svg-components/mathematics/graphs';
+
+import {
+    createInclineFrictionKinetic,
+    createInclineFrictionStatic,
+    createBlockStacked,
+    createPulleyCompound2,
+    createSpringSeries,
+    createSpringParallel,
+    createCircuitWheatstone,
+    createCircuitLadder,
+    createCircuitRCCharging,
+    createLensCombinationConvexConvex,
+    createLensCombinationConvexConcave,
+} from './physics/complex_variants';
+
+import {
+    createPentane,
+    createIsopentane,
+    createNeopentane,
+    createHexane,
+    createCyclopropane,
+    createCyclobutane,
+    createCyclopentane,
+    createCyclohexane,
+    createEther,
+    createEster,
+    createAmine,
+    createAmide,
+} from './chemistry/more_chemistry';
 
 // Advanced circuit diagrams
 import {
@@ -337,6 +378,13 @@ export {
     combineComparison,
     parseCombination,
 } from './combinations';
+
+import {
+    generateInclineVariants,
+    generateParabolaVariants,
+    generateHyperbolaVariants,
+    generateElementVariants,
+} from './bulk_variants';
 
 // Existing FBD presets
 import {
@@ -530,7 +578,10 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'trapezoid': createTrapezoid,
     'rhombus': createRhombus,
     'parallelogram': createParallelogram,
-    'ellipse-shape': createEllipse,
+    'ellipse-shape': (id: string) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createEllipse(3, 2, { width: 300, height: 300 })
+    }),
     'cube': createCube,
     'sphere': createSphere,
     'cylinder': createCylinder,
@@ -545,9 +596,18 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'graph-logarithm': createLogarithm,
     'graph-absolute': createAbsoluteValue,
     'vector': createVector,
-    'parabola': createParabola,
-    'hyperbola': createHyperbola,
-    'ellipse-graph': createEllipse,
+    'parabola': (id: string, a: number = 0.1, b: number = 0, c: number = 0) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createParabola(a, b, c, { width: 300, height: 300 })
+    }),
+    'hyperbola': (id: string, a: number = 2, b: number = 2) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createHyperbola(a, b, { width: 300, height: 300 })
+    }),
+    'ellipse-graph': (id: string, a: number = 3, b: number = 2) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createEllipse(a, b, { width: 300, height: 300 })
+    }),
     'circle-graph': createCircleGraph,
     'modular': createModularGraph,
 
@@ -669,9 +729,52 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'big-bang': createBigBang,
     'standard-model': createStandardModel,
 
-    // ===== ALIASES (Backward Compatibility) =====
-    'graph-parabola': createParabola,
     'graph-circle': createCircleGraph,
+    'cubic': (id: string, a: number = 0.5, b: number = 0, c: number = 0, d: number = 0) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createCubic(a, b, c, d, { width: 300, height: 300 })
+    }),
+    'reciprocal': (id: string, a: number = 1) => ({
+        id, width: 300, height: 300, points: [], forces: [],
+        customSVG: createReciprocal(a, { width: 300, height: 300 })
+    }),
+
+    // ===== PHYSICS: MECHANICS (VARIANTS) =====
+    'incline-friction-kinetic': createInclineFrictionKinetic,
+    'incline-friction-static': createInclineFrictionStatic,
+    'block-stacked': createBlockStacked,
+    'pulley-compound-2': createPulleyCompound2,
+    'spring-series': createSpringSeries,
+    'spring-parallel': createSpringParallel,
+
+    // ===== PHYSICS: ELECTRICITY (VARIANTS) =====
+    'circuit-wheatstone': createCircuitWheatstone,
+    'circuit-ladder': createCircuitLadder,
+    'circuit-rc-charging': createCircuitRCCharging,
+
+    // ===== PHYSICS: OPTICS (VARIANTS) =====
+    'lens-combination-convex-convex': createLensCombinationConvexConvex,
+    'lens-combination-convex-concave': createLensCombinationConvexConcave,
+
+    // ===== CHEMISTRY: ORGANIC EXTENDED =====
+    'pentane': createPentane,
+    'isopentane': createIsopentane,
+    'neopentane': createNeopentane,
+    'hexane': createHexane,
+    'cyclopropane': createCyclopropane,
+    'cyclobutane': createCyclobutane,
+    'cyclopentane': createCyclopentane,
+    'cyclohexane': createCyclohexane,
+    'ether-group': createEther,
+    'ester-group': createEster,
+    'amine-group': createAmine,
+    'amide-group': createAmide,
+
+    // ===== BULK GENERATED PRESETS (Standardized Variants) =====
+    ...generateInclineVariants(),
+    ...generateParabolaVariants(),
+    ...generateHyperbolaVariants(),
+    ...generateElementVariants(),
 };
 
 /**

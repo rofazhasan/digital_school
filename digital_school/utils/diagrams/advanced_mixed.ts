@@ -166,6 +166,7 @@ export function createParametric(id: string): FBDDiagram {
 export function createPolar(id: string): FBDDiagram {
     return createAdvancedDiagram(id, 400, 400, [
         // Polar grid
+        `<circle cx="200" cy="200" r="150" fill="url(#grad-cell-3d)" opacity="0.05"/>`,
         `<circle cx="200" cy="200" r="50" fill="none" stroke="#e0e0e0" stroke-width="1"/>`,
         `<circle cx="200" cy="200" r="100" fill="none" stroke="#e0e0e0" stroke-width="1"/>`,
         `<circle cx="200" cy="200" r="150" fill="none" stroke="#e0e0e0" stroke-width="1"/>`,

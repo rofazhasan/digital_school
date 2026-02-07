@@ -1,9 +1,9 @@
 # 📐 Complete Diagram System Documentation
 ## Digital School Platform - 300 Scientific Diagrams
 
-**Version:** 4.0  
+**Version:** 5.0  
 **Last Updated:** February 7, 2026  
-**Total Diagrams:** **301 Presets** + Unlimited Combinations  
+**Total Diagrams:** **354 Presets** + Unlimited Combinations  
 **Subjects:** Physics, Chemistry, Biology, Mathematics, Interdisciplinary
 
 ---
@@ -30,12 +30,12 @@ The Diagram System is a **powerful inline diagram rendering engine** that conver
 
 ### Why Use It?
 
+✅ **World-Class Aesthetics** - 3D shading, glowing vectors, and professional technical styling  
 ✅ **Fast** - Renders instantly, no external image loading  
 ✅ **Lightweight** - Pure SVG, no heavy dependencies  
-✅ **Responsive** - Works on mobile, tablet, desktop, and print  
-✅ **Professional** - Publication-quality diagrams  
-✅ **Flexible** - Combine multiple diagrams in custom layouts  
-✅ **Accessible** - Works with screen readers and MathJax
+✅ **Universal Responsiveness** - Auto-scales across all devices and contexts  
+✅ **Print-Optimized** - Perfectly adjusted for high-quality paper output  
+✅ **Accessible** - Fully compatible with screen readers and MathJax
 
 ### Basic Syntax
 
@@ -60,6 +60,26 @@ This renders a block on a 30° incline with mass 10kg, showing force vectors.
 | **Print Pages** | ✅ | Optimized for printing |
 | **Evaluations** | ✅ | Teacher grading interface |
 | **Problem Solving** | ✅ | Interactive sessions |
+
+### Supported Syntax Formats
+
+The system now supports 4 distinct syntax formats to cover all use cases:
+
+1.  **New Standard Presets**:
+    `##PRESET:name(param1, param2)##`
+    *Example:* `##PRESET:incline(30,10,true)##`
+
+2.  **Combination Layouts**:
+    `##COMBINE:MODE[item1, item2]##`
+    *Example:* `##COMBINE:SERIES[spring(100),block(10)]##`
+
+3.  **Legacy FBD Syntax**:
+    `##P1(...) | F1@P1(...)##`
+    *Example:* `##P1(100,100) | F1@P1(50,0,F,force)##`
+
+4.  **Legacy Preset Wrapper**:
+    `##PRESET:name(params)##` (handled by unified parser)
+    *Example:* `##PRESET:hanging(5)##`
 
 ---
 
@@ -1042,6 +1062,22 @@ Specifically designed for high-contrast comparison between two or more states.
 - **Syntax**: `##COMBINE:COMPARE[Label1|preset1, Label2|preset2]##`
 - **Logic**: Uses side-by-side vertical panels with prominent blue labels. Scaled to fit a standard comparison view.
 - **Use Case**: "Before vs. After", "Healthy vs. Diseased", "Control vs. Variable".
+
+---
+
+## 🕰️ Legacy Support
+
+The unified parser (`utils/diagrams/inline-parser.ts`) maintains full backward compatibility with older content.
+
+### 1. Legacy FBD Syntax
+Used for manually defining points and forces without a preset.
+- **Syntax**: `##Definition | Definition | ...##`
+- **Example**: `##P1(100,100) | F1@P1(50,0,F,force)##`
+- **Status**: Supported but **deprecated** for new content. Use Presets instead.
+
+### 2. Legacy Preset Wrapper
+Older content using `PRESET:` is seamlessly handled by the new engine, often re-routing to arguably better SVG implementations.
+- **Example**: `##PRESET:hanging(5)##` -> Renders the new SVG `hanging` preset.
 
 ---
 

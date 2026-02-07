@@ -3,7 +3,7 @@
  * Global types for FBD rendering across the application
  */
 
-export type ForceType = 'normal' | 'friction' | 'tension' | 'weight' | 'applied' | 'custom';
+export type ForceType = 'normal' | 'friction' | 'tension' | 'weight' | 'applied' | 'custom' | 'component';
 export type PointType = 'fixed' | 'pivot' | 'free';
 export type BodyType = 'point' | 'rectangle' | 'circle' | 'triangle' | 'custom';
 export type MomentDirection = 'cw' | 'ccw';
@@ -45,6 +45,7 @@ export interface FBDBody {
     points?: { x: number; y: number }[];
     fill?: string;
     stroke?: string;
+    angle?: number; // Rotation in degrees
 }
 
 export interface FBDDiagram {
@@ -55,11 +56,13 @@ export interface FBDDiagram {
     forces: FBDForce[];
     moments?: FBDMoment[];
     body?: FBDBody;
+    bodies?: FBDBody[];
     showAxes?: boolean;
     showGrid?: boolean;
     showAngles?: boolean;
     backgroundColor?: string;
-    customSVG?: string; // For custom SVG content (circuits, waves, chemistry, etc.)
+    backgroundSVG?: string; // Static background layer (e.g. incline base)
+    customSVG?: string; // Final compiled SVG content
 }
 
 export interface FBDConfig {
@@ -80,6 +83,7 @@ export const DEFAULT_FBD_CONFIG: FBDConfig = {
         tension: '#8B5CF6',     // purple
         applied: '#F59E0B',     // amber
         custom: '#6B7280',      // gray
+        component: '#9CA3AF',   // light gray for components
     },
     defaultArrowWidth: 2.5,
     defaultArrowHeadSize: 10,

@@ -1,4 +1,4 @@
-
+import { SVG_DEFS } from '../diagrams/common/gradients';
 import type { FBDDiagram, FBDForce, FBDPoint, FBDBody, FBDMoment } from './types';
 import { DEFAULT_FBD_CONFIG } from './types';
 
@@ -9,7 +9,7 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
     const { width, height, id } = diagram;
     const config = DEFAULT_FBD_CONFIG;
 
-    let svgContent = '';
+    let svgContent = SVG_DEFS;
 
     // 1. Grid (Optional)
     if (diagram.showGrid) {
@@ -21,9 +21,22 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         svgContent += renderAxes(width, height, config.axesColor);
     }
 
-    // 3. Body
+    // 3. Background SVG Layer (Incline planes, etc.)
+    if (diagram.backgroundSVG) {
+        let innerContent = diagram.backgroundSVG
+            .replace(/<svg[^>]*>/, '')
+            .replace(/<\/svg>/, '');
+        svgContent += `<g class="diagram-background">${innerContent}</g>`;
+    }
+
+    // 4. Body (Backward compatibility and multi-body support)
     if (diagram.body) {
         svgContent += renderBody(diagram.body);
+    }
+    if (diagram.bodies) {
+        diagram.bodies.forEach(body => {
+            svgContent += renderBody(body);
+        });
     }
 
     // 4. Points (Fixed supports, etc.)
@@ -49,8 +62,7 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
         });
     }
 
-    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" class="fbd-diagram" id="${id}">
-        <rect width="${width}" height="${height}" fill="${diagram.backgroundColor || 'transparent'}" />
+    return `<svg width="100%" height="auto" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" class="fbd-diagram responsive-svg" id="${id}" style="max-width: ${width}px; background-color: ${diagram.backgroundColor || 'transparent'};">
         ${svgContent}
     </svg>`;
 }
@@ -72,24 +84,28 @@ function renderAxes(w: number, h: number, color: string): string {
 
 function renderBody(body: FBDBody): string {
     const style = `fill="${body.fill || '#e2e8f0'}" stroke="${body.stroke || '#475569'}" stroke-width="2"`;
+    const rotate = body.angle ? `transform="rotate(${body.angle}, ${body.centerX}, ${body.centerY})"` : '';
 
+    let content = '';
     switch (body.type) {
         case 'rectangle':
-            return `<rect x="${body.centerX - (body.width || 0) / 2}" y="${body.centerY - (body.height || 0) / 2}" 
-                          width="${body.width}" height="${body.height}" ${style} />`;
+            content = `<rect x="${body.centerX - (body.width || 0) / 2}" y="${body.centerY - (body.height || 0) / 2}" 
+                             width="${body.width}" height="${body.height}" ${style} />`;
+            break;
         case 'circle':
-            return `<circle cx="${body.centerX}" cy="${body.centerY}" r="${body.radius}" ${style} />`;
+            content = `<circle cx="${body.centerX}" cy="${body.centerY}" r="${body.radius}" ${style} />`;
+            break;
         case 'triangle':
-            // Simple equilateral/isosceles approximation based on radius/width
             const r = body.radius || (body.width ? body.width / 2 : 20);
             const h = r * Math.sqrt(3);
             const p1 = `${body.centerX},${body.centerY - r}`;
             const p2 = `${body.centerX - h / 2},${body.centerY + r / 2}`;
             const p3 = `${body.centerX + h / 2},${body.centerY + r / 2}`;
-            return `<polygon points="${p1} ${p2} ${p3}" ${style} />`;
-        default:
-            return '';
+            content = `<polygon points="${p1} ${p2} ${p3}" ${style} />`;
+            break;
     }
+
+    return rotate ? `<g ${rotate}>${content}</g>` : content;
 }
 
 function renderPoint(point: FBDPoint): string {
@@ -141,9 +157,10 @@ function renderForce(force: FBDForce, point: FBDPoint, config: any): string {
     const y2 = endY - headSize * Math.sin(angleFromX + Math.PI / 6);
 
     return `
-        <g class="force-vector">
-            <line x1="${point.x}" y1="${point.y}" x2="${endX}" y2="${endY}" stroke="${color}" stroke-width="2.5" />
-            <polygon points="${endX},${endY} ${x1},${y1} ${x2},${y2}" fill="${color}" />
+        <g class="force-vector" filter="url(#vector-glow)">
+            <line x1="${point.x}" y1="${point.y}" x2="${endX}" y2="${endY}" 
+                  stroke="${color}" stroke-width="2.5" stroke-linecap="round"
+                  marker-end="url(#arrowhead)" />
             ${force.label ? renderLabel(endX, endY, force.label, color, angleRad) : ''}
         </g>
     `;

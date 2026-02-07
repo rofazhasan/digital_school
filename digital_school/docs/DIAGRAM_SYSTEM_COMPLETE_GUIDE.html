@@ -467,7 +467,7 @@
             <div class="subtitle">Digital School Platform - Scientific Diagram Engine</div>
             <div class="stats">
                 <div class="stat-box">
-                    <div class="stat-number">301</div>
+                    <div class="stat-number">354</div>
                     <div class="stat-label">Total Diagrams</div>
                 </div>
                 <div class="stat-box">
@@ -518,12 +518,14 @@
                         <p>Only 45KB gzipped. No heavy dependencies or external libraries required.</p>
                     </div>
                     <div class="feature-card">
-                        <h4>📱 Responsive</h4>
-                        <p>Perfect on mobile, tablet, desktop, and print. Resolution independent SVG.</p>
+                        <h4>📱 Universal Responsiveness</h4>
+                        <p>Auto-scales across all devices and contexts. Perfect on mobile, tablet, desktop, and print.
+                        </p>
                     </div>
                     <div class="feature-card">
-                        <h4>🎨 Professional</h4>
-                        <p>Publication-quality diagrams with proper typography and styling.</p>
+                        <h4>🎨 World-Class Aesthetics</h4>
+                        <p>3D shading, glowing vectors, and professional technical styling for publication-quality
+                            output.</p>
                     </div>
                     <div class="feature-card">
                         <h4>🔧 Flexible</h4>
@@ -1427,6 +1429,142 @@ Follow these instructions to generate world-class scientific diagrams...
                                             of the Digital School Diagram System. Every preset listed is ready for
                                             production use.</p>
                                     </div>
+            </section>
+
+            <!-- SYNTAX REFERENCE SECTION -->
+            <section id="syntax-reference">
+                <h2>📝 Syntax Reference & Examples</h2>
+                <div class="feature-grid">
+                    <div class="feature-card" style="background: white; color: #333; border: 1px solid #e2e8f0;">
+                        <h4
+                            style="color: #667eea; border-bottom: 2px solid #edf2f7; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            1. Standard Presets</h4>
+                        <p style="color: #4a5568; font-size: 0.9rem;">The primary way to generate professional diagrams.
+                        </p>
+                        <div class="code-block" style="background: #f7fafc; color: #2d3748; border: 1px solid #e2e8f0;">
+                            ##PRESET:incline(30,10,true)##
+                        </div>
+                        <div style="text-align: center; color: #2d3748; font-weight: bold; margin-top: 0.5rem;">
+                            PASSED (SVG Generated)
+                        </div>
+                    </div>
+
+                    <div class="feature-card" style="background: white; color: #333; border: 1px solid #e2e8f0;">
+                        <h4
+                            style="color: #667eea; border-bottom: 2px solid #edf2f7; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            2. Combinations</h4>
+                        <p style="color: #4a5568; font-size: 0.9rem;">Combine multiple presets into layouts.</p>
+                        <div class="code-block" style="background: #f7fafc; color: #2d3748; border: 1px solid #e2e8f0;">
+                            ##COMBINE:SERIES[spring,block]##
+                        </div>
+                        <div style="text-align: center; color: #2d3748; font-weight: bold; margin-top: 0.5rem;">
+                            PASSED (SVG Generated)
+                        </div>
+                    </div>
+
+                    <div class="feature-card" style="background: white; color: #333; border: 1px solid #e2e8f0;">
+                        <h4
+                            style="color: #667eea; border-bottom: 2px solid #edf2f7; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            3. Legacy FBD</h4>
+                        <p style="color: #4a5568; font-size: 0.9rem;">Backward compatibility for raw FBDs.</p>
+                        <div class="code-block" style="background: #f7fafc; color: #2d3748; border: 1px solid #e2e8f0;">
+                            ##P1(100,100) | F1@P1(50,0,F,force)##
+                        </div>
+                        <div style="text-align: center; color: #2d3748; font-weight: bold; margin-top: 0.5rem;">
+                            PASSED (SVG Generated)
+                        </div>
+                    </div>
+
+                    <div class="feature-card" style="background: white; color: #333; border: 1px solid #e2e8f0;">
+                        <h4
+                            style="color: #667eea; border-bottom: 2px solid #edf2f7; padding-bottom: 0.5rem; margin-bottom: 1rem;">
+                            4. Legacy Preset</h4>
+                        <p style="color: #4a5568; font-size: 0.9rem;">Old preset syntax handled by new engine.</p>
+                        <div class="code-block" style="background: #f7fafc; color: #2d3748; border: 1px solid #e2e8f0;">
+                            ##PRESET:hanging(5)##
+                        </div>
+                        <div style="text-align: center; color: #2d3748; font-weight: bold; margin-top: 0.5rem;">
+                            PASSED (SVG Generated)
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+
+
+            <!-- LEGACY FBD CONSTRUCTION SECTION -->
+            <section id="legacy-fbd">
+                <h2>🏗️ Legacy FBD Construction</h2>
+                <div style="background: #fff5f5; border-left: 4px solid #fc8181; padding: 1.5rem; margin-bottom: 2rem;">
+                    <p style="margin: 0; color: #c53030;">
+                        <strong>Note:</strong> This syntax is supported for backward compatibility. New diagrams should
+                        use <strong>Presets</strong> whenever possible.
+                    </p>
+                </div>
+
+                <div class="grid-2">
+                    <div class="card">
+                        <h3>1. Grammar</h3>
+                        <p>Construct diagrams by piping definitions together:</p>
+                        <code
+                            style="display: block; background: #2d3748; color: #a3bffa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                            ##DEF1 | DEF2 | DEF3##
+                        </code>
+                        <ul style="line-height: 1.8;">
+                            <li><strong>Point:</strong> <code>P{id}(x,y)</code></li>
+                            <li><strong>Force:</strong> <code>F{id}@P{ref}(mag, angle, label, type)</code></li>
+                            <li><strong>Moment:</strong> <code>M{id}@P{ref}(mag, label)</code></li>
+                        </ul>
+                    </div>
+
+                    <div class="card">
+                        <h3>2. Force Types</h3>
+                        <table style="width: 100%; text-align: left; border-collapse: collapse;">
+                            <thead>
+                                <tr style="border-bottom: 2px solid #e2e8f0;">
+                                    <th style="padding: 0.5rem;">Type</th>
+                                    <th style="padding: 0.5rem;">Color</th>
+                                    <th style="padding: 0.5rem;">Usage</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding: 0.5rem;"><code>push/pull</code></td>
+                                    <td style="color: #4299e1;">Blue</td>
+                                    <td>Applied forces</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.5rem;"><code>fric</code></td>
+                                    <td style="color: #ed8936;">Orange</td>
+                                    <td>Friction</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.5rem;"><code>norm</code></td>
+                                    <td style="color: #48bb78;">Green</td>
+                                    <td>Normal force</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 0.5rem;"><code>grav</code></td>
+                                    <td style="color: #9f7aea;">Purple</td>
+                                    <td>Gravity/Weight</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 2rem;">
+                    <h3>3. Complex Example</h3>
+                    <div class="code-block" style="background: #2d3748; color: #e2e8f0;">
+                        ##P1(150,150) | P2(250,150) | F1@P1(50,270,mg,grav) | F2@P2(40,90,N,norm) | F3@P1(30,0,T,pull)##
+                    </div>
+                    <div style="margin-top: 1rem; text-align: center;">
+                        <span
+                            style="display: inline-block; padding: 0.5rem 1rem; background: #c6f6d5; color: #22543d; border-radius: 99px; font-weight: bold; font-size: 0.8rem;">
+                            Renders a beam with gravity, normal force, and tension
+                        </span>
+                    </div>
+                </div>
             </section>
 
             <!-- USAGE SECTION -->

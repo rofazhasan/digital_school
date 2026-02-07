@@ -79,10 +79,21 @@ export class FBDBuilder {
     }
 
     /**
-     * Set the rigid body
+     * Set the primary rigid body
      */
     setBody(body: FBDBody): this {
         this.diagram.body = body;
+        return this;
+    }
+
+    /**
+     * Add an additional rigid body (for multi-body systems)
+     */
+    addBody(body: FBDBody): this {
+        if (!this.diagram.bodies) {
+            this.diagram.bodies = [];
+        }
+        this.diagram.bodies.push(body);
         return this;
     }
 
@@ -103,6 +114,22 @@ export class FBDBuilder {
     }
 
     /**
+     * Set a static background SVG layer (e.g. incline plane)
+     */
+    setBackgroundSVG(svg: string): this {
+        this.diagram.backgroundSVG = svg;
+        return this;
+    }
+
+    /**
+     * Set a custom SVG layer (DEPRECATED: Use setBackgroundSVG or let builder generate it)
+     */
+    setCustomSVG(svg: string): this {
+        this.diagram.customSVG = svg;
+        return this;
+    }
+
+    /**
      * Toggle angle labels
      */
     showAngles(show: boolean = true): this {
@@ -115,10 +142,8 @@ export class FBDBuilder {
      * Build and return the diagram
      */
     build(): FBDDiagram {
-        // Generate SVG if not already present
-        if (!this.diagram.customSVG) {
-            this.diagram.customSVG = renderFBDToSVG(this.diagram);
-        }
+        // ALWAYS generate SVG to ensure forces/bodies added via developer-friendly methods are included
+        this.diagram.customSVG = renderFBDToSVG(this.diagram);
         return this.diagram;
     }
 }
@@ -155,7 +180,7 @@ export function createSimpleFBD(
 }
 
 /**
- * Create a block on incline diagram
+ * Create a block on incline diagram with world-class visuals
  */
 export function createBlockOnIncline(
     id: string,
@@ -163,25 +188,44 @@ export function createBlockOnIncline(
     mass: number = 10,
     friction: boolean = true
 ): FBDDiagram {
-    const g = 9.8;
-    const weight = mass * g;
-    const normal = weight * Math.cos((inclineAngle * Math.PI) / 180);
-    const parallel = weight * Math.sin((inclineAngle * Math.PI) / 180);
+    const angleRad = (inclineAngle * Math.PI) / 180;
 
-    const builder = new FBDBuilder(id, 600, 400)
-        .addPoint('block', 300, 200, 'Block')
+    // Calculate triangle coordinates for the incline base
+    const baseW = 400;
+    const baseH = baseW * Math.tan(angleRad);
+    const startX = 100;
+    const startY = 350;
+
+    // Position block at center of incline surface
+    const blockX = startX + (baseW / 2);
+    const blockY = startY - (baseH / 2);
+
+    const builder = new FBDBuilder(id, 600, 450)
+        // Add technical incline base as backgroundSVG
+        .setBackgroundSVG(`
+            <path d="M ${startX} ${startY} L ${startX + baseW} ${startY} L ${startX + baseW} ${startY - baseH} Z" 
+                  fill="url(#soft-shadow)" stroke="#34495e" stroke-width="2" />
+            <path d="M ${startX} ${startY} L ${startX + baseW} ${startY}" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>
+            <path d="M ${startX + 30} ${startY} A 30 30 0 0 0 ${startX + 30 * Math.cos(angleRad)} ${startY - 30 * Math.sin(angleRad)}" 
+                  fill="none" stroke="#e67e22" stroke-width="2" />
+            <text x="${startX + 40}" y="${startY - 10}" font-size="14" fill="#e67e22" font-family="Inter">${inclineAngle}°</text>
+        `)
+        .addPoint('block', blockX, blockY, 'Block')
         .addForce('weight', 'block', 80, 270, 'mg', 'weight')
         .addForce('normal', 'block', 70, 90 + inclineAngle, 'N', 'normal')
         .setBody({
             type: 'rectangle',
-            centerX: 300,
-            centerY: 200,
+            centerX: blockX,
+            centerY: blockY,
             width: 60,
             height: 40,
+            fill: 'url(#grad-cell-3d)',
+            stroke: '#2c3e50',
+            angle: -inclineAngle // Tilt the block
         });
 
     if (friction) {
-        builder.addForce('friction', 'block', 30, 180, 'f', 'friction');
+        builder.addForce('friction', 'block', 40, 180 + inclineAngle, 'f', 'friction');
     }
 
     return builder.build();
@@ -208,6 +252,8 @@ export function createHangingMass(
             centerX: 200,
             centerY: 250,
             radius: 30,
+            fill: 'url(#grad-cell-3d)',
+            stroke: '#2980b9'
         })
         .build();
 }
@@ -234,6 +280,8 @@ export function createPulleySystem(
             centerX: 200,
             centerY: 200,
             radius: 25,
+            fill: 'url(#grad-cell-3d)',
+            stroke: '#2980b9'
         })
         .build();
 }

@@ -27,13 +27,20 @@ function createCircuitDiagram(id: string, width: number, height: number, element
  * @param id Diagram ID
  * @param components Array of component types
  */
-export function createSeriesCircuit(id: string, components: string[] = ['battery', 'resistor', 'resistor', 'bulb']): FBDDiagram {
+export function createSeriesCircuit(id: string, ...components: string[]): FBDDiagram {
+    if (components.length === 0) {
+        components = ['battery', 'resistor', 'resistor', 'bulb'];
+    }
     const width = 600;
     const height = 400;
     const elements: string[] = [];
 
-    // Circuit wire
-    elements.push(`<path d="M 100 200 L 500 200 L 500 300 L 100 300 Z" fill="none" stroke="#333" stroke-width="3"/>`);
+    // Circuit wire with soft glow
+    elements.push(`<path d="M 100 200 L 500 200 L 500 300 L 100 300 Z" fill="none" stroke="#2c3e50" stroke-width="2" stroke-linejoin="round"/>`);
+
+    // Current direction marker
+    elements.push(`<path d="M 300 195 L 320 195" stroke="#e74c3c" stroke-width="2" marker-end="url(#arrowhead)" filter="url(#vector-glow)"/>`);
+    elements.push(`<text x="310" y="185" font-size="12" fill="#e74c3c" text-anchor="middle" font-style="italic">I</text>`);
 
     // Add components
     let x = 150;
@@ -51,9 +58,9 @@ export function createSeriesCircuit(id: string, components: string[] = ['battery
                 break;
             case 'resistor':
                 elements.push(`
-          <path d="M ${x - 15} ${y} L ${x - 10} ${y - 10} L ${x} ${y + 10} L ${x + 10} ${y - 10} L ${x + 15} ${y}" 
-                fill="none" stroke="#333" stroke-width="2"/>
-          <text x="${x}" y="${y + 25}" font-size="10" text-anchor="middle">R${idx}</text>
+          <path d="M ${x - 20} ${y} L ${x - 15} ${y} L ${x - 12} ${y - 12} L ${x - 6} ${y + 12} L ${x} ${y - 12} L ${x + 6} ${y + 12} L ${x + 12} ${y - 12} L ${x + 15} ${y} L ${x + 20} ${y}" 
+                fill="none" stroke="#2c3e50" stroke-width="2"/>
+          <text x="${x}" y="${y + 30}" font-size="11" fill="#34495e" text-anchor="middle" font-weight="600">R${idx}</text>
         `);
                 break;
             case 'bulb':
@@ -130,11 +137,10 @@ export function createResistor(id: string): FBDDiagram {
 
 export function createCapacitor(id: string): FBDDiagram {
     return createCircuitDiagram(id, 200, 100, [
-        `<line x1="20" y1="50" x2="85" y2="50" stroke="#333" stroke-width="3"/>`,
-        `<line x1="85" y1="20" x2="85" y2="80" stroke="#333" stroke-width="3"/>`,
-        `<line x1="115" y1="20" x2="115" y2="80" stroke="#333" stroke-width="3"/>`,
-        `<line x1="115" y1="50" x2="180" y2="50" stroke="#333" stroke-width="3"/>`,
-        `<text x="100" y="100" font-size="14" text-anchor="middle">Capacitor (C)</text>`
+        `<line x1="20" y1="50" x2="180" y2="50" stroke="#2c3e50" stroke-width="2" stroke-dasharray="0 85 30 85 0"/>`,
+        `<line x1="85" y1="20" x2="85" y2="80" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>`,
+        `<line x1="115" y1="20" x2="115" y2="80" stroke="#2c3e50" stroke-width="3" stroke-linecap="round"/>`,
+        `<text x="100" y="100" font-size="14" fill="#34495e" text-anchor="middle" font-weight="600">Capacitor (C)</text>`
     ]);
 }
 

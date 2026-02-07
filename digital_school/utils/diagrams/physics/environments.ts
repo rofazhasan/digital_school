@@ -38,13 +38,32 @@ export function createPendulumInMedium(
         builder.addForce('thermal', 'bob', 25, 90, 'F_th', 'applied');
     }
     // vacuum has no drag
-
     builder.setBody({
         type: 'circle',
         centerX: bobX,
         centerY: bobY,
         radius: 20,
     });
+
+    // Add visual environment
+    if (medium === 'water') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="500" height="600" fill="#e0f7fa" opacity="0.5"/>
+            <path d="M 0 50 Q 125 60 250 50 T 500 50 L 500 600 L 0 600 Z" fill="#b2ebf2" opacity="0.5"/>
+        `);
+    } else if (medium === 'fire') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="500" height="600" fill="#fff3e0" opacity="0.5"/>
+            <!-- Heat waves / Fire gradient -->
+            <defs>
+                <linearGradient id="fire-grad-${id}" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="#ffccbc" stop-opacity="0.6"/>
+                    <stop offset="100%" stop-color="#ffab91" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <rect x="0" y="200" width="500" height="400" fill="url(#fire-grad-${id})"/>
+        `);
+    }
 
     return builder.showAxes(false).build();
 }
@@ -100,6 +119,25 @@ export function createProjectileInMedium(
         radius: 15,
     });
 
+    // Add visual environment
+    if (medium === 'water') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="700" height="500" fill="#e0f7fa" opacity="0.3"/>
+            <rect x="0" y="300" width="700" height="200" fill="#b2ebf2" opacity="0.5"/>
+        `);
+    } else if (medium === 'fire') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="700" height="500" fill="#fff3e0" opacity="0.3"/>
+            <defs>
+                <linearGradient id="fire-grad-proj-${id}" x1="0%" y1="100%" x2="0%" y2="0%">
+                    <stop offset="0%" stop-color="#ffccbc" stop-opacity="0.4"/>
+                    <stop offset="100%" stop-color="#ffab91" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <rect x="0" y="100" width="700" height="400" fill="url(#fire-grad-proj-${id})"/>
+        `);
+    }
+
     return builder.showAxes(true).build();
 }
 
@@ -137,6 +175,17 @@ export function createFreeFallInMedium(
         centerY: 250,
         radius: 25,
     });
+
+    // Add visual environment
+    if (medium === 'water') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="400" height="500" fill="#e0f7fa" opacity="0.5"/>
+        `);
+    } else if (medium === 'fire') {
+        builder.setBackgroundSVG(`
+            <rect x="0" y="0" width="400" height="500" fill="#fff3e0" opacity="0.5"/>
+        `);
+    }
 
     return builder.showAxes(true).build();
 }

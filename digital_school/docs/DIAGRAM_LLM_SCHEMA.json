@@ -9,7 +9,31 @@
             "boolean",
             "string",
             "hex_color"
-        ]
+        ],
+        "visual_standards": {
+            "aesthetics": "World-Class / Professional / Technical",
+            "features": [
+                "3D Shading (grad-cell-3d)",
+                "Vector Glow (filter: url(#vector-glow))",
+                "High-Visibility Arrow Markers (url(#arrowhead))",
+                "Glassmorphism (url(#glass-grad))",
+                "Universal Responsiveness (viewBox, preserveAspectRatio)"
+            ],
+            "typography": [
+                "Inter",
+                "Kalpurush (Bengali)",
+                "MathJax support"
+            ]
+        },
+        "legacy_syntax": {
+            "structure": "##ELEMENT | ELEMENT | ...##",
+            "description": "Legacy FBD construction using pipe-separated definitions.",
+            "elements": {
+                "point": "P<id>(x,y)",
+                "force": "F<id>@P<ref>(mag, angle, label, type)",
+                "moment": "M<id>@P<ref>(mag, label)"
+            }
+        }
     },
     "combination_layouts": {
         "SERIES": {

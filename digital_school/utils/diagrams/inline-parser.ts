@@ -1,64 +1,132 @@
-
 import { getPreset, parseCombination } from './index';
+import { parseExcelFBD } from '../fbd/excel-parser';
+import { renderFBDToSVG } from '../fbd/svg-renderer';
 
 /**
  * Parses text and replaces diagram syntax with SVG strings.
- * Supported syntax:
- * 1. ##PRESET:name(arg1,arg2)##
- * 2. ##COMBINE:MODE[args]##
+ * Unified parser for:
+ * 1. ##COMBINE:MODE[args]##
+ * 2. ##PRESET:name(args)## (New System)
+ * 3. ##P1...## (Legacy FBD Excel Format)
  */
 export function parseDiagramsInText(text: string): string {
     if (!text) return '';
 
-    // 1. Handle Combinations first (as they might contain parentheses or similar chars)
-    // Syntax: ##COMBINE:MODE[args]##
-    // We use a regex that matches the tag boundaries.
-    text = text.replace(/##COMBINE:(.*?)\[(.*?)\]##/g, (match, mode, args) => {
+    // Use a single generic regex to capture all ##...## blocks
+    return text.replace(/##(.*?)##/g, (match, content) => {
+        let trimmedContent = content.trim();
+
+        // Check for size qualifier: [size:small], [size:medium], [size:large]
+        let sizeStyle = '';
+        const sizeMatch = trimmedContent.match(/\[size:(small|medium|large|tiny)\]/);
+        if (sizeMatch) {
+            const size = sizeMatch[1];
+            trimmedContent = trimmedContent.replace(sizeMatch[0], '').trim();
+            if (size === 'tiny') sizeStyle = 'max-width: 80px;';
+            else if (size === 'small') sizeStyle = 'max-width: 150px;';
+            else if (size === 'medium') sizeStyle = 'max-width: 300px;';
+            else if (size === 'large') sizeStyle = 'max-width: 500px;';
+        }
+
         try {
-            // Reconstruct the syntax expected by parseCombination
-            // mode is "SERIES", args is "spring,pendulum"
-            // parseCombination expects "SERIES:spring,pendulum"
-            const syntax = `${mode}:${args}`;
-            const diagram = parseCombination(syntax);
-            if (diagram && diagram.customSVG) {
-                return diagram.customSVG;
+            // 1. Handle Combinations
+            if (trimmedContent.startsWith('COMBINE:')) {
+                const parts = trimmedContent.split('|').map((p: string) => p.trim());
+                const combinePart = parts[0];
+                const fbdParts = parts.slice(1).join(' | ');
+
+                const combineMatch = combinePart.match(/^COMBINE:(.*?)\[(.*?)\]$/);
+                if (combineMatch) {
+                    const [, mode, args] = combineMatch;
+                    const syntax = `${mode}:${args}`;
+                    let diagram = parseCombination(syntax);
+
+                    if (diagram && fbdParts) {
+                        const extraFBD = parseExcelFBD(fbdParts, `hybrid-combine-${Math.random().toString(36).substr(2, 5)}`);
+                        if (extraFBD) {
+                            diagram.points = [...diagram.points, ...extraFBD.points];
+                            diagram.forces = [...diagram.forces, ...extraFBD.forces];
+                            diagram.moments = [...(diagram.moments || []), ...(extraFBD.moments || [])];
+                        }
+                    }
+
+                    if (diagram && diagram.customSVG) {
+                        if (!fbdParts) {
+                            let svg = diagram.customSVG;
+                            if (!svg.trim().startsWith('<svg')) {
+                                svg = `<svg width="${diagram.width}" height="${diagram.height}" viewBox="0 0 ${diagram.width} ${diagram.height}" xmlns="http://www.w3.org/2000/svg">${diagram.customSVG}</svg>`;
+                            }
+                            // Inject sizeStyle if present
+                            if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
+                            return svg;
+                        }
+                        return renderFBDToSVG(diagram);
+                    }
+                }
             }
-            return `<span class="text-red-500 font-mono text-xs">Error parsing combination: ${mode}</span>`;
+
+            // 2. Handle Presets
+            if (trimmedContent.startsWith('PRESET:')) {
+                const parts = trimmedContent.split('|').map((p: string) => p.trim());
+                const presetPart = parts[0];
+                const fbdParts = parts.slice(1).join(' | ');
+
+                const presetMatch = presetPart.match(/^PRESET:([a-zA-Z0-9-_]+)(?:\((.*?)\))?$/);
+                if (presetMatch) {
+                    const [, name, argsStr] = presetMatch;
+                    const presetFn = getPreset(name);
+
+                    if (presetFn) {
+                        const args = argsStr ? argsStr.split(',').map((a: string) => {
+                            const val = a.trim();
+                            if (val === 'true') return true;
+                            if (val === 'false') return false;
+                            if (!isNaN(Number(val)) && val !== '') return Number(val);
+                            return val;
+                        }) : [];
+
+                        const id = `diagram-${name}-${Math.random().toString(36).substr(2, 9)}`;
+                        let diagram = presetFn(id, ...args);
+
+                        if (fbdParts) {
+                            const extraFBD = parseExcelFBD(fbdParts, `hybrid-${id}`);
+                            if (extraFBD) {
+                                diagram.points = [...diagram.points, ...extraFBD.points];
+                                diagram.forces = [...diagram.forces, ...extraFBD.forces];
+                                diagram.moments = [...(diagram.moments || []), ...(extraFBD.moments || [])];
+                            }
+                        }
+
+                        if (diagram.customSVG && !fbdParts) {
+                            let svg = diagram.customSVG;
+                            if (!svg.trim().startsWith('<svg')) {
+                                svg = `<svg width="${diagram.width}" height="${diagram.height}" viewBox="0 0 ${diagram.width} ${diagram.height}" xmlns="http://www.w3.org/2000/svg">${diagram.customSVG}</svg>`;
+                            }
+                            // Inject sizeStyle if present
+                            if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
+                            return svg;
+                        }
+                        return renderFBDToSVG(diagram);
+                    }
+                }
+            }
+
+            // 3. Fallback: Try Legacy/Excel FBD Parsing
+            const legacyDiagram = parseExcelFBD(trimmedContent, `legacy-${Math.random().toString(36).substr(2, 5)}`);
+            if (legacyDiagram) {
+                if (legacyDiagram.customSVG) {
+                    let svg = legacyDiagram.customSVG;
+                    if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
+                    return svg;
+                }
+                return renderFBDToSVG(legacyDiagram);
+            }
+
+            return `<span class="text-red-500 font-mono text-xs">Error parsing diagram</span>`;
+
         } catch (e) {
-            console.error('Error parsing combination:', e);
-            return match; // Return original on error
+            console.error('Error parsing diagram block:', trimmedContent, e);
+            return match;
         }
     });
-
-    // 2. Handle Individual Presets
-    // Syntax: ##PRESET:name(arg1,arg2)## or ##PRESET:name##
-    text = text.replace(/##PRESET:([a-zA-Z0-9-]+)(?:\((.*?)\))?##/g, (match, name, argsStr) => {
-        try {
-            const presetFn = getPreset(name);
-            if (!presetFn) return `<span class="text-red-500 font-mono text-xs">Unknown preset: ${name}</span>`;
-
-            const args = argsStr ? argsStr.split(',').map((a: string) => {
-                const val = a.trim();
-                // Try to parse numbers/booleans
-                if (val === 'true') return true;
-                if (val === 'false') return false;
-                if (!isNaN(Number(val)) && val !== '') return Number(val);
-                return val;
-            }) : [];
-
-            // Generate unique ID
-            const id = `diagram-${name}-${Math.random().toString(36).substr(2, 9)}`;
-            const diagram = presetFn(id, ...args);
-
-            if (diagram.customSVG) {
-                return diagram.customSVG;
-            }
-            return match;
-        } catch (e) {
-            console.error('Error parsing preset:', e);
-            return match;
-        }
-    });
-
-    return text;
 }

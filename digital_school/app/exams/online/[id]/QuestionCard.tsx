@@ -9,7 +9,7 @@ import { X, Check, AlertCircle, Upload } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
-import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
+import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 interface QuestionCardProps {
   disabled?: boolean;
@@ -90,7 +90,7 @@ const MCQOption = memo(({
       <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
         <div className="min-w-0">
           <MathJax inline dynamic>
-            <TextWithFBDs text={cleanupMath(label || "")} />
+            <UniversalMathJax inline>{cleanupMath(label || "")}</UniversalMathJax>
           </MathJax>
         </div>
         {/* @ts-ignore */}
@@ -191,7 +191,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
           {/* Question Text */}
           <div className="prose prose-indigo max-w-none text-gray-800 text-lg md:text-xl font-medium leading-relaxed mb-8">
             <MathJax dynamic inline>
-              <TextWithFBDs text={cleanupMath(text || "")} />
+              <UniversalMathJax inline>{cleanupMath(text || "")}</UniversalMathJax>
             </MathJax>
           </div>
 
@@ -356,7 +356,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                     {subQuestions.map((subQ: any, idx: number) => (
                       <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
                         <div className="text-sm font-medium text-gray-700 mb-2">
-                          {idx + 1}. {subQ.text || subQ.question || subQ}
+                          {idx + 1}. <UniversalMathJax inline>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
                           {subQ.image && (
                             <div className="mt-2">
                               <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />

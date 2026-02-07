@@ -33,9 +33,9 @@ export function createConvexLens(id: string, focalLength: number = 15): FBDDiagr
     return createOpticsDiagram(id, 400, 300, [
         // Principal axis
         `<line x1="50" y1="${cy}" x2="350" y2="${cy}" stroke="#666" stroke-width="1" stroke-dasharray="5,5"/>`,
-        // Lens (convex shape)
-        `<path d="M ${cx} ${cy - 80} Q ${cx - 15} ${cy} ${cx} ${cy + 80}" fill="none" stroke="#333" stroke-width="3"/>`,
-        `<path d="M ${cx} ${cy - 80} Q ${cx + 15} ${cy} ${cx} ${cy + 80}" fill="none" stroke="#333" stroke-width="3"/>`,
+        // Lens (convex shape) with professional glass look
+        `<path d="M ${cx} ${cy - 80} Q ${cx - 15} ${cy} ${cx} ${cy + 80}" fill="url(#glass-grad)" stroke="#3498db" stroke-width="2" opacity="0.8"/>`,
+        `<path d="M ${cx} ${cy - 80} Q ${cx + 15} ${cy} ${cx} ${cy + 80}" fill="url(#glass-grad)" stroke="#3498db" stroke-width="2" opacity="0.8"/>`,
         // Focal points
         `<circle cx="${cx - focalLength * 3}" cy="${cy}" r="3" fill="#d32f2f"/>`,
         `<circle cx="${cx + focalLength * 3}" cy="${cy}" r="3" fill="#d32f2f"/>`,
@@ -137,10 +137,10 @@ export function createPlaneMirror(id: string): FBDDiagram {
         `<rect x="170" y="50" width="10" height="200" fill="#666"/>`,
         // Normal line
         `<line x1="175" y1="150" x2="100" y2="150" stroke="#666" stroke-width="1" stroke-dasharray="5,5"/>`,
-        // Incident ray
-        `<line x1="50" y1="100" x2="175" y2="150" stroke="#d32f2f" stroke-width="2" marker-end="url(#arrowred)"/>`,
-        // Reflected ray
-        `<line x1="175" y1="150" x2="50" y2="200" stroke="#1976d2" stroke-width="2" marker-end="url(#arrowblue)"/>`,
+        // Incident ray with glow
+        `<line x1="50" y1="100" x2="175" y2="150" stroke="#e74c3c" stroke-width="2.5" marker-end="url(#arrowhead)" filter="url(#vector-glow)"/>`,
+        // Reflected ray with glow
+        `<line x1="175" y1="150" x2="50" y2="200" stroke="#3498db" stroke-width="2.5" marker-end="url(#arrowhead)" filter="url(#vector-glow)"/>`,
         `<text x="175" y="30" font-size="14" font-weight="bold" text-anchor="middle">Plane Mirror</text>`,
         `<text x="100" y="90" font-size="11" fill="#d32f2f">Incident</text>`,
         `<text x="100" y="210" font-size="11" fill="#1976d2">Reflected</text>`
@@ -158,14 +158,14 @@ export function createPrism(id: string, angle: number = 60): FBDDiagram {
         `<polygon points="200,80 320,220 80,220" fill="#e3f2fd" stroke="#333" stroke-width="3" opacity="0.7"/>`,
         // White light ray entering
         `<line x1="30" y1="140" x2="140" y2="160" stroke="#666" stroke-width="3"/>`,
-        // Dispersed rays (spectrum)
-        `<line x1="260" y1="190" x2="370" y2="220" stroke="#ff0000" stroke-width="2"/>`, // Red
-        `<line x1="260" y1="190" x2="365" y2="210" stroke="#ff7f00" stroke-width="2"/>`, // Orange
-        `<line x1="260" y1="190" x2="360" y2="200" stroke="#ffff00" stroke-width="2"/>`, // Yellow
-        `<line x1="260" y1="190" x2="355" y2="190" stroke="#00ff00" stroke-width="2"/>`, // Green
-        `<line x1="260" y1="190" x2="350" y2="180" stroke="#0000ff" stroke-width="2"/>`, // Blue
-        `<line x1="260" y1="190" x2="345" y2="170" stroke="#4b0082" stroke-width="2"/>`, // Indigo
-        `<line x1="260" y1="190" x2="340" y2="160" stroke="#9400d3" stroke-width="2"/>`, // Violet
+        // Dispersed rays (spectrum) with high fidelity
+        `<line x1="260" y1="190" x2="370" y2="220" stroke="#ff0000" stroke-width="2" filter="url(#vector-glow)"/>`, // Red
+        `<line x1="260" y1="190" x2="365" y2="210" stroke="#ff7f00" stroke-width="2" filter="url(#vector-glow)"/>`, // Orange
+        `<line x1="260" y1="190" x2="360" y2="200" stroke="#ffff00" stroke-width="2" filter="url(#vector-glow)"/>`, // Yellow
+        `<line x1="260" y1="190" x2="355" y2="190" stroke="#00ff00" stroke-width="2" filter="url(#vector-glow)"/>`, // Green
+        `<line x1="260" y1="190" x2="350" y2="180" stroke="#0000ff" stroke-width="2" filter="url(#vector-glow)"/>`, // Blue
+        `<line x1="260" y1="190" x2="345" y2="170" stroke="#4b0082" stroke-width="2" filter="url(#vector-glow)"/>`, // Indigo
+        `<line x1="260" y1="190" x2="340" y2="160" stroke="#9400d3" stroke-width="2" filter="url(#vector-glow)"/>`, // Violet
         `<text x="200" y="50" font-size="14" font-weight="bold" text-anchor="middle">Prism</text>`,
         `<text x="200" y="260" font-size="11" text-anchor="middle">Apex angle: ${angle}°</text>`,
         `<text x="50" y="130" font-size="10">White light</text>`,

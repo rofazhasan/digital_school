@@ -24,7 +24,7 @@ const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolb
 // import html2canvas from 'html2canvas';
 // import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { TextWithFBDs } from "@/components/fbd/TextWithFBDs";
+
 
 // Types
 interface Question {
@@ -629,7 +629,7 @@ export default function ProblemSolvingSession() {
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
                                     <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
                                         <UniversalMathJax inline dynamic>
-                                            <TextWithFBDs text={cleanupMath(currentQ.questionText)} />
+                                            {cleanupMath(currentQ.questionText)}
                                         </UniversalMathJax>
                                     </h3>
 
@@ -703,7 +703,7 @@ export default function ProblemSolvingSession() {
                                                             <div className="flex-1">
                                                                 <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
                                                                     <UniversalMathJax inline dynamic>
-                                                                        <TextWithFBDs text={cleanupMath(opt.text)} />
+                                                                        {cleanupMath(opt.text)}
                                                                     </UniversalMathJax>
                                                                 </span>
                                                             </div>

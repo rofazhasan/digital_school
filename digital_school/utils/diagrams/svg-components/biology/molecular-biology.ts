@@ -4,63 +4,70 @@
  */
 
 export interface MolecularBiologyOptions {
-    width?: number;
-    height?: number;
-    showLabel?: boolean;
+  width?: number;
+  height?: number;
+  showLabel?: boolean;
 }
 
 /**
  * Create protein synthesis diagram
  */
 export function createProteinSynthesis(options: MolecularBiologyOptions = {}): string {
-    const { width = 240, height = 180, showLabel = true } = options;
+  const { width = 280, height = 200, showLabel = true } = options;
 
-    return `
-    <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
-         class="protein-synthesis" xmlns="http://www.w3.org/2000/svg">
-      <!-- DNA -->
-      <g id="dna">
-        <path d="M 30,50 Q 40,40 50,50 Q 60,60 70,50" stroke="#E74C3C" stroke-width="2.5" fill="none"/>
-        <path d="M 30,60 Q 40,70 50,60 Q 60,50 70,60" stroke="#E74C3C" stroke-width="2.5" fill="none"/>
-        <text x="50" y="35" font-size="10" fill="#E74C3C" text-anchor="middle" font-weight="600">DNA</text>
+  return `
+    <svg width="100%" height="auto" viewBox="0 0 ${width} ${height + 30}" 
+         style="max-width: ${width}px;" class="protein-synthesis-v2" xmlns="http://www.w3.org/2000/svg">
+      <!-- Background Soft Glow -->
+      <circle cx="140" cy="110" r="100" fill="url(#grad-bio-soft)" opacity="0.05" />
+
+      <!-- DNA Triple/Double Helix Detail -->
+      <g id="dna-premium" filter="url(#dna-glow)">
+        <path d="M 30,50 Q 45,35 60,50 Q 75,65 90,50" stroke="#c0392b" stroke-width="3" fill="none" opacity="0.8"/>
+        <path d="M 30,60 Q 45,75 60,60 Q 75,45 90,60" stroke="#2980b9" stroke-width="3" fill="none" opacity="0.8"/>
+        <text x="60" y="32" font-size="10" fill="#2c3e50" text-anchor="middle" font-weight="700">DNA TEMPLATE</text>
       </g>
       
-      <!-- Transcription arrow -->
-      <line x1="75" y1="55" x2="95" y2="55" stroke="#F39C12" stroke-width="2"/>
-      <polygon points="95,52 100,55 95,58" fill="#F39C12"/>
-      <text x="87" y="50" font-size="8" fill="#F39C12">Transcription</text>
+      <!-- Transcription Complex -->
+      <path d="M 95,55 L 115,55" stroke="#f39c12" stroke-width="2" stroke-dasharray="2,1"/>
+      <polygon points="115,52 120,55 115,58" fill="#f39c12"/>
       
-      <!-- mRNA -->
-      <g id="mrna">
-        <path d="M 105,50 L 115,55 L 125,50 L 135,55 L 145,50" stroke="#3498DB" stroke-width="2.5" fill="none"/>
-        <text x="125" y="40" font-size="10" fill="#3498DB" text-anchor="middle" font-weight="600">mRNA</text>
+      <!-- mRNA Ribbon -->
+      <g id="mrna-premium" filter="url(#soft-shadow)">
+        <path d="M 125,50 C 145,50 145,100 120,105" stroke="#3498db" stroke-width="4" fill="none" stroke-linecap="round"/>
+        <text x="155" y="75" font-size="10" fill="#3498db" font-weight="700">mRNA</text>
       </g>
       
-      <!-- Translation arrow -->
-      <line x1="120" y1="65" x2="120" y2="85" stroke="#F39C12" stroke-width="2"/>
-      <polygon points="117,85 120,90 123,85" fill="#F39C12"/>
-      <text x="130" y="77" font-size="8" fill="#F39C12">Translation</text>
+      <!-- Ribosome: 3D SHADED -->
+      <g id="ribosome-3d" filter="url(#soft-shadow)">
+        <!-- Large Subunit -->
+        <ellipse cx="120" cy="120" rx="45" ry="30" fill="url(#grad-cell-3d)" stroke="#2980b9" stroke-width="1.5" opacity="0.9"/>
+        <!-- Small Subunit -->
+        <ellipse cx="120" cy="145" rx="35" ry="15" fill="#ecf0f1" stroke="#7f8c8d" stroke-width="1.5" />
+        <text x="120" y="125" font-size="11" fill="#2c3e50" text-anchor="middle" font-weight="800">RIBOSOME</text>
+      </g>
       
-      <!-- Ribosome -->
-      <ellipse cx="120" cy="110" rx="30" ry="20" fill="#9B59B6" opacity="0.3" stroke="#9B59B6" stroke-width="2"/>
-      <text x="120" y="115" font-size="10" fill="#2C3E50" text-anchor="middle" font-weight="600">Ribosome</text>
-      
-      <!-- tRNA -->
-      ${[0, 1, 2].map(i => `
-        <path d="M ${95 + i * 20},130 L ${95 + i * 20},140 L ${100 + i * 20},145 L ${90 + i * 20},145 Z" 
-              fill="#27AE60" opacity="0.5" stroke="#27AE60" stroke-width="1.5"/>
+      <!-- tRNA with "Amino Acid" sphere -->
+      ${[0, 1].map(i => `
+        <g transform="translate(${90 + i * 25}, 160)">
+          <path d="M 0,0 L 0,-15 L 5,-20 L -5,-20 Z" fill="#27ae60" stroke="#1e8449" stroke-width="1"/>
+          <circle cx="0" cy="-25" r="5" fill="#e67e22" stroke="#d35400" />
+        </g>
       `).join('')}
-      <text x="105" y="160" font-size="9" fill="#27AE60" text-anchor="middle">tRNA</text>
       
-      <!-- Protein chain -->
-      <path d="M 160,110 Q 170,100 180,110 Q 190,120 200,110 Q 210,100 220,110" 
-            stroke="#E74C3C" stroke-width="3" fill="none"/>
-      <text x="190" y="95" font-size="10" fill="#E74C3C" text-anchor="middle" font-weight="600">Protein</text>
+      <!-- Growing Polypeptide Chain -->
+      <g filter="url(#soft-shadow)">
+        <path d="M 165,120 C 185,100 210,140 240,110" stroke="#e74c3c" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="1,6" />
+        <circle cx="165" cy="120" r="4" fill="#e74c3c" />
+        <circle cx="180" cy="110" r="4" fill="#e74c3c" />
+        <circle cx="200" cy="125" r="4" fill="#e74c3c" />
+        <text x="210" y="90" font-size="11" fill="#c0392b" font-weight="700">PROTEIN CHAIN</text>
+      </g>
       
       ${showLabel ? `
-        <text x="${width / 2}" y="${height + 15}" font-size="11" font-family="Inter, sans-serif" 
-              fill="#2C3E50" text-anchor="middle">
-          Protein Synthesis
+        <text x="${width / 2}" y="${height + 22}" font-size="13" font-family="Inter, sans-serif" 
+              fill="#2c3e50" text-anchor="middle" font-weight="600">
+          Protein Synthesis (Translation)
         </text>
       ` : ''}
     </svg>
@@ -71,35 +78,44 @@ export function createProteinSynthesis(options: MolecularBiologyOptions = {}): s
  * Create DNA double helix structure diagram
  */
 export function createDNAStructure(options: MolecularBiologyOptions = {}): string {
-    const { width = 180, height = 200, showLabel = true } = options;
+  const { width = 180, height = 240, showLabel = true } = options;
 
+  return `
+    <svg width="100%" height="auto" viewBox="0 0 ${width} ${height + 20}" 
+         style="max-width: ${width}px;" class="dna-structure-v2" xmlns="http://www.w3.org/2000/svg">
+      <!-- Glow Layer -->
+      <g filter="url(#dna-glow)">
+        <!-- Helix A -->
+        <path d="M 60,30 Q 85,60 60,90 Q 35,120 60,150 Q 85,180 60,210" 
+              stroke="#e74c3c" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.9"/>
+        <!-- Helix B -->
+        <path d="M 120,30 Q 95,60 120,90 Q 145,120 120,150 Q 95,180 120,210" 
+              stroke="#3498db" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.9"/>
+      </g>
+      
+      <!-- Base Pairs (Hydrogen Bonds) -->
+      ${[0, 1, 2, 3, 4, 5, 6, 7, 8].map(i => {
+    const y = 45 + i * 18;
+    const phase = (i * 18) / 60;
+    const xOffset = Math.sin(phase * Math.PI) * 20;
+    const x1 = 90 + xOffset;
+    const x2 = 90 - xOffset;
+    const color = i % 2 === 0 ? '#f1c40f' : '#2ecc71';
     return `
-    <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
-         class="dna-structure" xmlns="http://www.w3.org/2000/svg">
-      <!-- Double helix -->
-      <path d="M 60,30 Q 70,50 60,70 Q 50,90 60,110 Q 70,130 60,150 Q 50,170 60,190" 
-            stroke="#E74C3C" stroke-width="3" fill="none"/>
-      <path d="M 120,30 Q 110,50 120,70 Q 130,90 120,110 Q 110,130 120,150 Q 130,170 120,190" 
-            stroke="#3498DB" stroke-width="3" fill="none"/>
+          <line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="2.5" stroke-linecap="round" opacity="0.8"/>
+        `;
+  }).join('')}
       
-      <!-- Base pairs -->
-      ${[0, 1, 2, 3, 4, 5, 6, 7].map(i => {
-        const y = 40 + i * 20;
-        const x1 = 60 + Math.sin(i * 0.8) * 10;
-        const x2 = 120 - Math.sin(i * 0.8) * 10;
-        const color = i % 2 === 0 ? '#F39C12' : '#27AE60';
-        return `<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${color}" stroke-width="2"/>`;
-    }).join('')}
-      
-      <!-- Labels -->
-      <text x="30" y="100" font-size="9" fill="#F39C12">A-T</text>
-      <text x="30" y="120" font-size="9" fill="#27AE60">G-C</text>
-      <text x="90" y="210" font-size="10" fill="#2C3E50" text-anchor="middle">3.4 nm/turn</text>
+      <!-- Annotations -->
+      <g style="font-family: 'Inter', sans-serif; font-weight: 600;">
+        <text x="25" y="100" font-size="8" fill="#e67e22">ADENINE-THYMINE</text>
+        <text x="25" y="120" font-size="8" fill="#27ae60">GUANINE-CYTOSINE</text>
+      </g>
       
       ${showLabel ? `
-        <text x="${width / 2}" y="${height + 15}" font-size="11" font-family="Inter, sans-serif" 
-              fill="#2C3E50" text-anchor="middle">
-          DNA Double Helix
+        <text x="${width / 2}" y="${height + 15}" font-size="12" font-family="Inter, sans-serif" 
+              fill="#2c3e50" text-anchor="middle" font-weight="600">
+          DNA Double Helix Structure
         </text>
       ` : ''}
     </svg>
@@ -110,9 +126,9 @@ export function createDNAStructure(options: MolecularBiologyOptions = {}): strin
  * Create enzyme kinetics (Michaelis-Menten) diagram
  */
 export function createEnzymeKinetics(options: MolecularBiologyOptions = {}): string {
-    const { width = 220, height = 160, showLabel = true } = options;
+  const { width = 220, height = 160, showLabel = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
          class="enzyme-kinetics" xmlns="http://www.w3.org/2000/svg">
       <!-- Axes -->
@@ -155,9 +171,9 @@ export function createEnzymeKinetics(options: MolecularBiologyOptions = {}): str
  * Create cell signaling pathway diagram
  */
 export function createCellSignaling(options: MolecularBiologyOptions = {}): string {
-    const { width = 200, height = 180, showLabel = true } = options;
+  const { width = 200, height = 180, showLabel = true } = options;
 
-    return `
+  return `
     <svg width="${width}" height="${height + 20}" viewBox="0 0 ${width} ${height + 20}" 
          class="cell-signaling" xmlns="http://www.w3.org/2000/svg">
       <!-- Cell membrane -->
