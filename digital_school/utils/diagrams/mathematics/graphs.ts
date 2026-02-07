@@ -247,3 +247,57 @@ export function createModularGraph(id: string, modulus: number = 12): FBDDiagram
 
     return createMathDiagram(id, width, height, elements);
 }
+
+/**
+ * Linear graph (y = mx + c)
+ */
+export function createLinearGraph(
+    id: string,
+    m: number = 1,
+    c: number = 0,
+    label: string = ''
+): FBDDiagram {
+    const width = 500;
+    const height = 500;
+    const elements: string[] = [];
+    const centerX = 250;
+    const centerY = 250;
+    const scale = 40; // Pixels per unit
+
+    // Grid
+    elements.push(`<defs><pattern id="grid-${id}" width="${scale}" height="${scale}" patternUnits="userSpaceOnUse"><path d="M ${scale} 0 L 0 0 0 ${scale}" fill="none" stroke="#f0f0f0" stroke-width="1"/></pattern></defs>`);
+    elements.push(`<rect width="${width}" height="${height}" fill="url(#grid-${id})" />`);
+
+    // Axes
+    elements.push(`<line x1="20" y1="${centerY}" x2="${width - 20}" y2="${centerY}" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>`);
+    elements.push(`<line x1="${centerX}" y1="${height - 20}" x2="${centerX}" y2="20" stroke="#333" stroke-width="2" marker-end="url(#arrow)"/>`);
+    elements.push(`<text x="${width - 30}" y="${centerY + 20}" font-family="Arial" font-size="14">x</text>`);
+    elements.push(`<text x="${centerX + 15}" y="30" font-family="Arial" font-size="14">y</text>`);
+
+    // Calculate start and end points
+    // y = mx + c -> pixelY = centerY - (m * (pixelX - centerX) / scale + c) * scale
+    // xVal = (xPx - centerX) / scale
+
+    const points: string[] = [];
+    for (let xPx = 20; xPx <= width - 20; xPx += 5) {
+        const xVal = (xPx - centerX) / scale;
+        const yVal = m * xVal + c;
+        const yPx = centerY - yVal * scale;
+
+        if (yPx >= 20 && yPx <= height - 20) {
+            points.push(`${xPx},${yPx}`);
+        }
+    }
+
+    if (points.length > 1) {
+        elements.push(`<polyline points="${points.join(' ')}" fill="none" stroke="#2563eb" stroke-width="3" />`);
+    }
+
+    // Label
+    const displayLabel = label || `y = ${m}x + ${c}`;
+    if (displayLabel) {
+        elements.push(`<text x="${width - 150}" y="50" font-family="Arial" font-size="16" fill="#2563eb" font-weight="bold">${displayLabel}</text>`);
+    }
+
+    return createMathDiagram(id, width, height, elements);
+}

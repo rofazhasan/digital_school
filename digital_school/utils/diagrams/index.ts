@@ -267,6 +267,7 @@ import {
 import {
     createCircleGraph,
     createModularGraph,
+    createLinearGraph,
 } from './mathematics/graphs';
 
 import {
@@ -610,6 +611,7 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     }),
     'circle-graph': createCircleGraph,
     'modular': createModularGraph,
+    'graph-linear': (id: string, m: number = 1, c: number = 0, label: string = '') => createLinearGraph(id, m, c, label),
 
     // ===== CIRCUITS: ADVANCED =====
     'lrc-series': (id: string) => createLRCCircuit(id, 'series'),
