@@ -27,10 +27,8 @@ export default function SessionGuard() {
             };
             const encodedInfo = btoa(JSON.stringify(infoObj));
 
-            // Clear the cookie client-side IMMEDIATELY to prevent middleware redirect loops
-            // this fixes the issue where clicking "Signup" on the login page might still
-            // trigger a middleware redirect to the dashboard if the cookie persisted.
-            document.cookie = 'session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            // NOTE: The session-token is HttpOnly, so it cannot be deleted here.
+            // We rely on the Middleware to delete it when it sees the 'reason' parameter.
 
             window.location.href = `/login?reason=session_invalidated&info=${encodedInfo}`;
         } catch (e) {

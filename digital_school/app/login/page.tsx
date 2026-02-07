@@ -48,9 +48,7 @@ function LoginContent() {
         const info = searchParams.get('info');
 
         if (reason === 'session_invalidated' || reason === 'session_expired') {
-            // Clear the session cookie to prevent middleware redirect loops 
-            // and ensure a clean login state
-            document.cookie = 'session-token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+            // Note: Cookie clearing is handled by the middleware for HttpOnly tokens
 
             if (reason === 'session_invalidated' && info) {
                 try {
