@@ -378,6 +378,7 @@ export default function StudentDashboardPage() {
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'exams', label: 'Exams', icon: FileText },
+              { id: 'prac-perfect', label: 'PracPerfect', icon: Sparkles, href: '/student/prac-perfect' },
               { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
               { id: 'analytics', label: 'Analytics', icon: TrendingUp },
               { id: 'notices', label: 'Notices', icon: Bell }
