@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
                         options: q.options || undefined,
                         subQuestions: q.subQuestions || undefined,
                         modelAnswer: q.modelAnswer,
-                        fbd: q.fbd || undefined,
+                        // fbd: q.fbd || undefined, // REMOVED
                         createdById: creator.id,
                         hasMath: q.questionText.includes('\\') || (!!q.modelAnswer && q.modelAnswer.includes('\\'))
                     });
