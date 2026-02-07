@@ -425,7 +425,27 @@ export default function StudentDashboardPage() {
                 </p>
               </div>
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-4 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+                <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
+                  <Card
+                    className="border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-indigo-50/30"
+                    onClick={() => router.push('/student/prac-perfect')}
+                  >
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-sm font-medium text-indigo-900">Practice Perfectly</CardTitle>
+                      <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                        <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold text-indigo-700 font-mono tracking-tight">PracPerfect</div>
+                      <p className="text-xs text-indigo-600/70 mt-1">
+                        Personalized practice sessions
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+
                 <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
                   <Card className="border-l-4 border-l-blue-500 shadow-sm hover:shadow-md transition-shadow">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

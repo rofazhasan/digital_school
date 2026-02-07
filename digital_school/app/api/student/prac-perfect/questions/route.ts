@@ -1,15 +1,16 @@
-import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { NextResponse, NextRequest } from 'next/server';
+import { getTokenFromRequest } from '@/lib/auth';
 import prisma from '@/lib/db';
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
+        const auth = await getTokenFromRequest(request);
 
-        if (!session || !session.user || !session.user.id || session.user.role !== 'STUDENT') {
+        if (!auth || !auth.user || auth.user.role !== 'STUDENT') {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+
+        const session = { user: auth.user };
 
         // Get Student Profile to find their class
         const studentProfile = await prisma.studentProfile.findUnique({
