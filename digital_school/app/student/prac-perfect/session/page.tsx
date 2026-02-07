@@ -51,6 +51,7 @@ interface Question {
 export default function PracPerfectSessionPage() {
     const router = useRouter();
     const boardRef = useRef<SmartBoardRef>(null);
+    const questionContainerRef = useRef<HTMLDivElement>(null);
 
     // State
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -161,13 +162,15 @@ export default function PracPerfectSessionPage() {
         return () => clearInterval(timer);
     }, [router]);
 
-    // Reset state on question change
+    // Reset state and scroll on question change
     useEffect(() => {
         setSelectedOption(null);
         setIsChecked(false);
         setIsCorrect(false);
-        if (boardRef.current) {
-            // boardRef.current.clear(); 
+
+        // Auto-scroll question container to top
+        if (questionContainerRef.current) {
+            questionContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
     }, [currentIndex]);
 
@@ -274,7 +277,10 @@ export default function PracPerfectSessionPage() {
 
                 {/* 3. QUESTION CARD (Draggable/Fixed Overlay) */}
                 {showQuestion && (
-                    <div className="absolute top-24 left-4 md:left-10 w-[95vw] md:w-[500px] max-h-[calc(100vh-180px)] z-40 overflow-y-auto custom-scrollbar">
+                    <div
+                        ref={questionContainerRef}
+                        className="absolute top-20 left-4 md:left-10 w-[95vw] md:w-[600px] lg:w-[900px] xl:w-[1100px] 2xl:w-[1200px] max-h-[calc(100vh-160px)] z-40 overflow-y-auto custom-scrollbar transition-all duration-300 scroll-smooth"
+                    >
                         <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-slate-900/5 ${isDark ? 'bg-slate-900/80 text-white' : 'bg-white/80 text-slate-900'} transition-all duration-500`}>
                             <div className="p-6 space-y-6">
                                 {/* Question Header */}
@@ -310,7 +316,7 @@ export default function PracPerfectSessionPage() {
 
                                 {/* Options (MCQ) */}
                                 {currentQ.type === 'MCQ' && Array.isArray(currentQ.options) && (
-                                    <div className="space-y-3 mt-6">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
                                         {currentQ.options.map((opt: any, idx: number) => {
                                             const optText = typeof opt === 'string' ? opt : (opt.text || opt.label || JSON.stringify(opt));
 
