@@ -3,6 +3,7 @@
  */
 
 import type { FBDDiagram } from '../../fbd/types';
+import { createMethane, createCO2 as createCO2String } from '../svg-components/chemistry/molecules';
 
 function createChemDiagram(id: string, width: number, height: number, elements: string[]): FBDDiagram {
     return {
@@ -133,13 +134,14 @@ export function createAtom(id: string, electrons: number = 6, element: string = 
     return createChemDiagram(id, width, height, elements);
 }
 
+
 export function createMolecule(id: string, type: 'H2O' | 'CO2' | 'CH4' = 'H2O'): FBDDiagram {
-    const elements: string[] = [];
     const width = 400;
     const height = 300;
 
     if (type === 'H2O') {
-        // Water molecule
+        const elements: string[] = [];
+        // Water molecule (legacy implementation here, or could use createWater from molecules.ts)
         elements.push(`<circle cx="200" cy="150" r="30" fill="#dc2626" stroke="#991b1b" stroke-width="2"/>`);
         elements.push(`<text x="200" y="157" font-size="18" font-weight="bold" fill="white" text-anchor="middle">O</text>`);
 
@@ -152,7 +154,30 @@ export function createMolecule(id: string, type: 'H2O' | 'CO2' | 'CH4' = 'H2O'):
         elements.push(`<text x="260" y="105" font-size="16" font-weight="bold" fill="#333" text-anchor="middle">H</text>`);
 
         elements.push(`<text x="200" y="250" font-size="14" text-anchor="middle">H₂O (Water)</text>`);
+        return createChemDiagram(id, width, height, elements);
+    } else if (type === 'CO2') {
+        return {
+            id,
+            width,
+            height,
+            points: [],
+            forces: [],
+            showAxes: false,
+            showGrid: false,
+            customSVG: createCO2String({ width, height })
+        };
+    } else if (type === 'CH4') {
+        return {
+            id,
+            width,
+            height,
+            points: [],
+            forces: [],
+            showAxes: false,
+            showGrid: false,
+            customSVG: createMethane({ width, height })
+        };
     }
 
-    return createChemDiagram(id, width, height, elements);
+    return createChemDiagram(id, width, height, []);
 }

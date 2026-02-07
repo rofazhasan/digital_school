@@ -4,6 +4,7 @@
  */
 
 import type { FBDDiagram, FBDForce, FBDPoint, FBDBody, FBDMoment } from './types';
+import { renderFBDToSVG } from './svg-renderer';
 
 /**
  * FBD Builder - Fluent API for creating diagrams
@@ -109,10 +110,15 @@ export class FBDBuilder {
         return this;
     }
 
+
     /**
      * Build and return the diagram
      */
     build(): FBDDiagram {
+        // Generate SVG if not already present
+        if (!this.diagram.customSVG) {
+            this.diagram.customSVG = renderFBDToSVG(this.diagram);
+        }
         return this.diagram;
     }
 }
