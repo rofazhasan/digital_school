@@ -80,6 +80,9 @@ export default function PracPerfectSessionPage() {
     // Initialize
     useEffect(() => {
         const loadSession = async () => {
+            // Set Page Title
+            document.title = "Practise Session || Student | Digital School";
+
             const storedIds = localStorage.getItem("prac-perfect-session");
             if (!storedIds) {
                 toast.error("No active session found");
@@ -161,6 +164,30 @@ export default function PracPerfectSessionPage() {
         const timer = setInterval(() => setElapsedTime(p => p + 1), 1000);
         return () => clearInterval(timer);
     }, [router]);
+
+    // Keyboard Navigation
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Only handle if not typing in an input
+            if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+            if (e.key === 'ArrowRight') {
+                if (isChecked) handleNext();
+                else if (selectedOption !== null) handleCheckAnswer();
+            } else if (e.key === 'ArrowLeft') {
+                if (currentIndex > 0) setCurrentIndex(c => c - 1);
+            } else if (e.key === 'Enter') {
+                if (!isChecked && selectedOption !== null) {
+                    handleCheckAnswer();
+                } else if (isChecked) {
+                    handleNext();
+                }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [currentIndex, isChecked, selectedOption, questions.length]);
 
     // Reset state and scroll on question change
     useEffect(() => {

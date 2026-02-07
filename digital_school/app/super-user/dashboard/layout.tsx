@@ -24,6 +24,11 @@ export default async function Layout({
                 ip: info.ip || 'Unknown',
                 time: info.time || new Date().toISOString()
             })).toString('base64');
+
+            // Clear the cookie server-side to prevent redirect loops 
+            // and fix the Signup link navigation issue
+            (await cookies()).delete('session-token');
+
             redirect(`/login?reason=session_invalidated&info=${encodedInfo}`);
         }
     }
