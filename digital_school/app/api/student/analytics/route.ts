@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
             }
         });
 
-        const attendancePercentage = totalDays > 0 ? ((presentCount / totalDays) * 100).toFixed(1) : 0;
+        const attendancePercentage = totalDays > 0 ? Number(((presentCount / totalDays) * 100).toFixed(1)) : 0;
 
         // 3. Rank
         // To get rank, we need to compare with others in the same class.
@@ -117,6 +117,78 @@ export async function GET(req: NextRequest) {
             .map((entry, index) => ({ ...entry, rank: index + 1 }))
             .slice(0, 10); // Return top 10 for more depth
 
+        // 6. Trends & Subject Performance
+        // Group by exam to show progress over time
+        // To compare with others, we need class-wide averages for these exams
+        const examIds = results.map(r => r.examId);
+        const classResults = await prisma.result.findMany({
+            where: {
+                examId: { in: examIds },
+                student: { classId: studentProfile.classId }
+            },
+            select: {
+                examId: true,
+                total: true
+            }
+        });
+
+        const examAverages: { [key: string]: { total: number, count: number } } = {};
+        classResults.forEach(r => {
+            if (!examAverages[r.examId]) examAverages[r.examId] = { total: 0, count: 0 };
+            examAverages[r.examId].total += r.total;
+            examAverages[r.examId].count += 1;
+        });
+
+        const sortedResults = [...results].sort((a, b) => new Date(a.exam.date).getTime() - new Date(b.exam.date).getTime());
+        const trends = sortedResults.map(r => {
+            const classData = examAverages[r.examId];
+            const classAvg = classData ? Math.round((classData.total / (classData.count * r.exam.totalMarks)) * 100) : 0;
+
+            return {
+                label: r.exam.name,
+                score: Math.round((r.total / r.exam.totalMarks) * 100),
+                classAverage: classAvg,
+                date: r.exam.date
+            };
+        });
+
+        // Subject Strengths
+        const subjectGroups: { [key: string]: { total: number, possible: number, count: number } } = {};
+        results.forEach(r => {
+            const subject = r.exam.description || 'General';
+            if (!subjectGroups[subject]) subjectGroups[subject] = { total: 0, possible: 0, count: 0 };
+            subjectGroups[subject].total += r.total;
+            subjectGroups[subject].possible += r.exam.totalMarks;
+            subjectGroups[subject].count += 1;
+        });
+
+        const subjectPerformance = Object.entries(subjectGroups).map(([subject, data]) => ({
+            subject,
+            score: Math.round((data.total / data.possible) * 100)
+        }));
+
+        // 7. Insights (Good or Bad)
+        const insights = [];
+        if (averagePercentage >= 80) insights.push({ text: "Excellent overall performance!", type: "good" });
+        else if (averagePercentage < 50) insights.push({ text: "Overall score needs improvement.", type: "bad" });
+
+        const topSubject = [...subjectPerformance].sort((a, b) => b.score - a.score)[0];
+        if (topSubject && topSubject.score >= 85) insights.push({ text: `Outstanding in ${topSubject.subject}!`, type: "good" });
+
+        const weakSubject = [...subjectPerformance].sort((a, b) => a.score - b.score)[0];
+        if (weakSubject && weakSubject.score < 50) insights.push({ text: `Focus more on ${weakSubject.subject}.`, type: "bad" });
+
+        // Growth Insight
+        if (trends.length >= 2) {
+            const last = trends[trends.length - 1].score;
+            const prev = trends[trends.length - 2].score;
+            if (last > prev) insights.push({ text: "Great job! Your performance is trending upwards.", type: "good" });
+            else if (last < prev - 10) insights.push({ text: "Your recent score dropped significantly. Stay focused!", type: "bad" });
+        }
+
+        if (attendancePercentage >= 95) insights.push({ text: "Great attendance record!", type: "good" });
+        else if (attendancePercentage < 75) insights.push({ text: "Low attendance might affect grades.", type: "bad" });
+
         return NextResponse.json({
             analytics: {
                 attendance: {
@@ -133,7 +205,10 @@ export async function GET(req: NextRequest) {
                 },
                 rank: currentRank,
                 totalStudents: classStudents.length,
-                leaderboard
+                leaderboard,
+                trends,
+                subjectPerformance,
+                insights
             },
             badges
         });

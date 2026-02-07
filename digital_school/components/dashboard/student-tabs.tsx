@@ -35,72 +35,123 @@ ChartJS.register(
     ArcElement
 );
 
-export function StudentAnalyticsTab() {
+interface StudentAnalyticsTabProps {
+    analytics: any;
+}
+
+export function StudentAnalyticsTab({ analytics }: StudentAnalyticsTabProps) {
+    if (!analytics) return <div className="p-8 text-center text-muted-foreground">No analytics data available.</div>;
+
     const performanceData = {
-        labels: ['Unit 1', 'Mid-Term', 'Unit 2', 'Final (Mock)'],
+        labels: (analytics.trends || []).map((t: any) => t.label),
         datasets: [
             {
                 label: 'My Score (%)',
-                data: [78, 82, 85, 88],
-                borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1,
-                fill: false
+                data: (analytics.trends || []).map((t: any) => t.score),
+                borderColor: 'rgb(59, 130, 246)',
+                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                tension: 0.3,
+                fill: true
             },
             {
                 label: 'Class Average (%)',
-                data: [72, 75, 74, 76],
-                borderColor: 'rgb(201, 203, 207)',
+                data: (analytics.trends || []).map((t: any) => t.classAverage),
+                borderColor: 'rgba(100, 116, 139, 0.5)',
                 borderDash: [5, 5],
-                tension: 0.1,
+                tension: 0.3,
                 fill: false
             }
         ]
     };
 
-    const subjectStrengths = {
-        labels: ['Physics', 'Math', 'Chemistry', 'English', 'Biology'],
+    const subjectData = {
+        labels: (analytics.subjectPerformance || []).map((s: any) => s.subject),
         datasets: [
             {
-                label: 'Score',
-                data: [85, 90, 78, 82, 88],
+                label: 'Performance (%)',
+                data: (analytics.subjectPerformance || []).map((s: any) => s.score),
                 backgroundColor: [
-                    'rgba(255, 99, 132, 0.5)',
-                    'rgba(54, 162, 235, 0.5)',
-                    'rgba(255, 206, 86, 0.5)',
-                    'rgba(75, 192, 192, 0.5)',
-                    'rgba(153, 102, 255, 0.5)',
+                    'rgba(59, 130, 246, 0.6)',
+                    'rgba(16, 185, 129, 0.6)',
+                    'rgba(245, 158, 11, 0.6)',
+                    'rgba(239, 68, 68, 0.6)',
+                    'rgba(139, 92, 246, 0.6)',
                 ],
-                borderColor: [
-                    'rgba(255, 99, 132, 1)',
-                    'rgba(54, 162, 235, 1)',
-                    'rgba(255, 206, 86, 1)',
-                    'rgba(75, 192, 192, 1)',
-                    'rgba(153, 102, 255, 1)',
-                ],
-                borderWidth: 1,
+                borderRadius: 8,
             },
         ],
     };
 
+    const chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                display: false
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                max: 100,
+                grid: {
+                    color: 'rgba(0, 0, 0, 0.05)'
+                }
+            },
+            x: {
+                grid: {
+                    display: false
+                }
+            }
+        }
+    };
+
     return (
         <div className="space-y-6">
+            {/* Insights Row */}
+            {analytics.insights && analytics.insights.length > 0 && (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {analytics.insights.map((insight: any, i: number) => (
+                        <Card key={i} className={`border-none shadow-sm ${insight.type === 'good' ? 'bg-green-500/10 text-green-700' : 'bg-red-500/10 text-red-700'}`}>
+                            <CardContent className="p-4 flex items-center gap-3">
+                                {insight.type === 'good' ? <div className="p-2 bg-green-500 rounded-full text-white">✓</div> : <div className="p-2 bg-red-500 rounded-full text-white">!</div>}
+                                <span className="font-medium">{insight.text}</span>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+            )}
+
             <div className="grid gap-6 md:grid-cols-2">
-                <Card>
+                <Card className="shadow-sm border-none bg-slate-50/50">
                     <CardHeader>
-                        <CardTitle>Academic Progress</CardTitle>
-                        <CardDescription>Your performance trend over the semester.</CardDescription>
+                        <CardTitle className="text-lg">Academic Progress</CardTitle>
+                        <CardDescription>Your performance trend across all exams.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Line data={performanceData} height={300} options={{ maintainAspectRatio: false }} />
+                    <CardContent className="h-[300px]">
+                        {(analytics.trends || []).length > 0 ? (
+                            <Line data={performanceData} options={chartOptions} />
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-sm italic">
+                                Take more exams to see your progress trend!
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
-                <Card>
+
+                <Card className="shadow-sm border-none bg-slate-50/50">
                     <CardHeader>
-                        <CardTitle>Subject Performance</CardTitle>
-                        <CardDescription>Marks distribution across subjects.</CardDescription>
+                        <CardTitle className="text-lg">Subject-wise Mastery</CardTitle>
+                        <CardDescription>Average scores across different subjects.</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <Bar data={subjectStrengths} height={300} options={{ maintainAspectRatio: false }} />
+                    <CardContent className="h-[300px]">
+                        {(analytics.subjectPerformance || []).length > 0 ? (
+                            <Bar data={subjectData} options={chartOptions} />
+                        ) : (
+                            <div className="h-full flex items-center justify-center text-muted-foreground text-sm italic">
+                                No subject data available yet.
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>

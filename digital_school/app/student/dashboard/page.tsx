@@ -898,7 +898,7 @@ export default function StudentDashboardPage() {
           {activeTab === 'analytics' && (
             <div className="mb-8 max-w-7xl 2xl:max-w-[95vw] mx-auto">
               <h2 className="text-3xl font-bold mb-6">Academic Analytics</h2>
-              <StudentAnalyticsTab />
+              <StudentAnalyticsTab analytics={analytics} />
             </div>
           )}
 
