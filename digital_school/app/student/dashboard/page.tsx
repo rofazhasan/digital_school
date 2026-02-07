@@ -142,13 +142,21 @@ export default function StudentDashboardPage() {
               const userClassId = data.user.studentProfile?.classId;
 
               if (userClassId && Array.isArray(examData)) {
+                const now = new Date();
+                const cutoffDate = new Date();
+                cutoffDate.setDate(now.getDate() + 3);
+                cutoffDate.setHours(0, 0, 0, 0);
+
                 filtered = examData.filter((exam: any) => {
                   // Class Filter
-                  return exam.classId === userClassId;
-                });
+                  if (exam.classId !== userClassId) return false;
 
-                // Sort by date (descending - newest/upcoming first)
-                filtered.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                  // Date Filter (Past + Next 2 days)
+                  const examDate = new Date(exam.date);
+                  if (examDate >= cutoffDate) return false;
+
+                  return true;
+                });
               }
               if (isMounted) setExams(filtered);
             })
