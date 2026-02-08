@@ -65,21 +65,21 @@ export default function SessionGuard() {
                 await checkSession();
                 if (isShowingModal.current) return;
 
-                // Setup WebSocket
-                const socketUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
-                activeSocket = io(socketUrl, {
-                    auth: {
-                        token: document.cookie.split('; ').find(row => row.startsWith('session-token='))?.split('=')[1]
-                    },
-                    reconnectionAttempts: 3
-                });
+                // Setup WebSocket - DISABLED for Serverless/Netlify
+                // const socketUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+                // activeSocket = io(socketUrl, {
+                //     auth: {
+                //         token: document.cookie.split('; ').find(row => row.startsWith('session-token='))?.split('=')[1]
+                //     },
+                //     reconnectionAttempts: 3
+                // });
 
-                activeSocket.on('forced-logout', handleForcedLogout);
-                activeSocket.on('notification', (data: any) => {
-                    if (data.type === 'forced-logout') handleForcedLogout(data);
-                });
+                // activeSocket.on('forced-logout', handleForcedLogout);
+                // activeSocket.on('notification', (data: any) => {
+                //     if (data.type === 'forced-logout') handleForcedLogout(data);
+                // });
 
-                // Setup Polling
+                // Setup Polling (Fallback is now primary)
                 pollInterval = setInterval(checkSession, 5000);
 
             } catch (error) {
@@ -90,7 +90,7 @@ export default function SessionGuard() {
         initializeSession();
 
         return () => {
-            if (activeSocket) activeSocket.disconnect();
+            // if (activeSocket) activeSocket.disconnect();
             if (pollInterval) clearInterval(pollInterval);
         };
     }, [pathname, isPublicPage]);

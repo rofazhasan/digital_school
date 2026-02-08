@@ -55,6 +55,51 @@ export async function GET(
     }
 
     // Fetch submission with exam set and drawings
+    // -------------------------------------------------------------------------
+    // LATE AUTO-RELEASE CHECK
+    // -------------------------------------------------------------------------
+    let isMCQOnly = false;
+    try {
+      const { isMCQOnlyExam } = await import("@/lib/exam-logic");
+      // Need to pass exam sets, but here we fetched exam with class.
+      // We need to fetch exam sets or rely on legacy check if not available.
+      // Let's fetch sets quickly or use the single set if available (though fetch here is expensive)
+      // Actually, for results page we might not want to fetch all sets if not necessary.
+      // But we can check CQ/SQ counts first, and if 0, then we are good.
+      // If non-zero, we might be blocked.
+      // For Safety: Just use the imported function which handles the exam object properties first.
+
+      // We need to fetch exam sets if we want robust check.
+      const examSetsForCheck = await db.examSet.findMany({ where: { examId: exam.id } });
+      isMCQOnly = isMCQOnlyExam(exam, examSetsForCheck);
+    } catch (e) {
+      isMCQOnly = ((exam.cqTotalQuestions === 0 || !exam.cqTotalQuestions) &&
+        (exam.sqTotalQuestions === 0 || !exam.sqTotalQuestions));
+    }
+
+    const isTimeOver = (new Date() > new Date(exam.endTime));
+
+    if (isMCQOnly && isTimeOver) {
+      // Check if results are likely published (check current user's result or any result)
+      // We'll check if any result exists and is published to avoid redundant calls
+      const sampleResult = await db.result.findFirst({
+        where: { examId: exam.id },
+        select: { isPublished: true }
+      });
+
+      if (!sampleResult || !sampleResult.isPublished) {
+        try {
+          // Dynamically import to avoid circular dependencies
+          const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
+          console.log(`[ResultAPI] Time over and results not published. Triggering auto-release for ${exam.id}`);
+          await finalizeAndReleaseExam(exam.id);
+        } catch (e) {
+          console.error("[ResultAPI] Error in late auto-release:", e);
+        }
+      }
+    }
+    // -------------------------------------------------------------------------
+
     const submission = await (db.examSubmission as any).findFirst({
       where: {
         examId: examId,

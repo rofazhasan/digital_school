@@ -1425,7 +1425,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           </div>
                           <div className="space-y-6">
                             {result.questions
-                              .filter(q => q.type === 'MCQ')
+                              .filter(q => {
+                                if (q.type !== 'MCQ') return false;
+                                // Filter Logic
+                                const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                                const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                                switch (filterStatus) {
+                                  case 'CORRECT': return isCorrect;
+                                  case 'WRONG': return hasAnswer && !isCorrect;
+                                  case 'UNANSWERED': return !hasAnswer;
+                                  default: return true;
+                                }
+                              })
                               .map((question, index) => (
                                 <motion.div
                                   key={question.id}

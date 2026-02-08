@@ -128,6 +128,64 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     console.log(`[Submit] Success for user ${studentId}, exam ${examId}, set ${targetExamSetId}`);
 
+    // -------------------------------------------------------------------------
+    // AUTO-GRADING & AUTO-RELEASE LOGIC
+    // -------------------------------------------------------------------------
+
+    // 1. If MCQ Only, evaluate immediately
+    // Helper to check if MCQ only (improved check)
+    let isMCQOnly = false;
+    try {
+      const { isMCQOnlyExam } = await import("@/lib/exam-logic");
+      isMCQOnly = isMCQOnlyExam(exam, exam.examSets);
+    } catch (e) {
+      // Fallback if import fails (shouldn't happen)
+      isMCQOnly = (exam.cqTotalQuestions === 0 || !exam.cqTotalQuestions) &&
+        (exam.sqTotalQuestions === 0 || !exam.sqTotalQuestions);
+    }
+
+    if (isMCQOnly) {
+      try {
+        // Dynamically import to avoid circular dependency issues if any
+        const { evaluateSubmission, finalizeAndReleaseExam } = await import("@/lib/exam-logic");
+
+        // Evaluate THIS submission immediately
+        await evaluateSubmission(submission, exam, exam.examSets);
+        console.log(`✅ Auto-graded submission ${submission.id}`);
+
+        // 2. Check Auto-Release Conditions
+        // Condition A: All students in the class have submitted
+        // Condition B: Time is over (and this submission might be the trigger)
+
+        const totalStudentsCount = await prisma.studentProfile.count({
+          where: { classId: exam.classId, user: { isActive: true } }
+        });
+
+        const submittedCount = await prisma.examSubmission.count({
+          where: {
+            examId: examId,
+            // @ts-ignore
+            status: 'SUBMITTED'
+          }
+        });
+
+        const isTimeOver = new Date() > new Date(exam.endTime);
+        const allSubmitted = submittedCount >= totalStudentsCount;
+
+        console.log(`[Auto-Release Check] Exam ${examId}: Submitted ${submittedCount}/${totalStudentsCount}, TimeOver: ${isTimeOver}`);
+
+        if (allSubmitted || isTimeOver) {
+          console.log(`🚀 Triggering Auto-Release for Exam ${examId}`);
+          // This will force-submit any pending ones (if time over) and release results
+          await finalizeAndReleaseExam(examId);
+        }
+
+      } catch (evalError) {
+        console.error("Auto-evaluation error:", evalError);
+        // We don't block the response, just log error
+      }
+    }
+
     return NextResponse.json({
       success: true,
       submissionId: submission.id,

@@ -148,6 +148,25 @@ export async function GET(
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
+    // -------------------------------------------------------------------------
+    // AUTO-RELEASE TRIGGER (Teacher View Fallback)
+    // -------------------------------------------------------------------------
+    try {
+      const { isMCQOnlyExam, finalizeAndReleaseExam } = await import("@/lib/exam-logic");
+      const isMCQOnly = isMCQOnlyExam(exam, (exam as any).examSets);
+      const isTimeOver = (new Date() > new Date(exam.endTime));
+
+      // If MCQ only and time is over, trigger release (handled safely/idempotently by lib)
+      if (isMCQOnly && isTimeOver) {
+        // Run in background but await to ensure consistency if this is the first view
+        await finalizeAndReleaseExam(exam.id);
+      }
+    } catch (e) {
+      console.error("Auto-release trigger failed in evaluation API:", e);
+      // Continue loading page even if trigger fails
+    }
+    // -------------------------------------------------------------------------
+
     // Get questions from exam sets - each student might have different questions
     const allQuestions: any[] = [];
     const studentQuestionsMap = new Map();
