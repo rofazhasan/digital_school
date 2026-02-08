@@ -181,6 +181,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [notificationMessage, setNotificationMessage] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string>('');
   const [zoomedImageTitle, setZoomedImageTitle] = useState<string>('');
+  const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNANSWERED'>('ALL');
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [annotatedImageFailed, setAnnotatedImageFailed] = useState(false);
   const [originalImageFallback, setOriginalImageFallback] = useState<string>('');
@@ -1116,7 +1117,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                           {result.result.isPublished && result.result.rank && (
                             <div className="p-4 bg-blue-50 rounded-lg text-center">
                               <div className="text-2xl font-bold text-blue-600">{result.result.rank}</div>
@@ -1126,6 +1127,22 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           <div className="p-4 bg-green-50 rounded-lg text-center">
                             <div className="text-2xl font-bold text-green-600">{result.statistics.totalStudents}</div>
                             <div className="text-sm text-gray-600">Total Students</div>
+                          </div>
+
+                          {/* Efficiency Metric */}
+                          <div className="p-4 bg-purple-50 rounded-lg text-center">
+                            <div className="text-2xl font-bold text-purple-600">
+                              {(() => {
+                                const answered = result.questions.filter(q =>
+                                  q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided'
+                                ).length;
+                                const correct = result.questions.filter(q =>
+                                  q.awardedMarks === q.marks && q.marks > 0
+                                ).length;
+                                return answered > 0 ? ((correct / answered) * 100).toFixed(0) + '%' : 'N/A';
+                              })()}
+                            </div>
+                            <div className="text-sm text-gray-600">Efficiency</div>
                           </div>
                         </div>
 
@@ -1339,705 +1356,802 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
+                  {/* Filter Controls */}
+                  <div className="flex flex-wrap gap-2 mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <span className="text-sm font-medium text-gray-700 my-auto mr-2">Filter Questions:</span>
+                    <Button
+                      variant={filterStatus === 'ALL' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilterStatus('ALL')}
+                      className={filterStatus === 'ALL' ? 'bg-indigo-600' : ''}
+                    >
+                      All
+                    </Button>
+                    <Button
+                      variant={filterStatus === 'CORRECT' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilterStatus('CORRECT')}
+                      className={filterStatus === 'CORRECT' ? 'bg-green-600' : 'text-green-700 border-green-200 hover:bg-green-50'}
+                    >
+                      <CheckCircle className="h-4 w-4 mr-1" /> Correct
+                    </Button>
+                    <Button
+                      variant={filterStatus === 'WRONG' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilterStatus('WRONG')}
+                      className={filterStatus === 'WRONG' ? 'bg-red-600' : 'text-red-700 border-red-200 hover:bg-red-50'}
+                    >
+                      <XCircle className="h-4 w-4 mr-1" /> Wrong/Partial
+                    </Button>
+                    <Button
+                      variant={filterStatus === 'UNANSWERED' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setFilterStatus('UNANSWERED')}
+                      className={filterStatus === 'UNANSWERED' ? 'bg-gray-600' : 'text-gray-700 border-gray-200 hover:bg-gray-50'}
+                    >
+                      <Minus className="h-4 w-4 mr-1" /> Unanswered
+                    </Button>
+                  </div>
+
                   <div className="space-y-12">
                     {/* MCQ Section */}
-                    {result.questions.filter(q => q.type === 'MCQ').length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <CheckSquare className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Multiple Choice Questions (MCQ)</h3>
-                          <Badge className="bg-blue-100 text-blue-800">
-                            {result.questions.filter(q => q.type === 'MCQ').length} Questions
-                          </Badge>
-                          {result.questions.some(q => q.type === 'MCQ' && q.awardedMarks < 0) && (
-                            <Badge variant="destructive" className="text-xs">
-                              Negative Marking Applied
+                    {result.questions.filter(q => {
+                      if (q.type !== 'MCQ') return false;
+                      // Filter Logic
+                      const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                              <CheckSquare className="h-4 w-4 text-blue-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Multiple Choice Questions (MCQ)</h3>
+                            <Badge className="bg-blue-100 text-blue-800">
+                              {result.questions.filter(q => q.type === 'MCQ').length} Questions
                             </Badge>
-                          )}
-                        </div>
-                        <div className="space-y-6">
-                          {result.questions
-                            .filter(q => q.type === 'MCQ')
-                            .map((question, index) => (
-                              <motion.div
-                                key={question.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.1 * index }}
-                                className="border rounded-lg p-6 bg-blue-50/50"
-                              >
-                                {/* Question Header */}
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-3">
-                                    <Badge className="bg-blue-100 text-blue-800">
-                                      MCQ
-                                    </Badge>
-                                    <span className="text-sm text-gray-600">Question {index + 1}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">Marks:</span>
-                                    <Badge variant={question.isCorrect ? 'default' : 'destructive'}>
-                                      {question.awardedMarks}/{question.marks}
-                                    </Badge>
-                                    {question.awardedMarks < 0 && (
-                                      <Badge variant="destructive" className="text-xs">
-                                        Negative
+                            {result.questions.some(q => q.type === 'MCQ' && q.awardedMarks < 0) && (
+                              <Badge variant="destructive" className="text-xs">
+                                Negative Marking Applied
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => q.type === 'MCQ')
+                              .map((question, index) => (
+                                <motion.div
+                                  key={question.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.1 * index }}
+                                  className="border rounded-lg p-6 bg-blue-50/50"
+                                >
+                                  {/* Question Header */}
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <Badge className="bg-blue-100 text-blue-800">
+                                        MCQ
                                       </Badge>
+                                      <span className="text-sm text-gray-600">Question {index + 1}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-gray-600">Marks:</span>
+                                      <Badge variant={question.isCorrect ? 'default' : 'destructive'}>
+                                        {question.awardedMarks}/{question.marks}
+                                      </Badge>
+                                      {question.awardedMarks < 0 && (
+                                        <Badge variant="destructive" className="text-xs">
+                                          Negative
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+
+                                  {/* Question Text */}
+                                  <div className="mb-4">
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
+                                    <div className="text-gray-700">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                    </div>
+                                    {question.awardedMarks < 0 && (
+                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                                        <div className="flex items-center gap-2">
+                                          <Minus className="h-4 w-4 text-red-600" />
+                                          <span className="text-sm text-red-700 font-medium">
+                                            Negative marks applied for incorrect answer: {question.awardedMarks} marks
+                                          </span>
+                                        </div>
+                                      </div>
                                     )}
                                   </div>
-                                </div>
 
-                                {/* Question Text */}
-                                <div className="mb-4">
-                                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                  <div className="text-gray-700">
-                                    <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                  </div>
-                                  {question.awardedMarks < 0 && (
-                                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                                      <div className="flex items-center gap-2">
-                                        <Minus className="h-4 w-4 text-red-600" />
-                                        <span className="text-sm text-red-700 font-medium">
-                                          Negative marks applied for incorrect answer: {question.awardedMarks} marks
-                                        </span>
+                                  {/* MCQ Options */}
+                                  {question.options && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Options:</h4>
+                                      <div className="space-y-2">
+                                        {question.options.map((option, optIndex) => {
+                                          const isCorrect = option.isCorrect;
+                                          const isSelected = question.studentAnswer === option.text;
+                                          const isUnanswered = !question.studentAnswer;
+
+                                          return (
+                                            <div
+                                              key={optIndex}
+                                              className={`p-3 rounded-lg border-2 transition-all ${isCorrect && isSelected
+                                                ? 'border-green-500 bg-green-50'
+                                                : isCorrect && isUnanswered
+                                                  ? 'border-blue-500 bg-blue-50' // Different color for correct answer when unanswered
+                                                  : isSelected && !isCorrect
+                                                    ? 'border-red-500 bg-red-50'
+                                                    : isCorrect
+                                                      ? 'border-green-500 bg-green-50'
+                                                      : 'border-gray-200 bg-white'
+                                                }`}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <span className="font-medium">{String.fromCharCode(0x0995 + optIndex)}.</span>
+                                                <span className={isCorrect && isUnanswered ? 'text-blue-700 font-medium' : ''}>
+                                                  <UniversalMathJax inline dynamic>
+                                                    {cleanupMath(option.text)}
+                                                  </UniversalMathJax>
+                                                </span>
+                                                {isCorrect && (
+                                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                                )}
+                                                {isSelected && !isCorrect && (
+                                                  <XCircle className="h-4 w-4 text-red-600" />
+                                                )}
+                                                {isCorrect && isUnanswered && (
+                                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                    Correct Answer
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
                                       </div>
                                     </div>
                                   )}
-                                </div>
 
-                                {/* MCQ Options */}
-                                {question.options && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Options:</h4>
-                                    <div className="space-y-2">
-                                      {question.options.map((option, optIndex) => {
-                                        const isCorrect = option.isCorrect;
-                                        const isSelected = question.studentAnswer === option.text;
-                                        const isUnanswered = !question.studentAnswer;
-
-                                        return (
-                                          <div
-                                            key={optIndex}
-                                            className={`p-3 rounded-lg border-2 transition-all ${isCorrect && isSelected
-                                              ? 'border-green-500 bg-green-50'
-                                              : isCorrect && isUnanswered
-                                                ? 'border-blue-500 bg-blue-50' // Different color for correct answer when unanswered
-                                                : isSelected && !isCorrect
-                                                  ? 'border-red-500 bg-red-50'
-                                                  : isCorrect
-                                                    ? 'border-green-500 bg-green-50'
-                                                    : 'border-gray-200 bg-white'
-                                              }`}
-                                          >
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-medium">{String.fromCharCode(0x0995 + optIndex)}.</span>
-                                              <span className={isCorrect && isUnanswered ? 'text-blue-700 font-medium' : ''}>
-                                                <UniversalMathJax inline dynamic>
-                                                  {cleanupMath(option.text)}
-                                                </UniversalMathJax>
-                                              </span>
-                                              {isCorrect && (
-                                                <CheckCircle className="h-4 w-4 text-green-600" />
-                                              )}
-                                              {isSelected && !isCorrect && (
-                                                <XCircle className="h-4 w-4 text-red-600" />
-                                              )}
-                                              {isCorrect && isUnanswered && (
-                                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                  Correct Answer
-                                                </span>
-                                              )}
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Explanation */}
-                                {question.explanation && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Explanation:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                      <div className="text-gray-700">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                  {/* Explanation */}
+                                  {question.explanation && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Explanation:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
+                                        <div className="text-gray-700">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Feedback */}
-                                {question.feedback && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                      <p className="text-gray-700">{question.feedback}</p>
+                                  {/* Feedback */}
+                                  {question.feedback && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
+                                        <p className="text-gray-700">{question.feedback}</p>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </motion.div>
-                            ))}
+                                  )}
+                                </motion.div>
+                              ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
 
                     {/* CQ Section */}
-                    {result.questions.filter(q => q.type === 'CQ').length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <FileText className="h-4 w-4 text-green-600" />
+                    {result.questions.filter(q => {
+                      if (q.type !== 'CQ') return false;
+                      // Filter Logic
+                      const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                              <FileText className="h-4 w-4 text-green-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Creative Questions (CQ)</h3>
+                            <Badge className="bg-green-100 text-green-800">
+                              {result.questions.filter(q => q.type === 'CQ').length} Questions
+                            </Badge>
                           </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Creative Questions (CQ)</h3>
-                          <Badge className="bg-green-100 text-green-800">
-                            {result.questions.filter(q => q.type === 'CQ').length} Questions
-                          </Badge>
-                        </div>
-                        <div className="space-y-6">
-                          {result.questions
-                            .filter(q => q.type === 'CQ')
-                            .map((question, index) => (
-                              <motion.div
-                                key={question.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.1 * index }}
-                                className="border rounded-lg p-6 bg-green-50/50"
-                              >
-                                {/* Question Header */}
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-3">
-                                    <Badge className="bg-green-100 text-green-800">
-                                      CQ
-                                    </Badge>
-                                    <span className="text-sm text-gray-600">Question {index + 1}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">Marks:</span>
-                                    <Badge variant="secondary">
-                                      {question.awardedMarks}/{question.marks}
-                                    </Badge>
-                                  </div>
-                                </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => {
+                                if (q.type !== 'CQ') return false;
+                                // Filter Logic
+                                const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                                const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
 
-                                {/* Question Text */}
-                                <div className="mb-4">
-                                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                  <div className="text-gray-700">
-                                    <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                  </div>
-                                </div>
-
-                                {/* Student Answer */}
-                                <div className="mb-4">
-                                  <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
-                                  {question.studentAnswer ? (
-                                    <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                      <p className="text-gray-700">{question.studentAnswer}</p>
+                                switch (filterStatus) {
+                                  case 'CORRECT': return isCorrect;
+                                  case 'WRONG': return hasAnswer && !isCorrect;
+                                  case 'UNANSWERED': return !hasAnswer;
+                                  default: return true;
+                                }
+                              })
+                              .map((question, index) => (
+                                <motion.div
+                                  key={question.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.1 * index }}
+                                  className="border rounded-lg p-6 bg-green-50/50"
+                                >
+                                  {/* Question Header */}
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <Badge className="bg-green-100 text-green-800">
+                                        CQ
+                                      </Badge>
+                                      <span className="text-sm text-gray-600">Question {index + 1}</span>
                                     </div>
-                                  ) : (
-                                    <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
-                                      <p className="text-gray-500 italic">No answer provided</p>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-gray-600">Marks:</span>
+                                      <Badge variant="secondary">
+                                        {question.awardedMarks}/{question.marks}
+                                      </Badge>
                                     </div>
-                                  )}
-                                </div>
+                                  </div>
 
-                                {/* Student Answer Images */}
-                                {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                  {/* Question Text */}
                                   <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <Camera className="h-4 w-4 text-green-600" />
-                                        <span className="text-sm font-medium text-green-800">
-                                          Images you uploaded during the exam
-                                        </span>
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
+                                    <div className="text-gray-700">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                    </div>
+                                  </div>
+
+                                  {/* Student Answer */}
+                                  <div className="mb-4">
+                                    <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
+                                    {question.studentAnswer ? (
+                                      <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
+                                        <p className="text-gray-700">{question.studentAnswer}</p>
                                       </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {question.studentAnswerImages.map((imageUrl: string, index: number) => (
-                                          <div
-                                            key={index}
-                                            className="relative group cursor-pointer"
-                                            onClick={() => {
-                                              setZoomedImage(imageUrl);
-                                              setZoomedImageTitle(`Your Answer Image ${index + 1}`);
-                                              setShowZoomModal(true);
-                                            }}
-                                          >
-                                            <img
-                                              src={imageUrl}
-                                              alt={`Your answer image ${index + 1}`}
-                                              crossOrigin="anonymous"
-                                              className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
-                                              onLoad={() => {
-                                                console.log('Student answer image loaded successfully:', imageUrl);
+                                    ) : (
+                                      <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
+                                        <p className="text-gray-500 italic">No answer provided</p>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Student Answer Images */}
+                                  {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <Camera className="h-4 w-4 text-green-600" />
+                                          <span className="text-sm font-medium text-green-800">
+                                            Images you uploaded during the exam
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                          {question.studentAnswerImages.map((imageUrl: string, index: number) => (
+                                            <div
+                                              key={index}
+                                              className="relative group cursor-pointer"
+                                              onClick={() => {
+                                                setZoomedImage(imageUrl);
+                                                setZoomedImageTitle(`Your Answer Image ${index + 1}`);
+                                                setShowZoomModal(true);
                                               }}
-                                              onError={(e) => {
-                                                console.error('Student answer image failed to load:', imageUrl);
-                                                // Show error placeholder
-                                                e.currentTarget.style.display = 'none';
-                                                const parent = e.currentTarget.parentElement;
-                                                if (parent) {
-                                                  const errorDiv = document.createElement('div');
-                                                  errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
-                                                  errorDiv.innerHTML = `
+                                            >
+                                              <img
+                                                src={imageUrl}
+                                                alt={`Your answer image ${index + 1}`}
+                                                crossOrigin="anonymous"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                onLoad={() => {
+                                                  console.log('Student answer image loaded successfully:', imageUrl);
+                                                }}
+                                                onError={(e) => {
+                                                  console.error('Student answer image failed to load:', imageUrl);
+                                                  // Show error placeholder
+                                                  e.currentTarget.style.display = 'none';
+                                                  const parent = e.currentTarget.parentElement;
+                                                  if (parent) {
+                                                    const errorDiv = document.createElement('div');
+                                                    errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
+                                                    errorDiv.innerHTML = `
                                                   <div class="text-center">
                                                     <div class="mb-1">📷</div>
                                                     <div>Image not available</div>
                                                     <div class="text-xs mt-1">URL: ${imageUrl.substring(0, 50)}...</div>
                                                   </div>
                                                 `;
-                                                  parent.appendChild(errorDiv);
-                                                }
-                                              }}
-                                            />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    parent.appendChild(errorDiv);
+                                                  }
+                                                }}
+                                              />
+                                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              </div>
                                             </div>
-                                          </div>
-                                        ))}
+                                          ))}
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Evaluator's Drawing Feedback */}
-                                {question.allDrawings && question.allDrawings.length > 0 && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        <MessageSquare className="h-4 w-4 text-orange-600" />
-                                        <span className="text-sm font-medium text-orange-800">
-                                          Teacher's annotations on your answer
-                                        </span>
-                                      </div>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                        {question.allDrawings.map((drawing, index) => (
-                                          <div
-                                            key={index}
-                                            className="relative group cursor-pointer"
-                                            onClick={() => {
-                                              setZoomedImage(drawing.imageData);
-                                              setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
-                                              setShowZoomModal(true);
-                                            }}
-                                          >
-                                            <img
-                                              src={drawing.imageData}
-                                              alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                              crossOrigin="anonymous"
-                                              className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
-                                              onError={(e) => {
-                                                console.error('Annotated image failed to load:', drawing.imageData);
-                                                // Show error placeholder
-                                                e.currentTarget.style.display = 'none';
-                                                const parent = e.currentTarget.parentElement;
-                                                if (parent) {
-                                                  const errorDiv = document.createElement('div');
-                                                  errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
-                                                  errorDiv.innerHTML = `
+                                  {/* Evaluator's Drawing Feedback */}
+                                  {question.allDrawings && question.allDrawings.length > 0 && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
+                                        <div className="flex items-center gap-2 mb-2">
+                                          <MessageSquare className="h-4 w-4 text-orange-600" />
+                                          <span className="text-sm font-medium text-orange-800">
+                                            Teacher's annotations on your answer
+                                          </span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                          {question.allDrawings.map((drawing, index) => (
+                                            <div
+                                              key={index}
+                                              className="relative group cursor-pointer"
+                                              onClick={() => {
+                                                setZoomedImage(drawing.imageData);
+                                                setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
+                                                setShowZoomModal(true);
+                                              }}
+                                            >
+                                              <img
+                                                src={drawing.imageData}
+                                                alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
+                                                crossOrigin="anonymous"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                onError={(e) => {
+                                                  console.error('Annotated image failed to load:', drawing.imageData);
+                                                  // Show error placeholder
+                                                  e.currentTarget.style.display = 'none';
+                                                  const parent = e.currentTarget.parentElement;
+                                                  if (parent) {
+                                                    const errorDiv = document.createElement('div');
+                                                    errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
+                                                    errorDiv.innerHTML = `
                                                   <div class="text-center">
                                                     <div class="mb-1">📷</div>
                                                     <div>Annotated image not available</div>
                                                   </div>
                                                 `;
-                                                  parent.appendChild(errorDiv);
-                                                }
-                                              }}
-                                            />
-                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                              <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                    parent.appendChild(errorDiv);
+                                                  }
+                                                }}
+                                              />
+                                              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                              </div>
                                             </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Model Answer */}
+                                  {question.modelAnswer && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
+                                        <div className="text-gray-700">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Sub Questions */}
+                                  {question.subQuestions && question.subQuestions.length > 0 && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
+                                      <div className="space-y-2">
+                                        {question.subQuestions.map((subQ, subIndex) => (
+                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                            <div className="mb-2">
+                                              <p className="text-gray-700 font-medium">
+                                                {subQ.questionText || subQ.text || subQ.question || ''}
+                                              </p>
+                                            </div>
+                                            {subQ.modelAnswer && (
+                                              <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
+                                                <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
+                                                <p className="text-gray-700">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
+                                                </p>
+                                              </div>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Model Answer */}
-                                {question.modelAnswer && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                      <div className="text-gray-700">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
+                                  {/* Feedback */}
+                                  {question.feedback && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
+                                        <p className="text-gray-700">{question.feedback}</p>
                                       </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
+                                </motion.div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
 
-                                {/* Sub Questions */}
-                                {question.subQuestions && question.subQuestions.length > 0 && (
+                    {/* SQ Section */}
+                    {result.questions.filter(q => {
+                      if (q.type !== 'SQ') return false;
+                      // Filter Logic
+                      const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                              <MessageSquare className="h-4 w-4 text-yellow-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Short Questions (SQ)</h3>
+                            <Badge className="bg-yellow-100 text-yellow-800">
+                              {result.questions.filter(q => q.type === 'SQ').length} Questions
+                            </Badge>
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => {
+                                if (q.type !== 'SQ') return false;
+                                // Filter Logic
+                                const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                                const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                                switch (filterStatus) {
+                                  case 'CORRECT': return isCorrect;
+                                  case 'WRONG': return hasAnswer && !isCorrect;
+                                  case 'UNANSWERED': return !hasAnswer;
+                                  default: return true;
+                                }
+                              })
+                              .map((question, index) => (
+                                <motion.div
+                                  key={question.id}
+                                  initial={{ opacity: 0, x: -20 }}
+                                  animate={{ opacity: 1, x: 0 }}
+                                  transition={{ delay: 0.1 * index }}
+                                  className="border rounded-lg p-6 bg-yellow-50/50"
+                                >
+                                  {/* Question Header */}
+                                  <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                      <Badge className="bg-yellow-100 text-yellow-800">
+                                        SQ
+                                      </Badge>
+                                      <span className="text-sm text-gray-600">Question {index + 1}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm text-gray-600">Marks:</span>
+                                      <Badge variant="outline">
+                                        {question.awardedMarks}/{question.marks}
+                                      </Badge>
+                                    </div>
+                                  </div>
+
+                                  {/* Question Text */}
                                   <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
-                                    <div className="space-y-2">
-                                      {question.subQuestions.map((subQ, subIndex) => (
-                                        <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
-                                          <div className="mb-2">
-                                            <p className="text-gray-700 font-medium">
-                                              {subQ.questionText || subQ.text || subQ.question || ''}
-                                            </p>
-                                          </div>
-                                          {subQ.modelAnswer && (
-                                            <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
-                                              <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
-                                              <p className="text-gray-700">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
-                                              </p>
+                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
+                                    <div className="text-gray-700">
+                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                    </div>
+                                  </div>
+
+                                  {question.type === 'CQ' && question.subQuestions ? (
+                                    <div className="space-y-8 mt-6">
+                                      <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
+                                      {question.subQuestions.map((subQ: any, idx: number) => (
+                                        <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                          {/* Sub-question Header */}
+                                          <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
+                                            <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
+                                              {idx + 1}
+                                            </span>
+                                            <div className="flex-grow pt-1">
+                                              {subQ.text ? (
+                                                <div className="text-gray-800 font-medium leading-relaxed">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.text)}</UniversalMathJax>
+                                                </div>
+                                              ) : (
+                                                <span className="text-gray-500 italic">Sub-question {idx + 1}</span>
+                                              )}
                                             </div>
-                                          )}
+                                          </div>
+
+                                          <div className="p-4 space-y-4">
+                                            {/* Model Answer (Prominent) */}
+                                            {(subQ.modelAnswer || subQ.answer) && (
+                                              <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                                                <div className="flex items-center gap-2 mb-2 text-green-800 font-semibold text-sm uppercase tracking-wide">
+                                                  <CheckCircle className="w-4 h-4" />
+                                                  Model Answer
+                                                </div>
+                                                <div className="text-gray-800 leading-relaxed font-sans">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
+                                                </div>
+                                              </div>
+                                            )}
+
+                                            {/* Student Answer */}
+                                            <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
+                                              <div className="text-blue-800 font-semibold text-sm uppercase tracking-wide mb-2">
+                                                Your Answer
+                                              </div>
+                                              {subQ.studentAnswer ? (
+                                                <div className="text-gray-800 leading-relaxed font-sans">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
+                                                </div>
+                                              ) : (
+                                                <p className="text-gray-400 italic text-sm">No text answer provided</p>
+                                              )}
+                                            </div>
+
+                                            {/* Attachments & Feedback */}
+                                            {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
+                                              <div className="mt-4 pt-4 border-t border-gray-100">
+                                                <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                  <Camera className="w-4 h-4" />
+                                                  Attachments & Feedback
+                                                </div>
+                                                <div className="flex flex-wrap gap-4">
+                                                  {(() => {
+                                                    const images = subQ.studentImages || [];
+                                                    return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
+                                                      const globalIdx = idx * 100 + imgK;
+                                                      const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
+                                                      const displayUrl = drawing ? drawing.imageData : imgUrl;
+                                                      const isAnnotated = !!drawing;
+
+                                                      return (
+                                                        <div
+                                                          key={imgK}
+                                                          className="relative group cursor-pointer perspective-1000"
+                                                          onClick={() => {
+                                                            setZoomedImage(displayUrl);
+                                                            setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
+                                                            setShowZoomModal(true);
+                                                          }}
+                                                        >
+                                                          <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
+                                                            <img
+                                                              src={displayUrl}
+                                                              alt={`Sub ${idx + 1} Img ${imgK + 1}`}
+                                                              className="w-32 h-32 object-cover bg-gray-50"
+                                                              loading="lazy"
+                                                            />
+                                                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                              <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+                                                            </div>
+                                                            {isAnnotated && (
+                                                              <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
+                                                                <MessageSquare className="w-3 h-3" />
+                                                                Feedback
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        </div>
+                                                      );
+                                                    }) : null;
+                                                  })()}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       ))}
                                     </div>
-                                  </div>
-                                )}
-
-                                {/* Feedback */}
-                                {question.feedback && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                      <p className="text-gray-700">{question.feedback}</p>
-                                    </div>
-                                  </div>
-                                )}
-                              </motion.div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* SQ Section */}
-                    {result.questions.filter(q => q.type === 'SQ').length > 0 && (
-                      <div>
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                            <MessageSquare className="h-4 w-4 text-yellow-600" />
-                          </div>
-                          <h3 className="text-2xl font-bold text-gray-800">Short Questions (SQ)</h3>
-                          <Badge className="bg-yellow-100 text-yellow-800">
-                            {result.questions.filter(q => q.type === 'SQ').length} Questions
-                          </Badge>
-                        </div>
-                        <div className="space-y-6">
-                          {result.questions
-                            .filter(q => q.type === 'SQ')
-                            .map((question, index) => (
-                              <motion.div
-                                key={question.id}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: 0.1 * index }}
-                                className="border rounded-lg p-6 bg-yellow-50/50"
-                              >
-                                {/* Question Header */}
-                                <div className="flex items-center justify-between mb-4">
-                                  <div className="flex items-center gap-3">
-                                    <Badge className="bg-yellow-100 text-yellow-800">
-                                      SQ
-                                    </Badge>
-                                    <span className="text-sm text-gray-600">Question {index + 1}</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm text-gray-600">Marks:</span>
-                                    <Badge variant="outline">
-                                      {question.awardedMarks}/{question.marks}
-                                    </Badge>
-                                  </div>
-                                </div>
-
-                                {/* Question Text */}
-                                <div className="mb-4">
-                                  <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                  <div className="text-gray-700">
-                                    <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                  </div>
-                                </div>
-
-                                {question.type === 'CQ' && question.subQuestions ? (
-                                  <div className="space-y-8 mt-6">
-                                    <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
-                                    {question.subQuestions.map((subQ: any, idx: number) => (
-                                      <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
-                                        {/* Sub-question Header */}
-                                        <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
-                                          <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
-                                            {idx + 1}
-                                          </span>
-                                          <div className="flex-grow pt-1">
-                                            {subQ.text ? (
-                                              <div className="text-gray-800 font-medium leading-relaxed">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text)}</UniversalMathJax>
-                                              </div>
-                                            ) : (
-                                              <span className="text-gray-500 italic">Sub-question {idx + 1}</span>
-                                            )}
-                                          </div>
-                                        </div>
-
-                                        <div className="p-4 space-y-4">
-                                          {/* Model Answer (Prominent) */}
-                                          {(subQ.modelAnswer || subQ.answer) && (
-                                            <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                                              <div className="flex items-center gap-2 mb-2 text-green-800 font-semibold text-sm uppercase tracking-wide">
-                                                <CheckCircle className="w-4 h-4" />
-                                                Model Answer
-                                              </div>
-                                              <div className="text-gray-800 leading-relaxed font-sans">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
-                                              </div>
-                                            </div>
-                                          )}
-
-                                          {/* Student Answer */}
-                                          <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
-                                            <div className="text-blue-800 font-semibold text-sm uppercase tracking-wide mb-2">
-                                              Your Answer
-                                            </div>
-                                            {subQ.studentAnswer ? (
-                                              <div className="text-gray-800 leading-relaxed font-sans">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
-                                              </div>
-                                            ) : (
-                                              <p className="text-gray-400 italic text-sm">No text answer provided</p>
-                                            )}
-                                          </div>
-
-                                          {/* Attachments & Feedback */}
-                                          {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
-                                            <div className="mt-4 pt-4 border-t border-gray-100">
-                                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                <Camera className="w-4 h-4" />
-                                                Attachments & Feedback
-                                              </div>
-                                              <div className="flex flex-wrap gap-4">
-                                                {(() => {
-                                                  const images = subQ.studentImages || [];
-                                                  return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
-                                                    const globalIdx = idx * 100 + imgK;
-                                                    const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
-                                                    const displayUrl = drawing ? drawing.imageData : imgUrl;
-                                                    const isAnnotated = !!drawing;
-
-                                                    return (
-                                                      <div
-                                                        key={imgK}
-                                                        className="relative group cursor-pointer perspective-1000"
-                                                        onClick={() => {
-                                                          setZoomedImage(displayUrl);
-                                                          setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
-                                                          setShowZoomModal(true);
-                                                        }}
-                                                      >
-                                                        <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
-                                                          <img
-                                                            src={displayUrl}
-                                                            alt={`Sub ${idx + 1} Img ${imgK + 1}`}
-                                                            className="w-32 h-32 object-cover bg-gray-50"
-                                                            loading="lazy"
-                                                          />
-                                                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                            <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
-                                                          </div>
-                                                          {isAnnotated && (
-                                                            <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
-                                                              <MessageSquare className="w-3 h-3" />
-                                                              Feedback
-                                                            </div>
-                                                          )}
-                                                        </div>
-                                                      </div>
-                                                    );
-                                                  }) : null;
-                                                })()}
-                                              </div>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <>
-                                    {/* Student Answer */}
-                                    <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
-                                      {question.studentAnswer ? (
-                                        <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                          <p className="text-gray-700">{question.studentAnswer}</p>
-                                        </div>
-                                      ) : (
-                                        <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
-                                          <p className="text-gray-500 italic">No answer provided</p>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Student Answer Images */}
-                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                  ) : (
+                                    <>
+                                      {/* Student Answer */}
                                       <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <Camera className="h-4 w-4 text-green-600" />
-                                            <span className="text-sm font-medium text-green-800">
-                                              Images you uploaded during the exam
-                                            </span>
+                                        <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
+                                        {question.studentAnswer ? (
+                                          <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
+                                            <p className="text-gray-700">{question.studentAnswer}</p>
                                           </div>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.studentAnswerImages.map((imageUrl: string, index: number) => (
-                                              <div
-                                                key={index}
-                                                className="relative group cursor-pointer"
-                                                onClick={() => {
-                                                  setZoomedImage(imageUrl);
-                                                  setZoomedImageTitle(`Your Answer Image ${index + 1}`);
-                                                  setShowZoomModal(true);
-                                                }}
-                                              >
-                                                <img
-                                                  src={imageUrl}
-                                                  alt={`Your answer image ${index + 1}`}
-                                                  className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
-                                                  onError={(e) => {
-                                                    console.error('Student answer image failed to load:', imageUrl);
-                                                    e.currentTarget.style.display = 'none';
-                                                    const parent = e.currentTarget.parentElement;
-                                                    if (parent) {
-                                                      const errorDiv = document.createElement('div');
-                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
-                                                      errorDiv.innerHTML = `
+                                        ) : (
+                                          <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
+                                            <p className="text-gray-500 italic">No answer provided</p>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Student Answer Images */}
+                                      {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                        <div className="mb-4">
+                                          <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
+                                          <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <Camera className="h-4 w-4 text-green-600" />
+                                              <span className="text-sm font-medium text-green-800">
+                                                Images you uploaded during the exam
+                                              </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                              {question.studentAnswerImages.map((imageUrl: string, index: number) => (
+                                                <div
+                                                  key={index}
+                                                  className="relative group cursor-pointer"
+                                                  onClick={() => {
+                                                    setZoomedImage(imageUrl);
+                                                    setZoomedImageTitle(`Your Answer Image ${index + 1}`);
+                                                    setShowZoomModal(true);
+                                                  }}
+                                                >
+                                                  <img
+                                                    src={imageUrl}
+                                                    alt={`Your answer image ${index + 1}`}
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                    onError={(e) => {
+                                                      console.error('Student answer image failed to load:', imageUrl);
+                                                      e.currentTarget.style.display = 'none';
+                                                      const parent = e.currentTarget.parentElement;
+                                                      if (parent) {
+                                                        const errorDiv = document.createElement('div');
+                                                        errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
+                                                        errorDiv.innerHTML = `
                                                       <div class="text-center">
                                                         <div class="mb-1">📷</div>
                                                         <div>Image not available</div>
                                                       </div>
                                                     `;
-                                                      parent.appendChild(errorDiv);
-                                                    }
-                                                  }}
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        parent.appendChild(errorDiv);
+                                                      }
+                                                    }}
+                                                  />
+                                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                    <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            ))}
+                                              ))}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {/* Evaluator's Drawing Feedback */}
-                                    {question.allDrawings && question.allDrawings.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <MessageSquare className="h-4 w-4 text-orange-600" />
-                                            <span className="text-sm font-medium text-orange-800">
-                                              Teacher's annotations on your answer
-                                            </span>
-                                          </div>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.allDrawings.map((drawing, index) => (
-                                              <div
-                                                key={index}
-                                                className="relative group cursor-pointer"
-                                                onClick={() => {
-                                                  setZoomedImage(drawing.imageData);
-                                                  setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
-                                                  setShowZoomModal(true);
-                                                }}
-                                              >
-                                                <img
-                                                  src={drawing.imageData}
-                                                  alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                                  className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
-                                                  onError={(e) => {
-                                                    console.error('Annotated image failed to load:', drawing.imageData);
-                                                    e.currentTarget.style.display = 'none';
-                                                    const parent = e.currentTarget.parentElement;
-                                                    if (parent) {
-                                                      const errorDiv = document.createElement('div');
-                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
-                                                      errorDiv.innerHTML = `
+                                      {/* Evaluator's Drawing Feedback */}
+                                      {question.allDrawings && question.allDrawings.length > 0 && (
+                                        <div className="mb-4">
+                                          <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
+                                          <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <MessageSquare className="h-4 w-4 text-orange-600" />
+                                              <span className="text-sm font-medium text-orange-800">
+                                                Teacher's annotations on your answer
+                                              </span>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                              {question.allDrawings.map((drawing, index) => (
+                                                <div
+                                                  key={index}
+                                                  className="relative group cursor-pointer"
+                                                  onClick={() => {
+                                                    setZoomedImage(drawing.imageData);
+                                                    setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
+                                                    setShowZoomModal(true);
+                                                  }}
+                                                >
+                                                  <img
+                                                    src={drawing.imageData}
+                                                    alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                    onError={(e) => {
+                                                      console.error('Annotated image failed to load:', drawing.imageData);
+                                                      e.currentTarget.style.display = 'none';
+                                                      const parent = e.currentTarget.parentElement;
+                                                      if (parent) {
+                                                        const errorDiv = document.createElement('div');
+                                                        errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
+                                                        errorDiv.innerHTML = `
                                                       <div class="text-center">
                                                         <div class="mb-1">📷</div>
                                                         <div>Annotated image not available</div>
                                                       </div>
                                                     `;
-                                                      parent.appendChild(errorDiv);
-                                                    }
-                                                  }}
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        parent.appendChild(errorDiv);
+                                                      }
+                                                    }}
+                                                  />
+                                                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                                                    <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                  </div>
                                                 </div>
-                                              </div>
-                                            ))}
+                                              ))}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
-                                  </>
-                                )}
+                                      )}
+                                    </>
+                                  )}
 
-                                {/* Model Answer */}
-                                {question.modelAnswer && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                      <div className="text-gray-700">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
+                                  {/* Model Answer */}
+                                  {question.modelAnswer && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
+                                        <div className="text-gray-700">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
+                                        </div>
                                       </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Sub Questions */}
-                                {question.subQuestions && question.subQuestions.length > 0 && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
-                                    <div className="space-y-2">
-                                      {question.subQuestions.map((subQ, subIndex) => (
-                                        <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
-                                          <div className="mb-2">
-                                            <p className="text-gray-700 font-medium">
-                                              {subQ.questionText || subQ.text || subQ.question || ''}
-                                            </p>
-                                          </div>
-                                          {subQ.modelAnswer && (
-                                            <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
-                                              <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
-                                              <p className="text-gray-700">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
+                                  {/* Sub Questions */}
+                                  {question.subQuestions && question.subQuestions.length > 0 && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
+                                      <div className="space-y-2">
+                                        {question.subQuestions.map((subQ, subIndex) => (
+                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                            <div className="mb-2">
+                                              <p className="text-gray-700 font-medium">
+                                                {subQ.questionText || subQ.text || subQ.question || ''}
                                               </p>
                                             </div>
-                                          )}
-                                        </div>
-                                      ))}
+                                            {subQ.modelAnswer && (
+                                              <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
+                                                <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
+                                                <p className="text-gray-700">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
+                                                </p>
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Feedback */}
-                                {question.feedback && (
-                                  <div className="mb-4">
-                                    <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                    <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                      <p className="text-gray-700">{question.feedback}</p>
+                                  {/* Feedback */}
+                                  {question.feedback && (
+                                    <div className="mb-4">
+                                      <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
+                                      <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
+                                        <p className="text-gray-700">{question.feedback}</p>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </motion.div>
-                            ))}
+                                  )}
+                                </motion.div>
+                              ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
                   </div>
                 </CardContent>
               </Card>
