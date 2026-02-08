@@ -172,8 +172,7 @@ export default function PracPerfectSessionPage() {
             if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 
             if (e.key === 'ArrowRight') {
-                if (isChecked) handleNext();
-                else if (selectedOption !== null) handleCheckAnswer();
+                handleNext();
             } else if (e.key === 'ArrowLeft') {
                 if (currentIndex > 0) setCurrentIndex(c => c - 1);
             } else if (e.key === 'Enter') {
