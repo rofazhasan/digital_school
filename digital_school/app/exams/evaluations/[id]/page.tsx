@@ -830,7 +830,28 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             total: data.submissions[0].result?.total
           } : null
         });
-        setExam(data);
+        if (targetStudentId && exam && data.submissions && data.submissions.length > 0) {
+          // Merge logic: Update only the specific student in the existing list
+          setExam(prevExam => {
+            if (!prevExam) return data;
+
+            const updatedSubmissions = [...prevExam.submissions];
+            const studentIndex = updatedSubmissions.findIndex(s => s.student.id === targetStudentId);
+
+            if (studentIndex !== -1) {
+              updatedSubmissions[studentIndex] = data.submissions[0];
+              return {
+                ...prevExam,
+                questions: data.questions, // Update questions too as they might differ per student (sets)
+                submissions: updatedSubmissions
+              };
+            }
+            return data; // Fallback if student not found (shouldn't happen)
+          });
+        } else {
+          // Initial load or full refresh
+          setExam(data);
+        }
       } else {
         const errorText = await response.text();
         console.error('API Error:', errorText);

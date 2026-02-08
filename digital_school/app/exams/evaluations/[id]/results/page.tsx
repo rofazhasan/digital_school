@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { ArrowLeft, Download, Trophy, Medal, Award } from "lucide-react";
 import { toast } from "sonner";
+import { calculateGrade, calculatePercentage } from "@/lib/utils";
 
 interface ExamResult {
     rank: number;
@@ -69,7 +70,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                         (sub.answers ? calculateTypeMarks(sub.answers, data.questions, 'sq') : 0);
 
                     const totalObtained = result.total !== undefined ? result.total : (mcq + cq + sq);
-                    const percentage = data.totalMarks > 0 ? (totalObtained / data.totalMarks) * 100 : 0;
+                    const percentage = data.totalMarks > 0 ? calculatePercentage(totalObtained, data.totalMarks) : 0;
+                    const grade = calculateGrade(percentage);
 
                     return {
                         submissionId: sub.id,
@@ -80,8 +82,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                         sqMarks: sq,
                         totalObtained: totalObtained,
                         totalMarks: data.totalMarks,
-                        percentage: parseFloat(percentage.toFixed(2)),
-                        grade: getGrade(percentage),
+                        percentage: percentage,
+                        grade: grade,
                         status: sub.status,
                         submissionStatus: sub.submissionStatus
                     };
@@ -129,14 +131,18 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
         }, 0);
     };
 
-    const getGrade = (percentage: number) => {
-        if (percentage >= 80) return "A+";
-        if (percentage >= 70) return "A";
-        if (percentage >= 60) return "A-";
-        if (percentage >= 50) return "B";
-        if (percentage >= 40) return "C";
-        if (percentage >= 33) return "D";
-        return "F";
+    const getGradeColor = (grade: string) => {
+        switch (grade) {
+            case 'A+': return 'bg-gradient-to-r from-green-500 to-emerald-600 text-white border-0';
+            case 'A': return 'bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0';
+            case 'A-': return 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white border-0';
+            case 'B+': return 'bg-gradient-to-r from-blue-400 to-indigo-500 text-white border-0';
+            case 'B': return 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white border-0';
+            case 'C': return 'bg-gradient-to-r from-orange-500 to-red-600 text-white border-0';
+            case 'D': return 'bg-gradient-to-r from-red-500 to-pink-600 text-white border-0';
+            case 'F': return 'bg-gradient-to-r from-gray-500 to-slate-600 text-white border-0';
+            default: return 'bg-gray-100 text-gray-800';
+        }
     };
 
     const getRankIcon = (rank: number) => {
@@ -232,11 +238,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                                                             </Badge>
                                                         ) : (
                                                             <Badge
-                                                                className={
-                                                                    result.grade === 'F' ? 'bg-red-100 text-red-800 hover:bg-red-100' :
-                                                                        result.grade === 'A+' ? 'bg-green-100 text-green-800 hover:bg-green-100' :
-                                                                            'bg-blue-100 text-blue-800 hover:bg-blue-100'
-                                                                }
+                                                                className={getGradeColor(result.grade)}
                                                             >
                                                                 {result.grade}
                                                             </Badge>

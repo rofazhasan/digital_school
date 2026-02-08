@@ -295,6 +295,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   const printData = getPrintData();
 
+  const [userRole, setUserRole] = useState<string | null>(null);
+
   useEffect(() => {
     // Check user role and redirect if admin/teacher
     const checkRoleAndRedirect = async () => {
@@ -303,6 +305,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         if (response.ok) {
           const data = await response.json();
           const role = data.user?.role;
+          setUserRole(role);
 
           if (role === 'ADMIN' || role === 'SUPER_USER' || role === 'TEACHER') {
             toast.info('Redirecting to Evaluation Results...');
@@ -721,12 +724,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             className="mb-8"
           >
             <div className="flex items-center justify-between mb-6">
-              <Button asChild variant="outline" size="sm">
-                <Link href="/exams/online">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back to Exams
-                </Link>
-              </Button>
+              <div className="flex gap-2">
+                <Button asChild variant="outline" size="sm">
+                  <Link href="/exams/online">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Exams
+                  </Link>
+                </Button>
+                {userRole && (
+                  <Button asChild variant="default" size="sm" className="bg-blue-600 hover:bg-blue-700">
+                    <Link href={
+                      userRole === 'STUDENT' ? '/student/dashboard' :
+                        userRole === 'TEACHER' ? '/teacher/dashboard' :
+                          userRole === 'ADMIN' ? '/admin/dashboard' :
+                            userRole === 'SUPER_USER' ? '/super-user/dashboard' :
+                              '/dashboard'
+                    }>
+                      <BarChart3 className="h-4 w-4 mr-2" />
+                      Dashboard
+                    </Link>
+                  </Button>
+                )}
+              </div>
               <div className="flex gap-2">
                 {result.result?.isPublished && (
                   <Button
