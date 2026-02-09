@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (existingSubmission?.startedAt) {
       const startTime = new Date(existingSubmission.startedAt).getTime();
       const durationMs = exam.duration * 60 * 1000;
-      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+      const bufferMs = 15 * 1000; // 15 seconds buffer
       const now = Date.now();
 
       if (now > startTime + durationMs + bufferMs) {

@@ -54,26 +54,28 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
     }
 
     // Only run timer when online (visual only - server time is master)
-    if (isOnline) {
-      intervalRef.current = setInterval(() => {
-        setSecondsLeft(prev => {
-          // Re-calculate from absolute start time to prevent drift
-          if (exam.startedAt) {
-            const startTime = new Date(exam.startedAt).getTime();
-            const now = Date.now();
-            const durationSeconds = exam.duration * 60;
-            const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
 
-            if (newTime <= 0) {
-              if (onTimeUp) onTimeUp();
-              return 0;
-            }
-            return newTime;
+    // Run timer regardless of online status - rely on system time
+    // if (isOnline) {
+    intervalRef.current = setInterval(() => {
+      setSecondsLeft(prev => {
+        // Re-calculate from absolute start time to prevent drift
+        if (exam.startedAt) {
+          const startTime = new Date(exam.startedAt).getTime();
+          const now = Date.now();
+          const durationSeconds = exam.duration * 60;
+          const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
+
+          if (newTime <= 0) {
+            if (onTimeUp) onTimeUp();
+            return 0;
           }
-          return Math.max(0, prev - 1);
-        });
-      }, 1000);
-    }
+          return newTime;
+        }
+        return Math.max(0, prev - 1);
+      });
+    }, 1000);
+    // }
 
     return () => {
       if (intervalRef.current) {
