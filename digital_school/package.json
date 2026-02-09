@@ -38,6 +38,8 @@
     "typescript": "5.8.3",
     "tailwindcss": "^4",
     "@tailwindcss/postcss": "^4",
+    "postcss": "^8.4.0",
+    "autoprefixer": "^10.4.0",
     "@radix-ui/react-accordion": "^1.2.11",
     "@radix-ui/react-alert-dialog": "^1.1.14",
     "@radix-ui/react-avatar": "^1.1.10",
@@ -138,7 +140,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "6.6.4",
     "@types/lodash.debounce": "^4.0.9",
     "@types/node": "^20.19.1",
