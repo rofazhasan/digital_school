@@ -244,30 +244,32 @@ export default function EvaluationsPage() {
 
 
   return (
-    <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-4 md:p-6 lg:p-8">
+      <div className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Exam Evaluations</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">Exam Evaluations</h1>
+          <p className="text-base md:text-lg text-gray-600">
             {isSuperUser
               ? "Manage exam evaluations and assign evaluators"
               : "View your assigned exam evaluations"
             }
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push('/dashboard')}>
-            <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+        <div className="flex flex-wrap gap-2 md:gap-3">
+          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="flex-1 sm:flex-none">
+            <LayoutDashboard className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Dashboard</span>
+            <span className="sm:hidden">Home</span>
           </Button>
-          <Button variant="outline" onClick={() => router.push('/exams')}>
-            <FileText className="mr-2 h-4 w-4" /> Exams
+          <Button variant="outline" size="sm" onClick={() => router.push('/exams')} className="flex-1 sm:flex-none">
+            <FileText className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Exams</span>
+            <span className="sm:hidden">Exams</span>
           </Button>
         </div>
       </div>
 
-      <div className="mb-6 flex gap-4">
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-white">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -282,11 +284,9 @@ export default function EvaluationsPage() {
         </Select>
 
         {isSuperUser && (
-          <div className="text-sm text-gray-600 flex items-center gap-2">
-            <span>Showing:</span>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              All Exams (Active & Inactive)
-            </Badge>
+          <div className="text-sm text-gray-600 flex items-center gap-2 bg-blue-50/50 px-3 py-1.5 rounded-full border border-blue-100">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span>Showing All Exams</span>
           </div>
         )}
       </div>
@@ -316,29 +316,42 @@ export default function EvaluationsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {new Date(exam.date).toLocaleDateString()}
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <Calendar className="h-5 w-5 text-indigo-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Date</span>
+                    <span className="text-sm font-medium">
+                      {new Date(exam.date).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {exam.submittedStudents}/{exam.totalStudents} students
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Submissions</span>
+                    <span className="text-sm font-medium">
+                      {exam.submittedStudents}/{exam.totalStudents} students
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {exam.publishedResults} results published
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <FileText className="h-5 w-5 text-emerald-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Published</span>
+                    <span className="text-sm font-medium">
+                      {exam.publishedResults} results
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">
-                    Class: {exam.class.name} {exam.class.section}
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <LayoutDashboard className="h-5 w-5 text-amber-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Class info</span>
+                    <span className="text-sm font-medium">
+                      {exam.class.name} {exam.class.section}
+                    </span>
+                  </div>
                 </div>
               </div>
 

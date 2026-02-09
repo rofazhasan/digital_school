@@ -43,7 +43,7 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { MathJax, MathJaxContext } from "better-react-mathjax";
+import { MathJaxContext } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
@@ -2111,7 +2111,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   </div>
                                 </div>
                                 <div className="text-lg mb-4">
-                                  <MathJax key={currentQuestion.id} dynamic>{currentQuestion.text}</MathJax>
+                                  <UniversalMathJax key={currentQuestion.id} dynamic>{currentQuestion.text}</UniversalMathJax>
                                 </div>
 
                                 {/* Subquestions */}
@@ -2122,7 +2122,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div key={idx} className="pl-4 border-l-2 border-gray-200">
                                         <div className="flex items-center justify-between mb-1">
                                           <span className="text-sm font-medium text-gray-600">
-                                            (a{String.fromCharCode(97 + idx)}) <MathJax inline dynamic>{subQ.questionText || subQ.text || subQ.question || ''}</MathJax>
+                                            (a{String.fromCharCode(97 + idx)}) <UniversalMathJax inline dynamic>{subQ.questionText || subQ.text || subQ.question || ''}</UniversalMathJax>
                                             {subQ.image && (
                                               <div className="mt-1 block">
                                                 <img src={subQ.image} alt="Sub-question" className="max-h-24 rounded border bg-white object-contain" />
@@ -2135,7 +2135,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         </div>
                                         {subQ.modelAnswer && (
                                           <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                            <strong>Model Answer:</strong> <MathJax inline dynamic>{subQ.modelAnswer}</MathJax>
+                                            <strong>Model Answer:</strong> <UniversalMathJax inline dynamic>{subQ.modelAnswer}</UniversalMathJax>
                                           </div>
                                         )}
                                       </div>
@@ -2157,7 +2157,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           ) : (
                                             <XCircle className="h-5 w-5 text-red-600" />
                                           )}
-                                          <span className="text-lg"><MathJax inline>{currentAnswer}</MathJax></span>
+                                          <span className="text-lg"><UniversalMathJax inline>{currentAnswer}</UniversalMathJax></span>
                                         </div>
                                       ) : (
                                         <span className="text-gray-500">No answer provided</span>
@@ -2169,7 +2169,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       {currentAnswer && typeof currentAnswer === 'string' && (
                                         <div>
                                           <div className="text-xs font-semibold text-gray-500 mb-1">Text Answer:</div>
-                                          <div className="whitespace-pre-wrap"><MathJax>{currentAnswer}</MathJax></div>
+                                          <div className="whitespace-pre-wrap"><UniversalMathJax>{currentAnswer}</UniversalMathJax></div>
                                         </div>
                                       )}
 
@@ -2237,7 +2237,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             return (
                                               <div key={idx} className="pl-4 border-l-2 border-indigo-100">
                                                 <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
-                                                <div className="mb-2 text-gray-800"><MathJax dynamic>{subText}</MathJax></div>
+                                                <div className="mb-2 text-gray-800"><UniversalMathJax dynamic>{subText}</UniversalMathJax></div>
                                                 {(() => {
                                                   const singleImg = currentStudent?.answers?.[`${subKey}_image`];
                                                   const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
@@ -2314,7 +2314,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
                                                 <div className="flex-1">
                                                   <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                    <MathJax>{optText}</MathJax>
+                                                    <UniversalMathJax>{optText}</UniversalMathJax>
                                                   </span>
                                                   {opt.image && (
                                                     <div className="mt-1">
@@ -2343,7 +2343,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       Correct / Model Answer:
                                     </h5>
                                     <div className="text-green-900">
-                                      <MathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</MathJax>
+                                      <UniversalMathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</UniversalMathJax>
                                     </div>
                                   </div>
                                 )}
@@ -2356,9 +2356,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       Explanation:
                                     </h5>
                                     <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
-                                      <MathJax key={currentQuestion.id} dynamic>
+                                      <UniversalMathJax key={currentQuestion.id} dynamic>
                                         {currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
-                                      </MathJax>
+                                      </UniversalMathJax>
                                     </div>
                                   </div>
                                 )}

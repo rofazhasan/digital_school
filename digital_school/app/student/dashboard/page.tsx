@@ -286,7 +286,7 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* Desktop Navigation */}
-              <nav className="hidden md:flex items-center space-x-6">
+              <nav className="hidden lg:flex items-center space-x-6">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Home },
                   { id: 'exams', label: 'Exams', icon: FileText },
@@ -360,9 +360,9 @@ export default function StudentDashboardPage() {
       </header>
 
       {/* Mobile Navigation */}
-      <div className="md:hidden border-b bg-background/95 backdrop-blur">
+      <div className="lg:hidden border-b bg-background/95 backdrop-blur overflow-hidden">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex space-x-1 py-2 overflow-x-auto no-scrollbar">
+          <div className="flex space-x-1 py-3 overflow-x-auto no-scrollbar scroll-smooth snap-x">
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'exams', label: 'Exams', icon: FileText },
@@ -413,7 +413,7 @@ export default function StudentDashboardPage() {
                 </p>
               </div>
               {/* Overview Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 md:gap-6 mb-8">
                 <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
                   <Card
                     className="border-l-4 border-l-indigo-500 shadow-sm hover:shadow-md transition-shadow cursor-pointer bg-indigo-50/30"
@@ -516,8 +516,8 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* Attendance & Class Rank Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                <Card className="md:col-span-2 shadow-sm">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                <Card className="lg:col-span-2 shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <Calendar className="h-5 w-5 mr-2 text-primary" />

@@ -215,7 +215,7 @@ export default function TeacherDashboard() {
     );
 
     const MobileSidebar = () => (
-        <div className={`fixed inset-0 z-50 bg-black/50 transition-opacity md:hidden ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileSidebarOpen(false)}>
+        <div className={`fixed inset-0 z-50 bg-black/50 transition-opacity lg:hidden ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileSidebarOpen(false)}>
             <div className={`absolute inset-y-0 left-0 w-64 bg-white shadow-xl transition-transform transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={(e) => e.stopPropagation()}>
                 <div className="h-16 flex items-center justify-between px-4 border-b bg-gray-50/50">
                     <span className="font-bold text-xl text-gray-800">Menu</span>
@@ -265,11 +265,11 @@ export default function TeacherDashboard() {
             <Sidebar />
             <MobileSidebar />
 
-            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'} flex flex-col min-h-screen`}>
+            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} flex flex-col min-h-screen`}>
                 {/* Top Header */}
                 <header className="h-16 bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setMobileSidebarOpen(true)}>
+                        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileSidebarOpen(true)}>
                             <Menu className="h-5 w-5" />
                         </Button>
                         <div>

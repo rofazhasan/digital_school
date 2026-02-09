@@ -130,8 +130,8 @@ export function AdminAnalyticsTab() {
                     <CardTitle>Financial Overview</CardTitle>
                     <CardDescription>Revenue vs Expenses for first half of year.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Line data={data} options={{ responsive: true, maintainAspectRatio: false }} height={300} />
+                <CardContent className="h-[300px] md:h-[400px]">
+                    <Line data={data} options={{ responsive: true, maintainAspectRatio: false }} />
                 </CardContent>
             </Card>
         </div>
@@ -169,32 +169,34 @@ export function AttendanceTab() {
                     </div>
                 </div>
 
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Class</TableHead>
-                            <TableHead>Total Students</TableHead>
-                            <TableHead>Present</TableHead>
-                            <TableHead>Absent</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {[
-                            { class: 'Class 10-A', total: 45, present: 42, absent: 3 },
-                            { class: 'Class 12-B', total: 40, present: 35, absent: 5 },
-                            { class: 'Class 9-C', total: 38, present: 38, absent: 0 },
-                        ].map((row, i) => (
-                            <TableRow key={i}>
-                                <TableCell className="font-medium">{row.class}</TableCell>
-                                <TableCell>{row.total}</TableCell>
-                                <TableCell className="text-green-600">{row.present}</TableCell>
-                                <TableCell className="text-red-600">{row.absent}</TableCell>
-                                <TableCell><Button variant="ghost" size="sm">Details</Button></TableCell>
+                <div className="rounded-md border overflow-x-auto no-scrollbar">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="min-w-[100px]">Class</TableHead>
+                                <TableHead className="min-w-[120px]">Total Students</TableHead>
+                                <TableHead className="min-w-[100px]">Present</TableHead>
+                                <TableHead className="min-w-[100px]">Absent</TableHead>
+                                <TableHead className="min-w-[100px]">Actions</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {[
+                                { class: 'Class 10-A', total: 45, present: 42, absent: 3 },
+                                { class: 'Class 12-B', total: 40, present: 35, absent: 5 },
+                                { class: 'Class 9-C', total: 38, present: 38, absent: 0 },
+                            ].map((row, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium whitespace-nowrap">{row.class}</TableCell>
+                                    <TableCell>{row.total}</TableCell>
+                                    <TableCell className="text-green-600 font-medium">{row.present}</TableCell>
+                                    <TableCell className="text-red-600 font-medium">{row.absent}</TableCell>
+                                    <TableCell><Button variant="ghost" size="sm">Details</Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
     );
@@ -247,40 +249,42 @@ export function BillingTab() {
                     <Input placeholder="Search invoice..." className="max-w-sm" />
                     <Button variant="outline"><Filter className="h-4 w-4" /></Button>
                 </div>
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Invoice ID</TableHead>
-                            <TableHead>Student</TableHead>
-                            <TableHead>Amount</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Date</TableHead>
-                            <TableHead>Actions</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {[
-                            { id: 'INV-001', student: 'John Doe', amount: '$500', status: 'Paid', date: '2025-05-01' },
-                            { id: 'INV-002', student: 'Jane Smith', amount: '$500', status: 'Pending', date: '2025-05-05' },
-                            { id: 'INV-003', student: 'Ali Khan', amount: '$450', status: 'Overdue', date: '2025-04-20' },
-                        ].map((inv, i) => (
-                            <TableRow key={i}>
-                                <TableCell className="font-medium">{inv.id}</TableCell>
-                                <TableCell>{inv.student}</TableCell>
-                                <TableCell>{inv.amount}</TableCell>
-                                <TableCell>
-                                    <Badge className={
-                                        inv.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                                            inv.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-red-100 text-red-800'
-                                    }>{inv.status}</Badge>
-                                </TableCell>
-                                <TableCell>{inv.date}</TableCell>
-                                <TableCell><Button size="sm" variant="outline">View</Button></TableCell>
+                <div className="rounded-md border overflow-x-auto no-scrollbar">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead className="min-w-[100px]">Invoice ID</TableHead>
+                                <TableHead className="min-w-[150px]">Student</TableHead>
+                                <TableHead className="min-w-[100px]">Amount</TableHead>
+                                <TableHead className="min-w-[100px]">Status</TableHead>
+                                <TableHead className="min-w-[120px]">Date</TableHead>
+                                <TableHead className="min-w-[100px]">Actions</TableHead>
                             </TableRow>
-                        ))}
-                    </TableBody>
-                </Table>
+                        </TableHeader>
+                        <TableBody>
+                            {[
+                                { id: 'INV-001', student: 'John Doe', amount: '$500', status: 'Paid', date: '2025-05-01' },
+                                { id: 'INV-002', student: 'Jane Smith', amount: '$500', status: 'Pending', date: '2025-05-05' },
+                                { id: 'INV-003', student: 'Ali Khan', amount: '$450', status: 'Overdue', date: '2025-04-20' },
+                            ].map((inv, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium">{inv.id}</TableCell>
+                                    <TableCell className="whitespace-nowrap">{inv.student}</TableCell>
+                                    <TableCell>{inv.amount}</TableCell>
+                                    <TableCell>
+                                        <Badge className={
+                                            inv.status === 'Paid' ? 'bg-green-100 text-green-800' :
+                                                inv.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
+                                                    'bg-red-100 text-red-800'
+                                        }>{inv.status}</Badge>
+                                    </TableCell>
+                                    <TableCell className="whitespace-nowrap">{inv.date}</TableCell>
+                                    <TableCell><Button size="sm" variant="outline">View</Button></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </div>
             </CardContent>
         </Card>
     );
@@ -288,34 +292,34 @@ export function BillingTab() {
 
 export function ChatTab() {
     return (
-        <div className="grid grid-cols-3 h-[600px] border rounded-lg overflow-hidden bg-white">
-            <div className="border-r col-span-1 bg-gray-50 p-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 h-auto md:h-[600px] border rounded-lg overflow-hidden bg-white shadow-sm">
+            <div className="border-b md:border-b-0 md:border-r col-span-1 bg-gray-50 p-4 overflow-y-auto">
                 <div className="mb-4">
-                    <Input placeholder="Search contacts..." />
+                    <Input placeholder="Search contacts..." className="bg-white" />
                 </div>
-                <div className="space-y-2">
+                <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible no-scrollbar pb-2 md:pb-0">
                     {['Support Team', 'Teachers Group', 'Admin Console'].map((name, i) => (
-                        <div key={i} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 cursor-pointer bg-white border">
-                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                        <div key={i} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 cursor-pointer bg-white border min-w-[180px] md:min-w-0 transition-colors">
+                            <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
                                 {name.charAt(0)}
                             </div>
-                            <div>
+                            <div className="hidden sm:block">
                                 <div className="font-medium text-sm">{name}</div>
-                                <div className="text-xs text-muted-foreground truncate w-32">Latest message preview...</div>
+                                <div className="text-xs text-muted-foreground truncate w-24 lg:w-32">Latest message...</div>
                             </div>
                         </div>
                     ))}
                 </div>
             </div>
-            <div className="col-span-2 flex flex-col">
-                <div className="p-4 border-b flex justify-between items-center bg-white">
+            <div className="col-span-1 md:col-span-2 flex flex-col min-h-[400px]">
+                <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
                     <div className="font-medium">Support Team</div>
                     <Button variant="ghost" size="sm"><Settings className="h-4 w-4" /></Button>
                 </div>
                 <div className="flex-1 p-4 bg-gray-50 flex items-center justify-center text-muted-foreground">
                     Select a chat to start messaging
                 </div>
-                <div className="p-4 border-t bg-white flex gap-2">
+                <div className="p-4 border-t bg-white flex gap-2 sticky bottom-0 z-10">
                     <Input placeholder="Type a message..." />
                     <Button>Send</Button>
                 </div>

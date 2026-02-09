@@ -509,16 +509,16 @@ export default function ExamsPage() {
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
+                <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
                   Exam Management
                 </h1>
-                <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
+                <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-300">
                   Create, manage, and monitor all your examinations
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
                 <Button
                   variant="outline"
                   size="sm"
@@ -527,7 +527,8 @@ export default function ExamsPage() {
                   className="flex items-center gap-2"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refesh
+                  <span className="hidden sm:inline">Refresh</span>
+                  <span className="sm:hidden">Sync</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -536,7 +537,7 @@ export default function ExamsPage() {
                   className="flex items-center gap-2"
                 >
                   <BookOpen className="w-4 h-4" />
-                  Question Bank
+                  <span className="hidden sm:inline">Question Bank</span>
                 </Button>
                 <Button
                   variant="outline"
@@ -545,7 +546,7 @@ export default function ExamsPage() {
                   className="flex items-center gap-2"
                 >
                   <FileText className="w-4 h-4" />
-                  Evaluations
+                  <span className="hidden sm:inline">Evaluations</span>
                 </Button>
                 <Button
                   variant="secondary"
@@ -554,7 +555,7 @@ export default function ExamsPage() {
                   className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"
                 >
                   <ArrowRight className="w-4 h-4" />
-                  Dashboard
+                  <span className="hidden sm:inline">Dashboard</span>
                 </Button>
                 {userRole !== 'TEACHER' && (
                   <Button
@@ -562,7 +563,7 @@ export default function ExamsPage() {
                     className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
                   >
                     <Plus className="w-4 h-4" />
-                    Create Exam
+                    <span>Create Exam</span>
                   </Button>
                 )}
               </div>
@@ -659,13 +660,15 @@ export default function ExamsPage() {
             <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
               <CardContent className="p-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-5 bg-gray-100 dark:bg-gray-700">
-                    <TabsTrigger value="all">All Exams</TabsTrigger>
-                    <TabsTrigger value="active">Active</TabsTrigger>
-                    <TabsTrigger value="pending">Pending</TabsTrigger>
-                    <TabsTrigger value="online">Online</TabsTrigger>
-                    <TabsTrigger value="negative-marking">Negative Marking</TabsTrigger>
-                  </TabsList>
+                  <div className="overflow-x-auto no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
+                    <TabsList className="flex w-max md:w-full bg-gray-100 dark:bg-gray-700 p-1">
+                      <TabsTrigger value="all" className="whitespace-nowrap">All Exams</TabsTrigger>
+                      <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
+                      <TabsTrigger value="pending" className="whitespace-nowrap">Pending</TabsTrigger>
+                      <TabsTrigger value="online" className="whitespace-nowrap">Online</TabsTrigger>
+                      <TabsTrigger value="negative-marking" className="whitespace-nowrap">Negative Marking</TabsTrigger>
+                    </TabsList>
+                  </div>
 
                   <div className="mt-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
