@@ -44,14 +44,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let targetExamSetId = examStudentMap?.examSetId || null;
 
-    // 2. If not in map, try finding it from existing submission (preserve it)
-    if (!targetExamSetId) {
-      const existingSubmission = await prisma.examSubmission.findUnique({
-        where: { studentId_examId: { studentId, examId } },
-        select: { examSetId: true }
-      });
-      if (existingSubmission?.examSetId) {
-        targetExamSetId = existingSubmission.examSetId;
+    // 2. If not in map or for validation, try finding it from existing submission
+    const existingSubmission = await prisma.examSubmission.findUnique({
+      where: { studentId_examId: { studentId, examId } },
+      select: { examSetId: true, startedAt: true }
+    });
+
+    if (!targetExamSetId && existingSubmission?.examSetId) {
+      targetExamSetId = existingSubmission.examSetId;
+    }
+
+    // TIME VALIDATION
+    if (existingSubmission?.startedAt) {
+      const startTime = new Date(existingSubmission.startedAt).getTime();
+      const durationMs = exam.duration * 60 * 1000;
+      const bufferMs = 2 * 60 * 1000; // 2 minutes buffer
+      const now = Date.now();
+
+      if (now > startTime + durationMs + bufferMs) {
+        console.log(`[Submit] Time Limit Exceeded for user ${studentId}. Started: ${existingSubmission.startedAt}, Limit: ${durationMs / 60000}m`);
+        return NextResponse.json({ error: "Exam time limit exceeded" }, { status: 403 });
       }
     }
 
@@ -63,32 +75,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Process answers
     const processedAnswers = { ...data.answers, _status: 'submitted' };
 
-    // Helper to count answers
-    const countAnswer = (questionId: string) => {
-      let foundQuestion = null;
-      for (const examSet of exam.examSets) {
-        if (examSet.questionsJson) {
-          const questions = Array.isArray(examSet.questionsJson)
-            ? examSet.questionsJson
-            : typeof examSet.questionsJson === "string"
-              ? JSON.parse(examSet.questionsJson)
-              : [];
+    // Optimize: Pre-map question types for O(1) lookup
+    const questionTypeMap = new Map<string, string>();
 
-          foundQuestion = questions.find((q: any) => q.id === questionId);
-          if (foundQuestion) break;
-        }
+    // Build map from all sets (or just the target set if we knew it for sure)
+    // If targetExamSetId is known, we optimize by only checking that set
+    const setsToProcess = targetExamSetId
+      ? exam.examSets.filter((s: any) => s.id === targetExamSetId)
+      : exam.examSets;
+
+    for (const examSet of setsToProcess) {
+      if (!examSet.questionsJson) continue;
+      const questions = Array.isArray(examSet.questionsJson)
+        ? examSet.questionsJson
+        : typeof examSet.questionsJson === "string"
+          ? JSON.parse(examSet.questionsJson)
+          : [];
+
+      for (const q of questions) {
+        if (q.id) questionTypeMap.set(q.id, (q.type || q.questionType || '').toLowerCase());
       }
+    }
 
-      if (foundQuestion) {
-        const questionType = (foundQuestion.type || foundQuestion.questionType || "").toLowerCase();
-        if (questionType === "cq") cqAnswered++;
-        else if (questionType === "sq") sqAnswered++;
-        return { found: true, type: questionType };
-      }
-      return { found: false, type: null };
-    };
-
-    // Analyze answers for limits
+    // Analyze answers
     const answerKeys = Object.keys(data.answers).filter(k => !k.endsWith('_images'));
 
     for (const qId of answerKeys) {
@@ -96,7 +105,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const hasWritten = val && val !== "" && val !== "No answer provided";
 
       if (hasWritten) {
-        countAnswer(qId);
+        const type = questionTypeMap.get(qId);
+        if (type === 'cq') cqAnswered++;
+        else if (type === 'sq') sqAnswered++;
       }
     }
 

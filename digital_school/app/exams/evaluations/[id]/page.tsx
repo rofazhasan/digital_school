@@ -740,14 +740,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                             </div>
                             <div className="flex-grow space-y-2">
                               <div className="prose prose-sm max-w-none">
-                                <UniversalMathJax inline>{cleanupMath(q.text)}</UniversalMathJax>
+                                <UniversalMathJax inline dynamic>{cleanupMath(q.text)}</UniversalMathJax>
                               </div>
 
                               {hasAnswer ? (
                                 <div className="mt-3 p-3 bg-white rounded border border-blue-100">
                                   <p className="text-xs font-semibold text-gray-500 mb-1">Student Answer:</p>
                                   <div className="text-sm font-medium text-blue-800">
-                                    <UniversalMathJax inline>{cleanupMath(String(ans))}</UniversalMathJax>
+                                    <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
                                   </div>
                                 </div>
                               ) : (
@@ -766,7 +766,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="flex items-start">
                                         <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                                         <div className="flex-1">
-                                          <UniversalMathJax inline>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
                                           {opt.image && (
                                             <div className="mt-1">
                                               <img src={opt.image} alt="Option" className="max-h-20 rounded border bg-white object-contain" />
