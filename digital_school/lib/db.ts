@@ -29,68 +29,12 @@ if (process.env.NODE_ENV !== 'production') globalThis.prisma = prismadb;
 
 // Enhanced database client with connection management
 export class DatabaseClient {
-    private static instance: PrismaClient;
-    private static isConnecting = false;
-    private static connectionPromise: Promise<PrismaClient> | null = null;
-
+    // Return the singleton instance directly
     static async getInstance(): Promise<PrismaClient> {
-        if (this.instance && this.isConnected()) {
-            return this.instance;
-        }
-
-        if (this.isConnecting && this.connectionPromise) {
-            return this.connectionPromise;
-        }
-
-        this.isConnecting = true;
-        this.connectionPromise = this.connectWithRetry();
-
-        try {
-            this.instance = await this.connectionPromise;
-            return this.instance;
-        } finally {
-            this.isConnecting = false;
-            this.connectionPromise = null;
-        }
+        return prismadb;
     }
 
-    private static async connectWithRetry(maxRetries = 3): Promise<PrismaClient> {
-        let lastError: Error | null = null;
-
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                // Test the connection
-                await prismadb.$connect();
-
-                // Verify connection with a simple query
-                await prismadb.$queryRaw`SELECT 1`;
-
-                console.log(`✅ Database connected successfully (attempt ${attempt})`);
-                return prismadb;
-            } catch (error) {
-                lastError = error as Error;
-                console.error(`❌ Database connection attempt ${attempt} failed:`, error);
-
-                if (attempt < maxRetries) {
-                    // Wait before retrying (exponential backoff)
-                    const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        }
-
-        throw new Error(`Database connection failed after ${maxRetries} attempts: ${lastError?.message}`);
-    }
-
-    private static isConnected(): boolean {
-        try {
-            // Quick check if the client is connected
-            return prismadb !== null && typeof prismadb === 'object';
-        } catch {
-            return false;
-        }
-    }
-
+    // Keep the timeout utility as it's useful
     static async executeWithTimeout<T>(
         operation: () => Promise<T>,
         timeoutMs: number = 30000

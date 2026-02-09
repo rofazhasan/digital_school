@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "@fontsource/noto-serif-bengali/index.css";
 
+@source "..";
+@source "../components";
+@source "../lib";
+
 /* Bengali text styling */
 .font-noto-sans-bengali {
   font-family: 'Noto Serif Bengali', serif;
