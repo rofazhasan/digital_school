@@ -295,12 +295,12 @@ export default function EvaluationsPage() {
         {exams.map((exam) => (
           <Card key={exam.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-xl">{exam.name}</CardTitle>
-                  <p className="text-gray-600 mt-1">{exam.description}</p>
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
+                  <p className="text-gray-600 mt-1 line-clamp-2">{exam.description}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                   <Badge className={getStatusColor(exam.status)}>
                     <div className="flex items-center gap-1">
                       {getStatusIcon(exam.status)}
@@ -385,12 +385,12 @@ export default function EvaluationsPage() {
                 </div>
               )}
 
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex flex-col sm:flex-row gap-2">
                 {/* View Evaluation - Hidden for Admins unless they are also evaluators (handled by logic) */}
                 {(!isAdmin || isSuperUser) && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    className="w-full sm:w-auto"
                     onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
                   >
                     <Eye className="h-4 w-4 mr-2" />
@@ -402,7 +402,7 @@ export default function EvaluationsPage() {
                 {(isSuperUser || isAdmin) && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    className="w-full sm:w-auto text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                     onClick={() => {
                       setSelectedExam(exam);
                       setAssignDialogOpen(true);
@@ -418,7 +418,7 @@ export default function EvaluationsPage() {
                 {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
                   <Button
                     variant="outline"
-                    size="sm"
+                    className="w-full sm:w-auto text-green-600 border-green-200 hover:bg-green-50"
                     onClick={() => releaseResults(exam.id)}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />

@@ -131,7 +131,7 @@ export default function TeacherDashboard() {
     };
 
     const Sidebar = () => (
-        <div className={`fixed inset-y-0 left-0 z-50 bg-white border-r transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} hidden md:flex flex-col shadow-sm`}>
+        <div className={`fixed inset-y-0 left-0 z-50 bg-white border-r transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} hidden lg:flex flex-col shadow-sm`}>
             <div className="h-16 flex items-center justify-between px-4 border-b">
                 {!sidebarCollapsed && (
                     <div className="flex items-center gap-2">
@@ -148,7 +148,7 @@ export default function TeacherDashboard() {
                         </div>
                     </div>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden md:flex text-gray-400 hover:text-gray-600">
+                <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:flex text-gray-400 hover:text-gray-600">
                     {sidebarCollapsed ? <ChevronDown className="h-5 w-5 rotate-[-90deg]" /> : <Menu className="h-5 w-5" />}
                 </Button>
             </div>
@@ -265,15 +265,15 @@ export default function TeacherDashboard() {
             <Sidebar />
             <MobileSidebar />
 
-            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} flex flex-col min-h-screen`}>
+            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} flex flex-col min-h-screen w-full`}>
                 {/* Top Header */}
-                <header className="h-16 bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobileSidebarOpen(true)}>
+                <header className="h-auto min-h-[4rem] py-2 bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
+                        <Button variant="ghost" size="icon" className="lg:hidden flex-shrink-0" onClick={() => setMobileSidebarOpen(true)}>
                             <Menu className="h-5 w-5" />
                         </Button>
-                        <div>
-                            <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 px-1">
+                        <div className="truncate">
+                            <h1 className="text-lg md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 px-1 truncate">
                                 {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
                             </h1>
                         </div>

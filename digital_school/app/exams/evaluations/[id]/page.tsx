@@ -1533,7 +1533,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
           {/* Header */}
           <div className="mb-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
                 <p className="text-gray-600">{exam.description}</p>
@@ -1566,45 +1566,47 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {/* Debug Info */}
-              <div className="text-xs text-gray-500">
-                <div>Questions: {exam.questions?.length || 0}</div>
-                <div>Submissions: {exam.submissions?.length || 0}</div>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => window.history.back()}>
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-                <Button variant="outline" onClick={() => router.push("/dashboard")}>
-                  <LayoutDashboard className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setShowReviewRequests(true)}
-                  className={`relative ${reviewRequests.filter(r => r.status === 'PENDING').length > 0
-                    ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
-                    : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'}`}
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Review Requests ({reviewRequests.filter(r => r.status === 'PENDING').length})
-                  {reviewRequests.filter(r => r.status === 'PENDING').length > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {reviewRequests.filter(r => r.status === 'PENDING').length}
-                    </span>
-                  )}
-                </Button>
-                {isSuperUser && (
-                  <Button
-                    onClick={releaseResults}
-                    className="bg-green-600 hover:bg-green-700"
-                    title="Release results to make them visible to students"
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Release Results
+              <div className="flex flex-col sm:flex-row xl:items-center gap-4">
+                {/* Debug Info */}
+                <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded-md hidden md:block">
+                  <div>Questions: {exam.questions?.length || 0}</div>
+                  <div>Submissions: {exam.submissions?.length || 0}</div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="outline" onClick={() => window.history.back()}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back
                   </Button>
-                )}
+                  <Button variant="outline" onClick={() => router.push("/dashboard")}>
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowReviewRequests(true)}
+                    className={`relative ${reviewRequests.filter(r => r.status === 'PENDING').length > 0
+                      ? 'bg-red-50 border-red-200 text-red-700 hover:bg-red-100'
+                      : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'}`}
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Review Requests ({reviewRequests.filter(r => r.status === 'PENDING').length})
+                    {reviewRequests.filter(r => r.status === 'PENDING').length > 0 && (
+                      <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {reviewRequests.filter(r => r.status === 'PENDING').length}
+                      </span>
+                    )}
+                  </Button>
+                  {isSuperUser && (
+                    <Button
+                      onClick={releaseResults}
+                      className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
+                      title="Release results to make them visible to students"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Release Results
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -1625,8 +1627,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             <TabsContent value="evaluation">
               {/* Student Navigation */}
               <div className="mb-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                  <div className="flex items-center justify-center lg:justify-start gap-4 Order-2 lg:order-1">
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -1638,16 +1640,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                         }
                       }}
                       disabled={currentStudentIndex === 0}
+                      className="h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2"
                     >
-                      <ArrowLeft className="h-4 w-4" />
+                      <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Previous</span>
                     </Button>
 
-                    <div className="text-center">
-                      <div className="font-semibold">
-                        {currentStudent?.student.name} ({currentStudent?.student.roll})
+                    <div className="text-center min-w-[120px]">
+                      <div className="font-semibold text-gray-900 truncate max-w-[150px] sm:max-w-none">
+                        {currentStudent?.student.name}
                       </div>
-                      <div className="text-sm text-gray-600">
-                        Student {currentStudentIndex + 1} of {exam.submissions.length}
+                      <div className="text-xs text-gray-500 font-medium">
+                        Roll: {currentStudent?.student.roll} • {currentStudentIndex + 1}/{exam.submissions.length}
                       </div>
                     </div>
 
@@ -1662,130 +1666,127 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                         }
                       }}
                       disabled={currentStudentIndex === exam.submissions.length - 1}
+                      className="h-10 w-10 p-0 sm:h-auto sm:w-auto sm:px-4 sm:py-2"
                     >
-                      <ArrowRight className="h-4 w-4" />
+                      <span className="hidden sm:inline">Next</span>
+                      <ArrowRight className="h-4 w-4 sm:ml-2" />
                     </Button>
                   </div>
 
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => currentStudent && window.open(`/exams/evaluations/${id}/print/${currentStudent.student.id}`, '_blank')}
-                      disabled={!currentStudent}
-                      title="Print student script with marks"
-                    >
-                      <Printer className="h-4 w-4 mr-2" />
-                      Print Script
-                    </Button>
+                  <div className="flex flex-wrap items-center justify-center lg:justify-end gap-2 order-1 lg:order-2">
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button
+                        variant="outline"
+                        onClick={() => currentStudent && window.open(`/exams/evaluations/${id}/print/${currentStudent.student.id}`, '_blank')}
+                        disabled={!currentStudent}
+                        title="Print student script with marks"
+                        className="flex-1 sm:flex-none"
+                      >
+                        <Printer className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Print Script</span>
+                      </Button>
 
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        if (!currentStudent || !exam) return;
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          if (!currentStudent || !exam) return;
 
-                        const questions = exam.questions || [];
-                        if (!questions.length) return toast.error("No questions found");
+                          const questions = exam.questions || [];
+                          if (!questions.length) return toast.error("No questions found");
 
-                        const sessionData = questions.map((q) => {
-                          const ans = currentStudent.answers ? currentStudent.answers[q.id] : null;
-                          let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                          let userIdx = null;
+                          const sessionData = questions.map((q) => {
+                            const ans = currentStudent.answers ? currentStudent.answers[q.id] : null;
+                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
+                            let userIdx = null;
 
-                          if (ans !== undefined && ans !== null) {
-                            const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                            const isCorrect = correctOpt && (
-                              (typeof ans === 'number' && q.options?.[ans]?.text === correctOpt.text) ||
-                              (ans === correctOpt.text)
-                            );
-                            status = isCorrect ? 'correct' : 'wrong';
+                            if (ans !== undefined && ans !== null) {
+                              const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                              const isCorrect = correctOpt && (
+                                (typeof ans === 'number' && q.options?.[ans]?.text === correctOpt.text) ||
+                                (ans === correctOpt.text)
+                              );
+                              status = isCorrect ? 'correct' : 'wrong';
 
-                            if (q.type === 'mcq' && q.options) {
-                              userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                              if (q.type === 'mcq' && q.options) {
+                                userIdx = typeof ans === 'number' ? ans : q.options.findIndex((o: any) => o.text === ans);
+                              }
                             }
-                          }
 
-                          // normalize questionText
-                          const questionText = (q as any).questionText || q.text || "Question text missing";
+                            // normalize questionText
+                            const questionText = (q as any).questionText || q.text || "Question text missing";
 
-                          return {
-                            ...q,
-                            questionText, // Ensure this exists for the session page
-                            status,
-                            userAnswer: userIdx,
-                            type: q.type.toUpperCase() === 'MCQ' ? 'MCQ' : q.type
+                            return {
+                              ...q,
+                              questionText, // Ensure this exists for the session page
+                              status,
+                              userAnswer: userIdx,
+                              type: q.type.toUpperCase() === 'MCQ' ? 'MCQ' : q.type
+                            };
+                          });
+
+                          // Store as object with Metadata
+                          const payload = {
+                            examName: exam.name || "Exam Review",
+                            questions: sessionData
                           };
-                        });
 
-                        // Store as object with Metadata
-                        const payload = {
-                          examName: exam.name || "Exam Review",
-                          questions: sessionData
-                        };
+                          localStorage.setItem("review-session-data", JSON.stringify(payload));
+                          toast.success("Opening Review Session...");
+                          window.open(`/problem-solving/review?id=${id}`, '_blank'); // Targeted dedicated page
+                        }}
+                        disabled={!currentStudent}
+                        title="Open in interactive Problem Solving Session"
+                        className="text-indigo-600 border-indigo-200 hover:bg-indigo-50 flex-1 sm:flex-none"
+                      >
+                        <MonitorPlay className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Review Session</span>
+                      </Button>
+                    </div>
 
-                        localStorage.setItem("review-session-data", JSON.stringify(payload));
-                        toast.success("Opening Review Session...");
-                        window.open(`/problem-solving/review?id=${id}`, '_blank'); // Targeted dedicated page
-                      }}
-                      disabled={!currentStudent}
-                      title="Open in interactive Problem Solving Session"
-                      className="text-indigo-600 border-indigo-200 hover:bg-indigo-50"
-                    >
-                      <MonitorPlay className="h-4 w-4 mr-2" />
-                      Review in Session
-                    </Button>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                      <Button
+                        onClick={submitStudentEvaluation}
+                        disabled={saving || !canSubmitStudent()}
+                        className={`flex-1 sm:flex-none ${canSubmitStudent()
+                          ? "bg-blue-600 hover:bg-blue-700 text-white"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                        title={
+                          !canSubmitStudent()
+                            ? "Student evaluation is already completed"
+                            : "Submit this student's evaluation"
+                        }
+                      >
+                        <Save className="h-4 w-4 sm:mr-2" />
+                        <span>Submit {currentStudent?.status === 'COMPLETED' ? '✓' : 'Student'}</span>
+                      </Button>
 
-                    <Button
-                      onClick={submitStudentEvaluation}
-                      disabled={saving || !canSubmitStudent()}
-                      className={`${canSubmitStudent()
-                        ? "bg-blue-600 hover:bg-blue-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                        }`}
-                      title={
-                        !canSubmitStudent()
-                          ? "Student evaluation is already completed"
-                          : "Submit this student's evaluation"
-                      }
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Submit Student
-                      {currentStudent?.status === 'COMPLETED' && (
-                        <Badge className="ml-2 bg-green-100 text-green-800 text-xs">
-                          ✓ Completed
-                        </Badge>
-                      )}
-                    </Button>
-
-                    <Button
-                      onClick={submitAllEvaluations}
-                      disabled={saving || !canSubmitAll()}
-                      className={`${canSubmitAll()
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-gray-400 cursor-not-allowed"
-                        }`}
-                      title={
-                        !canSubmitAll()
-                          ? "All student evaluations are already completed"
-                          : "Submit all student evaluations"
-                      }
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Submit All
-                      {exam && exam.submissions.every(s => s.status === 'COMPLETED') && (
-                        <Badge className="ml-2 bg-green-100 text-green-800 text-xs">
-                          ✓ All Completed
-                        </Badge>
-                      )}
-                    </Button>
+                      <Button
+                        onClick={submitAllEvaluations}
+                        disabled={saving || !canSubmitAll()}
+                        className={`flex-1 sm:flex-none ${canSubmitAll()
+                          ? "bg-green-600 hover:bg-green-700 text-white"
+                          : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          }`}
+                        title={
+                          !canSubmitAll()
+                            ? "All student evaluations are already completed"
+                            : "Submit all student evaluations"
+                        }
+                      >
+                        <CheckCircle className="h-4 w-4 sm:mr-2" />
+                        <span>Submit All {exam && exam.submissions.every(s => s.status === 'COMPLETED') ? '✓' : ''}</span>
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Question Type Filter */}
               <div className="mb-4">
-                <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <span className="text-sm font-medium text-gray-700">Filter by type:</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {(['all', 'mcq', 'cq', 'sq'] as const).map((type) => (
                       <Button
                         key={type}
@@ -1795,15 +1796,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           setQuestionTypeFilter(type);
                           setCurrentQuestionIndex(0); // Reset to first question when filtering
                         }}
-                        className="capitalize"
+                        className="capitalize px-4 flex-1 sm:flex-none"
                       >
-                        {type === 'all' ? 'All' : type.toUpperCase()}
+                        {type === 'all' ? 'All Questions' : type.toUpperCase()}
                       </Button>
                     ))}
                   </div>
-                  <div className="text-sm text-gray-500">
-                    Showing {filteredQuestions.length} of {exam.questions.length} questions
-                  </div>
+                </div>
+                <div className="text-sm text-gray-500 mt-2 sm:mt-0">
+                  Showing {filteredQuestions.length} of {exam.questions.length} questions
                 </div>
               </div>
 
@@ -1812,9 +1813,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 <div className="mb-4">
                   <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <h3 className="text-lg font-semibold text-gray-800">Marks Summary</h3>
-                        <div className="text-sm text-gray-600">
+                        <div className="text-sm font-medium text-blue-700 bg-blue-100/50 px-2 py-1 rounded">
                           Total: {totalMarks} marks
                         </div>
                       </div>
@@ -1920,30 +1921,34 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
               {/* Question Navigation */}
               <div className="mb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center justify-between w-full sm:w-auto gap-4">
                     <Button
                       variant="outline"
                       onClick={() => setCurrentQuestionIndex(Math.max(0, currentQuestionIndex - 1))}
                       disabled={currentQuestionIndex === 0}
+                      className="flex-1 sm:flex-none"
                     >
-                      <ChevronLeft className="h-4 w-4 mr-2" />
-                      Previous Question
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Prev
                     </Button>
 
-                    <div className="text-sm text-gray-600">
-                      Question {currentQuestionIndex + 1} of {filteredQuestions.length}
+                    <div className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                      Q {currentQuestionIndex + 1} / {filteredQuestions.length}
                     </div>
 
                     <Button
                       variant="outline"
                       onClick={() => setCurrentQuestionIndex(Math.min(filteredQuestions.length - 1, currentQuestionIndex + 1))}
                       disabled={currentQuestionIndex === filteredQuestions.length - 1}
+                      className="flex-1 sm:flex-none"
                     >
-                      Next Question
-                      <ChevronRight className="h-4 w-4 ml-2" />
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
                     </Button>
                   </div>
+
+                  {/* Additional actions if any could go here */}
                 </div>
               </div>
 

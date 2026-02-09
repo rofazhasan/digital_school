@@ -496,47 +496,45 @@ export default function ExamResultsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search exams, classes, or students..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10"
                 />
               </div>
-
               <Select value={selectedExam} onValueChange={setSelectedExam}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Exam" />
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Exam" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Exams</SelectItem>
                   {examResults.map((result) => (
                     <SelectItem key={result.exam.id} value={result.exam.id}>
-                      {result.exam.name} - {result.exam.class.name} {result.exam.class.section}
+                      {result.exam.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-
               <Select value={sortBy} onValueChange={(value: 'date' | 'name' | 'class') => setSortBy(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sort by" />
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Sort" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="name">Exam Name</SelectItem>
+                  <SelectItem value="name">Name</SelectItem>
                   <SelectItem value="class">Class</SelectItem>
                 </SelectContent>
               </Select>
-
               <Button
                 variant="outline"
+                className="h-10 w-full"
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               >
-                {sortOrder === 'asc' ? '↑' : '↓'} Sort Order
+                {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
               </Button>
             </div>
           </CardContent>
@@ -568,24 +566,26 @@ export default function ExamResultsPage() {
               return (
                 <Card key={examResult.exam?.id || 'unknown'} className="overflow-hidden">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="w-5 h-5" />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <FileText className="w-5 h-5 text-primary" />
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
-                        <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} •
-                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}
+                        <CardDescription className="flex flex-wrap items-center gap-x-2">
+                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={studentResult.isPublished ? "default" : "secondary"}>
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <Badge variant={studentResult.isPublished ? "default" : "secondary"} className="px-3">
                           {studentResult.isPublished ? "Published" : "Draft"}
                         </Badge>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => toggleExpandedResult(examResult.exam.id)}
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -830,22 +830,25 @@ export default function ExamResultsPage() {
               {filteredResults.map((examResult) => (
                 <Card key={examResult.exam?.id || 'unknown'}>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="w-5 h-5" />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <FileText className="w-5 h-5 text-primary" />
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
-                        <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} •
-                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} •
-                          {examResult.totalStudents || 0} students
+                        <CardDescription className="flex flex-wrap items-center gap-x-2">
+                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {examResult.totalStudents || 0} students</span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Button
                           variant="outline"
                           size="sm"
+                          className="flex-1 sm:flex-none h-9"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                           disabled={downloading.has(`${examResult.exam.id}-pdf`)}
                         >
@@ -859,6 +862,7 @@ export default function ExamResultsPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="flex-1 sm:flex-none h-9"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                           disabled={downloading.has(`${examResult.exam.id}-csv`)}
                         >
@@ -901,17 +905,19 @@ export default function ExamResultsPage() {
             {filteredResults.map((examResult) => (
               <Card key={examResult.exam.id}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <CardTitle>{examResult.exam.name}</CardTitle>
+                      <CardTitle className="text-lg">{examResult.exam.name}</CardTitle>
                       <CardDescription>
                         {examResult.exam.class.name} {examResult.exam.class.section} •
                         {new Date(examResult.exam.date).toLocaleDateString()}
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none h-9"
                         onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                         disabled={downloading.has(`${examResult.exam.id}-pdf`)}
                       >
@@ -924,6 +930,8 @@ export default function ExamResultsPage() {
                       </Button>
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none h-9"
                         onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                         disabled={downloading.has(`${examResult.exam.id}-csv`)}
                       >
@@ -937,49 +945,51 @@ export default function ExamResultsPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rank</TableHead>
-                        <TableHead>Roll</TableHead>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>MCQ</TableHead>
-                        <TableHead>CQ</TableHead>
-                        <TableHead>SQ</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Percentage</TableHead>
-                        <TableHead>Grade</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {examResult.results?.map((result) => (
-                        <TableRow key={result.id}>
-                          <TableCell>
-                            {getRankBadge(result.rank)}
-                          </TableCell>
-                          <TableCell className="font-medium">{result.student?.roll || 'N/A'}</TableCell>
-                          <TableCell>{result.student?.user?.name || 'Unknown'}</TableCell>
-                          <TableCell>{result.mcqMarks || 0}</TableCell>
-                          <TableCell>{result.cqMarks || 0}</TableCell>
-                          <TableCell>{result.sqMarks || 0}</TableCell>
-                          <TableCell className="font-semibold">{result.total || 0}</TableCell>
-                          <TableCell>{result.percentage?.toFixed(1) || 0}%</TableCell>
-                          <TableCell>
-                            <Badge className={getGradeColor(result.grade)}>
-                              {result.grade || 'N/A'}
-                            </Badge>
-                          </TableCell>
+                <CardContent className="p-0 sm:p-6">
+                  <div className="rounded-md border overflow-x-auto no-scrollbar">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="min-w-[80px]">Rank</TableHead>
+                          <TableHead className="min-w-[100px]">Roll</TableHead>
+                          <TableHead className="min-w-[150px]">Student Name</TableHead>
+                          <TableHead className="min-w-[80px]">MCQ</TableHead>
+                          <TableHead className="min-w-[80px]">CQ</TableHead>
+                          <TableHead className="min-w-[80px]">SQ</TableHead>
+                          <TableHead className="min-w-[80px]">Total</TableHead>
+                          <TableHead className="min-w-[100px]">Percentage</TableHead>
+                          <TableHead className="min-w-[100px]">Grade</TableHead>
                         </TableRow>
-                      )) || (
-                          <TableRow>
-                            <TableCell colSpan={9} className="text-center text-muted-foreground">
-                              No results available
+                      </TableHeader>
+                      <TableBody>
+                        {examResult.results?.map((result) => (
+                          <TableRow key={result.id}>
+                            <TableCell>
+                              {getRankBadge(result.rank)}
+                            </TableCell>
+                            <TableCell className="font-medium">{result.student?.roll || 'N/A'}</TableCell>
+                            <TableCell className="whitespace-nowrap font-medium">{result.student?.user?.name || 'Unknown'}</TableCell>
+                            <TableCell>{result.mcqMarks || 0}</TableCell>
+                            <TableCell>{result.cqMarks || 0}</TableCell>
+                            <TableCell>{result.sqMarks || 0}</TableCell>
+                            <TableCell className="font-bold text-primary">{result.total || 0}</TableCell>
+                            <TableCell>{result.percentage?.toFixed(1) || 0}%</TableCell>
+                            <TableCell>
+                              <Badge className={getGradeColor(result.grade)}>
+                                {result.grade || 'N/A'}
+                              </Badge>
                             </TableCell>
                           </TableRow>
-                        )}
-                    </TableBody>
-                  </Table>
+                        )) || (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                No results available
+                              </TableCell>
+                            </TableRow>
+                          )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             ))}

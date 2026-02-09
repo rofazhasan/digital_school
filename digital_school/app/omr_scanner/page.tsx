@@ -108,12 +108,12 @@ export default function OMRScannerPage() {
 
     return (
         <div className="container mx-auto p-4 max-w-5xl min-h-screen">
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">OMR Scanner</h1>
                     <p className="text-muted-foreground">Server-side processing for high accuracy.</p>
                 </div>
-                <Button variant="outline" onClick={() => { setScanResult(null); setPreviewUrl(null); if (activeTab === 'camera') startCamera(); }}>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => { setScanResult(null); setPreviewUrl(null); if (activeTab === 'camera') startCamera(); }}>
                     <RefreshCw className="w-4 h-4 mr-2" /> Reset
                 </Button>
             </div>
@@ -188,29 +188,29 @@ export default function OMRScannerPage() {
                                 <div className="space-y-6">
                                     {/* Grading Badge */}
                                     {scanResult.grading && (
-                                        <div className={`p-4 rounded-lg flex justify-between items-center ${scanResult.grading.score > 0 ? "bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-900"}`}>
+                                        <div className={`p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${scanResult.grading.score > 0 ? "bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-900"}`}>
                                             <div>
                                                 <p className="text-xs font-semibold uppercase opacity-70">Calculated Score</p>
                                                 <p className="text-3xl font-bold">{scanResult.grading.score.toFixed(2)} / {scanResult.grading.total}</p>
                                             </div>
-                                            <div className="text-right text-xs">
-                                                <p>{scanResult.grading.examName}</p>
-                                                <p>Set: {scanResult.grading.setName}</p>
+                                            <div className="text-left sm:text-right text-xs">
+                                                <p className="font-semibold">{scanResult.grading.examName}</p>
+                                                <p className="opacity-70">Set: {scanResult.grading.setName}</p>
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-3 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase">Roll No</p>
-                                            <p className="text-xl font-mono font-bold">{scanResult.roll || "?"}</p>
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Roll No</p>
+                                            <p className="text-xl font-mono font-bold truncate">{scanResult.roll || "?"}</p>
                                         </div>
                                         <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase">Set Code</p>
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Set Code</p>
                                             <p className="text-xl font-mono font-bold">{scanResult.set || "?"}</p>
                                         </div>
                                         <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase">Answers</p>
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Answers</p>
                                             <p className="text-xl font-mono font-bold">{Object.keys(scanResult.answers || {}).length}</p>
                                         </div>
                                     </div>
@@ -218,7 +218,7 @@ export default function OMRScannerPage() {
                                     {/* Answer Grid */}
                                     <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-[400px] overflow-y-auto">
                                         <h3 className="font-semibold mb-3 text-sm">Detected Answers</h3>
-                                        <div className="grid grid-cols-4 gap-2 text-xs">
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 text-xs">
                                             {/* We want to show 100 questions cleanly */}
                                             {Array.from({ length: 100 }).map((_, i) => {
                                                 const qNum = i + 1;

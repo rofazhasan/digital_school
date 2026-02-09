@@ -142,14 +142,14 @@ export function AttendanceTab() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <CardTitle>Daily Attendance</CardTitle>
                         <CardDescription>Monitor student and teacher attendance.</CardDescription>
                     </div>
-                    <div className="flex gap-2">
-                        <Input type="date" className="w-auto" />
-                        <Button>View Report</Button>
+                    <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto">
+                        <Input type="date" className="flex-1 sm:w-auto" />
+                        <Button className="flex-1 sm:flex-none">View Report</Button>
                     </div>
                 </div>
             </CardHeader>
@@ -205,12 +205,14 @@ export function AttendanceTab() {
 export function NoticesTab() {
     return (
         <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                     <CardTitle>Notice Board</CardTitle>
                     <CardDescription>Manage and publish notices.</CardDescription>
                 </div>
-                <Button><Bell className="mr-2 h-4 w-4" /> Publish Notice</Button>
+                <Button className="w-full sm:w-auto">
+                    <Bell className="mr-2 h-4 w-4" /> Publish Notice
+                </Button>
             </CardHeader>
             <CardContent>
                 <div className="space-y-4">
@@ -219,7 +221,7 @@ export function NoticesTab() {
                         { title: 'Exam Schedule Update', date: '2025-06-20', audience: 'Students', status: 'Published' },
                         { title: 'Parents Meeting', date: '2025-07-01', audience: 'Parents', status: 'Draft' },
                     ].map((notice, i) => (
-                        <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3">
                             <div>
                                 <h4 className="font-medium">{notice.title}</h4>
                                 <div className="text-sm text-muted-foreground flex gap-3">
@@ -228,7 +230,9 @@ export function NoticesTab() {
                                     <span>{notice.audience}</span>
                                 </div>
                             </div>
-                            <Badge variant={notice.status === 'Published' ? 'default' : 'secondary'}>{notice.status}</Badge>
+                            <div className="flex justify-start sm:justify-end">
+                                <Badge variant={notice.status === 'Published' ? 'default' : 'secondary'}>{notice.status}</Badge>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -245,9 +249,9 @@ export function BillingTab() {
                 <CardDescription>Manage student fees and payments.</CardDescription>
             </CardHeader>
             <CardContent>
-                <div className="flex gap-4 mb-4">
-                    <Input placeholder="Search invoice..." className="max-w-sm" />
-                    <Button variant="outline"><Filter className="h-4 w-4" /></Button>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                    <Input placeholder="Search invoice..." className="w-full sm:max-w-sm" />
+                    <Button variant="outline" className="w-full sm:w-auto"><Filter className="h-4 w-4 sm:mr-2" /><span className="sm:hidden">Filter</span><span className="hidden sm:inline">Filter Records</span></Button>
                 </div>
                 <div className="rounded-md border overflow-x-auto no-scrollbar">
                     <Table>
@@ -295,9 +299,12 @@ export function ChatTab() {
         <div className="grid grid-cols-1 md:grid-cols-3 h-auto md:h-[600px] border rounded-lg overflow-hidden bg-white shadow-sm">
             <div className="border-b md:border-b-0 md:border-r col-span-1 bg-gray-50 p-4 overflow-y-auto">
                 <div className="mb-4">
-                    <Input placeholder="Search contacts..." className="bg-white" />
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input placeholder="Search contacts..." className="pl-9 bg-white" />
+                    </div>
                 </div>
-                <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible no-scrollbar pb-2 md:pb-0">
+                <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible no-scrollbar pb-3 md:pb-0">
                     {['Support Team', 'Teachers Group', 'Admin Console'].map((name, i) => (
                         <div key={i} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-100 cursor-pointer bg-white border min-w-[180px] md:min-w-0 transition-colors">
                             <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold shrink-0">
@@ -319,9 +326,9 @@ export function ChatTab() {
                 <div className="flex-1 p-4 bg-gray-50 flex items-center justify-center text-muted-foreground">
                     Select a chat to start messaging
                 </div>
-                <div className="p-4 border-t bg-white flex gap-2 sticky bottom-0 z-10">
-                    <Input placeholder="Type a message..." />
-                    <Button>Send</Button>
+                <div className="p-3 border-t bg-white flex gap-2 sticky bottom-0 z-10">
+                    <Input placeholder="Type a message..." className="flex-1" />
+                    <Button className="px-6">Send</Button>
                 </div>
             </div>
         </div>
@@ -388,9 +395,9 @@ export function AdminSettingsTab() {
                     </div>
                 </CardContent>
             </Card>
-            <div className="flex justify-end gap-2">
-                <Button variant="outline">Reset</Button>
-                <Button>Save Changes</Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-3 mt-4">
+                <Button variant="outline" className="w-full sm:w-auto">Reset</Button>
+                <Button className="w-full sm:w-auto">Save Changes</Button>
             </div>
         </div>
     );
@@ -400,26 +407,26 @@ export function AdminAdmitCardsTab() {
     return (
         <Card>
             <CardHeader>
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
                         <CardTitle>Admit Cards</CardTitle>
                         <CardDescription>Generate and manage student admit cards.</CardDescription>
                     </div>
-                    <Button><Download className="mr-2 h-4 w-4" /> Bulk Download</Button>
+                    <Button className="w-full sm:w-auto"><Download className="mr-2 h-4 w-4" /> Bulk Download</Button>
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="flex gap-4 mb-4">
-                    <div className="grid gap-1 w-full max-w-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                    <div className="grid gap-1.5 w-full">
                         <Label>Select Exam</Label>
                         <Input placeholder="Select exam..." />
                     </div>
-                    <div className="grid gap-1 w-full max-w-sm">
+                    <div className="grid gap-1.5 w-full">
                         <Label>Select Class</Label>
                         <Input placeholder="Select class..." />
                     </div>
                     <div className="flex items-end">
-                        <Button variant="secondary">Filter</Button>
+                        <Button variant="secondary" className="w-full sm:w-auto">Filter Results</Button>
                     </div>
                 </div>
                 <div className="border rounded-lg p-8 text-center text-muted-foreground bg-gray-50 border-dashed">
