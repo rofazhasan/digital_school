@@ -67,7 +67,10 @@ export default function ExamLayout() {
     navigation,
     navigateToQuestion,
     saveStatus,
-    isUploading // Get from context
+    isUploading, // Get from context
+    warnings: contextWarnings,
+    setWarnings: setContextWarnings,
+    sortedQuestions
   } = useExamContext();
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -76,7 +79,7 @@ export default function ExamLayout() {
   const [showInstructions, setShowInstructions] = useState(!exam.startedAt);
   const [isStarting, setIsStarting] = useState(false);
 
-  const questions = exam.questions || [];
+  const questions = sortedQuestions || [];
   const currentQuestion = questions[navigation.current];
   const totalQuestions = questions.length;
   // Use live answers for count
@@ -127,8 +130,8 @@ export default function ExamLayout() {
 
   // Combined Violation Handler
   const onViolation = useCallback((count: number) => {
-    // Limit is 3 for switching tabs
-    if (count >= 3) {
+    // 4 warnings limit for auto-submit
+    if (count >= 4) {
       handleSubmit(true);
     }
   }, [handleSubmit]);
@@ -139,12 +142,14 @@ export default function ExamLayout() {
     return type === 'cq' || type === 'sq';
   });
 
-  // Browser/Tab Proctoring - DISABLED for exams with CQ/SQ questions
+  // Browser/Tab Proctoring - Re-enabled for all exams
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
-    maxWarnings: 3,
-    isExamActive: isExamActive && !hasCQorSQ, // Disable proctoring if exam has CQ/SQ
-    isUploading: isUploading // Pass context state
+    maxWarnings: 4,
+    isExamActive: isExamActive,
+    isUploading: isUploading, // Pass context state
+    externalWarnings: contextWarnings,
+    setExternalWarnings: setContextWarnings
   });
 
   // Check initial start state
@@ -333,7 +338,7 @@ export default function ExamLayout() {
                 {warnings > 0 && (
                   <Badge variant="destructive" className="animate-pulse hidden sm:flex gap-1">
                     <ShieldAlert className="w-3 h-3" />
-                    Sys: {warnings}/3
+                    Sys: {warnings}/4
                   </Badge>
                 )}
               </div>
@@ -447,7 +452,7 @@ export default function ExamLayout() {
           <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
             You have left fullscreen mode or switched tabs. This is recorded as a violation.
             <br /><br />
-            <span className="font-bold text-red-500">Warning {warnings}/3</span>
+            <span className="font-bold text-red-500">Warning {warnings}/4</span>
           </p>
           <Button
             size="lg"

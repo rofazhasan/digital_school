@@ -37,10 +37,8 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
 
   // Timer tick logic
   useEffect(() => {
-    // Prevent immediate trigger on mount if time is already 0 (safety)
-    // Only trigger if we were running and hit 0
     if (secondsLeft <= 0 && exam.startedAt) {
-      // If time is really up (double check with calculation)
+      // If time is really up
       const durationSeconds = exam.duration * 60;
       const startTime = new Date(exam.startedAt).getTime();
       const now = Date.now();
@@ -53,29 +51,22 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
       return;
     }
 
-    // Only run timer when online (visual only - server time is master)
-
     // Run timer regardless of online status - rely on system time
-    // if (isOnline) {
     intervalRef.current = setInterval(() => {
-      setSecondsLeft(prev => {
-        // Re-calculate from absolute start time to prevent drift
-        if (exam.startedAt) {
-          const startTime = new Date(exam.startedAt).getTime();
-          const now = Date.now();
-          const durationSeconds = exam.duration * 60;
-          const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
+      if (exam.startedAt) {
+        const startTime = new Date(exam.startedAt).getTime();
+        const now = Date.now();
+        const durationSeconds = exam.duration * 60;
+        const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
 
-          if (newTime <= 0) {
-            if (onTimeUp) onTimeUp();
-            return 0;
-          }
-          return newTime;
+        setSecondsLeft(newTime);
+        if (newTime <= 0) {
+          if (onTimeUp) onTimeUp();
         }
-        return Math.max(0, prev - 1);
-      });
+      } else {
+        setSecondsLeft(prev => Math.max(0, prev - 1));
+      }
     }, 1000);
-    // }
 
     return () => {
       if (intervalRef.current) {
@@ -83,7 +74,7 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
         intervalRef.current = null;
       }
     };
-  }, [secondsLeft, onTimeUp, isOnline, exam.startedAt, exam.duration]);
+  }, [onTimeUp, exam.startedAt, exam.duration, secondsLeft === 0]);
 
   // Warning effect
   useEffect(() => {

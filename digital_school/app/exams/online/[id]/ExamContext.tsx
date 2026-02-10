@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 const ExamContext = createContext<any>(null);
 
@@ -49,12 +49,14 @@ export function ExamContextProvider({
   const [highContrast, setHighContrast] = useState(false);
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
   const [isUploading, setIsUploading] = useState(false); // New Internal State
+  const [warnings, setWarnings] = useState(0); // Lifted state
   const isOnline = useOnlineStatus();
 
   // Scope to specific submission to prevent retake bleed-over
   const submissionId = exam.submissionId || 'new';
   const localKey = `exam-answers-${exam.id}-${submissionId}`;
   const navigationKey = `exam-navigation-${exam.id}-${submissionId}`;
+  const warningsKey = `exam-warnings-${exam.id}-${submissionId}`;
 
   // Load answers and navigation from localStorage on mount
   useEffect(() => {
@@ -76,7 +78,13 @@ export function ExamContextProvider({
         setNavigation(parsedNavigation);
       } catch { }
     }
-  }, [localKey, navigationKey]);
+
+    // Load warnings
+    const savedWarnings = localStorage.getItem(warningsKey);
+    if (savedWarnings) {
+      setWarnings(parseInt(savedWarnings) || 0);
+    }
+  }, [localKey, navigationKey, warningsKey]);
 
   // Save answers to localStorage on every change
   useEffect(() => {
@@ -89,6 +97,34 @@ export function ExamContextProvider({
     if (typeof window === "undefined") return;
     localStorage.setItem(navigationKey, JSON.stringify(navigation));
   }, [navigation, navigationKey]);
+
+  // Save warnings to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(warningsKey, warnings.toString());
+  }, [warnings, warningsKey]);
+
+  // CONSISTENT QUESTION SORTING (Groups MCQ -> CQ -> SQ -> Numeric)
+  const sortedQuestions = useMemo(() => {
+    if (!exam.questions) return [];
+
+    const types = ['mcq', 'cq', 'sq', 'numeric'];
+    const grouped: any = { mcq: [], cq: [], sq: [], numeric: [], other: [] };
+
+    exam.questions.forEach((q: any) => {
+      const type = (q.type || q.questionType || '').toLowerCase();
+      if (grouped[type]) grouped[type].push(q);
+      else grouped.other.push(q);
+    });
+
+    return [
+      ...grouped.mcq,
+      ...grouped.cq,
+      ...grouped.sq,
+      ...grouped.numeric,
+      ...grouped.other
+    ];
+  }, [exam.questions]);
 
   // Simple autosave with Appwrite image handling
   const saveAnswers = useCallback(async (answersToSave: any) => {
@@ -126,10 +162,10 @@ export function ExamContextProvider({
 
   // Enhanced navigation with performance optimizations
   const navigateToQuestion = useCallback((index: number) => {
-    if (index >= 0 && index < (exam.questions?.length || 0)) {
+    if (index >= 0 && index < (sortedQuestions.length || 0)) {
       setNavigation((prev: any) => ({ ...prev, current: index }));
     }
-  }, [exam.questions?.length]);
+  }, [sortedQuestions.length]);
 
   const markQuestion = useCallback((questionId: string, marked: boolean) => {
     setNavigation((prev: any) => ({
@@ -178,7 +214,10 @@ export function ExamContextProvider({
     saveAnswers,
     isOnline,
     isUploading,
-    setIsUploading
+    setIsUploading,
+    warnings,
+    setWarnings,
+    sortedQuestions
   };
 
   return (

@@ -12,10 +12,17 @@ export const useProctoring = ({
     onViolation,
     maxWarnings = 3,
     isExamActive,
-    isUploading = false // Default to false
-}: UseProctoringProps) => {
+    isUploading = false,
+    externalWarnings,
+    setExternalWarnings
+}: UseProctoringProps & {
+    externalWarnings?: number,
+    setExternalWarnings?: React.Dispatch<React.SetStateAction<number>>
+}) => {
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [warnings, setWarnings] = useState(0);
+    const [internalWarnings, setInternalWarnings] = useState(0);
+    const warnings = externalWarnings !== undefined ? externalWarnings : internalWarnings;
+    const setWarnings = setExternalWarnings || setInternalWarnings;
     const [isTabActive, setIsTabActive] = useState(true);
 
     // Trigger violation handler

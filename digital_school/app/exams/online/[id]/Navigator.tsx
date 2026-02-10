@@ -52,8 +52,8 @@ interface NavigatorProps {
 }
 
 export default function Navigator({ questions }: NavigatorProps) {
-  const { exam, answers, navigation, navigateToQuestion } = useExamContext();
-  const questionList = questions || exam.questions || [];
+  const { exam, answers, navigation, navigateToQuestion, sortedQuestions } = useExamContext();
+  const questionList = sortedQuestions || questions || exam.questions || [];
 
   const categorizedQuestions = useMemo(() => {
     const mcqQuestions = questionList.filter((q: any) => (q.type || q.questionType || "").toLowerCase() === "mcq");
