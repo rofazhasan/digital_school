@@ -164,7 +164,6 @@ import { Label } from "@/components/ui/label";
 
 
 
-import { AppFooter } from "@/components/AppFooter";
 import { ApprovalsTab, AiUsageTab, SystemLogsTab, AnalyticsTab, ProfileTab } from "@/components/dashboard/super-user-tabs";
 
 import {
@@ -456,11 +455,11 @@ export default function SuperUserDashboardPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'APPROVED': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'REJECTED': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'COMPLETED': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+      case 'PENDING': return 'bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800';
+      case 'APPROVED': return 'bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800';
+      case 'REJECTED': return 'bg-rose-100 text-rose-800 border-rose-200 dark:bg-rose-900/30 dark:text-rose-200 dark:border-rose-800';
+      case 'COMPLETED': return 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-200 dark:border-sky-800';
+      default: return 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-900/30 dark:text-slate-200 dark:border-slate-800';
     }
   };
 
@@ -826,11 +825,14 @@ export default function SuperUserDashboardPage() {
                                   <TableCell className="text-xs md:text-sm hidden md:table-cell">{exam.totalStudents}</TableCell>
                                   <TableCell>
                                     <div className="flex space-x-1">
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                        <Eye className="h-3 w-3" />
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
+                                        <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
-                                        <Edit className="h-3 w-3" />
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 transition-colors">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors">
+                                        <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
                                   </TableCell>

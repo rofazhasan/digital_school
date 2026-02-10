@@ -33,6 +33,7 @@ const hindSiliguri = Hind_Siliguri({
 });
 
 
+import { AppFooter } from "@/components/AppFooter";
 import db from "@/lib/db";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -69,13 +70,16 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
       </head>
-      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} ${outfit.variable} ${hindSiliguri.variable} overflow-x-hidden`}>
+      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} ${outfit.variable} ${hindSiliguri.variable} overflow-x-hidden flex flex-col min-h-screen`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>
               <MaintenanceGuard>
                 <SessionGuard />
-                {children}
+                <main className="flex-grow">
+                  {children}
+                </main>
+                <AppFooter />
                 <Toaster />
               </MaintenanceGuard>
             </NavigationWrapper>
