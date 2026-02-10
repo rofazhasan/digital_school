@@ -405,10 +405,10 @@ export default function StudentDashboardPage() {
             <>
               {/* Welcome Section */}
               <div className="mb-8">
-                <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                <h1 className="text-xl md:text-3xl font-bold mb-2 bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                   Welcome back, {user.name}! 👋
                 </h1>
-                <p className="text-muted-foreground text-lg">
+                <p className="text-muted-foreground text-base md:text-lg">
                   Here's what's happening with your studies today.
                 </p>
               </div>
@@ -426,7 +426,7 @@ export default function StudentDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold text-indigo-700 font-mono tracking-tight">PracPerfect</div>
+                      <div className="text-xl md:text-2xl font-bold text-indigo-700 font-mono tracking-tight">PracPerfect</div>
                       <p className="text-xs text-indigo-600/70 mt-1">
                         Personalized practice sessions
                       </p>
@@ -445,7 +445,7 @@ export default function StudentDashboardPage() {
                     <CardContent>
                       {exams.length > 0 ? (
                         <>
-                          <div className="text-2xl font-bold truncate">{exams[0].name}</div>
+                          <div className="text-xl md:text-2xl font-bold truncate">{exams[0].name}</div>
                           <p className="text-xs text-muted-foreground mt-1">
                             {exams[0].subject} • {exams[0].date ? new Date(exams[0].date).toLocaleDateString() : ''}
                           </p>
@@ -468,7 +468,7 @@ export default function StudentDashboardPage() {
                     <CardContent>
                       {lastResult ? (
                         <>
-                          <div className="text-2xl font-bold">{lastResult.percentage ? `${lastResult.percentage}%` : lastResult.grade || '-'}</div>
+                          <div className="text-xl md:text-2xl font-bold">{lastResult.percentage ? `${lastResult.percentage}%` : lastResult.grade || '-'}</div>
                           <p className="text-xs text-muted-foreground mt-1 truncate">
                             {lastResult.examTitle} {lastResult && lastResult.rank != null ? `• Rank ${lastResult.rank}` : ''}
                           </p>
@@ -489,7 +489,7 @@ export default function StudentDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{attendanceData.percentage}%</div>
+                      <div className="text-xl md:text-2xl font-bold">{attendanceData.percentage}%</div>
                       <p className="text-xs text-muted-foreground mt-1">
                         {attendanceData.present} present, {attendanceData.absent} absent
                       </p>
@@ -506,7 +506,7 @@ export default function StudentDashboardPage() {
                       </div>
                     </CardHeader>
                     <CardContent>
-                      <div className="text-2xl font-bold">{performanceData.grade}</div>
+                      <div className="text-xl md:text-2xl font-bold">{performanceData.grade}</div>
                       <p className="text-xs text-muted-foreground mt-1">
                         GPA: {performanceData.gpa}
                       </p>
@@ -528,7 +528,7 @@ export default function StudentDashboardPage() {
                   <CardContent>
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex flex-col">
-                        <span className="text-4xl font-bold text-primary">{attendanceData.percentage}%</span>
+                        <span className="text-2xl md:text-4xl font-bold text-primary">{attendanceData.percentage}%</span>
                         <span className="text-sm text-muted-foreground">Overall Attendance</span>
                       </div>
                       <div className="flex gap-4 text-sm">
@@ -574,7 +574,7 @@ export default function StudentDashboardPage() {
                   <CardContent className="flex flex-col items-center justify-center py-6">
                     <div className="relative mb-4">
                       <div className="w-32 h-32 rounded-full border-8 border-background bg-white dark:bg-gray-900 shadow-xl flex items-center justify-center">
-                        <span className="text-5xl font-bold text-primary">#{classRank}</span>
+                        <span className="text-3xl md:text-5xl font-bold text-primary">#{classRank}</span>
                       </div>
                       <div className="absolute -bottom-2 -right-2 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow-lg flex items-center">
                         <TrendingUp className="w-3 h-3 mr-1" /> Top 10%
@@ -596,7 +596,7 @@ export default function StudentDashboardPage() {
 
               {/* Badges and Leaderboard */}
               <div className="mb-8">
-                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Achievements</h2>
+                <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Achievements</h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="md:col-span-2">
                     <Card className="shadow-sm h-full">
@@ -680,7 +680,7 @@ export default function StudentDashboardPage() {
 
               {/* Notices */}
               <div className="mb-8">
-                <h2 className="text-2xl font-bold mb-4 flex items-center gap-2"><Bell className="w-6 h-6 text-primary" /> Notice Board</h2>
+                <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Bell className="w-6 h-6 text-primary" /> Notice Board</h2>
                 <Card className="border-t-4 border-t-primary shadow-sm">
                   <Accordion type="single" collapsible className="w-full">
                     {notices.map((notice, index) => (
@@ -717,7 +717,7 @@ export default function StudentDashboardPage() {
             <div className="mb-8 max-w-5xl mx-auto">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-3xl font-bold">My Exams</h2>
+                  <h2 className="text-xl md:text-3xl font-bold">My Exams</h2>
                   <p className="text-muted-foreground">View and manage your upcoming examinations</p>
                 </div>
                 <Button variant="default" onClick={() => router.push('/exams/online')} className="shadow-lg shadow-primary/20">
@@ -744,7 +744,7 @@ export default function StudentDashboardPage() {
                               {exam.time ? new Date(`2000-01-01T${exam.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
                             </span>
                           </div>
-                          <CardTitle className="text-xl group-hover:text-primary transition-colors">{exam.name}</CardTitle>
+                          <CardTitle className="text-lg md:text-xl group-hover:text-primary transition-colors">{exam.name}</CardTitle>
                           <CardDescription className="flex items-center gap-1 mt-1">
                             <BookOpen className="w-3 h-3" /> {exam.subject}
                           </CardDescription>

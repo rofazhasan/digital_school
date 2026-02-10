@@ -87,10 +87,10 @@ const MCQOption = memo(({
       </div>
 
       {/* Option Text */}
-      <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
+      <div className="flex-1 pt-1 text-sm md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
         <div className="min-w-0">
           <MathJax inline dynamic>
-            <UniversalMathJax inline>{cleanupMath(label || "")}</UniversalMathJax>
+            <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
           </MathJax>
         </div>
         {/* @ts-ignore */}
@@ -189,9 +189,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
           </div>
 
           {/* Question Text */}
-          <div className="prose prose-indigo max-w-none text-gray-800 text-lg md:text-xl font-medium leading-relaxed mb-8">
+          <div className="prose prose-indigo max-w-none text-gray-800 text-base md:text-xl font-medium leading-relaxed mb-8">
             <MathJax dynamic inline>
-              <UniversalMathJax inline>{cleanupMath(text || "")}</UniversalMathJax>
+              <UniversalMathJax inline dynamic>{cleanupMath(text || "")}</UniversalMathJax>
             </MathJax>
           </div>
 
@@ -355,8 +355,8 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                   <div className="space-y-6">
                     {subQuestions.map((subQ: any, idx: number) => (
                       <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
-                        <div className="text-sm font-medium text-gray-700 mb-2">
-                          {idx + 1}. <UniversalMathJax inline>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
+                        <div className="text-sm md:text-base font-medium text-gray-700 mb-2">
+                          {idx + 1}. <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
                           {subQ.image && (
                             <div className="mt-2">
                               <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />

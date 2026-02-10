@@ -451,7 +451,7 @@ export default function ExamResultsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Exam Results</h1>
+          <h1 className="text-xl md:text-3xl font-bold tracking-tight">Exam Results</h1>
           <p className="text-muted-foreground">
             {isStudent
               ? 'View your exam results and performance analysis'
@@ -568,7 +568,7 @@ export default function ExamResultsPage() {
                   <CardHeader>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                       <div className="space-y-1">
-                        <CardTitle className="flex items-center gap-2 text-lg">
+                        <CardTitle className="flex items-center gap-2 text-base md:text-lg">
                           <FileText className="w-5 h-5 text-primary" />
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>

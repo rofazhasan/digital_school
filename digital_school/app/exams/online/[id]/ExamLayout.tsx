@@ -210,15 +210,15 @@ export default function ExamLayout() {
             <div className="flex justify-center mb-4">
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'অনলাইন পরীক্ষা'}</h1>
-            <p className="text-lg text-muted-foreground">আপনি কি পরীক্ষা শুরু করতে প্রস্তুত?</p>
+            <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'অনলাইন পরীক্ষা'}</h1>
+            <p className="text-sm md:text-lg text-muted-foreground">আপনি কি পরীক্ষা শুরু করতে প্রস্তুত?</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-muted/50 p-4 rounded-xl text-center">
               <Clock className="w-6 h-6 mx-auto text-primary mb-2" />
               <h3 className="font-semibold text-foreground text-sm">সময়</h3>
-              <p className="text-lg font-bold text-primary">{exam.duration} মিনিট</p>
+              <p className="text-base md:text-lg font-bold text-primary">{exam.duration} মিনিট</p>
             </div>
             <div className="bg-muted/50 p-4 rounded-xl text-center">
               <HelpCircle className="w-6 h-6 mx-auto text-primary mb-2" />
@@ -228,12 +228,12 @@ export default function ExamLayout() {
             <div className="bg-muted/50 p-4 rounded-xl text-center">
               <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
               <h3 className="font-semibold text-foreground text-sm">পূর্ণমান</h3>
-              <p className="text-lg font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
+              <p className="text-base md:text-lg font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
             </div>
             <div className="bg-muted/50 p-4 rounded-xl text-center">
               <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
               <h3 className="font-semibold text-foreground text-sm">পাস মার্ক</h3>
-              <p className="text-lg font-bold text-primary">{passMark}</p>
+              <p className="text-base md:text-lg font-bold text-primary">{passMark}</p>
             </div>
           </div>
 
@@ -316,7 +316,7 @@ export default function ExamLayout() {
             <div className="flex items-center space-x-3">
               <img src={instituteLogo} alt={instituteName} className="h-8 w-auto hidden sm:block object-contain" />
               <div className="hidden sm:block">
-                <h1 className="font-bold text-foreground truncate max-w-[200px]">{exam.title || exam.name}</h1>
+                <h1 className="font-bold text-foreground truncate max-w-[200px] text-sm md:text-base">{exam.title || exam.name}</h1>
               </div>
             </div>
           </div>
@@ -443,8 +443,8 @@ export default function ExamLayout() {
           <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
             <ShieldAlert className="w-12 h-12 text-red-600" />
           </div>
-          <h1 className="text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
-          <p className="text-lg text-muted-foreground max-w-md mb-8">
+          <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
+          <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
             You have left fullscreen mode or switched tabs. This is recorded as a violation.
             <br /><br />
             <span className="font-bold text-red-500">Warning {warnings}/3</span>

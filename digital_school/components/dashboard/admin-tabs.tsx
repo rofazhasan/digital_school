@@ -89,7 +89,7 @@ export function AdminAnalyticsTab() {
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">$123,456</div>
+                        <div className="text-xl md:text-2xl font-bold">$123,456</div>
                         <p className="text-xs text-muted-foreground">+20.1% from last month</p>
                     </CardContent>
                 </Card>
@@ -99,7 +99,7 @@ export function AdminAnalyticsTab() {
                         <Users className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">1,234</div>
+                        <div className="text-xl md:text-2xl font-bold">2,350</div>
                         <p className="text-xs text-muted-foreground">+180 since last month</p>
                     </CardContent>
                 </Card>

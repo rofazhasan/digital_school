@@ -1535,7 +1535,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           <div className="mb-6">
             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
+                <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
                 <p className="text-gray-600">{exam.description}</p>
 
                 {/* Permission and Status Summary */}
@@ -2115,8 +2115,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     {currentQuestion.marks} mark{currentQuestion.marks > 1 ? 's' : ''}
                                   </div>
                                 </div>
-                                <div className="text-lg mb-4">
-                                  <UniversalMathJax key={currentQuestion.id} dynamic>{currentQuestion.text}</UniversalMathJax>
+                                <div className="text-base md:text-lg mb-4">
+                                  <UniversalMathJax key={currentQuestion.id} dynamic>{cleanupMath(currentQuestion.text)}</UniversalMathJax>
                                 </div>
 
                                 {/* Subquestions */}
@@ -2126,8 +2126,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     {currentQuestion.subQuestions.map((subQ: any, idx: number) => (
                                       <div key={idx} className="pl-4 border-l-2 border-gray-200">
                                         <div className="flex items-center justify-between mb-1">
-                                          <span className="text-sm font-medium text-gray-600">
-                                            (a{String.fromCharCode(97 + idx)}) <UniversalMathJax inline dynamic>{subQ.questionText || subQ.text || subQ.question || ''}</UniversalMathJax>
+                                          <span className="text-sm md:text-base font-medium text-gray-600">
+                                            (a{String.fromCharCode(97 + idx)}) <UniversalMathJax inline dynamic>{cleanupMath(subQ.questionText || subQ.text || subQ.question || '')}</UniversalMathJax>
                                             {subQ.image && (
                                               <div className="mt-1 block">
                                                 <img src={subQ.image} alt="Sub-question" className="max-h-24 rounded border bg-white object-contain" />
@@ -2140,7 +2140,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         </div>
                                         {subQ.modelAnswer && (
                                           <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                            <strong>Model Answer:</strong> <UniversalMathJax inline dynamic>{subQ.modelAnswer}</UniversalMathJax>
+                                            <strong>Model Answer:</strong> <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
                                           </div>
                                         )}
                                       </div>
@@ -2162,7 +2162,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           ) : (
                                             <XCircle className="h-5 w-5 text-red-600" />
                                           )}
-                                          <span className="text-lg"><UniversalMathJax inline>{currentAnswer}</UniversalMathJax></span>
+                                          <span className="text-base md:text-lg"><UniversalMathJax inline dynamic>{cleanupMath(currentAnswer)}</UniversalMathJax></span>
                                         </div>
                                       ) : (
                                         <span className="text-gray-500">No answer provided</span>
@@ -2174,7 +2174,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       {currentAnswer && typeof currentAnswer === 'string' && (
                                         <div>
                                           <div className="text-xs font-semibold text-gray-500 mb-1">Text Answer:</div>
-                                          <div className="whitespace-pre-wrap"><UniversalMathJax>{currentAnswer}</UniversalMathJax></div>
+                                          <div className="whitespace-pre-wrap text-sm md:text-base"><UniversalMathJax dynamic>{cleanupMath(currentAnswer)}</UniversalMathJax></div>
                                         </div>
                                       )}
 
@@ -2242,7 +2242,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             return (
                                               <div key={idx} className="pl-4 border-l-2 border-indigo-100">
                                                 <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
-                                                <div className="mb-2 text-gray-800"><UniversalMathJax dynamic>{subText}</UniversalMathJax></div>
+                                                <div className="mb-2 text-gray-800 text-sm md:text-base"><UniversalMathJax dynamic>{cleanupMath(subText)}</UniversalMathJax></div>
                                                 {(() => {
                                                   const singleImg = currentStudent?.answers?.[`${subKey}_image`];
                                                   const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
@@ -2318,8 +2318,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <div className="flex items-center gap-2">
                                                 <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
                                                 <div className="flex-1">
-                                                  <span className={isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}>
-                                                    <UniversalMathJax>{optText}</UniversalMathJax>
+                                                  <span className={`text-sm md:text-base ${isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}`}>
+                                                    <UniversalMathJax dynamic>{cleanupMath(optText)}</UniversalMathJax>
                                                   </span>
                                                   {opt.image && (
                                                     <div className="mt-1">
@@ -2347,8 +2347,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <CheckCircle className="h-4 w-4" />
                                       Correct / Model Answer:
                                     </h5>
-                                    <div className="text-green-900">
-                                      <UniversalMathJax key={currentQuestion.id} dynamic>{currentQuestion.modelAnswer || String(currentQuestion.correct)}</UniversalMathJax>
+                                    <div className="text-green-900 text-sm md:text-base">
+                                      <UniversalMathJax key={currentQuestion.id} dynamic>{cleanupMath(currentQuestion.modelAnswer || String(currentQuestion.correct))}</UniversalMathJax>
                                     </div>
                                   </div>
                                 )}
@@ -2360,9 +2360,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
                                       Explanation:
                                     </h5>
-                                    <div className="text-blue-900 text-sm" style={{ whiteSpace: 'pre-wrap' }}>
+                                    <div className="text-blue-900 text-xs md:text-sm" style={{ whiteSpace: 'pre-wrap' }}>
                                       <UniversalMathJax key={currentQuestion.id} dynamic>
-                                        {currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}
+                                        {cleanupMath(currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''))}
                                       </UniversalMathJax>
                                     </div>
                                   </div>
