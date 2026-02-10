@@ -240,6 +240,7 @@ export default function QuestionBankPage() {
   const [classFilter, setClassFilter] = useState("all");
   const [subjectFilter, setSubjectFilter] = useState("all");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [topicFilter, setTopicFilter] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
 
@@ -326,6 +327,21 @@ export default function QuestionBankPage() {
       const newSet = new Set(prev);
       if (newSet.has(id)) newSet.delete(id);
       else newSet.add(id);
+      return newSet;
+    });
+  };
+
+  const toggleSelectPage = () => {
+    const pageIds = paginatedQuestions.map(q => q.id);
+    const allOnPageSelected = pageIds.every(id => selectedQuestions.has(id));
+
+    setSelectedQuestions(prev => {
+      const newSet = new Set(prev);
+      if (allOnPageSelected) {
+        pageIds.forEach(id => newSet.delete(id));
+      } else {
+        pageIds.forEach(id => newSet.add(id));
+      }
       return newSet;
     });
   };
@@ -428,6 +444,7 @@ export default function QuestionBankPage() {
       .filter((q: Question) => classFilter === "all" || q.class?.id === classFilter)
       .filter((q: Question) => subjectFilter === "all" || q.subject === subjectFilter)
       .filter((q: Question) => difficultyFilter === "all" || q.difficulty === difficultyFilter)
+      .filter((q: Question) => typeFilter === "all" || q.type === typeFilter)
       .filter((q: Question) => topicFilter === "" || (q.topic || '').toLowerCase().includes(topicFilter.toLowerCase()))
       .filter((q: Question) => {
         if (!dateRange || !dateRange.from) return true;
@@ -442,7 +459,7 @@ export default function QuestionBankPage() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, classFilter, subjectFilter, difficultyFilter, topicFilter, dateRange]);
+  }, [searchTerm, classFilter, subjectFilter, difficultyFilter, typeFilter, topicFilter, dateRange]);
 
   const totalPages = Math.ceil(filteredQuestions.length / itemsPerPage);
   const paginatedQuestions = useMemo(() => {
@@ -455,6 +472,7 @@ export default function QuestionBankPage() {
     setClassFilter("all");
     setSubjectFilter("all");
     setDifficultyFilter("all");
+    setTypeFilter("all");
     setTopicFilter("");
     setDateRange(undefined);
     setCurrentPage(1);
@@ -547,8 +565,8 @@ export default function QuestionBankPage() {
 
                 <TabsContent value="browse" className="mt-4">
                   <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                      <div className="lg:col-span-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                      <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
                         <Label htmlFor="search-term">Search</Label>
                         <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                       </div>
@@ -574,14 +592,26 @@ export default function QuestionBankPage() {
                         </Select>
                       </div>
                       <div>
+                        <Label htmlFor="type-filter">Type</Label>
+                        <Select value={typeFilter} onValueChange={setTypeFilter}>
+                          <SelectTrigger id="type-filter"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Types</SelectItem>
+                            <SelectItem value="MCQ">MCQ</SelectItem>
+                            <SelectItem value="CQ">CQ</SelectItem>
+                            <SelectItem value="SQ">SQ</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div>
                         <Label htmlFor="topic-filter">Topic</Label>
                         <Input id="topic-filter" placeholder="Filter by topic..." value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} />
                       </div>
-                      <div>
+                      <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
                         <Label>Date Range</Label>
                         <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
                       </div>
-                      <div className="flex items-end gap-2 lg:col-span-5 flex-wrap">
+                      <div className="flex items-end gap-2 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-6 flex-wrap mt-2">
                         <Button onClick={resetFilters} variant="ghost" size="sm" className="whitespace-nowrap"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
                         <div className="flex-grow"></div>
                         <Button onClick={() => window.location.href = '/problem-solving'} variant="outline" className="whitespace-nowrap bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800"><BrainCircuit className="mr-2 h-4 w-4" /> Live Problem Solving</Button>
@@ -601,20 +631,30 @@ export default function QuestionBankPage() {
                           onCheckedChange={toggleSelectAll}
                         />
                         <Label htmlFor="select-all" className="cursor-pointer">
-                          Select All ({filteredQuestions.length})
+                          Select All Results ({filteredQuestions.length})
+                        </Label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="select-page"
+                          checked={paginatedQuestions.length > 0 && paginatedQuestions.every(q => selectedQuestions.has(q.id))}
+                          onCheckedChange={toggleSelectPage}
+                        />
+                        <Label htmlFor="select-page" className="cursor-pointer">
+                          Select This Page ({paginatedQuestions.length})
                         </Label>
                       </div>
                       {selectedQuestions.size > 0 && (
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(true)} className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(true)} className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 whitespace-nowrap">
                             <CheckCircle2 className="h-4 w-4 mr-2" />
                             Add to Practice ({selectedQuestions.size})
                           </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(false)} className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20">
+                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(false)} className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20 whitespace-nowrap">
                             <XCircle className="h-4 w-4 mr-2" />
                             Remove Practice ({selectedQuestions.size})
                           </Button>
-                          <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+                          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="whitespace-nowrap">
                             <Trash2 className="h-4 w-4 mr-2" /> Delete Selected ({selectedQuestions.size})
                           </Button>
                         </div>

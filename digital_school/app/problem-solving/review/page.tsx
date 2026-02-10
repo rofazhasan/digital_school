@@ -418,95 +418,54 @@ export default function ReviewToSessionPort() {
                                     </UniversalMathJax>
                                 </h3>
 
-                                <div className="mt-10 space-y-4">
+                                <div className="mt-10 space-y-6">
+                                    {/* MCQ Options */}
                                     {currentQ.type?.toUpperCase() === 'MCQ' && currentQ.options && (
                                         <div className="grid gap-4">
                                             {currentQ.options.map((opt, idx) => {
                                                 const isSelected = selectedOption === idx;
                                                 const isCorrect = opt.isCorrect;
-
-                                                // Student's original submission (Persistent)
                                                 const isStudentAnswer = currentQ.userAnswer === idx;
-
-                                                // REVEAL LOGIC: STRICTLY MANUAL
-                                                // Only show colors if the "Check Answer" button was clicked.
                                                 const shouldReveal = isAnswerChecked;
 
-                                                // Base Style
                                                 let statusClass = isDark
                                                     ? "border-slate-800 bg-slate-800/30 hover:bg-slate-800/60"
                                                     : "border-slate-100 bg-white shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md hover:border-slate-200";
 
-                                                // INTERACTION STATE: Highlight selected option (Blue border/bg) before reveal
                                                 if (isSelected) {
                                                     statusClass = isDark
                                                         ? "bg-indigo-900/30 border-indigo-500/40 ring-1 ring-indigo-500/20"
                                                         : "bg-indigo-50/50 border-indigo-200 ring-1 ring-indigo-100 shadow-sm";
                                                 }
 
-                                                // REVEAL STATE: Colors override selection styles
                                                 if (shouldReveal) {
-                                                    if (isCorrect) {
-                                                        // Always show CORRECT answer in GREEN
-                                                        statusClass = isDark ? "bg-emerald-950/30 border-emerald-500/40" : "bg-emerald-50 border-emerald-200 ring-1 ring-emerald-100";
-                                                    }
-                                                    else if (isSelected) {
-                                                        // Show SELECTED WRONG answer in RED
-                                                        statusClass = isDark ? "bg-rose-950/30 border-rose-500/40 opacity-90" : "bg-rose-50 border-rose-200 ring-1 ring-rose-100 opacity-90";
-                                                    }
-                                                    else {
-                                                        // Dim others
-                                                        statusClass = isDark ? "bg-slate-800/20 opacity-40 grayscale" : "bg-slate-50 opacity-40 grayscale";
-                                                    }
+                                                    if (isCorrect) statusClass = isDark ? "bg-emerald-950/30 border-emerald-500/40" : "bg-emerald-50 border-emerald-200 ring-1 ring-emerald-100";
+                                                    else if (isSelected) statusClass = isDark ? "bg-rose-950/30 border-rose-500/40 opacity-90" : "bg-rose-50 border-rose-200 ring-1 ring-rose-100 opacity-90";
+                                                    else statusClass = isDark ? "bg-slate-800/20 opacity-40 grayscale" : "bg-slate-50 opacity-40 grayscale";
                                                 }
 
                                                 return (
                                                     <div
                                                         key={idx}
-                                                        onClick={(e) => {
+                                                        onClick={() => {
                                                             if (annotationMode) return;
-                                                            // Teacher Interaction
                                                             setSelectedOption(idx);
                                                             setIsAnswerChecked(false);
                                                         }}
-                                                        className={`
-                                                  p-5 rounded-2xl border transition-all duration-300 flex items-start gap-5 group cursor-pointer relative overflow-hidden
-                                                  ${annotationMode ? 'cursor-crosshair' : ''}
-                                                  ${statusClass}
-                                              `}
+                                                        className={`p-5 rounded-2xl border transition-all duration-300 flex items-start gap-5 group cursor-pointer relative overflow-hidden ${statusClass}`}
                                                     >
-                                                        {/* Option Label (A, B, C...) */}
-                                                        <div className={`
-                                                  shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-all duration-300 border
-                                                  ${isSelected ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : (isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500 group-hover:border-slate-300 group-hover:bg-slate-50')}
-                                                  ${shouldReveal && isCorrect ? '!bg-emerald-500 !border-emerald-400 !text-white !shadow-emerald-500/30' : ''}
-                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-rose-500 !border-rose-400 !text-white !shadow-rose-500/30' : ''}
-                                              `}>
+                                                        <div className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold border ${isSelected ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/30' : (isDark ? 'bg-slate-800 border-slate-700 text-slate-400' : 'bg-white border-slate-200 text-slate-500 group-hover:border-slate-300')} ${shouldReveal && isCorrect ? '!bg-emerald-500 !border-emerald-400 !text-white' : ''} ${shouldReveal && isSelected && !isCorrect ? '!bg-rose-500 !border-rose-400 !text-white' : ''}`}>
                                                             {String.fromCharCode(65 + idx)}
                                                         </div>
-
-                                                        <div className="flex-1 flex flex-col z-10">
+                                                        <div className="flex-1 flex flex-col">
                                                             <span className={`text-lg leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
-                                                                <UniversalMathJax inline dynamic>
-                                                                    {cleanupMath(opt.text)}
-                                                                </UniversalMathJax>
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
                                                             </span>
-
-                                                            {/* Student Answer Indicator (Persistent) */}
                                                             {isStudentAnswer && (
-                                                                <div className="mt-3 flex items-center gap-2 animate-in fade-in slide-in-from-bottom-1 duration-500">
+                                                                <div className="mt-3 flex items-center gap-2">
                                                                     <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[10px] font-bold uppercase tracking-wider ${isDark ? 'bg-indigo-950/50 border-indigo-800 text-indigo-300' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
-                                                                        <User className="w-3 h-3" />
-                                                                        Student Pick
+                                                                        <User className="w-3 h-3" /> Student Pick
                                                                     </div>
-
-                                                                    {/* Status Badges (Only after Reveal) */}
-                                                                    {shouldReveal && currentQ.status === 'correct' && (
-                                                                        <span className="text-[10px] bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Correct</span>
-                                                                    )}
-                                                                    {shouldReveal && currentQ.status === 'wrong' && (
-                                                                        <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-2 py-1 rounded-full font-bold uppercase tracking-wider">Wrong</span>
-                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -515,30 +474,62 @@ export default function ReviewToSessionPort() {
                                             })}
                                         </div>
                                     )}
-                                </div>
 
-                                {/* Check Answer Button: Show if NOT revealed yet */}
-                                {(!isAnswerChecked) && currentQ.type?.toUpperCase() === 'MCQ' && (
-                                    <Button
-                                        onClick={() => setIsAnswerChecked(true)}
-                                        // Disabled only if nothing selected, UNLESS we just want to see the answer
-                                        // disabled={selectedOption === null}
-                                        className="w-full mt-8 h-12 text-base font-semibold bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all hover:scale-[1.01] rounded-xl"
-                                    >
-                                        Check Answer & Explanation
-                                    </Button>
-                                )}
+                                    {/* CQ Sub Questions */}
+                                    {currentQ.type?.toUpperCase() === 'CQ' && Array.isArray(currentQ.subQuestions) && (
+                                        <div className="space-y-6">
+                                            {currentQ.subQuestions.map((sub: any, idx: number) => (
+                                                <div key={idx} className={`p-6 rounded-2xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                                    <div className="flex gap-4 items-start">
+                                                        <span className="font-bold text-indigo-600 flex-shrink-0 text-lg">({String.fromCharCode(97 + idx)})</span>
+                                                        <div className="flex-1 text-base font-medium leading-relaxed">
+                                                            <UniversalMathJax inline dynamic>{sub.question || sub.text}</UniversalMathJax>
+                                                        </div>
+                                                    </div>
 
-                                {isAnswerChecked && (
-                                    <div className={`mt-8 p-6 rounded-2xl border ${isDark ? 'bg-indigo-900/10 border-indigo-500/20' : 'bg-slate-50 border-slate-100'}`}>
-                                        <h4 className="font-bold text-indigo-600 flex items-center gap-2 mb-3">
-                                            <CheckCircle className="w-5 h-5" /> Explanation
-                                        </h4>
-                                        <div className="prose dark:prose-invert max-w-none text-slate-600 leading-relaxed">
-                                            <MathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
+                                                    {isAnswerChecked && (sub.answer || sub.modelAnswer) && (
+                                                        <div className="mt-4 pt-4 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-1">
+                                                            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-2">
+                                                                <div className="w-1 h-1 rounded-full bg-emerald-500"></div> Model Answer
+                                                            </div>
+                                                            <div className="text-base font-fancy text-slate-600 dark:text-slate-400 italic">
+                                                                <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+
+                                    {/* Reveal Button */}
+                                    {(!isAnswerChecked && currentQ.status !== 'correct') && (currentQ.type?.toUpperCase() === 'MCQ' || currentQ.type?.toUpperCase() === 'CQ' || currentQ.type?.toUpperCase() === 'SQ') && (
+                                        <div className="pt-4">
+                                            <Button
+                                                onClick={() => setIsAnswerChecked(true)}
+                                                className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl shadow-xl shadow-indigo-500/20 text-lg font-bold tracking-tight transition-all hover:scale-[1.01] active:scale-[0.99]"
+                                            >
+                                                REVEAL SOLUTION
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {/* Full Solution / Explanation */}
+                                    {(isAnswerChecked || currentQ.status === 'correct') && (currentQ.options?.some(o => o.isCorrect && o.explanation) || currentQ.modelAnswer) && (
+                                        <div className={`p-6 rounded-2xl border-2 animate-in fade-in slide-in-from-top-4 ${isDark ? 'bg-emerald-950/20 border-emerald-500/20' : 'bg-emerald-50/50 border-emerald-200'}`}>
+                                            <h4 className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-4">
+                                                <CheckCircle className="w-5 h-5" /> {currentQ.type?.toUpperCase() === 'CQ' || currentQ.type?.toUpperCase() === 'SQ' ? 'Full Model Answer' : 'Detailed Explanation'}
+                                            </h4>
+                                            <div className="prose dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 leading-relaxed font-medium">
+                                                <UniversalMathJax dynamic>
+                                                    {currentQ.type?.toUpperCase() === 'MCQ'
+                                                        ? (currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided.")
+                                                        : (currentQ.modelAnswer || "No model answer provided.")}
+                                                </UniversalMathJax>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </Card>
                     </div>
@@ -562,6 +553,6 @@ export default function ReviewToSessionPort() {
                 <div ref={hiddenPDFContainerRef} className="absolute top-0 left-[-9999px] w-[794px] opacity-0 pointer-events-none -z-50 bg-white"></div>
             </div>
 
-        </MathJaxContext>
+        </MathJaxContext >
     );
 }

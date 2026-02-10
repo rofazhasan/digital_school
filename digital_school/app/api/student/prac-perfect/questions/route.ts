@@ -65,6 +65,7 @@ export async function GET(request: NextRequest) {
                 options: true,
                 modelAnswer: true, // Used for answer checking
                 images: true, // For rendering diagrams
+                subQuestions: true, // For CQ sub-questions
                 // explanation: true, // Field does not exist in schema, omit for now or use another field if available
                 class: {
                     select: { name: true }

@@ -712,26 +712,54 @@ export default function ProblemSolvingSession() {
                                                 })}
                                             </div>
                                         )}
+
+                                        {currentQ.type === 'CQ' && Array.isArray(currentQ.subQuestions) && (
+                                            <div className="space-y-6 mt-4">
+                                                {currentQ.subQuestions.map((sub: any, idx: number) => (
+                                                    <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                                        <div className="flex gap-3 items-start">
+                                                            <span className="font-bold text-indigo-600 flex-shrink-0">({String.fromCharCode(97 + idx)})</span>
+                                                            <div className="flex-1 text-sm font-medium leading-relaxed">
+                                                                <UniversalMathJax inline dynamic>{sub.question || sub.text}</UniversalMathJax>
+                                                            </div>
+                                                        </div>
+
+                                                        {(isAnswerChecked || currentQ.status === 'correct') && (sub.answer || sub.modelAnswer) && (
+                                                            <div className="mt-3 pt-3 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-1">
+                                                                <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Model Answer</div>
+                                                                <div className="text-sm font-fancy text-emerald-600 dark:text-emerald-400 italic">
+                                                                    <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Check Answer Button: Show if NOT revealed yet */}
-                                    {(!isAnswerChecked && currentQ.status !== 'correct') && currentQ.type === 'MCQ' && (
+                                    {(!isAnswerChecked && currentQ.status !== 'correct') && (currentQ.type === 'MCQ' || currentQ.type === 'CQ' || currentQ.type === 'SQ') && (
                                         <Button
                                             onClick={() => setIsAnswerChecked(true)}
-                                            disabled={selectedOption === null && !currentQ.status}
+                                            disabled={currentQ.type === 'MCQ' && selectedOption === null && !currentQ.status}
                                             className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700"
                                         >
-                                            {currentQ.status ? "Show Correct Answer" : "Check Answer"}
+                                            {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? "Reveal Model Answer" : (currentQ.status ? "Show Correct Answer" : "Check Answer")}
                                         </Button>
                                     )}
 
-                                    {(isAnswerChecked || currentQ.status === 'correct') && (
+                                    {(isAnswerChecked || currentQ.status === 'correct') && (currentQ.options?.some(o => o.isCorrect && o.explanation) || currentQ.modelAnswer) && (
                                         <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                                             <h4 className="font-bold text-indigo-500 flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4" /> Explanation
+                                                <CheckCircle className="w-4 h-4" /> {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? 'Model Answer' : 'Explanation'}
                                             </h4>
                                             <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
-                                                <MathJax dynamic>{currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided."}</MathJax>
+                                                <UniversalMathJax dynamic>
+                                                    {currentQ.type === 'MCQ'
+                                                        ? (currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided.")
+                                                        : (currentQ.modelAnswer || "No model answer provided.")}
+                                                </UniversalMathJax>
                                             </div>
                                         </div>
                                     )}

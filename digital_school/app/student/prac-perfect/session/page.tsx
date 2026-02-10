@@ -46,6 +46,7 @@ interface Question {
     options?: any[]; // Array of strings or objects depending on parsing
     modelAnswer?: string; // Correct option index/value
     images?: string[];
+    subQuestions?: any[];
 }
 
 export default function PracPerfectSessionPage() {
@@ -340,6 +341,31 @@ export default function PracPerfectSessionPage() {
                                     </div>
                                 )}
 
+                                {/* CQ Sub Questions */}
+                                {currentQ.type === 'CQ' && Array.isArray(currentQ.subQuestions) && (
+                                    <div className="space-y-6 mt-4">
+                                        {currentQ.subQuestions.map((sub: any, idx: number) => (
+                                            <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                                <div className="flex gap-3 items-start">
+                                                    <span className="font-bold text-indigo-600 flex-shrink-0">({String.fromCharCode(97 + idx)})</span>
+                                                    <div className="flex-1 text-sm font-medium leading-relaxed">
+                                                        <UniversalMathJax inline dynamic>{sub.question || sub.text}</UniversalMathJax>
+                                                    </div>
+                                                </div>
+
+                                                {isChecked && (sub.answer || sub.modelAnswer) && (
+                                                    <div className="mt-3 pt-3 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-1">
+                                                        <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Model Answer</div>
+                                                        <div className="text-sm font-fancy text-emerald-600 dark:text-emerald-400 italic">
+                                                            <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
                                 {/* Options (MCQ) */}
                                 {currentQ.type === 'MCQ' && Array.isArray(currentQ.options) && (
                                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-6">
@@ -402,10 +428,10 @@ export default function PracPerfectSessionPage() {
                                     {!isChecked ? (
                                         <Button
                                             className="w-full h-12 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all font-fancy"
-                                            disabled={selectedOption === null}
+                                            disabled={currentQ.type === 'MCQ' && selectedOption === null}
                                             onClick={handleCheckAnswer}
                                         >
-                                            Check Answer
+                                            {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? 'Show Model Answer' : 'Check Answer'}
                                         </Button>
                                     ) : (
                                         <Button
@@ -422,26 +448,30 @@ export default function PracPerfectSessionPage() {
                                 {(isChecked || result === 'unanswered') && (
                                     <div className={`p-5 rounded-2xl border-2 animate-in fade-in slide-in-from-top-2 shadow-xl 
                                         ${isCorrect ? 'bg-green-500/10 border-green-500/30 text-green-900 dark:text-green-300' :
-                                            result === 'unanswered' ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300' :
-                                                'bg-red-500/10 border-red-500/30 text-red-900 dark:text-red-300'}`}>
+                                            (currentQ.type === 'CQ' || currentQ.type === 'SQ') ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-900 dark:text-indigo-300' :
+                                                result === 'unanswered' ? 'bg-amber-500/10 border-amber-500/30 text-amber-900 dark:text-amber-300' :
+                                                    'bg-red-500/10 border-red-500/30 text-red-900 dark:text-red-300'}`}>
 
                                         <div className="flex items-center justify-between gap-2 mb-3">
                                             <div className="flex items-center gap-2">
                                                 <div className={`h-8 w-8 rounded-full flex items-center justify-center 
                                                     ${isCorrect ? 'bg-green-100 text-green-600' :
-                                                        result === 'unanswered' ? 'bg-amber-100 text-amber-600' :
-                                                            'bg-red-100 text-red-600'}`}>
+                                                        (currentQ.type === 'CQ' || currentQ.type === 'SQ') ? 'bg-indigo-100 text-indigo-600' :
+                                                            result === 'unanswered' ? 'bg-amber-100 text-amber-600' :
+                                                                'bg-red-100 text-red-600'}`}>
                                                     {isCorrect ? <CheckCircle className="w-5 h-5" /> :
-                                                        result === 'unanswered' ? <AlertCircle className="w-5 h-5" /> :
-                                                            <XCircle className="w-5 h-5" />}
+                                                        (currentQ.type === 'CQ' || currentQ.type === 'SQ') ? <Sparkles className="w-5 h-5" /> :
+                                                            result === 'unanswered' ? <AlertCircle className="w-5 h-5" /> :
+                                                                <XCircle className="w-5 h-5" />}
                                                 </div>
                                                 <span className="font-fancy font-black text-base">
                                                     {isCorrect ? 'Excellent! Correct Answer.' :
-                                                        result === 'unanswered' ? 'Question Skipped' :
-                                                            'Not quite right...'}
+                                                        (currentQ.type === 'CQ' || currentQ.type === 'SQ') ? 'Model Answer Revealed' :
+                                                            result === 'unanswered' ? 'Question Skipped' :
+                                                                'Not quite right...'}
                                                 </span>
                                             </div>
-                                            {(!isCorrect || result === 'unanswered') && (
+                                            {(!isCorrect || result === 'unanswered') && currentQ.type === 'MCQ' && (
                                                 <Badge className="bg-green-600 text-white border-white border-2 font-black px-4 py-1.5 shadow-md">
                                                     Correct Answer: {(() => {
                                                         const correctOpt = currentQ.options?.find((o: any) => o.isCorrect);
@@ -468,8 +498,17 @@ export default function PracPerfectSessionPage() {
                                                             </div>
                                                         );
                                                     }
-                                                    return !isCorrect ? <p className="opacity-80 italic">Review the core concepts and try again!</p> : null;
+                                                    return !isCorrect && currentQ.type === 'MCQ' ? <p className="opacity-80 italic">Review the core concepts and try again!</p> : null;
                                                 })()}
+                                            </div>
+                                        )}
+
+                                        {(currentQ.type === 'CQ' || currentQ.type === 'SQ') && currentQ.modelAnswer && (
+                                            <div className="mt-3 pt-4 border-t border-current/10">
+                                                <div className="font-fancy font-black mb-2 text-xs opacity-70 uppercase tracking-[0.1em]">Full Model Answer</div>
+                                                <div className="leading-relaxed opacity-90 italic">
+                                                    <UniversalMathJax dynamic>{currentQ.modelAnswer}</UniversalMathJax>
+                                                </div>
                                             </div>
                                         )}
                                     </div>
