@@ -974,7 +974,7 @@ export default function ExamsPage() {
                                 </div>
                                 <p className="text-base font-bold text-red-600 dark:text-red-400 font-fancy">
                                   {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0
-                                    ? `${exam.mcqNegativeMarking} (-${Math.round(exam.mcqNegativeMarking * 100)}%)`
+                                    ? `-${exam.mcqNegativeMarking >= 1 ? exam.mcqNegativeMarking : Math.round(exam.mcqNegativeMarking * 100)}%`
                                     : '0'
                                   }
                                 </p>
