@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,10 +11,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 
 import {
-  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search,
-  Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
-  Globe, Monitor, FileText, BarChart3, Settings, Download,
-  RefreshCw, SortAsc, SortDesc, FilterX, Save, X, ArrowRight
+  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, Save,
+  FileText, Monitor, Globe, MoreVertical,
+  SortAsc, SortDesc, BarChart3
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -25,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -253,7 +252,7 @@ export default function ExamsPage() {
       toast({ title: 'Success', description: 'Exam updated successfully.' });
       setIsEditOpen(false);
       await fetchExams();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to update exam.',
@@ -285,7 +284,7 @@ export default function ExamsPage() {
       if (selectedExams.includes(id)) {
         setSelectedExams(prev => prev.filter(examId => examId !== id));
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to delete exam.',
@@ -324,7 +323,7 @@ export default function ExamsPage() {
 
       setSelectedExams([]);
       await fetchExams();
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to delete exams.',
@@ -333,6 +332,14 @@ export default function ExamsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreate = () => {
+    router.push("/exams/create");
+  };
+
+  const handleExamClick = (id: string) => {
+    router.push(`/exams/${id}`);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -350,36 +357,6 @@ export default function ExamsPage() {
     } else {
       setSelectedExams(prev => prev.filter(examId => examId !== id));
     }
-  };
-
-  const handleApprove = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/exams?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: true }),
-      });
-      if (!res.ok) throw new Error('Failed to approve exam');
-      toast({ title: 'Success', description: 'Exam approved successfully.' });
-      await fetchExams();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to approve exam.',
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreate = () => {
-    router.push("/exams/create");
-  };
-
-  const handleExamClick = (id: string) => {
-    router.push(`/exams/${id}`);
   };
 
   const resetFilters = () => {
@@ -402,7 +379,7 @@ export default function ExamsPage() {
 
   // Filter and sort exams
   const filteredAndSortedExams = useMemo(() => {
-    let filtered = exams.filter(exam => {
+    const filtered = exams.filter(exam => {
       const matchesSearch = !debouncedSearch ||
         exam.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
         exam.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
@@ -435,7 +412,8 @@ export default function ExamsPage() {
 
     // Sort exams
     filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
+      let aValue: string | number | Date = '';
+      let bValue: string | number | Date = '';
 
       switch (filters.sortBy) {
         case 'name':
@@ -662,6 +640,32 @@ export default function ExamsPage() {
                 </Tabs>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
+                  {selectedExams.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl"
+                    >
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400">{selectedExams.length} selected</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg p-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  )}
+                  <div className="flex items-center gap-2 mr-2">
+                    <Checkbox
+                      id="select-all"
+                      checked={selectedExams.length === filteredAndSortedExams.length && filteredAndSortedExams.length > 0}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      className="rounded-md border-gray-300"
+                    />
+                    <Label htmlFor="select-all" className="text-xs font-medium text-gray-500 cursor-pointer hidden lg:inline">Select All</Label>
+                  </div>
                   <div className="relative flex-1 md:min-w-[300px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                     <Input
@@ -725,6 +729,22 @@ export default function ExamsPage() {
                           </Select>
                         </div>
                         <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Negative Marking</Label>
+                          <Select
+                            value={filters.negativeMarking || 'all'}
+                            onValueChange={(v) => setFilters(p => ({ ...p, negativeMarking: v }))}
+                          >
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Exams" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Exams</SelectItem>
+                              <SelectItem value="with">With Negative Marking</SelectItem>
+                              <SelectItem value="without">Without Negative Marking</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
                           <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Sort By</Label>
                           <div className="flex gap-2">
                             <Select
@@ -749,7 +769,7 @@ export default function ExamsPage() {
                             </Button>
                           </div>
                         </div>
-                        <div className="flex items-end justify-end">
+                        <div className="flex items-end justify-end sm:col-span-2 lg:col-span-4">
                           <Button variant="ghost" onClick={resetFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2">
                             <RefreshCw className="w-4 h-4" />
                             Reset All
@@ -761,411 +781,346 @@ export default function ExamsPage() {
                 )}
               </AnimatePresence>
             </div>
-                          value={filters.negativeMarking || 'all'}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, negativeMarking: value }))}
-                        >
-                          <SelectTrigger id="negative-marking-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Exams</SelectItem>
-                            <SelectItem value="with">With Negative Marking</SelectItem>
-                            <SelectItem value="without">Without Negative Marking</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+          </motion.div>
 
-                      <div className="flex items-end gap-2">
-                        <Button
-                          variant="outline"
-                          onClick={resetFilters}
-                          className="flex items-center gap-2"
-                        >
-                          <FilterX className="w-4 h-4" />
-                          Reset
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="sort-by">Sort by:</Label>
-                        <Select
-                          value={filters.sortBy}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, sortBy: value }))}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="date">Date</SelectItem>
-                            <SelectItem value="created">Recently Created</SelectItem>
-                            <SelectItem value="name">Name</SelectItem>
-                            <SelectItem value="marks">Marks</SelectItem>
-                            <SelectItem value="subject">Subject</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFilters(prev => ({
-                          ...prev,
-                          sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc'
-                        }))}
-                        className="flex items-center gap-2"
-                      >
-                        {filters.sortOrder === 'asc' ? (
-                          <SortAsc className="w-4 h-4" />
-                        ) : (
-                          <SortDesc className="w-4 h-4" />
-                        )}
-                        {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-                      </Button>
-                    </div>
-                  </div >
-                </Tabs >
-              </CardContent >
-            </Card >
-          </motion.div >
-
-    {/* Exam Cards Grid */ }
-    < motion.div
-  initial = {{ opacity: 0, y: 20 }
-}
-animate = {{ opacity: 1, y: 0 }}
-transition = {{ delay: 0.3 }}
-          >
-{
-  loading?(
-              <div className = "flex justify-center items-center h-64" >
-      <div className="flex flex-col items-center gap-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
-      </div>
-              </div>
-            ) : filteredAndSortedExams.length === 0 ? (
-  <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
-    <CardContent className="p-12 text-center">
-      <div className="flex flex-col items-center gap-4">
-        <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
-          <BookOpen className="w-8 h-8 text-gray-400" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-            No exams found
-          </h3>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
-              ? 'Try adjusting your filters or search terms.'
-              : 'Get started by creating your first exam.'}
-          </p>
-          {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
-            <Button onClick={handleCreate} className="flex items-center gap-2">
-              <Plus className="w-4 h-4" />
-              Create Your First Exam
-            </Button>
-          )}
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-) : (
-  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-    <AnimatePresence mode="popLayout">
-      {paginatedExams.map((exam, index) => (
-        <motion.div
-          key={exam.id}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ delay: index * 0.1 }}
-          whileHover={{
-            scale: 1.02,
-            y: -4,
-            transition: { duration: 0.2 }
-          }}
-          className="group"
-                      <Card
-                        onClick={() => handleExamClick(exam.id)}
-                        className={`group relative h-full bg-white dark:bg-gray-800 border-gray-200/50 dark:border-gray-700/50 overflow-hidden card-premium rounded-[2rem] p-1 flex flex-col ${selectedExams.includes(exam.id) ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' : ''}`}
-                      >
-                        <div className="p-6 flex flex-col h-full bg-white dark:bg-gray-800 rounded-[1.75rem] shadow-sm group-hover:shadow-xl transition-all">
-                          {/* Top Section: Status & Actions */}
-                          <div className="flex items-start justify-between mb-4">
-                            <div className="flex flex-wrap gap-2">
-                              <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getStatusColor(exam.isActive)}`}>
-                                {exam.isActive ? 'Active' : 'Pending'}
-                              </Badge>
-                              <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getTypeColor(exam.type)}`}>
-                                {exam.type}
-                              </Badge>
-                            </div>
-                            {userRole !== 'TEACHER' && (
-                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
-                                <Checkbox
-                                  checked={selectedExams.includes(exam.id)}
-                                  onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
-                                  className="rounded-md border-gray-300 mr-2"
-                                />
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors p-0">
-                                      <MoreVertical className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="rounded-2xl border-gray-200 shadow-2xl p-2 min-w-[180px]">
-                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleEdit(exam.id)}>
-                                      <Edit className="w-4 h-4 text-blue-500" />
-                                      <span>Edit Exam</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
-                                      <BarChart3 className="w-4 h-4 text-emerald-500" />
-                                      <span>View Results</span>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator className="my-2" />
-                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
-                                      <Trash2 className="w-4 h-4" />
-                                      <span>Delete Exam</span>
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Subject & Name */}
-                          <div className="mb-4">
-                            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
-                              {exam.subject || 'Academic Exam'}
-                            </span>
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 min-h-[3rem] font-fancy">
-                              {exam.name}
-                            </h3>
-                          </div>
-
-                          {/* Quick Stats Grid */}
-                          <div className="grid grid-cols-2 gap-3 mb-6">
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
-                              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
-                                <Award className="w-3.5 h-3.5" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Total Marks</span>
-                              </div>
-                              <p className="text-base font-bold text-gray-900 dark:text-white">{exam.totalMarks}</p>
-                            </div>
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
-                              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
-                                <Calendar className="w-3.5 h-3.5" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Date</span>
-                              </div>
-                              <p className="text-base font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Detailed Stats & Metadata */}
-                          <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
-                            <div className="flex items-center gap-2">
-                              <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
-                                {exam.createdBy?.charAt(0) || 'U'}
-                              </div>
-                              <div className="flex flex-col">
-                                <p className="text-[10px] font-bold text-gray-500 leading-none mb-0.5 tracking-wider uppercase">Author</p>
-                                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[100px]">{exam.createdBy || 'Unknown'}</p>
-                              </div>
-                            </div>
-                            
-                            <div className="flex items-center gap-3">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                                    <Clock className="w-4 h-4" />
-                                    <span className="text-xs font-bold">{exam.duration}m</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>Duration: {exam.duration} minutes</TooltipContent>
-                              </Tooltip>
-                              
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="h-8 rounded-full group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all font-bold px-4 text-xs"
-                              >
-                                View
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </Card>
-        </motion.div>
-      ))}
-  </AnimatePresence>
-  </div >
-)}
-          </motion.div >
-
-  {/* Pagination Controls */ }
-{
-  totalPages > 1 && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
-    >
-      <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-        Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
-      </div>
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage === 1}
-          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-          className="rounded-xl px-4"
-        >
-          Previous
-        </Button>
-        <div className="flex items-center gap-1">
-          {[...Array(totalPages)].map((_, i) => {
-            const pageNum = i + 1;
-            // Show only first, last, and pages around current
-            if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-              return (
-                <Button
-                  key={pageNum}
-                  variant={currentPage === pageNum ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
-                >
-                  {pageNum}
-                </Button>
-              );
-            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-              return <span key={pageNum} className="text-gray-400">...</span>;
+          {/* Exam Cards Grid */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }
             }
-            return null;
-          })}
-        </div>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={currentPage === totalPages}
-          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-          className="rounded-xl px-4"
-        >
-          Next
-        </Button>
-      </div>
-    </motion.div>
-  )
-}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            {
+              loading ? (
+                <div className="flex justify-center items-center h-64" >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
+                  </div>
+                </div>
+              ) : filteredAndSortedExams.length === 0 ? (
+                <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
+                  <CardContent className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+                        <BookOpen className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          No exams found
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
+                          {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
+                            ? 'Try adjusting your filters or search terms.'
+                            : 'Get started by creating your first exam.'}
+                        </p>
+                        {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
+                          <Button onClick={handleCreate} className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Create Your First Exam
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <AnimatePresence mode="popLayout">
+                    {paginatedExams.map((exam, index) => (
+                      <motion.div
+                        key={exam.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{
+                          scale: 1.02,
+                          y: -4,
+                          transition: { duration: 0.2 }
+                        }}
+                        className="group"
+                      >
+                        <Card
+                          onClick={() => handleExamClick(exam.id)}
+                          className={`group relative h-full bg-white dark:bg-gray-800 border-gray-200/50 dark:border-gray-700/50 overflow-hidden card-premium rounded-[2rem] p-1 flex flex-col ${selectedExams.includes(exam.id) ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' : ''}`}
+                        >
+                          <div className="p-6 flex flex-col h-full bg-white dark:bg-gray-800 rounded-[1.75rem] shadow-sm group-hover:shadow-xl transition-all">
+                            {/* Top Section: Status & Actions */}
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex flex-wrap gap-2">
+                                <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getStatusColor(exam.isActive)}`}>
+                                  {exam.isActive ? 'Active' : 'Pending'}
+                                </Badge>
+                                <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter flex items-center gap-1 ${getTypeColor(exam.type)}`}>
+                                  {getTypeIcon(exam.type)}
+                                  {exam.type}
+                                </Badge>
+                              </div>
+                              {userRole !== 'TEACHER' && (
+                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedExams.includes(exam.id)}
+                                    onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
+                                    className="rounded-md border-gray-300 mr-2"
+                                  />
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors p-0">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="rounded-2xl border-gray-200 shadow-2xl p-2 min-w-[180px]">
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleEdit(exam.id)}>
+                                        <Edit className="w-4 h-4 text-blue-500" />
+                                        <span>Edit Exam</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
+                                        <BarChart3 className="w-4 h-4 text-emerald-500" />
+                                        <span>View Results</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator className="my-2" />
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Delete Exam</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Subject & Name */}
+                            <div className="mb-4">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
+                                {exam.subject || 'Academic Exam'}
+                              </span>
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 min-h-[3rem] font-fancy">
+                                {exam.name}
+                              </h3>
+                            </div>
+
+                            {/* Quick Stats Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                  <Award className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Total Marks</span>
+                                </div>
+                                <p className="text-base font-bold text-gray-900 dark:text-white">{exam.totalMarks}</p>
+                              </div>
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                  <Calendar className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Date</span>
+                                </div>
+                                <p className="text-base font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                  {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Detailed Stats & Metadata */}
+                            <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                                  {exam.createdBy?.charAt(0) || 'U'}
+                                </div>
+                                <div className="flex flex-col">
+                                  <p className="text-[10px] font-bold text-gray-500 leading-none mb-0.5 tracking-wider uppercase">Author</p>
+                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[100px]">{exam.createdBy || 'Unknown'}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                                      <Clock className="w-4 h-4" />
+                                      <span className="text-xs font-bold">{exam.duration}m</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent>Duration: {exam.duration} minutes</TooltipContent>
+                                </Tooltip>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 rounded-full group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all font-bold px-4 text-xs"
+                                >
+                                  View
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div >
+              )}
+          </motion.div >
+
+          {/* Pagination Controls */}
+          {
+            totalPages > 1 && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
+              >
+                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                  Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    className="rounded-xl px-4"
+                  >
+                    Previous
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {[...Array(totalPages)].map((_, i) => {
+                      const pageNum = i + 1;
+                      // Show only first, last, and pages around current
+                      if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                        return <span key={pageNum} className="text-gray-400">...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    className="rounded-xl px-4"
+                  >
+                    Next
+                  </Button>
+                </div>
+              </motion.div>
+            )
+          }
         </TooltipProvider >
 
-  <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-    <DialogContent className="sm:max-w-[600px]">
-      <DialogHeader>
-        <DialogTitle>Edit Exam</DialogTitle>
-        <DialogDescription>
-          Make changes to the exam here. Click save when you're done.
-        </DialogDescription>
-      </DialogHeader>
-      <div className="grid gap-4 py-4">
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="name" className="text-right">
-            Name
-          </Label>
-          <Input
-            id="name"
-            value={editForm.name}
-            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="description" className="text-right">
-            Description
-          </Label>
-          <Textarea
-            id="description"
-            value={editForm.description}
-            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="date" className="text-right">
-            Date
-          </Label>
-          <Input
-            id="date"
-            type="date"
-            value={editForm.date}
-            onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="startTime" className="text-right">
-            Start Time
-          </Label>
-          <Input
-            id="startTime"
-            type="datetime-local"
-            value={editForm.startTime}
-            onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="endTime" className="text-right">
-            End Time
-          </Label>
-          <Input
-            id="endTime"
-            type="datetime-local"
-            value={editForm.endTime}
-            onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="duration" className="text-right">
-            Duration (mins)
-          </Label>
-          <Input
-            id="duration"
-            type="number"
-            value={editForm.duration}
-            onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
-            className="col-span-3"
-          />
-        </div>
-        <div className="grid grid-cols-4 items-center gap-4">
-          <Label htmlFor="retake" className="text-right">
-            Allow Retake
-          </Label>
-          <div className="col-span-3 flex items-center space-x-2">
-            <Switch
-              id="retake"
-              checked={editForm.allowRetake}
-              onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
-            />
-            <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
-          </div>
-        </div>
-      </div>
-      <DialogFooter>
-        <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-        <Button onClick={handleUpdateExam} disabled={loading}>
-          {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-          Save Changes
-        </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Exam</DialogTitle>
+              <DialogDescription>
+                Make changes to the exam here. Click save when you&apos;re done.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editForm.date}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startTime" className="text-right">
+                  Start Time
+                </Label>
+                <Input
+                  id="startTime"
+                  type="datetime-local"
+                  value={editForm.startTime}
+                  onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endTime" className="text-right">
+                  End Time
+                </Label>
+                <Input
+                  id="endTime"
+                  type="datetime-local"
+                  value={editForm.endTime}
+                  onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">
+                  Duration (mins)
+                </Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={editForm.duration}
+                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="retake" className="text-right">
+                  Allow Retake
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <Switch
+                    id="retake"
+                    checked={editForm.allowRetake}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
+                  />
+                  <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateExam} disabled={loading}>
+                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div >
     </div >
   );
