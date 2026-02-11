@@ -131,7 +131,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
     return (
       <div ref={ref} className="answer-paper-container bg-white p-8 rounded-lg shadow-lg relative overflow-hidden" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
-        <div className="watermark print-only">DIGITAL SCHOOL</div>
+        <div className="watermark print-only">{examInfo.schoolName}</div>
 
         {/* Header */}
         <header className="text-center mb-6 relative border-b-4 border-black pb-4 text-black">

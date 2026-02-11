@@ -56,16 +56,17 @@
   /* Professional Page Footer with Bengali Numbering */
   .print-footer {
     position: fixed;
-    bottom: 0;
+    bottom: -15mm;
+    /* Positioned within the bottom margin */
     left: 0;
     right: 0;
-    height: 30px;
-    background: white;
+    height: 40px;
+    background: transparent;
     z-index: 100;
     text-align: center;
     border-top: 1px solid #000;
-    font-size: 0.9rem;
-    padding-top: 5px;
+    font-size: 0.95rem;
+    padding-top: 8px;
   }
 
   /* Reset counter and define Bengali numerals */
