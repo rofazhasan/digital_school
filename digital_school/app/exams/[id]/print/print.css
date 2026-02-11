@@ -44,11 +44,6 @@
     letter-spacing: 0.01em !important;
   }
 
-  .print-page-number::after {
-    content: "পৃষ্ঠা: " counter(page);
-    font-family: 'SolaimanLipi', serif;
-  }
-
   .print-header {
     position: fixed;
     top: 0;
