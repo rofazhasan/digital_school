@@ -247,18 +247,18 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
 
     const getLevelBadge = (log: ActivityLog) => {
         const details = log.details.toLowerCase();
-        const isAudit = log.action === 'UPDATE' && log.details.includes('SYSTEM_AUDIT');
+        const isAudit = log.action === 'SYSTEM_AUDIT';
 
         if (isAudit)
-            return <Badge className="bg-emerald-500 text-white text-[10px] py-0 border-none shadow-sm shadow-emerald-500/20">AUDIT</Badge>;
+            return <Badge className="bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-[10px] py-0 border-none shadow-[0_0_8px_rgba(16,185,129,0.4)] px-2 font-bold tracking-tight">AUDIT</Badge>;
 
         if (details.includes('error') || details.includes('fail') || details.includes('exception'))
-            return <Badge variant="destructive" className="text-[10px] py-0 border-none shadow-sm shadow-red-500/20 animate-pulse">ERROR</Badge>;
+            return <Badge variant="destructive" className="bg-gradient-to-r from-rose-600 to-red-500 text-[10px] py-0 border-none shadow-[0_0_8px_rgba(244,63,94,0.4)] animate-pulse px-2 font-bold tracking-tight">ERROR</Badge>;
 
         if (details.includes('warn') || details.includes('slow'))
-            return <Badge className="bg-amber-500 text-white text-[10px] py-0 border-none shadow-sm shadow-amber-500/20">WARN</Badge>;
+            return <Badge className="bg-gradient-to-r from-amber-600 to-orange-500 text-white text-[10px] py-0 border-none shadow-[0_0_8px_rgba(245,158,11,0.4)] px-2 font-bold tracking-tight">WARN</Badge>;
 
-        return <Badge variant="secondary" className="text-[10px] py-0 border-none opacity-80">INFO</Badge>;
+        return <Badge variant="secondary" className="text-[10px] py-0 border-none opacity-80 px-2 font-medium">INFO</Badge>;
     };
 
     const exportToJSON = (data: any, filename: string) => {
