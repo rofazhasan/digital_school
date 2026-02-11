@@ -88,6 +88,10 @@ export default function ExamsPage() {
   const [activeTab, setActiveTab] = useState('all');
   const [userRole, setUserRole] = useState<string>("");
   const [selectedExams, setSelectedExams] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(12);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
 
   // Edit Modal State
@@ -111,6 +115,15 @@ export default function ExamsPage() {
     fetchExams();
     fetchUserRole();
   }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+      setCurrentPage(1); // Reset to first page on search
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [filters.search]);
 
   const fetchUserRole = async () => {
     try {
@@ -390,10 +403,10 @@ export default function ExamsPage() {
   // Filter and sort exams
   const filteredAndSortedExams = useMemo(() => {
     let filtered = exams.filter(exam => {
-      const matchesSearch = !filters.search ||
-        exam.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        exam.description?.toLowerCase().includes(filters.search.toLowerCase()) ||
-        exam.subject.toLowerCase().includes(filters.search.toLowerCase());
+      const matchesSearch = !debouncedSearch ||
+        exam.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        exam.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        exam.subject.toLowerCase().includes(debouncedSearch.toLowerCase());
 
       const matchesStatus = filters.status === 'all' ||
         (filters.status === 'active' && exam.isActive) ||
@@ -458,7 +471,15 @@ export default function ExamsPage() {
     });
 
     return filtered;
-  }, [exams, filters]);
+  }, [exams, debouncedSearch, filters, activeTab]);
+
+  // Pagination Logic
+  const paginatedExams = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedExams.slice(startIndex, startIndex + pageSize);
+  }, [filteredAndSortedExams, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredAndSortedExams.length / pageSize);
 
   // Statistics
   const stats = useMemo(() => {
@@ -477,25 +498,25 @@ export default function ExamsPage() {
 
   const getStatusColor = (isActive: boolean) => {
     return isActive
-      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800"
+      : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-800";
   };
 
   const getTypeIcon = (type?: string) => {
     switch (type) {
-      case 'ONLINE': return <Monitor className="w-4 h-4" />;
-      case 'OFFLINE': return <FileText className="w-4 h-4" />;
-      case 'MIXED': return <Globe className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
+      case 'ONLINE': return <Monitor className="w-3 h-3" />;
+      case 'OFFLINE': return <FileText className="w-3 h-3" />;
+      case 'MIXED': return <Globe className="w-3 h-3" />;
+      default: return <FileText className="w-3 h-3" />;
     }
   };
 
   const getTypeColor = (type?: string) => {
     switch (type) {
-      case 'ONLINE': return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case 'OFFLINE': return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-      case 'MIXED': return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+      case 'ONLINE': return "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-100 dark:border-purple-800";
+      case 'OFFLINE': return "bg-slate-50 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-100 dark:border-slate-800";
+      case 'MIXED': return "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-100 dark:border-orange-800";
+      default: return "bg-slate-50 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-100 dark:border-slate-800";
     }
   };
 
@@ -511,11 +532,11 @@ export default function ExamsPage() {
           >
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-                  Exam Management
+                <h1 className="text-3xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-blue-800 to-indigo-900 dark:from-white dark:to-gray-400 font-fancy">
+                  Exam Hub
                 </h1>
-                <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-300">
-                  Create, manage, and monitor all your examinations
+                <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-400 font-medium">
+                  Simplify your academic evaluations with premium management tools.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -524,46 +545,18 @@ export default function ExamsPage() {
                   size="sm"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">Refresh</span>
-                  <span className="sm:hidden">Sync</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/question-bank')}
-                  className="flex items-center gap-2"
-                >
-                  <BookOpen className="w-4 h-4" />
-                  <span className="hidden sm:inline">Question Bank</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/exams/evaluations')}
-                  className="flex items-center gap-2"
-                >
-                  <FileText className="w-4 h-4" />
-                  <span className="hidden sm:inline">Evaluations</span>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => router.push('/dashboard')}
-                  className="flex items-center gap-2 bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                  <span className="hidden sm:inline">Dashboard</span>
+                  <span className="hidden sm:inline">Refresh Sync</span>
                 </Button>
                 {userRole !== 'TEACHER' && (
                   <Button
                     onClick={handleCreate}
-                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-[1.02] active:scale-95 text-white shadow-xl shadow-blue-500/20 rounded-full px-6 transition-all duration-300"
                   >
-                    <Plus className="w-4 h-4" />
-                    <span>Create Exam</span>
+                    <Plus className="w-5 h-5" />
+                    <span className="font-semibold">Create Exam</span>
                   </Button>
                 )}
               </div>
@@ -657,147 +650,117 @@ export default function ExamsPage() {
             transition={{ delay: 0.2 }}
             className="mb-6"
           >
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-6">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <div className="overflow-x-auto no-scrollbar -mx-2 px-2 md:mx-0 md:px-0">
-                    <TabsList className="flex w-max md:w-full bg-gray-100 dark:bg-gray-700 p-1">
-                      <TabsTrigger value="all" className="whitespace-nowrap">All Exams</TabsTrigger>
-                      <TabsTrigger value="active" className="whitespace-nowrap">Active</TabsTrigger>
-                      <TabsTrigger value="pending" className="whitespace-nowrap">Pending</TabsTrigger>
-                      <TabsTrigger value="online" className="whitespace-nowrap">Online</TabsTrigger>
-                      <TabsTrigger value="negative-marking" className="whitespace-nowrap">Negative Marking</TabsTrigger>
-                    </TabsList>
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+                  <TabsList className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200 dark:border-gray-700 p-1 rounded-xl">
+                    <TabsTrigger value="all" className="rounded-lg px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white">All</TabsTrigger>
+                    <TabsTrigger value="active" className="rounded-lg px-6 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Active</TabsTrigger>
+                    <TabsTrigger value="pending" className="rounded-lg px-6 data-[state=active]:bg-amber-600 data-[state=active]:text-white">Pending</TabsTrigger>
+                    <TabsTrigger value="online" className="rounded-lg px-6 data-[state=active]:bg-purple-600 data-[state=active]:text-white">Online</TabsTrigger>
+                  </TabsList>
+                </Tabs>
+
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  <div className="relative flex-1 md:min-w-[300px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Search exam name or subject..."
+                      value={filters.search}
+                      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                      className="pl-10 rounded-xl border-gray-200 focus:ring-blue-500 transition-all bg-white/50 backdrop-blur-sm"
+                    />
                   </div>
+                  <Button
+                    variant={showFilters ? "secondary" : "outline"}
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="rounded-xl flex items-center gap-2"
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">Filters</span>
+                  </Button>
+                </div>
+              </div>
 
-                  <div className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                      <div className="lg:col-span-2">
-                        <Label htmlFor="search">Search</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                          <Input
-                            id="search"
-                            placeholder="Search exams..."
-                            value={filters.search}
-                            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex items-end pb-2">
-                        <div className="flex items-center space-x-2">
-                          <Checkbox
-                            id="select-all"
-                            checked={filteredAndSortedExams.length > 0 && selectedExams.length === filteredAndSortedExams.length}
-                            onCheckedChange={handleSelectAll}
-                          />
-                          <Label htmlFor="select-all" className="cursor-pointer">Select All</Label>
-                        </div>
-                      </div>
-
-                      {selectedExams.length > 0 && (
-                        <div className="flex items-end pb-0 gap-2">
-                          <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={async () => {
-                              if (!confirm(`Are you sure you want to activate ${selectedExams.length} exams?`)) return;
-                              setLoading(true);
-                              try {
-                                // We can reuse the loop or make a bulk API. For now, looping is safer/easier without API changes.
-                                // Or simpler: just notify user we need a bulk activate API? 
-                                // Let's loop for now as it's client side.
-                                for (const id of selectedExams) {
-                                  await fetch(`/api/exams?id=${id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ isActive: true }),
-                                  });
-                                }
-                                toast({ title: "Success", description: "Exams activated successfully" });
-                                await fetchExams();
-                                setSelectedExams([]);
-                              } catch (e) {
-                                toast({ title: "Error", description: "Failed to activate exams", variant: "destructive" });
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            className="flex items-center gap-2 bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-100"
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <Card className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Subject</Label>
+                          <Select
+                            value={filters.subject}
+                            onValueChange={(v) => setFilters(p => ({ ...p, subject: v }))}
                           >
-                            <CheckCircle className="w-4 h-4" />
-                            Activate ({selectedExams.length})
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={handleBulkDelete}
-                            className="flex items-center gap-2"
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Subjects" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Subjects</SelectItem>
+                              {uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Type</Label>
+                          <Select
+                            value={filters.type}
+                            onValueChange={(v) => setFilters(p => ({ ...p, type: v }))}
                           >
-                            <Trash2 className="w-4 h-4" />
-                            Delete ({selectedExams.length})
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="ONLINE">Online</SelectItem>
+                              <SelectItem value="OFFLINE">Offline</SelectItem>
+                              <SelectItem value="MIXED">Mixed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Sort By</Label>
+                          <div className="flex gap-2">
+                            <Select
+                              value={filters.sortBy}
+                              onValueChange={(v) => setFilters(p => ({ ...p, sortBy: v }))}
+                            >
+                              <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200 flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="date">Date</SelectItem>
+                                <SelectItem value="created">Recently Added</SelectItem>
+                                <SelectItem value="marks">Total Marks</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              onClick={() => setFilters(p => ({ ...p, sortOrder: p.sortOrder === 'asc' ? 'desc' : 'asc' }))}
+                              className="rounded-xl w-10 p-0"
+                            >
+                              {filters.sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-end justify-end">
+                          <Button variant="ghost" onClick={resetFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4" />
+                            Reset All
                           </Button>
                         </div>
-                      )}
-
-                      <div>
-                        <Label htmlFor="status-filter">Status</Label>
-                        <Select
-                          value={filters.status}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-                        >
-                          <SelectTrigger id="status-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
-
-                      <div>
-                        <Label htmlFor="type-filter">Type</Label>
-                        <Select
-                          value={filters.type}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-                        >
-                          <SelectTrigger id="type-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="ONLINE">Online</SelectItem>
-                            <SelectItem value="OFFLINE">Offline</SelectItem>
-                            <SelectItem value="MIXED">Mixed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="subject-filter">Subject</Label>
-                        <Select
-                          value={filters.subject}
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, subject: value }))}
-                        >
-                          <SelectTrigger id="subject-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Subjects</SelectItem>
-                            {uniqueSubjects.map(subject => (
-                              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="negative-marking-filter">Negative Marking</Label>
-                        <Select
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
                           value={filters.negativeMarking || 'all'}
                           onValueChange={(value) => setFilters(prev => ({ ...prev, negativeMarking: value }))}
                         >
@@ -861,139 +824,110 @@ export default function ExamsPage() {
                         {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
                       </Button>
                     </div>
-                  </div>
-                </Tabs>
-              </CardContent>
-            </Card>
-          </motion.div>
+                  </div >
+                </Tabs >
+              </CardContent >
+            </Card >
+          </motion.div >
 
-          {/* Exam Cards Grid */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+    {/* Exam Cards Grid */ }
+    < motion.div
+  initial = {{ opacity: 0, y: 20 }
+}
+animate = {{ opacity: 1, y: 0 }}
+transition = {{ delay: 0.3 }}
           >
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                  <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
-                </div>
+{
+  loading?(
+              <div className = "flex justify-center items-center h-64" >
+      <div className="flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
+      </div>
               </div>
             ) : filteredAndSortedExams.length === 0 ? (
-              <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
-                      <BookOpen className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        No exams found
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-4">
-                        {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
-                          ? 'Try adjusting your filters or search terms.'
-                          : 'Get started by creating your first exam.'}
-                      </p>
-                      {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
-                        <Button onClick={handleCreate} className="flex items-center gap-2">
-                          <Plus className="w-4 h-4" />
-                          Create Your First Exam
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                <AnimatePresence>
-                  {filteredAndSortedExams.map((exam, index) => (
-                    <motion.div
-                      key={exam.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{
-                        scale: 1.02,
-                        y: -4,
-                        transition: { duration: 0.2 }
-                      }}
-                      className="group"
-                    >
+  <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
+    <CardContent className="p-12 text-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+          <BookOpen className="w-8 h-8 text-gray-400" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+            No exams found
+          </h3>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
+              ? 'Try adjusting your filters or search terms.'
+              : 'Get started by creating your first exam.'}
+          </p>
+          {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
+            <Button onClick={handleCreate} className="flex items-center gap-2">
+              <Plus className="w-4 h-4" />
+              Create Your First Exam
+            </Button>
+          )}
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+) : (
+  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+    <AnimatePresence mode="popLayout">
+      {paginatedExams.map((exam, index) => (
+        <motion.div
+          key={exam.id}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ delay: index * 0.1 }}
+          whileHover={{
+            scale: 1.02,
+            y: -4,
+            transition: { duration: 0.2 }
+          }}
+          className="group"
                       <Card
                         onClick={() => handleExamClick(exam.id)}
-                        className="h-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden"
+                        className={`group relative h-full bg-white dark:bg-gray-800 border-gray-200/50 dark:border-gray-700/50 overflow-hidden card-premium rounded-[2rem] p-1 flex flex-col ${selectedExams.includes(exam.id) ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' : ''}`}
                       >
-                        <CardHeader className="pb-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0 flex gap-3">
-                              <div className="pt-1">
-                                {userRole !== 'TEACHER' && (
-                                  <Checkbox
-                                    checked={selectedExams.includes(exam.id)}
-                                    onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
-                                    onClick={(e) => e.stopPropagation()}
-                                  />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                  {exam.name}
-                                </CardTitle>
-                                <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                  {exam.description || 'No description provided'}
-                                </CardDescription>
-                                <div className="hidden">{/* Debug hidden element */}{userRole}</div>
-                              </div>
+                        <div className="p-6 flex flex-col h-full bg-white dark:bg-gray-800 rounded-[1.75rem] shadow-sm group-hover:shadow-xl transition-all">
+                          {/* Top Section: Status & Actions */}
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex flex-wrap gap-2">
+                              <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getStatusColor(exam.isActive)}`}>
+                                {exam.isActive ? 'Active' : 'Pending'}
+                              </Badge>
+                              <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getTypeColor(exam.type)}`}>
+                                {exam.type}
+                              </Badge>
                             </div>
-
                             {userRole !== 'TEACHER' && (
-                              <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                <Checkbox
+                                  checked={selectedExams.includes(exam.id)}
+                                  onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
+                                  className="rounded-md border-gray-300 mr-2"
+                                />
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors p-0">
                                       <MoreVertical className="h-4 w-4" />
                                     </Button>
                                   </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}>
-                                      <Eye className="w-4 h-4 mr-2" />
-                                      View Details
+                                  <DropdownMenuContent align="end" className="rounded-2xl border-gray-200 shadow-2xl p-2 min-w-[180px]">
+                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleEdit(exam.id)}>
+                                      <Edit className="w-4 h-4 text-blue-500" />
+                                      <span>Edit Exam</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={(e) => {
-                                      e.stopPropagation();
-                                      console.log("Redirecting with role:", userRole);
-                                      const role = userRole?.toUpperCase();
-                                      if (role === "SUPER_USER" || role === "ADMIN" || role === "TEACHER") {
-                                        router.push(`/exams/evaluations/${exam.id}/results`);
-                                      } else {
-                                        router.push(`/exams/results/${exam.id}`);
-                                      }
-                                    }}>
-                                      <BarChart3 className="w-4 h-4 mr-2" />
-                                      View Results
+                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
+                                      <BarChart3 className="w-4 h-4 text-emerald-500" />
+                                      <span>View Results</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(exam.id); }}>
-                                      <Edit className="w-4 h-4 mr-2" />
-                                      Edit Exam
-                                    </DropdownMenuItem>
-                                    {userRole === "SUPER_USER" && !exam.isActive && (
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleApprove(exam.id); }}>
-                                        <CheckCircle className="w-4 h-4 mr-2" />
-                                        Approve Exam
-                                      </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
-                                      className="text-red-600 focus:text-red-600"
-                                    >
-                                      <Trash2 className="w-4 h-4 mr-2" />
-                                      Delete Exam
+                                    <DropdownMenuSeparator className="my-2" />
+                                    <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
+                                      <Trash2 className="w-4 h-4" />
+                                      <span>Delete Exam</span>
                                     </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
@@ -1001,283 +935,238 @@ export default function ExamsPage() {
                             )}
                           </div>
 
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            <Badge className={getStatusColor(exam.isActive)}>
-                              {exam.isActive ? (
-                                <>
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  Active
-                                </>
-                              ) : (
-                                <>
-                                  <AlertTriangle className="w-3 h-3 mr-1" />
-                                  Pending
-                                </>
-                              )}
-                            </Badge>
+                          {/* Subject & Name */}
+                          <div className="mb-4">
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
+                              {exam.subject || 'Academic Exam'}
+                            </span>
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 min-h-[3rem] font-fancy">
+                              {exam.name}
+                            </h3>
+                          </div>
 
-                            <Badge className={getTypeColor(exam.type)}>
-                              {getTypeIcon(exam.type)}
-                              <span className="ml-1">
-                                {exam.type === 'ONLINE' ? 'Online' :
-                                  exam.type === 'OFFLINE' ? 'Offline' :
-                                    exam.type === 'MIXED' ? 'Mixed' : 'Type'}
-                              </span>
-                            </Badge>
+                          {/* Quick Stats Grid */}
+                          <div className="grid grid-cols-2 gap-3 mb-6">
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                <Award className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Total Marks</span>
+                              </div>
+                              <p className="text-base font-bold text-gray-900 dark:text-white">{exam.totalMarks}</p>
+                            </div>
+                            <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                              <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                <Calendar className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Date</span>
+                              </div>
+                              <p className="text-base font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                              </p>
+                            </div>
+                          </div>
 
-                            {exam.allowRetake && (
-                              <Badge variant="outline" className="text-orange-600 border-orange-600">
-                                Retake Allowed
-                              </Badge>
-                            )}
-
-                            {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 && (
+                          {/* Detailed Stats & Metadata */}
+                          <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
+                            <div className="flex items-center gap-2">
+                              <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                                {exam.createdBy?.charAt(0) || 'U'}
+                              </div>
+                              <div className="flex flex-col">
+                                <p className="text-[10px] font-bold text-gray-500 leading-none mb-0.5 tracking-wider uppercase">Author</p>
+                                <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[100px]">{exam.createdBy || 'Unknown'}</p>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="text-red-600 border-red-600 cursor-help">
-                                    -{exam.mcqNegativeMarking}% MCQ
-                                  </Badge>
+                                  <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                                    <Clock className="w-4 h-4" />
+                                    <span className="text-xs font-bold">{exam.duration}m</span>
+                                  </div>
                                 </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Negative marking of {exam.mcqNegativeMarking}% for incorrect MCQ answers</p>
-                                </TooltipContent>
+                                <TooltipContent>Duration: {exam.duration} minutes</TooltipContent>
                               </Tooltip>
-                            )}
-                          </div>
-                        </CardHeader>
-
-                        <CardContent className="pt-0">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <BookOpen className="w-3 h-3" />
-                                Subject
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">{exam.subject}</p>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Award className="w-3 h-3" />
-                                Marks
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">{exam.totalMarks}</p>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Calendar className="w-3 h-3" />
-                                Date
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                {new Date(exam.date).toLocaleDateString()}
-                              </p>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Clock className="w-3 h-3" />
-                                Time
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white text-xs">
-                                {exam.startTime ? new Date(exam.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                                {' - '}
-                                {exam.endTime ? new Date(exam.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
-                              </p>
-                            </div>
-
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Users className="w-3 h-3" />
-                                Created By
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                {exam.createdBy || 'Unknown'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* CQ/SQ Information */}
-                          {(exam.cqTotalQuestions || exam.sqTotalQuestions) && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                {exam.cqTotalQuestions && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="cursor-help">
-                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                          <FileText className="w-3 h-3" />
-                                          CQ Questions
-                                        </div>
-                                        <p className="font-medium text-gray-900 dark:text-white">
-                                          {exam.cqRequiredQuestions || 0}/{exam.cqTotalQuestions}
-                                        </p>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Creative Questions: {exam.cqRequiredQuestions || 0} required out of {exam.cqTotalQuestions} total</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-
-                                {exam.sqTotalQuestions && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="cursor-help">
-                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                          <FileText className="w-3 h-3" />
-                                          SQ Questions
-                                        </div>
-                                        <p className="font-medium text-gray-900 dark:text-white">
-                                          {exam.sqRequiredQuestions || 0}/{exam.sqTotalQuestions}
-                                        </p>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Short Questions: {exam.sqRequiredQuestions || 0} required out of {exam.sqTotalQuestions} total</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center justify-between">
+                              
                               <Button
-                                variant="outline"
                                 size="sm"
-                                onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}
-                                className="flex items-center gap-2"
-                              >
-                                <Eye className="w-4 h-4" />
-                                View Details
-                              </Button>
-
-                              <Button
                                 variant="outline"
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}
-                                className="flex items-center gap-2"
+                                className="h-8 rounded-full group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all font-bold px-4 text-xs"
                               >
-                                <BarChart3 className="w-4 h-4" />
-                                Results
+                                View
                               </Button>
                             </div>
                           </div>
-                        </CardContent>
+                        </div>
                       </Card>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
-          </motion.div>
-        </TooltipProvider>
+        </motion.div>
+      ))}
+  </AnimatePresence>
+  </div >
+)}
+          </motion.div >
 
-        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>Edit Exam</DialogTitle>
-              <DialogDescription>
-                Make changes to the exam here. Click save when you're done.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="name" className="text-right">
-                  Name
-                </Label>
-                <Input
-                  id="name"
-                  value={editForm.name}
-                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="date" className="text-right">
-                  Date
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={editForm.date}
-                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="startTime" className="text-right">
-                  Start Time
-                </Label>
-                <Input
-                  id="startTime"
-                  type="datetime-local"
-                  value={editForm.startTime}
-                  onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="endTime" className="text-right">
-                  End Time
-                </Label>
-                <Input
-                  id="endTime"
-                  type="datetime-local"
-                  value={editForm.endTime}
-                  onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="duration" className="text-right">
-                  Duration (mins)
-                </Label>
-                <Input
-                  id="duration"
-                  type="number"
-                  value={editForm.duration}
-                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
-                  className="col-span-3"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="retake" className="text-right">
-                  Allow Retake
-                </Label>
-                <div className="col-span-3 flex items-center space-x-2">
-                  <Switch
-                    id="retake"
-                    checked={editForm.allowRetake}
-                    onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
-                  />
-                  <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
-              <Button onClick={handleUpdateExam} disabled={loading}>
-                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Save Changes
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+  {/* Pagination Controls */ }
+{
+  totalPages > 1 && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
+    >
+      <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+        Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
       </div>
+      <div className="flex items-center gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+          className="rounded-xl px-4"
+        >
+          Previous
+        </Button>
+        <div className="flex items-center gap-1">
+          {[...Array(totalPages)].map((_, i) => {
+            const pageNum = i + 1;
+            // Show only first, last, and pages around current
+            if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+              return (
+                <Button
+                  key={pageNum}
+                  variant={currentPage === pageNum ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
+                >
+                  {pageNum}
+                </Button>
+              );
+            } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+              return <span key={pageNum} className="text-gray-400">...</span>;
+            }
+            return null;
+          })}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+          className="rounded-xl px-4"
+        >
+          Next
+        </Button>
+      </div>
+    </motion.div>
+  )
+}
+        </TooltipProvider >
+
+  <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+    <DialogContent className="sm:max-w-[600px]">
+      <DialogHeader>
+        <DialogTitle>Edit Exam</DialogTitle>
+        <DialogDescription>
+          Make changes to the exam here. Click save when you're done.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="name" className="text-right">
+            Name
+          </Label>
+          <Input
+            id="name"
+            value={editForm.name}
+            onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="description" className="text-right">
+            Description
+          </Label>
+          <Textarea
+            id="description"
+            value={editForm.description}
+            onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="date" className="text-right">
+            Date
+          </Label>
+          <Input
+            id="date"
+            type="date"
+            value={editForm.date}
+            onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="startTime" className="text-right">
+            Start Time
+          </Label>
+          <Input
+            id="startTime"
+            type="datetime-local"
+            value={editForm.startTime}
+            onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="endTime" className="text-right">
+            End Time
+          </Label>
+          <Input
+            id="endTime"
+            type="datetime-local"
+            value={editForm.endTime}
+            onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="duration" className="text-right">
+            Duration (mins)
+          </Label>
+          <Input
+            id="duration"
+            type="number"
+            value={editForm.duration}
+            onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+            className="col-span-3"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="retake" className="text-right">
+            Allow Retake
+          </Label>
+          <div className="col-span-3 flex items-center space-x-2">
+            <Switch
+              id="retake"
+              checked={editForm.allowRetake}
+              onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
+            />
+            <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
+          </div>
+        </div>
+      </div>
+      <DialogFooter>
+        <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+        <Button onClick={handleUpdateExam} disabled={loading}>
+          {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+          Save Changes
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+      </div >
     </div >
   );
 }
