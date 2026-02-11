@@ -12,7 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 
 import {
   Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, Save,
-  FileText, Monitor, Globe, MoreVertical,
+  FileText, Monitor, Globe, MoreVertical, Library,
   SortAsc, SortDesc, BarChart3, LayoutDashboard, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -562,6 +562,15 @@ export default function ExamsPage() {
                 >
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Evaluations</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/question-bank')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all font-bold text-indigo-600 dark:text-indigo-400"
+                >
+                  <Library className="w-4 h-4" />
+                  <span className="hidden sm:inline">Question Bank</span>
                 </Button>
                 <Button
                   variant="outline"
