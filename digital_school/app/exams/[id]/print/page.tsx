@@ -209,10 +209,6 @@ export default function PrintExamPage() {
             ))
           )}
 
-          {/* Professional Print Footer */}
-          <div className="print-only print-footer">
-            <span className="print-page-number"></span>
-          </div>
         </div>
       </div>
     </MathJaxContext >
