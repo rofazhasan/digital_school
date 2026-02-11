@@ -826,6 +826,7 @@ export default function QuestionBankPage() {
                         <Button onClick={resetFilters} variant="link" className="mt-4 text-indigo-600 font-bold uppercase tracking-widest text-xs">Clear all filters</Button>
                       </div>
                     )}
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="create" className="mt-4">
