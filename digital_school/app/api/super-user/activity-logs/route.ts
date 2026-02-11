@@ -36,16 +36,24 @@ export async function GET(request: NextRequest) {
 
     // Transform data to match frontend expectations
     const transformedLogs = activityLogs.map(log => {
-      const action = log.action.toString();
+      let action = log.action.toString();
       let type: 'EXAM' | 'USER' | 'SYSTEM' | 'AI' = 'SYSTEM';
+      const context = log.context as any;
 
-      if (action.includes('EXAM') || action.includes('SUBMISSION')) type = 'EXAM';
-      else if (action.includes('USER') || action.includes('LOGIN') || action.includes('REGISTER')) type = 'USER';
-      else if (action.includes('AI') || action.includes('GENERAT')) type = 'AI';
+      if (context?.type === 'SYSTEM_AUDIT') {
+        action = 'SYSTEM_AUDIT';
+        type = 'SYSTEM';
+      } else if (action.includes('EXAM') || action.includes('SUBMISSION')) {
+        type = 'EXAM';
+      } else if (action.includes('USER') || action.includes('LOGIN') || action.includes('REGISTER')) {
+        type = 'USER';
+      } else if (action.includes('AI') || action.includes('GENERAT')) {
+        type = 'AI';
+      }
 
       return {
         id: log.id,
-        action: log.action,
+        action: action,
         user: log.user?.name || 'Unknown',
         details: JSON.stringify(log.context || {}),
         timestamp: log.timestamp,

@@ -190,7 +190,10 @@ import {
     ChevronRight,
     ChevronDown,
     Users,
-    ShieldCheck
+    ShieldCheck,
+    FileDown,
+    Share2,
+    Check
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -244,11 +247,28 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
 
     const getLevelBadge = (log: ActivityLog) => {
         const details = log.details.toLowerCase();
+        const isAudit = log.action === 'UPDATE' && log.details.includes('SYSTEM_AUDIT');
+
+        if (isAudit)
+            return <Badge className="bg-emerald-500 text-white text-[10px] py-0 border-none shadow-sm shadow-emerald-500/20">AUDIT</Badge>;
+
         if (details.includes('error') || details.includes('fail') || details.includes('exception'))
-            return <Badge variant="destructive" className="text-[10px] py-0">ERROR</Badge>;
+            return <Badge variant="destructive" className="text-[10px] py-0 border-none shadow-sm shadow-red-500/20 animate-pulse">ERROR</Badge>;
+
         if (details.includes('warn') || details.includes('slow'))
-            return <Badge className="bg-amber-500 text-white text-[10px] py-0">WARN</Badge>;
-        return <Badge variant="secondary" className="text-[10px] py-0">INFO</Badge>;
+            return <Badge className="bg-amber-500 text-white text-[10px] py-0 border-none shadow-sm shadow-amber-500/20">WARN</Badge>;
+
+        return <Badge variant="secondary" className="text-[10px] py-0 border-none opacity-80">INFO</Badge>;
+    };
+
+    const exportToJSON = (data: any, filename: string) => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
     };
 
     return (
@@ -264,11 +284,17 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
                             <CardDescription>Real-time audit trail and error tracking</CardDescription>
                         </div>
                         <div className="flex gap-2">
-                            <Button variant="default" size="sm" onClick={runAudit} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20">
-                                <ShieldCheck className="h-4 w-4 mr-2" /> Audit System
+                            {auditData && (
+                                <div className="hidden md:flex items-center px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-[10px] text-emerald-600 font-bold animate-in fade-in slide-in-from-right-2">
+                                    <Check className="h-3 w-3 mr-1" /> LAST AUDIT: {auditData.summary.totalPages} PAGES
+                                </div>
+                            )}
+                            <Button variant="default" size="sm" onClick={runAudit} disabled={isAuditing} className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/20 transition-all active:scale-95">
+                                <ShieldCheck className={`h-4 w-4 mr-2 ${isAuditing ? 'animate-spin' : ''}`} />
+                                {isAuditing ? 'Scanning...' : 'Audit System'}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => window.print()}>
-                                <Download className="h-4 w-4 mr-2" /> Export Logs
+                            <Button variant="outline" size="sm" onClick={() => exportToJSON(logs, `system-logs-${new Date().toISOString()}.json`)}>
+                                <FileDown className="h-4 w-4 mr-2" /> Export
                             </Button>
                         </div>
                     </div>
@@ -412,86 +438,112 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
                             <ShieldCheck className="h-6 w-6 text-emerald-500" />
                             System Audit Report
                         </DialogTitle>
-                        <DialogDescription>
-                            Comprehensive scan of system routes, APIs, environment, and infrastructure
+                        <DialogDescription className="flex items-center justify-between">
+                            <span>Comprehensive scan of system routes, APIs, environment, and infrastructure</span>
+                            <div className="flex gap-2">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => exportToJSON(auditData, `audit-report-${new Date().toISOString()}.json`)}>
+                                    <FileDown className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
+                                    <Share2 className="h-4 w-4" />
+                                </Button>
+                            </div>
                         </DialogDescription>
                     </DialogHeader>
 
                     {isAuditing ? (
-                        <div className="flex-1 flex flex-col items-center justify-center py-20 gap-4">
-                            <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
-                            <p className="font-medium animate-pulse">Scanning system components...</p>
+                        <div className="flex-1 flex flex-col items-center justify-center py-20 gap-6">
+                            <div className="relative">
+                                <div className="h-16 w-16 rounded-full border-4 border-primary/10 border-t-primary animate-spin" />
+                                <ShieldCheck className="h-8 w-8 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+                            </div>
+                            <div className="text-center space-y-1">
+                                <p className="font-bold text-lg">Performing Deep System Scan</p>
+                                <p className="text-sm text-muted-foreground">Analyzing routes, verifying environment, and testing infrastructure...</p>
+                            </div>
                         </div>
                     ) : auditData && (
-                        <div className="flex-1 overflow-auto py-6 space-y-8 pr-2">
-                            {/* Summary Cards */}
+                        <div className="flex-1 overflow-auto py-6 space-y-8 pr-2 custom-scrollbar">
+                            {/* Summary Cards with Glow Effects */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="p-4 rounded-xl border bg-muted/30">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total Pages</p>
-                                    <p className="text-2xl font-bold">{auditData.summary.totalPages}</p>
+                                <div className="p-4 rounded-2xl border bg-gradient-to-b from-muted/50 to-transparent shadow-sm relative overflow-hidden group">
+                                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <p className="text-[10px] uppercase font-black text-muted-foreground mb-1 tracking-widest">Total Pages</p>
+                                    <p className="text-3xl font-black text-primary">{auditData.summary.totalPages}</p>
                                 </div>
-                                <div className="p-4 rounded-xl border bg-muted/30">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Total APIs</p>
-                                    <p className="text-2xl font-bold">{auditData.summary.totalApis}</p>
+                                <div className="p-4 rounded-2xl border bg-gradient-to-b from-muted/50 to-transparent shadow-sm relative overflow-hidden group">
+                                    <div className="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <p className="text-[10px] uppercase font-black text-muted-foreground mb-1 tracking-widest">Total APIs</p>
+                                    <p className="text-3xl font-black text-sky-500">{auditData.summary.totalApis}</p>
                                 </div>
-                                <div className="p-4 rounded-xl border bg-muted/30">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Env Status</p>
-                                    <Badge className={auditData.summary.envStatus === 'HEALTHY' ? 'bg-emerald-500' : 'bg-amber-500'}>
-                                        {auditData.summary.envStatus}
-                                    </Badge>
+                                <div className="p-4 rounded-2xl border bg-gradient-to-b from-muted/50 to-transparent shadow-sm relative">
+                                    <p className="text-[10px] uppercase font-black text-muted-foreground mb-1 tracking-widest">Env Health</p>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`h-3 w-3 rounded-full ${auditData.summary.envStatus === 'HEALTHY' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-amber-500 animate-pulse'}`} />
+                                        <span className="font-bold text-sm tracking-tighter">{auditData.summary.envStatus}</span>
+                                    </div>
                                 </div>
-                                <div className="p-4 rounded-xl border bg-muted/30">
-                                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Infrastructure</p>
-                                    <Badge className={auditData.summary.infraStatus === 'HEALTHY' ? 'bg-emerald-500' : 'bg-rose-500'}>
-                                        {auditData.summary.infraStatus}
-                                    </Badge>
+                                <div className="p-4 rounded-2xl border bg-gradient-to-b from-muted/50 to-transparent shadow-sm relative">
+                                    <p className="text-[10px] uppercase font-black text-muted-foreground mb-1 tracking-widest">Infrastructure</p>
+                                    <div className="flex items-center gap-2">
+                                        <div className={`h-3 w-3 rounded-full ${auditData.summary.infraStatus === 'HEALTHY' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 animate-pulse'}`} />
+                                        <span className="font-bold text-sm tracking-tighter">{auditData.summary.infraStatus}</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Detailed Sections */}
+                            {/* Detailed Sections with Premium Spacing */}
                             <div className="grid md:grid-cols-2 gap-8">
                                 <div className="space-y-4">
-                                    <h3 className="font-bold flex items-center gap-2 text-primary">
-                                        <Activity className="h-4 w-4" /> Registered Page Routes
+                                    <h3 className="font-bold flex items-center gap-2 text-primary tracking-tight">
+                                        <div className="h-8 w-1 bg-primary rounded-full" />
+                                        Registered Page Routes
                                     </h3>
-                                    <div className="max-h-[300px] overflow-auto rounded-lg border bg-muted/10 p-2 space-y-1">
-                                        {auditData.pages.map((path: string) => (
-                                            <div key={path} className="text-xs font-mono p-2 hover:bg-muted/50 rounded flex justify-between items-center group">
-                                                <span>{path}</span>
-                                                <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">REACHABLE</Badge>
+                                    <div className="max-h-[350px] overflow-auto rounded-2xl border bg-muted/5 p-4 space-y-2 font-mono scrollbar-hide">
+                                        {auditData.pages.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground italic text-center py-10 opacity-50">Deep scan failed to resolve page routes. Ensure app/ directory is reachable.</p>
+                                        ) : auditData.pages.map((path: string) => (
+                                            <div key={path} className="text-[11px] p-2 hover:bg-primary/5 border border-transparent hover:border-primary/20 rounded-lg flex justify-between items-center group transition-all">
+                                                <span className="text-muted-foreground group-hover:text-foreground">{path}</span>
+                                                <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold border-primary/30 text-primary">REACHABLE</Badge>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h3 className="font-bold flex items-center gap-2 text-sky-500">
-                                        <Zap className="h-4 w-4" /> API Endpoints
+                                    <h3 className="font-bold flex items-center gap-2 text-sky-500 tracking-tight">
+                                        <div className="h-8 w-1 bg-sky-500 rounded-full" />
+                                        API Endpoints
                                     </h3>
-                                    <div className="max-h-[300px] overflow-auto rounded-lg border bg-muted/10 p-2 space-y-1">
-                                        {auditData.apis.map((path: string) => (
-                                            <div key={path} className="text-xs font-mono p-2 hover:bg-muted/50 rounded flex justify-between items-center group">
-                                                <span>{path}</span>
-                                                <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">ACTIVE</Badge>
+                                    <div className="max-h-[350px] overflow-auto rounded-2xl border bg-muted/5 p-4 space-y-2 font-mono scrollbar-hide">
+                                        {auditData.apis.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground italic text-center py-10 opacity-50">Deep scan failed to resolve API routes. Ensure app/api directory is reachable.</p>
+                                        ) : auditData.apis.map((path: string) => (
+                                            <div key={path} className="text-[11px] p-2 hover:bg-sky-500/5 border border-transparent hover:border-sky-500/20 rounded-lg flex justify-between items-center group transition-all">
+                                                <span className="text-muted-foreground group-hover:text-foreground">{path}</span>
+                                                <Badge variant="outline" className="opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold border-sky-500/30 text-sky-500">ACTIVE</Badge>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h3 className="font-bold flex items-center gap-2 text-amber-500">
-                                        <Terminal className="h-4 w-4" /> Environment Configuration
+                                    <h3 className="font-bold flex items-center gap-2 text-amber-500 tracking-tight">
+                                        <div className="h-8 w-1 bg-amber-500 rounded-full" />
+                                        Environment Configuration
                                     </h3>
-                                    <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                                    <div className="rounded-2xl border bg-muted/5 overflow-hidden">
                                         <Table>
                                             <TableBody>
                                                 {auditData.environment.map((env: any) => (
-                                                    <TableRow key={env.key} className="hover:bg-transparent">
-                                                        <TableCell className="text-xs font-mono font-medium py-2">{env.key}</TableCell>
-                                                        <TableCell className="py-2">
-                                                            <Badge variant={env.status === 'HEALTHY' ? 'secondary' : 'destructive'} className="text-[9px]">
-                                                                {env.status}
-                                                            </Badge>
+                                                    <TableRow key={env.key} className="hover:bg-amber-500/5 border-none">
+                                                        <TableCell className="text-[11px] font-mono font-bold py-3 pl-4">{env.key}</TableCell>
+                                                        <TableCell className="py-3 pr-4 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <span className={`text-[10px] font-black tracking-tighter ${env.status === 'HEALTHY' ? 'text-emerald-500' : 'text-rose-500'}`}>{env.status}</span>
+                                                                <div className={`h-2 w-2 rounded-full ${env.status === 'HEALTHY' ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.3)]' : 'bg-rose-500 shadow-[0_0_6px_rgba(239,68,68,0.3)]'}`} />
+                                                            </div>
                                                         </TableCell>
                                                     </TableRow>
                                                 ))}
@@ -501,17 +553,18 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
                                 </div>
 
                                 <div className="space-y-4">
-                                    <h3 className="font-bold flex items-center gap-2 text-emerald-500">
-                                        <DatabaseIcon className="h-4 w-4" /> Infrastructure Health
+                                    <h3 className="font-bold flex items-center gap-2 text-emerald-500 tracking-tight">
+                                        <div className="h-8 w-1 bg-emerald-500 rounded-full" />
+                                        Infrastructure Health
                                     </h3>
-                                    <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+                                    <div className="rounded-2xl border bg-muted/5 p-6 space-y-6">
                                         {auditData.infrastructure.map((infra: any) => (
-                                            <div key={infra.name} className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-sm font-medium">{infra.name}</p>
-                                                    <p className="text-[10px] text-muted-foreground">{infra.details}</p>
+                                            <div key={infra.name} className="flex items-center justify-between group">
+                                                <div className="space-y-1">
+                                                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground group-hover:text-foreground transition-colors">{infra.name}</p>
+                                                    <p className="text-[10px] font-mono opacity-60 bg-muted/50 px-2 py-0.5 rounded-md inline-block">{infra.details}</p>
                                                 </div>
-                                                <Badge className={infra.status === 'HEALTHY' ? 'bg-emerald-500' : 'bg-rose-500'}>
+                                                <Badge className={`${infra.status === 'HEALTHY' ? 'bg-emerald-500 shadow-md shadow-emerald-500/10' : 'bg-rose-500 shadow-md shadow-rose-500/10'} border-none`}>
                                                     {infra.status}
                                                 </Badge>
                                             </div>
