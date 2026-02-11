@@ -31,8 +31,9 @@
 
 @media print {
   @page {
-    size: 8.5in 14in;
-    margin: 8mm 6mm 8mm 6mm;
+    size: legal;
+    margin: 15mm 15mm 20mm 15mm;
+    /* Consistent margins with space for footer */
   }
 
   /* Premium Typography Refinements */
@@ -44,38 +45,36 @@
     letter-spacing: 0.01em !important;
   }
 
-  .break-after-page,
-  .print-break-page {
-    break-after: page !important;
-    page-break-after: always !important;
-    break-before: page !important;
-    page-break-before: always !important;
-    display: block !important;
+  /* Reset counter at the top of the print job */
+  .relative.z-10 {
+    counter-reset: pageNumber;
+  }
+
+  /* Increment counter on every page container */
+  .print-page-container {
+    counter-increment: pageNumber;
+    break-after: page;
+    page-break-after: always;
   }
 
   /* Professional Page Footer with Bengali Numbering */
   .print-footer {
     position: fixed;
-    bottom: -15mm;
-    /* Positioned within the bottom margin */
+    bottom: 5mm;
+    /* Positioned safely within the bottom margin */
     left: 0;
     right: 0;
-    height: 40px;
+    height: 30px;
     background: transparent;
-    z-index: 100;
+    z-index: 1000;
     text-align: center;
     border-top: 1px solid #000;
     font-size: 0.95rem;
-    padding-top: 8px;
-  }
-
-  /* Reset counter and define Bengali numerals */
-  body {
-    counter-reset: pageNumber;
+    padding-top: 5px;
+    pointer-events: none;
   }
 
   .print-page-number::after {
-    counter-increment: pageNumber;
     content: "পৃষ্ঠা: " counter(pageNumber);
     font-family: 'SolaimanLipi', serif;
   }
