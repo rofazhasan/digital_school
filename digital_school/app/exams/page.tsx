@@ -13,7 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, Save,
   FileText, Monitor, Globe, MoreVertical,
-  SortAsc, SortDesc, BarChart3
+  SortAsc, SortDesc, BarChart3, LayoutDashboard, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
@@ -256,6 +256,33 @@ export default function ExamsPage() {
       toast({
         title: 'Error',
         description: 'Failed to update exam.',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/exams?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !currentStatus }),
+      });
+
+      if (!res.ok) throw new Error('Failed to toggle status');
+
+      toast({
+        title: 'Success',
+        description: `Exam ${!currentStatus ? 'activated' : 'deactivated'} successfully.`
+      });
+      await fetchExams();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update exam status.',
         variant: "destructive"
       });
     } finally {
@@ -518,6 +545,24 @@ export default function ExamsPage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/evaluations')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Evaluations</span>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -879,6 +924,19 @@ export default function ExamsPage() {
                                         <BarChart3 className="w-4 h-4 text-emerald-500" />
                                         <span>View Results</span>
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleToggleActive(exam.id, exam.isActive)}>
+                                        {exam.isActive ? (
+                                          <>
+                                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                                            <span>Make Pending</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                            <span>Activate Exam</span>
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
                                       <DropdownMenuSeparator className="my-2" />
                                       <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
                                         <Trash2 className="w-4 h-4" />
@@ -907,15 +965,18 @@ export default function ExamsPage() {
                                   <Award className="w-3.5 h-3.5" />
                                   <span className="text-[10px] font-bold uppercase tracking-wider">Total Marks</span>
                                 </div>
-                                <p className="text-base font-bold text-gray-900 dark:text-white">{exam.totalMarks}</p>
+                                <p className="text-base font-bold text-gray-900 dark:text-white font-fancy">{exam.totalMarks}</p>
                               </div>
                               <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
                                 <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
-                                  <Calendar className="w-3.5 h-3.5" />
-                                  <span className="text-[10px] font-bold uppercase tracking-wider">Date</span>
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Minus Marks</span>
                                 </div>
-                                <p className="text-base font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                                  {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                <p className="text-base font-bold text-red-600 dark:text-red-400 font-fancy">
+                                  {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0
+                                    ? `${exam.mcqNegativeMarking} (-${Math.round(exam.mcqNegativeMarking * 100)}%)`
+                                    : '0'
+                                  }
                                 </p>
                               </div>
                             </div>
@@ -928,27 +989,29 @@ export default function ExamsPage() {
                                 </div>
                                 <div className="flex flex-col">
                                   <p className="text-[10px] font-bold text-gray-500 leading-none mb-0.5 tracking-wider uppercase">Author</p>
-                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[100px]">{exam.createdBy || 'Unknown'}</p>
+                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[80px]">{exam.createdBy || 'Unknown'}</p>
                                 </div>
                               </div>
 
                               <div className="flex items-center gap-3">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                                      <Clock className="w-4 h-4" />
-                                      <span className="text-xs font-bold">{exam.duration}m</span>
-                                    </div>
-                                  </TooltipTrigger>
-                                  <TooltipContent>Duration: {exam.duration} minutes</TooltipContent>
-                                </Tooltip>
-
+                                <div className="flex flex-col items-end">
+                                  <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <span className="text-xs font-bold">{exam.duration}m</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 mt-0.5">
+                                    <Calendar className="w-3 h-3" />
+                                    <span className="text-[9px] font-bold uppercase tracking-tighter">
+                                      {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  </div>
+                                </div>
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  className="h-8 rounded-full group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all font-bold px-4 text-xs"
+                                  className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
                                 >
-                                  View
+                                  Open
                                 </Button>
                               </div>
                             </div>
@@ -957,67 +1020,65 @@ export default function ExamsPage() {
                       </motion.div>
                     ))}
                   </AnimatePresence>
-                </div >
+                </div>
               )}
-          </motion.div >
+          </motion.div>
 
           {/* Pagination Controls */}
-          {
-            totalPages > 1 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
-              >
-                <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
-                  Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
+          {totalPages > 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
+            >
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="rounded-xl px-4"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show only first, last, and pages around current
+                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    className="rounded-xl px-4"
-                  >
-                    Previous
-                  </Button>
-                  <div className="flex items-center gap-1">
-                    {[...Array(totalPages)].map((_, i) => {
-                      const pageNum = i + 1;
-                      // Show only first, last, and pages around current
-                      if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={currentPage === pageNum ? "default" : "ghost"}
-                            size="sm"
-                            onClick={() => setCurrentPage(pageNum)}
-                            className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
-                          >
-                            {pageNum}
-                          </Button>
-                        );
-                      } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
-                        return <span key={pageNum} className="text-gray-400">...</span>;
-                      }
-                      return null;
-                    })}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    className="rounded-xl px-4"
-                  >
-                    Next
-                  </Button>
-                </div>
-              </motion.div>
-            )
-          }
-        </TooltipProvider >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="rounded-xl px-4"
+                >
+                  Next
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </TooltipProvider>
 
         <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
           <DialogContent className="sm:max-w-[600px]">
@@ -1121,7 +1182,7 @@ export default function ExamsPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }

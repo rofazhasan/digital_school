@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import React, { useState, useEffect, Suspense, useMemo, useRef, useCallback, RefObject } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { Points, PointMaterial } from "@react-three/drei";
@@ -31,7 +32,7 @@ import {
   PlusCircle, Wand2, Eye, EyeOff, CheckSquare,
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
-  Download, Save, AlertTriangle
+  Download, Save, AlertTriangle, LayoutDashboard
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -223,6 +224,7 @@ import { cleanupMath } from "@/lib/utils";
 
 // --- Main Page Component ---
 export default function QuestionBankPage() {
+  const router = useRouter();
   const [questions, setQuestions] = useState<Question[]>([]);
   const [questionBanks, setQuestionBanks] = useState<QuestionBank[]>([]);
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -549,123 +551,208 @@ export default function QuestionBankPage() {
           )}
         </div>
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10">
-          <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="text-3xl font-bold flex items-center gap-3"><BookCopy className="w-8 h-8 text-indigo-500" />Question Repository</CardTitle>
-              <CardDescription>A centralized hub to browse, create, and intelligently generate questions.</CardDescription>
-            </CardHeader>
-            <CardContent>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
+            <div>
+              <h1 className="text-3xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-indigo-800 to-blue-900 dark:from-white dark:to-gray-400 font-fancy">
+                Question Hub
+              </h1>
+              <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-400 font-medium">
+                A centralized repository to browse, create, and intelligently generate questions.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/dashboard')}
+                className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span className="hidden sm:inline">Dashboard</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push('/exams')}
+                className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all dark:border-gray-700 dark:hover:bg-gray-800"
+              >
+                <FileText className="w-4 h-4" />
+                <span className="hidden sm:inline">Exams Hub</span>
+              </Button>
+              <Button
+                onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-[1.02] active:scale-95 text-white shadow-xl shadow-blue-500/20 rounded-full px-6 transition-all duration-300"
+              >
+                <PlusCircle className="w-5 h-5" />
+                <span className="font-semibold">Add New</span>
+              </Button>
+            </div>
+          </div>
+
+          <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 shadow-2xl rounded-[2.5rem] overflow-hidden">
+            <CardContent className="p-0">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-3 bg-gray-200 dark:bg-gray-800">
-                  <TabsTrigger value="browse">Browse</TabsTrigger>
-                  <TabsTrigger value="create">Create Manually</TabsTrigger>
-                  <TabsTrigger value="ai">AI Generator</TabsTrigger>
-                  <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
-                </TabsList>
+                <div className="px-6 pt-6">
+                  <TabsList className="flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1.5 rounded-3xl w-fit">
+                    <TabsTrigger value="browse" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
+                      <Search className="w-4 h-4 mr-2" /> Browse
+                    </TabsTrigger>
+                    <TabsTrigger value="create" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
+                      <PlusCircle className="w-4 h-4 mr-2" /> Manual
+                    </TabsTrigger>
+                    <TabsTrigger value="ai" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
+                      <Bot className="w-4 h-4 mr-2" /> AI Generator
+                    </TabsTrigger>
+                    <TabsTrigger value="bulk" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
+                      <FileSpreadsheet className="w-4 h-4 mr-2" /> Bulk Upload
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
-                <TabsContent value="browse" className="mt-4">
-                  <Card className="p-4 mb-4 bg-white/50 dark:bg-gray-900/50">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                      <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
-                        <Label htmlFor="search-term">Search</Label>
-                        <Input id="search-term" placeholder="Search question text..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                      </div>
-                      <div>
-                        <Label htmlFor="class-filter">Class</Label>
-                        <Select value={classFilter} onValueChange={setClassFilter}>
-                          <SelectTrigger id="class-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="subject-filter">Subject</Label>
-                        <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                          <SelectTrigger id="subject-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="difficulty-filter">Difficulty</Label>
-                        <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
-                          <SelectTrigger id="difficulty-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="type-filter">Type</Label>
-                        <Select value={typeFilter} onValueChange={setTypeFilter}>
-                          <SelectTrigger id="type-filter"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="MCQ">MCQ</SelectItem>
-                            <SelectItem value="CQ">CQ</SelectItem>
-                            <SelectItem value="SQ">SQ</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="topic-filter">Topic</Label>
-                        <Input id="topic-filter" placeholder="Filter by topic..." value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} />
-                      </div>
-                      <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
-                        <Label>Date Range</Label>
-                        <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full" />
-                      </div>
-                      <div className="flex items-end gap-2 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-6 flex-wrap mt-2">
-                        <Button onClick={resetFilters} variant="ghost" size="sm" className="whitespace-nowrap"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
-                        <div className="flex-grow"></div>
-                        <Button onClick={() => window.location.href = '/problem-solving'} variant="outline" className="whitespace-nowrap bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800"><BrainCircuit className="mr-2 h-4 w-4" /> Live Problem Solving</Button>
-                        <Button onClick={() => window.location.href = '/exams'} variant="outline" className="whitespace-nowrap"><FileText className="mr-2 h-4 w-4" /> Go to Exams</Button>
-                        <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100 whitespace-nowrap"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
-                        <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="whitespace-nowrap"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
-                      </div>
-                    </div>
-                  </Card>
-
-                  {filteredQuestions.length > 0 && (
-                    <div className="flex items-center justify-between mb-4 p-2 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="select-all"
-                          checked={selectedQuestions.size === filteredQuestions.length && filteredQuestions.length > 0}
-                          onCheckedChange={toggleSelectAll}
-                        />
-                        <Label htmlFor="select-all" className="cursor-pointer">
-                          Select All Results ({filteredQuestions.length})
-                        </Label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="select-page"
-                          checked={paginatedQuestions.length > 0 && paginatedQuestions.every(q => selectedQuestions.has(q.id))}
-                          onCheckedChange={toggleSelectPage}
-                        />
-                        <Label htmlFor="select-page" className="cursor-pointer">
-                          Select This Page ({paginatedQuestions.length})
-                        </Label>
-                      </div>
-                      {selectedQuestions.size > 0 && (
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(true)} className="text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200 dark:border-green-800 dark:text-green-400 dark:hover:bg-green-900/20 whitespace-nowrap">
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Add to Practice ({selectedQuestions.size})
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => handleBulkPractice(false)} className="text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 border-yellow-200 dark:border-yellow-800 dark:text-yellow-400 dark:hover:bg-yellow-900/20 whitespace-nowrap">
-                            <XCircle className="h-4 w-4 mr-2" />
-                            Remove Practice ({selectedQuestions.size})
-                          </Button>
-                          <Button variant="destructive" size="sm" onClick={handleBulkDelete} className="whitespace-nowrap">
-                            <Trash2 className="h-4 w-4 mr-2" /> Delete Selected ({selectedQuestions.size})
-                          </Button>
+                <TabsContent value="browse" className="mt-0 p-6">
+                  <div className="space-y-6">
+                    <Card className="p-6 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-800 rounded-[2rem]">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6">
+                        <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
+                          <Label htmlFor="search-term" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Search Questions</Label>
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Input id="search-term" placeholder="Search content..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-11 rounded-2xl border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/20" />
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        <div>
+                          <Label htmlFor="class-filter" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Class</Label>
+                          <Select value={classFilter} onValueChange={setClassFilter}>
+                            <SelectTrigger id="class-filter" className="h-11 rounded-2xl border-gray-200 dark:border-gray-700"><SelectValue /></SelectTrigger>
+                            <SelectContent className="rounded-2xl"><SelectItem value="all">All Classes</SelectItem>{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="subject-filter" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Subject</Label>
+                          <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                            <SelectTrigger id="subject-filter" className="h-11 rounded-2xl border-gray-200 dark:border-gray-700"><SelectValue /></SelectTrigger>
+                            <SelectContent className="rounded-2xl"><SelectItem value="all">All Subjects</SelectItem>{uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="difficulty-filter" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Difficulty</Label>
+                          <Select value={difficultyFilter} onValueChange={setDifficultyFilter}>
+                            <SelectTrigger id="difficulty-filter" className="h-11 rounded-2xl border-gray-200 dark:border-gray-700"><SelectValue /></SelectTrigger>
+                            <SelectContent className="rounded-2xl"><SelectItem value="all">All Difficulties</SelectItem><SelectItem value="EASY">Easy</SelectItem><SelectItem value="MEDIUM">Medium</SelectItem><SelectItem value="HARD">Hard</SelectItem></SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="type-filter" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Type</Label>
+                          <Select value={typeFilter} onValueChange={setTypeFilter}>
+                            <SelectTrigger id="type-filter" className="h-11 rounded-2xl border-gray-200 dark:border-gray-700"><SelectValue /></SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="MCQ">MCQ</SelectItem>
+                              <SelectItem value="CQ">CQ</SelectItem>
+                              <SelectItem value="SQ">SQ</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <Label htmlFor="topic-filter" className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Topic Search</Label>
+                          <div className="relative">
+                            <Library className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                            <Input id="topic-filter" placeholder="e.g. Algebra" value={topicFilter} onChange={(e) => setTopicFilter(e.target.value)} className="pl-10 h-11 rounded-2xl border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-blue-500/20" />
+                          </div>
+                        </div>
+                        <div className="sm:col-span-2 md:col-span-1 lg:col-span-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 block">Creation Date Range</Label>
+                          <DatePickerWithRange date={dateRange} setDate={setDateRange} className="w-full h-11 overflow-hidden rounded-2xl border-gray-200 dark:border-gray-700" />
+                        </div>
+                        <div className="flex items-end gap-3 sm:col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-6 flex-wrap mt-2">
+                          <Button onClick={resetFilters} variant="ghost" size="sm" className="h-11 rounded-2xl text-gray-600 hover:text-gray-900 px-6"><FilterX className="mr-2 h-4 w-4" />Reset Filters</Button>
+                          <div className="flex-grow"></div>
+                          <Button onClick={() => window.location.href = '/problem-solving'} variant="outline" className="h-11 rounded-2xl bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:border-indigo-800 dark:text-indigo-400 px-6"><BrainCircuit className="mr-2 h-4 w-4" /> Live Solving</Button>
+                          <Button onClick={() => window.location.href = '/exams'} variant="outline" className="whitespace-nowrap"><FileText className="mr-2 h-4 w-4" /> Go to Exams</Button>
+                          <Button onClick={() => window.location.href = '/dashboard'} variant="secondary" className="bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-100 whitespace-nowrap"><ArrowRight className="mr-2 h-4 w-4" /> Dashboard</Button>
+                          <Button onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }} className="whitespace-nowrap"><PlusCircle className="mr-2 h-4 w-4" /> Add New</Button>
+                        </div>
+                      </div>
+                    </Card>
 
-                  {isLoading ? <div className="flex justify-center items-center h-64"><Loader2 className="h-8 w-8 animate-spin" /></div>
-                    : filteredQuestions.length > 0 ? (
-                      <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {filteredQuestions.length > 0 && (
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white/50 dark:bg-gray-800/50 rounded-[1.5rem] border border-gray-100 dark:border-gray-800 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-6">
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="select-all"
+                              checked={selectedQuestions.size === filteredQuestions.length && filteredQuestions.length > 0}
+                              onCheckedChange={toggleSelectAll}
+                              className="rounded-full border-gray-300 h-5 w-5"
+                            />
+                            <Label htmlFor="select-all" className="text-xs font-bold uppercase tracking-wider text-gray-500 cursor-pointer">
+                              All Results ({filteredQuestions.length})
+                            </Label>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="select-page"
+                              checked={paginatedQuestions.length > 0 && paginatedQuestions.every(q => selectedQuestions.has(q.id))}
+                              onCheckedChange={toggleSelectPage}
+                              className="rounded-full border-gray-300 h-5 w-5"
+                            />
+                            <Label htmlFor="select-page" className="text-xs font-bold uppercase tracking-wider text-gray-500 cursor-pointer">
+                              This Page ({paginatedQuestions.length})
+                            </Label>
+                          </div>
+                        </div>
+
+                        <AnimatePresence>
+                          {selectedQuestions.size > 0 && (
+                            <motion.div
+                              initial={{ opacity: 0, x: 20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 20 }}
+                              className="flex flex-wrap items-center gap-2"
+                            >
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleBulkPractice(true)}
+                                className="h-9 rounded-xl border-emerald-200 hover:bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:hover:bg-emerald-950/30 dark:text-emerald-400 font-bold text-[10px] uppercase tracking-wider"
+                              >
+                                <Sparkles className="h-3.5 w-3.5 mr-2" />
+                                + Practice ({selectedQuestions.size})
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleBulkPractice(false)}
+                                className="h-9 rounded-xl border-amber-200 hover:bg-amber-50 text-amber-700 dark:border-amber-800 dark:hover:bg-amber-950/30 dark:text-amber-400 font-bold text-[10px] uppercase tracking-wider"
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-2" />
+                                - Practice
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                className="h-9 rounded-xl bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/20 font-bold text-[10px] uppercase tracking-wider px-4"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete
+                              </Button>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    )}
+
+                    {isLoading ? (
+                      <div className="flex flex-col justify-center items-center h-96 gap-4">
+                        <div className="relative">
+                          <Loader2 className="h-12 w-12 animate-spin text-indigo-500" />
+                          <div className="absolute inset-0 blur-xl bg-indigo-500/20 animate-pulse rounded-full"></div>
+                        </div>
+                        <p className="text-sm font-bold uppercase tracking-widest text-gray-400 animate-pulse">Syncing Repository...</p>
+                      </div>
+                    ) : filteredQuestions.length > 0 ? (
+                      <div className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                           {paginatedQuestions.map(q => (
                             <QuestionCard
                               key={q.id}
@@ -679,40 +766,64 @@ export default function QuestionBankPage() {
                           ))}
                         </div>
 
-                        {/* Pagination Controls */}
+                        {/* Pagination */}
                         {totalPages > 1 && (
-                          <div className="flex items-center justify-between mt-8 p-4 bg-white/50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
-                            <span className="text-sm text-gray-500">
-                              Showing {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredQuestions.length)} of {filteredQuestions.length} questions
-                            </span>
+                          <div className="flex items-center justify-between pt-8 border-t border-gray-100 dark:border-gray-800">
+                            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest">
+                              Page {currentPage} of {totalPages}
+                            </p>
                             <div className="flex items-center gap-2">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                                 disabled={currentPage === 1}
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                className="h-10 rounded-2xl px-4 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 transition-all"
                               >
                                 Previous
                               </Button>
-                              <span className="text-sm font-medium px-2">
-                                Page {currentPage} of {totalPages}
-                              </span>
+                              <div className="flex items-center gap-1">
+                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                  let pageNum: number;
+                                  if (totalPages <= 5) pageNum = i + 1;
+                                  else if (currentPage <= 3) pageNum = i + 1;
+                                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                                  else pageNum = currentPage - 2 + i;
+
+                                  return (
+                                    <Button
+                                      key={pageNum}
+                                      variant={currentPage === pageNum ? "default" : "ghost"}
+                                      size="sm"
+                                      onClick={() => setCurrentPage(pageNum)}
+                                      className={`h-10 w-10 rounded-2xl font-bold ${currentPage === pageNum ? 'bg-indigo-600 shadow-lg shadow-indigo-600/20' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                    >
+                                      {pageNum}
+                                    </Button>
+                                  );
+                                })}
+                              </div>
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                                 disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                className="h-10 rounded-2xl px-4 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 transition-all"
                               >
                                 Next
                               </Button>
                             </div>
                           </div>
                         )}
-                      </>
+                      </div>
                     ) : (
-                      <div className="text-center py-16 text-gray-500">
-                        <p className="font-semibold">No questions found</p>
-                        <p className="text-sm">Try adjusting your filters or creating a new question.</p>
+                      <div className="flex flex-col items-center justify-center h-96 bg-gray-50/50 dark:bg-gray-800/20 rounded-[3rem] border-2 border-dashed border-gray-200 dark:border-gray-800">
+                        <div className="p-6 bg-white dark:bg-gray-800 rounded-[2rem] shadow-xl mb-6">
+                          <Search className="w-12 h-12 text-gray-300" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2 font-fancy">No matching questions</h3>
+                        <p className="text-gray-500 dark:text-gray-400 max-w-xs text-center">Try adjusting your filters or search terms to find what you're looking for.</p>
+                        <Button onClick={resetFilters} variant="link" className="mt-4 text-indigo-600 font-bold uppercase tracking-widest text-xs">Clear all filters</Button>
                       </div>
                     )}
                 </TabsContent>
@@ -752,129 +863,216 @@ const QuestionCard: React.FC<{
   onSelect?: () => void;
   onTogglePractice?: (id: string, current: boolean) => void;
 }> = ({ question, onEdit, onDelete, isSelected, onSelect, onTogglePractice }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const difficultyColors: Record<Difficulty, string> = {
-    EASY: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-    MEDIUM: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
-    HARD: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    EASY: "bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800",
+    MEDIUM: "bg-amber-50 text-amber-700 border-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800",
+    HARD: "bg-rose-50 text-rose-700 border-rose-100 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800",
   };
+
+  const getLetter = (index: number) => String.fromCharCode(65 + index); // A, B, C, D...
+
   return (
-    <Card className={`flex flex-col hover:shadow-lg transition-all duration-300 ${question.isForPractice ? 'ring-2 ring-indigo-500/20' : ''}`}>
-      <CardHeader className="pb-4">
-        <div className="flex justify-between items-start gap-2">
-          <div className="flex items-start gap-3 w-full">
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ y: -5, transition: { duration: 0.2 } }}
+      className="group h-full"
+    >
+      <Card className={`relative h-full flex flex-col overflow-hidden rounded-[2rem] border-gray-100 dark:border-gray-800 transition-all duration-300 hover:shadow-2xl hover:shadow-indigo-500/10 ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' : ''} ${question.isForPractice ? 'bg-gradient-to-br from-white to-indigo-50/30 dark:from-gray-900 dark:to-indigo-900/10' : 'bg-white dark:bg-gray-900'}`}>
+
+        {/* Top Status Bar */}
+        <div className="px-6 pt-6 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             {onSelect && (
               <Checkbox
                 checked={isSelected}
                 onCheckedChange={() => onSelect()}
-                className="mt-1"
+                className="rounded-full border-gray-300 data-[state=checked]:bg-blue-600 h-5 w-5"
               />
             )}
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                {question.isForPractice && (
-                  <Badge variant="secondary" className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 text-[10px] h-5 px-1.5 gap-1">
-                    <Sparkles className="w-3 h-3" /> Practice Ready
-                  </Badge>
-                )}
-              </div>
-              <CardTitle className="text-base font-semibold leading-snug prose prose-sm dark:prose-invert max-w-full">
-                <UniversalMathJax>{question.questionText || ''}</UniversalMathJax>
-              </CardTitle>
-            </div>
-          </div>
-          <Badge variant="outline" className="whitespace-nowrap">{question.marks} Marks</Badge>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs mt-2">
-          <Badge className={difficultyColors[question.difficulty]}>{question.difficulty}</Badge>
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">{question.subject}</Badge>
-          {question.topic && <Badge variant="outline" className="text-teal-600 border-teal-600 dark:text-teal-400 dark:border-teal-400">{question.topic}</Badge>}
-          <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">{question.class.name}</Badge>
-          {question.isAiGenerated && <Badge variant="outline" className="text-indigo-500 border-indigo-500"><Bot className="h-3 w-3 mr-1" />AI</Badge>}
-          {question.hasMath && (
-            <Badge variant="outline" className="text-blue-600 border-blue-600">
-              <div className="w-2 h-2 bg-blue-500 rounded-full mr-1"></div>
-              Math
+            <Badge variant="outline" className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${difficultyColors[question.difficulty]}`}>
+              {question.difficulty}
             </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="flex-grow prose prose-sm dark:prose-invert max-w-none">
-        {question.type === 'MCQ' && (
-          <div className="space-y-2">
-            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
-            <ul className="list-disc pl-5 my-0 space-y-2">
-              {((question.options || []) || []).map((opt: any, i: number) => (
-                <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                  <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
-                  {opt.image && (
-                    <div className="my-2">
-                      <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
-                    </div>
-                  )}
-                  {opt.isCorrect && opt.explanation && (
-                    <div className="mt-2 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md border border-green-200 dark:border-green-700">
-                      <span className="font-semibold text-green-700 dark:text-green-300 text-xs">Explanation: </span>
-                      <span className="text-green-600 dark:text-green-400 text-xs"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></span>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
           </div>
-        )}
-        {question.type === 'CQ' && (
-          <div className="space-y-2">
-            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
-            <ol className="list-decimal pl-5 my-0 space-y-3">
-              {((question.subQuestions || []) || []).map((sq: any, i: number) => (
-                <li key={i} className="space-y-2">
-                  <div>
-                    <UniversalMathJax>{sq.question || ''}</UniversalMathJax>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-black text-gray-400 dark:text-gray-500 tracking-tighter uppercase">ID: {question.id.slice(-6)}</span>
+            <Badge variant="secondary" className="bg-gray-100/80 dark:bg-gray-800/80 text-gray-600 dark:text-gray-400 font-bold rounded-lg px-2 h-6">
+              {question.marks} PT
+            </Badge>
+          </div>
+        </div>
 
-                    {sq.image && (
-                      <div className="my-2">
-                        <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-32 rounded border" />
+        <CardHeader className="pb-4 pt-4 px-6">
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400">
+                {question.subject}
+              </span>
+              <div className="h-1 w-1 rounded-full bg-gray-300 dark:bg-gray-700"></div>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                {question.class.name}
+              </span>
+              {question.type && (
+                <Badge className="bg-slate-900 text-white dark:bg-white dark:text-slate-900 text-[9px] font-black px-1.5 h-4 tracking-tighter">
+                  {question.type}
+                </Badge>
+              )}
+            </div>
+
+            <CardTitle className="text-lg font-bold leading-tight text-gray-900 dark:text-white font-fancy">
+              <UniversalMathJax>{question.questionText || ''}</UniversalMathJax>
+            </CardTitle>
+
+            {question.topic && (
+              <div className="flex items-center gap-1.5 text-xs text-teal-600 dark:text-teal-400 font-medium">
+                <Library className="w-3 h-3" />
+                {question.topic}
+              </div>
+            )}
+          </div>
+        </CardHeader>
+
+        <CardContent className="px-6 pb-6 flex-grow space-y-4">
+          {/* MCQ Options */}
+          {question.type === 'MCQ' && (
+            <div className="grid grid-cols-1 gap-2 mt-2">
+              {((question.options || [])).map((opt: any, i: number) => (
+                <div
+                  key={i}
+                  className={`relative p-3 rounded-2xl border transition-all duration-200 ${opt.isCorrect ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 shadow-sm' : 'bg-gray-50/50 border-gray-100 dark:bg-gray-800/30 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <span className={`flex-shrink-0 w-6 h-6 rounded-lg flex items-center justify-center font-bold text-xs ${opt.isCorrect ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-600'}`}>
+                      {getLetter(i)}
+                    </span>
+                    <div className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
+                      {opt.image && (
+                        <div className="mt-2 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                          <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 w-full object-contain bg-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {opt.isCorrect && opt.explanation && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3 pl-9 pr-2 overflow-hidden"
+                    >
+                      <div className="bg-emerald-100/50 dark:bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50">
+                        <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Explanation</p>
+                        <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                          <UniversalMathJax inline>{opt.explanation}</UniversalMathJax>
+                        </p>
                       </div>
-                    )}
-                    <span className="text-xs font-mono text-gray-500 ml-2">[{sq.marks || 0} marks]</span>
+                    </motion.div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* CQ Sub questions */}
+          {question.type === 'CQ' && (
+            <div className="space-y-3 mt-2">
+              {((question.subQuestions || [])).map((sq: any, i: number) => (
+                <div key={i} className="p-4 rounded-2xl bg-slate-50/50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="flex-shrink-0 w-5 h-5 rounded bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center text-[10px] font-black mt-0.5">
+                      {getLetter(i).toLowerCase()}
+                    </span>
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                          <UniversalMathJax>{sq.question || ''}</UniversalMathJax>
+                        </div>
+                        <span className="text-[10px] font-black bg-white dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-100 dark:border-gray-700 text-gray-500">
+                          {sq.marks}M
+                        </span>
+                      </div>
+                      {sq.image && (
+                        <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm bg-white">
+                          <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-40 w-full object-contain" />
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {sq.modelAnswer && (
-                    <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-                      <span className="font-semibold text-blue-700 dark:text-blue-300 text-xs">Model Answer: </span>
-                      <span className="text-blue-600 dark:text-blue-400 text-xs"><UniversalMathJax>{sq.modelAnswer}</UniversalMathJax></span>
+                    <div className="pl-8">
+                      <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                        <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 mb-1 leading-none tracking-tighter">Model Answer</p>
+                        <div className="text-xs text-blue-800 dark:text-blue-300 font-medium">
+                          <UniversalMathJax>{sq.modelAnswer}</UniversalMathJax>
+                        </div>
+                      </div>
                     </div>
                   )}
-                </li>
+                </div>
               ))}
-            </ol>
-          </div>
-        )}
-        {question.type === 'SQ' && question.modelAnswer && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-            <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
-            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
-              <UniversalMathJax>{question.modelAnswer}</UniversalMathJax>
             </div>
+          )}
+
+          {/* SQ Model Answer */}
+          {question.type === 'SQ' && question.modelAnswer && (
+            <div className="mt-3">
+              <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-300 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-indigo-500 rounded-full"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Model Answer</p>
+                </div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+                  <UniversalMathJax>{question.modelAnswer}</UniversalMathJax>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardContent>
+
+        <CardFooter className="flex items-center justify-between px-6 py-4 bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 backdrop-blur-sm mt-auto">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={question.isForPractice || false}
+                onCheckedChange={(c) => onTogglePractice && onTogglePractice(question.id, c)}
+                id={`practice-mode-${question.id}`}
+                className="data-[state=checked]:bg-indigo-600 scale-75"
+              />
+              <Label htmlFor={`practice-mode-${question.id}`} className="text-[10px] font-black uppercase tracking-tighter text-gray-500 cursor-pointer">
+                PracPerfect
+              </Label>
+            </div>
+            {question.isAiGenerated && (
+              <div className="hidden sm:flex items-center gap-1.5 px-2 h-5 bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 rounded-md text-[9px] font-black uppercase">
+                <Bot className="w-2.5 h-2.5" /> AI
+              </div>
+            )}
           </div>
-        )}
-      </CardContent>
-      <CardFooter className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50 pt-3 mt-auto border-t border-gray-100 dark:border-gray-800">
-        <div className="flex items-center space-x-2">
-          <Switch
-            checked={question.isForPractice || false}
-            onCheckedChange={(c) => onTogglePractice && onTogglePractice(question.id, c)}
-            id={`practice-mode-${question.id}`}
-          />
-          <Label htmlFor={`practice-mode-${question.id}`} className="text-xs text-muted-foreground font-normal cursor-pointer">
-            PracPerfect
-          </Label>
-        </div>
-        <div className="flex gap-1">
-          <Button variant="ghost" size="sm" className="h-8" onClick={() => onEdit(question)}><Edit className="h-3.5 w-3.5 mr-1.5" /> Edit</Button>
-          <Button variant="ghost" size="sm" className="h-8 text-red-500 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={() => onDelete(question.id)}><Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete</Button>
-        </div>
-      </CardFooter>
-    </Card>
+
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 rounded-xl p-0 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/30 dark:hover:text-blue-400"
+              onClick={() => onEdit(question)}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 w-9 rounded-xl p-0 text-rose-500 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400"
+              onClick={() => onDelete(question.id)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </motion.div>
   );
 };
 
