@@ -69,4 +69,44 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const authData = await getTokenFromRequest(request);
+
+    if (!authData || authData.user.role !== 'SUPER_USER') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const prismadb = await getDatabaseClient();
+
+    // Delete all logs
+    await prismadb.log.deleteMany();
+
+    // Log the purge action itself
+    await prismadb.log.create({
+      data: {
+        action: 'DELETE',
+        userId: authData.user.id,
+        context: {
+          type: 'SYSTEM',
+          details: 'Audit log history purged by Super User'
+        },
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'System'
+      }
+    });
+
+    return NextResponse.json({ message: 'Log history cleared successfully' });
+  } catch (error) {
+    console.error('Failed to clear logs:', error);
+    return NextResponse.json(
+      { error: 'Failed to clear log history' },
+      { status: 500 }
+    );
+  }
+}

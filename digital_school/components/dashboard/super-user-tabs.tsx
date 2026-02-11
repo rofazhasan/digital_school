@@ -193,7 +193,8 @@ import {
     ShieldCheck,
     FileDown,
     Share2,
-    Check
+    Check,
+    Trash2
 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -210,9 +211,17 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
     const [filterType, setFilterType] = useState<'ALL' | 'EXAM' | 'USER' | 'SYSTEM' | 'AI'>('ALL');
+    const [localLogs, setLocalLogs] = useState<ActivityLog[]>(logs);
     const [auditOpen, setAuditOpen] = useState(false);
     const [auditData, setAuditData] = useState<any>(null);
     const [isAuditing, setIsAuditing] = useState(false);
+    const [isClearing, setIsClearing] = useState(false);
+    const [confirmClearOpen, setConfirmClearOpen] = useState(false);
+
+    // Sync local logs when prop changes
+    useState(() => {
+        if (logs) setLocalLogs(logs);
+    });
 
     const runAudit = async () => {
         setIsAuditing(true);
@@ -228,7 +237,31 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
         }
     };
 
-    const filteredLogs = logs.filter(log => {
+    const handleClearHistory = async () => {
+        setIsClearing(true);
+        setConfirmClearOpen(false);
+
+        // Optimistic update
+        const previousLogs = [...localLogs];
+        setLocalLogs([]);
+
+        try {
+            const res = await fetch('/api/super-user/activity-logs', { method: 'DELETE' });
+            if (!res.ok) throw new Error('Delete failed');
+
+            // Re-fetch to get the "Purged" log entry
+            const freshRes = await fetch('/api/super-user/activity-logs');
+            const data = await freshRes.json();
+            setLocalLogs(data);
+        } catch (err) {
+            console.error('Failed to clear logs', err);
+            setLocalLogs(previousLogs);
+        } finally {
+            setIsClearing(false);
+        }
+    };
+
+    const filteredLogs = localLogs.filter(log => {
         const matchesSearch = log.action.toLowerCase().includes(searchTerm.toLowerCase()) ||
             log.user.toLowerCase().includes(searchTerm.toLowerCase()) ||
             log.details.toLowerCase().includes(searchTerm.toLowerCase());
@@ -293,8 +326,16 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
                                 <ShieldCheck className={`h-4 w-4 mr-2 ${isAuditing ? 'animate-spin' : ''}`} />
                                 {isAuditing ? 'Scanning...' : 'Audit System'}
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => exportToJSON(logs, `system-logs-${new Date().toISOString()}.json`)}>
+                            <Button variant="outline" size="sm" onClick={() => exportToJSON(localLogs, `system-logs-${new Date().toISOString()}.json`)}>
                                 <FileDown className="h-4 w-4 mr-2" /> Export
+                            </Button>
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => setConfirmClearOpen(true)}
+                                className="bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white border-rose-500/20 transition-all"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" /> Clear History
                             </Button>
                         </div>
                     </div>
@@ -574,6 +615,30 @@ export function SystemLogsTab({ logs }: { logs: ActivityLog[] }) {
                             </div>
                         </div>
                     )}
+                </DialogContent>
+            </Dialog>
+
+            {/* Confirmation Dialog for Purging Logs */}
+            <Dialog open={confirmClearOpen} onOpenChange={setConfirmClearOpen}>
+                <DialogContent className="max-w-md bg-background border-muted">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-rose-500">
+                            <Trash2 className="h-5 w-5" />
+                            Purge Log History?
+                        </DialogTitle>
+                        <DialogDescription className="pt-2">
+                            This action will permanently delete all activity logs from the database.
+                            This cannot be undone. Are you sure you want to proceed?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex justify-end gap-3 mt-4">
+                        <Button variant="outline" onClick={() => setConfirmClearOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleClearHistory} disabled={isClearing}>
+                            {isClearing ? 'Purging...' : 'Yes, Delete All Logs'}
+                        </Button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
