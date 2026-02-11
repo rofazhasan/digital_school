@@ -167,13 +167,39 @@ export default function EvaluationsPage() {
       });
 
       if (response.ok) {
+        // Find evaluator name for optimistic UI update
+        const evalObj = evaluators.find(e => e.id === selectedEvaluator);
+
+        // Update local state optimistically
+        setExams(prev => prev.map(exam => {
+          if (exam.id === selectedExam.id) {
+            const newAssignment = {
+              id: Date.now().toString(), // Temporary ID
+              status: "PENDING",
+              evaluator: {
+                name: evalObj?.name || "Assigned Evaluator",
+                email: evalObj?.email || "",
+                role: evalObj?.role || ""
+              },
+              assignedBy: { name: "You", email: "" },
+              notes: assignmentNotes
+            };
+            return {
+              ...exam,
+              status: "PENDING",
+              evaluationAssignments: [...(exam.evaluationAssignments || []), newAssignment]
+            };
+          }
+          return exam;
+        }));
+
         const data = await response.json();
         toast.success(data.message);
         setAssignDialogOpen(false);
         setSelectedExam(null);
         setSelectedEvaluator("");
         setAssignmentNotes("");
-        fetchExams();
+        // fetchExams();
       } else {
         const error = await response.json();
         toast.error(error.error);
@@ -194,9 +220,14 @@ export default function EvaluationsPage() {
       });
 
       if (response.ok) {
+        // Update local state optimistically
+        setExams(prev => prev.map(exam =>
+          exam.id === examId ? { ...exam, publishedResults: exam.submittedStudents } : exam
+        ));
+
         const data = await response.json();
         toast.success(data.message);
-        fetchExams();
+        // fetchExams();
       } else {
         const error = await response.json();
         toast.error(error.error);

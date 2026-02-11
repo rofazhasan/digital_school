@@ -274,11 +274,16 @@ export default function ExamsPage() {
 
       if (!res.ok) throw new Error('Failed to toggle status');
 
+      // Update local state optimistically
+      setExams(prev => prev.map(exam =>
+        exam.id === id ? { ...exam, isActive: !currentStatus } : exam
+      ));
+
       toast({
         title: 'Success',
         description: `Exam ${!currentStatus ? 'activated' : 'deactivated'} successfully.`
       });
-      await fetchExams();
+      // await fetchExams(); // No longer needed as we updated state optimistically
     } catch {
       toast({
         title: 'Error',
@@ -302,11 +307,15 @@ export default function ExamsPage() {
     try {
       const res = await fetch(`/api/exams?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete exam');
+
+      // Update local state optimistically
+      setExams(prev => prev.filter(exam => exam.id !== id));
+
       toast({
         title: 'Success',
         description: 'Exam and all related data deleted permanently.'
       });
-      await fetchExams();
+      // await fetchExams();
       // Remove from selection if selected
       if (selectedExams.includes(id)) {
         setSelectedExams(prev => prev.filter(examId => examId !== id));
@@ -342,14 +351,17 @@ export default function ExamsPage() {
 
       if (!res.ok) throw new Error('Failed to delete exams');
 
+      // Update local state optimistically
+      setExams(prev => prev.filter(exam => !selectedExams.includes(exam.id)));
+      setSelectedExams([]);
+
       const data = await res.json();
       toast({
         title: 'Success',
         description: data.message || 'Exams deleted successfully.'
       });
 
-      setSelectedExams([]);
-      await fetchExams();
+      // await fetchExams();
     } catch {
       toast({
         title: 'Error',
