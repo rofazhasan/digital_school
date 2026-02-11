@@ -20,7 +20,6 @@ const LANGS = {
   bn: { print: "প্রিন্ট করুন", pdf: "PDF ডাউনলোড করুন", preparing: "প্রস্তুত করা হচ্ছে...", waiting: "ম্যাথ রেন্ডারিং এর জন্য অপেক্ষা করা হচ্ছে..." },
   en: { print: "Print", pdf: "Download PDF", preparing: "Preparing...", waiting: "Waiting for Math to render..." }
 };
-const QUESTIONS_PER_PAGE = 12; // Controls pagination
 
 // --- Main Page Component ---
 export default function PrintExamPage() {
@@ -73,7 +72,6 @@ export default function PrintExamPage() {
     if (examData && printRef.current) {
       // Small delay to ensure DOM is ready
       setTimeout(() => {
-        forcePageBreaks();
       }, 100);
     }
   }, [examData]);
@@ -86,9 +84,6 @@ export default function PrintExamPage() {
     onBeforeGetContent: async () => {
       // This is the key! We wait until MathJax is ready.
       setIsPrinting(true);
-
-      // Force page breaks for SQ sections if CSS fails
-      forcePageBreaks();
 
       if (isMathJaxReady) {
         return; // Already ready, proceed to print
@@ -109,33 +104,6 @@ export default function PrintExamPage() {
       (window as any).__IS_MATHJAX_READY = false; // Reset global flag
     },
   } as any);
-
-  // Function to force page breaks for SQ sections
-  const forcePageBreaks = () => {
-    if (!printRef.current) return;
-
-    // Find all SQ section headers
-    const sqSections = printRef.current.querySelectorAll('.sq-section');
-    sqSections.forEach((section) => {
-      // Add inline styles to force page breaks
-      (section as HTMLElement).style.pageBreakBefore = 'always';
-      (section as HTMLElement).style.breakBefore = 'page';
-      (section as HTMLElement).style.marginTop = '0';
-      (section as HTMLElement).style.paddingTop = '0';
-
-      // Create a page break element before the section
-      const pageBreak = document.createElement('div');
-      pageBreak.style.pageBreakBefore = 'always';
-      pageBreak.style.breakBefore = 'page';
-      pageBreak.style.height = '0';
-      pageBreak.style.margin = '0';
-      pageBreak.style.padding = '0';
-      pageBreak.style.clear = 'both';
-
-      // Insert the page break before the section
-      section.parentNode?.insertBefore(pageBreak, section);
-    });
-  };
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
@@ -206,13 +174,6 @@ export default function PrintExamPage() {
             }`}>
             {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
           </span>
-          <button
-            onClick={forcePageBreaks}
-            className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold hover:bg-purple-700 transition"
-            title="Force page breaks for SQ sections"
-          >
-            Force Page Breaks
-          </button>
         </div>
 
         <div ref={printRef} className="relative z-10">
@@ -247,50 +208,18 @@ export default function PrintExamPage() {
               </div>
             ))
           )}
+
+          {/* Professional Print Footer */}
+          <div className="print-only print-footer">
+            <span className="print-page-number"></span>
+          </div>
         </div>
       </div>
-    </MathJaxContext>
+    </MathJaxContext >
   );
 }
 
 // --- Refactored Sub-Components for Clarity ---
-
-const QuestionSetPages = ({ set, examInfo }: { set: any, examInfo: any }) => {
-  // Flatten questions once for pagination
-  const allQuestions = [
-    ...(set.mcq?.map((q: any) => ({ ...q, _type: 'mcq' })) || []),
-    ...(set.cq?.map((q: any) => ({ ...q, _type: 'cq' })) || []),
-    ...(set.sq?.map((q: any) => ({ ...q, _type: 'sq' })) || []),
-  ];
-
-  const pageCount = Math.ceil(allQuestions.length / QUESTIONS_PER_PAGE);
-
-  return (
-    <>
-      {Array.from({ length: pageCount }, (_, pageIdx) => {
-        const start = pageIdx * QUESTIONS_PER_PAGE;
-        const end = start + QUESTIONS_PER_PAGE;
-        const chunk = allQuestions.slice(start, end);
-
-        const questionsForPage = {
-          mcq: chunk.filter((q) => q._type === 'mcq'),
-          cq: chunk.filter((q) => q._type === 'cq'),
-          sq: chunk.filter((q) => q._type === 'sq'),
-        };
-
-        return (
-          <div key={`${set.setId}-page-${pageIdx}`} className="print-page-container legal-paper">
-            <QuestionPaper
-              examInfo={{ ...examInfo, set: set.setName }}
-              questions={questionsForPage}
-              qrData={{ ...set.qrData, page: pageIdx + 1 }}
-            />
-          </div>
-        );
-      })}
-    </>
-  );
-};
 
 const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, language: 'bn' | 'en' }) => {
   const [uniqueCode] = useState(() => uuidv4());

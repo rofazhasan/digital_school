@@ -3,6 +3,7 @@ import QRCode from "react-qr-code";
 import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from '@/lib/utils';
+import { toBengaliNumerals } from '@/utils/numeralConverter';
 
 // --- TYPES ---
 interface MCQ {
@@ -129,24 +130,28 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const mcqPages = getMCQPages();
 
     return (
-      <div ref={ref} className="answer-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+      <div ref={ref} className="answer-paper-container bg-white p-8 rounded-lg shadow-lg relative overflow-hidden" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+        <div className="watermark print-only">DIGITAL SCHOOL</div>
+
         {/* Header */}
-        <header className="text-center mb-4 relative border-b-2 border-black pb-2">
-          <div className="absolute top-0 right-0">
+        <header className="text-center mb-6 relative border-b-4 border-black pb-4 text-black">
+          <div className="absolute top-0 right-0 qr-container">
             <QRCode value={JSON.stringify(qrData)} size={64} />
           </div>
-          <h1 className="text-2xl font-bold">{examInfo.schoolName}</h1>
-          <p className="text-sm">{examInfo.schoolAddress}</p>
-          <h2 className="mt-2 text-xl font-bold">{examInfo.title}</h2>
-          <div className="text-sm flex flex-row justify-center gap-x-3 flex-wrap">
-            <span><strong>বিষয়:</strong> {examInfo.subject}</span>
-            <span><strong>শ্রেণি:</strong> {examInfo.class}</span>
-            {examInfo.set && <span><strong>সেট:</strong> {examInfo.set}</span>}
-            <span><strong>তারিখ:</strong> {examInfo.date}</span>
-            {examInfo.duration && <span><strong>সময়:</strong> {examInfo.duration}</span>}
-            {examInfo.totalMarks && <span><strong>পূর্ণমান:</strong> {examInfo.totalMarks}</span>}
+          <h1 className="text-3xl font-bold tracking-tight mb-1">{examInfo.schoolName}</h1>
+          <p className="text-base text-gray-700 mb-2">{examInfo.schoolAddress}</p>
+          <div className="inline-block border-y-2 border-black py-1 px-8 my-2">
+            <h2 className="text-2xl font-bold uppercase">{examInfo.title}</h2>
           </div>
-          <div className="mt-2 text-lg font-bold text-red-600 border-t-2 border-red-600 pt-2">
+          <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
+            <span><strong>বিষয়:</strong> {examInfo.subject}</span>
+            <span><strong>শ্রেণি:</strong> {toBengaliNumerals(examInfo.class)}</span>
+            {examInfo.set && <span><strong>সেট:</strong> {examInfo.set}</span>}
+            <span><strong>তারিখ:</strong> {toBengaliNumerals(examInfo.date)}</span>
+            {examInfo.duration && <span><strong>সময়:</strong> {toBengaliNumerals(examInfo.duration)}</span>}
+            {examInfo.totalMarks && <span><strong>পূর্ণমান:</strong> {toBengaliNumerals(examInfo.totalMarks)}</span>}
+          </div>
+          <div className="mt-4 text-xl font-bold text-red-600 border-2 border-red-600 inline-block px-4 py-1 rounded shadow-sm">
             উত্তরপত্র (Answer Sheet)
           </div>
         </header>
@@ -160,155 +165,71 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header">
                 <h3>বহুনির্বাচনি প্রশ্নের উত্তর (MCQ Answers)</h3>
                 <div className="text-right">
-                  <div>মোট নম্বর: {mcqTotal}</div>
-                  {examInfo.mcqNegativeMarking && examInfo.mcqNegativeMarking > 0 && (
-                    <div className="text-red-600 text-sm">(প্রতিটি ভুল উত্তরের জন্য {examInfo.mcqNegativeMarking}% নম্বর কর্তন করা হবে)</div>
-                  )}
+                  <div>মোট নম্বর: {toBengaliNumerals(mcqTotal)}</div>
+                  {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 ? (
+                    <div className="text-red-600 text-sm">(প্রতিটি ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
+                  ) : null}
                 </div>
               </div>
 
-              {mcqPages.map((page, pageIdx) => (
-                <div key={pageIdx} className="mcq-page">
-                  {page.isTwoColumn ? (
-                    // Two column layout
-                    <div className="grid grid-cols-2 gap-x-8">
-                      {/* Left Column */}
-                      <div>
-                        {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.map((q: MCQ, idx: number) => {
-                          const globalIdx = pageIdx === 0 ? idx : (pageIdx * 18) + idx;
-                          return (
-                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                              <div className="flex items-start">
-                                <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
-                                <div className="flex-1 text-sm">
-                                  <div className="mb-1 text-black">
-                                    <span className="font-bold text-gray-800">প্রশ্ন: </span>
-                                    <Text>{q.q || q.questionText || ''}</Text>
-                                  </div>
-                                  <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
-                                    {q.options && q.options.map((opt, optIdx) => (
-                                      <div key={optIdx} className="text-xs text-gray-700 flex items-start">
-                                        <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
-                                        <Text>{opt.text || String(opt)}</Text>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="mb-1">
-                                    <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
-                                  </div>
-                                  <span className="text-red-600 font-bold">
-                                    উত্তর: {normalizeAnswer(q.correctAnswer)}
-                                  </span>
-                                  {q.explanation && (
-                                    <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+              <div className="mcq-container">
+                {mcqs.map((q, idx) => {
+                  // Dynamic column calculation based on option length
+                  const totalOptionsLength = (q.options || []).reduce((acc, opt) => acc + (opt.text || '').length, 0);
+                  let gridClass = "options-grid-4"; // Default for short options
+                  if (totalOptionsLength > 60) gridClass = "options-grid-1";
+                  else if (totalOptionsLength > 30) gridClass = "options-grid-2";
 
-                      {/* Right Column */}
-                      <div>
-                        {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).right.map((q: MCQ, idx: number) => {
-                          const globalIdx = pageIdx === 0 ? ((page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx) : (pageIdx * 18) + (page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx;
-                          return (
-                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                              <div className="flex items-start">
-                                <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
-                                <div className="flex-1 text-sm">
-                                  <div className="mb-1 text-black">
-                                    <span className="font-bold text-gray-800">প্রশ্ন: </span>
-                                    <Text>{q.q || q.questionText || ''}</Text>
-                                  </div>
-                                  <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
-                                    {q.options && q.options.map((opt, optIdx) => (
-                                      <div key={optIdx} className="text-xs text-gray-700 flex items-start">
-                                        <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
-                                        <Text>{opt.text || String(opt)}</Text>
-                                      </div>
-                                    ))}
-                                  </div>
-                                  <div className="mb-1">
-                                    <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
-                                  </div>
-                                  <span className="text-red-600 font-bold">
-                                    উত্তর: {normalizeAnswer(q.correctAnswer)}
-                                  </span>
-                                  {q.explanation && (
-                                    <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                      <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
-                                    </div>
-                                  )}
-                                </div>
+                  return (
+                    <div key={idx} className="mb-6 text-left question-block">
+                      <div className="flex items-start">
+                        <span className="font-bold mr-2 text-base">{toBengaliNumerals(idx + 1)}.</span>
+                        <div className="flex-1 text-base">
+                          <div className="mb-1 text-black">
+                            <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                            <Text>{q.q || q.questionText || ''}</Text>
+                          </div>
+                          <div className={`mb-2 ${gridClass} gap-y-1`}>
+                            {q.options && q.options.map((opt, optIdx) => (
+                              <div key={optIdx} className="option-item flex items-start">
+                                <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
+                                <Text>{opt.text || String(opt)}</Text>
                               </div>
+                            ))}
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-sm text-gray-600 font-medium">[{toBengaliNumerals(q.marks || '?')} নম্বর]</span>
+                          </div>
+                          <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mb-1">
+                            <span className="text-red-700 font-bold">
+                              উত্তর: {normalizeAnswer(q.correctAnswer)}
+                            </span>
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-1 text-black text-xs bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                              <span className="font-bold text-gray-800">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
                             </div>
-                          );
-                        })}
+                          )}
+                        </div>
                       </div>
                     </div>
-                  ) : (
-                    // Single column layout
-                    <div>
-                      {(page as { questions: MCQ[]; isTwoColumn: false }).questions.map((q: MCQ, idx: number) => (
-                        <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-                          <div className="flex items-start">
-                            <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
-                            <div className="flex-1 text-sm">
-                              <div className="mb-1 text-black">
-                                <span className="font-bold text-gray-800">প্রশ্ন: </span>
-                                <Text>{q.q || q.questionText || ''}</Text>
-                              </div>
-                              <div className="mb-1 grid grid-cols-2 gap-x-2 gap-y-1">
-                                {q.options && q.options.map((opt, optIdx) => (
-                                  <div key={optIdx} className="text-xs text-gray-700 flex items-start">
-                                    <span className="font-bold mr-1">{MCQ_LABELS[optIdx] || String.fromCharCode(65 + optIdx)}.</span>
-                                    <Text>{opt.text || String(opt)}</Text>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="mb-1">
-                                <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
-                              </div>
-                              <span className="text-red-600 font-bold">
-                                উত্তর: {normalizeAnswer(q.correctAnswer)}
-                              </span>
-                              {q.explanation && (
-                                <div className="mt-1 text-black text-xs bg-gray-50 p-1 rounded border border-gray-100">
-                                  <span className="font-bold">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                  );
+                })}
+              </div>
             </>
           )}
 
-          {/* CQ Section - starts on new page after MCQ */}
+          {/* CQ Section */}
           {cqs.length > 0 && (
             <>
               <div
-                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break"
-                style={{
-                  pageBreakBefore: 'always',
-                  breakBefore: 'page',
-                  marginTop: '0',
-                  paddingTop: '0'
-                }}
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-6 cq-section section-break"
               >
                 <h3>সৃজনশীল প্রশ্নের উত্তর (CQ Answers)</h3>
                 <div className="text-right">
-                  <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
+                  <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(cqRequiredMarks)}</div>
                   {cqRequired > 0 && (
-                    <div className="text-sm">(যেকোনো {cqRequired} টি উত্তর করতে হবে)</div>
+                    <div className="text-sm">(যেকোনো {toBengaliNumerals(cqRequired)} টি উত্তর করতে হবে)</div>
                   )}
                 </div>
               </div>
@@ -316,7 +237,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                 {cqs.map((q, idx) => (
                   <div key={idx} className="mb-3 text-left cq-question">
                     <div className="flex items-start">
-                      <span className="font-bold mr-2">{idx + 1}.</span>
+                      <span className="font-bold mr-2">{toBengaliNumerals(idx + 1)}.</span>
                       <div className="flex-1">
                         <div className="text-red-600 font-bold mb-2">
                           উত্তর:
@@ -328,20 +249,18 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                 <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
                                 <span className="flex-1">
                                   <div className="mb-1">
-                                    <span className="text-sm text-gray-600">[{sub.marks || '?'} নম্বর]</span>
+                                    <span className="text-sm text-gray-600">[{toBengaliNumerals(sub.marks || '?')} নম্বর]</span>
                                   </div>
-                                  <Text>
-                                    {q.subAnswers && q.subAnswers[sidx] ? q.subAnswers[sidx] : 'উত্তর দেওয়া হবে'}
-                                  </Text>
+                                  <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                                    <Text>{sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।'}</Text>
+                                  </div>
                                 </span>
                               </li>
                             ))}
                           </ul>
                         ) : (
-                          <div className="ml-4">
-                            <Text>
-                              {q.modelAnswer || 'উত্তর দেওয়া হবে'}
-                            </Text>
+                          <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                            <Text>{q.modelAnswer || 'উত্তর প্রদান করা হয়নি।'}</Text>
                           </div>
                         )}
                       </div>
@@ -352,23 +271,17 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             </>
           )}
 
-          {/* SQ Section - starts on new page after CQ */}
+          {/* SQ Section */}
           {sqs.length > 0 && (
             <>
               <div
-                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break"
-                style={{
-                  pageBreakBefore: 'always',
-                  breakBefore: 'page',
-                  marginTop: '0',
-                  paddingTop: '0'
-                }}
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-6 sq-section section-break"
               >
                 <h3>সংক্ষিপ্ত প্রশ্নের উত্তর (SQ Answers)</h3>
                 <div className="text-right">
-                  <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
+                  <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(sqRequiredMarks)}</div>
                   {sqRequired > 0 && (
-                    <div className="text-sm">(যেকোনো {sqRequired} টি উত্তর করতে হবে)</div>
+                    <div className="text-sm">(যেকোনো {toBengaliNumerals(sqRequired)} টি উত্তর করতে হবে)</div>
                   )}
                 </div>
               </div>
@@ -376,18 +289,13 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                 {sqs.map((q, idx) => (
                   <div key={idx} className="mb-3 text-left sq-question">
                     <div className="flex items-start">
-                      <span className="font-bold mr-2">{idx + 1}.</span>
+                      <span className="font-bold mr-2">{toBengaliNumerals(idx + 1)}.</span>
                       <div className="flex-1">
                         <div className="text-red-600 font-bold mb-2">
                           উত্তর:
                         </div>
-                        <div className="ml-4">
-                          <div className="mb-1">
-                            <span className="text-sm text-gray-600">[{q.marks || '?'} নম্বর]</span>
-                          </div>
-                          <Text>
-                            {q.modelAnswer || 'উত্তর দেওয়া হবে'}
-                          </Text>
+                        <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                          <Text>{q.modelAnswer || 'উত্তর প্রদান করা হয়নি।'}</Text>
                         </div>
                       </div>
                     </div>

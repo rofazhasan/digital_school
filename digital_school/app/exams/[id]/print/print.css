@@ -9,6 +9,7 @@
   font-weight: normal;
   font-style: normal;
 }
+
 .omr-bubble-font {
   font-family: 'OMRBubbles', 'Baloo Da 2', 'Noto Sans Bengali', Arial, sans-serif !important;
   font-size: 1.2em;
@@ -21,6 +22,7 @@
   font-weight: normal;
   font-style: normal;
 }
+
 .nazrul-omr-font {
   font-family: 'NazrulOMR-Regular', 'Baloo Da 2', 'Noto Serif Bengali', Arial, sans-serif !important;
   font-size: 1.2em;
@@ -32,38 +34,51 @@
     size: 8.5in 14in;
     margin: 8mm 6mm 8mm 6mm;
   }
-  
-  /* Font settings for print */
-  body, .question-paper-container, .answer-paper-container {
+
+  /* Premium Typography Refinements */
+  body,
+  .question-paper-container,
+  .answer-paper-container {
     font-family: 'SolaimanLipi', 'Times New Roman', serif !important;
+    line-height: 1.4 !important;
+    letter-spacing: 0.01em !important;
   }
-  .break-after-page, .print-break-page {
+
+  .break-after-page,
+  .print-break-page {
     break-after: page !important;
     page-break-after: always !important;
     break-before: page !important;
     page-break-before: always !important;
     display: block !important;
   }
+
+  /* Professional Page Footer with Bengali Numbering */
   .print-footer {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 32px;
+    height: 30px;
     background: white;
     z-index: 100;
     text-align: center;
-    border-top: 1px solid #e5e7eb;
+    border-top: 1px solid #000;
+    font-size: 0.9rem;
+    padding-top: 5px;
   }
-  .print-page-number:after {
-    counter-increment: page;
-    content: "পৃষ্ঠা: " counter(page);
-    font-size: 1rem;
+
+  /* Reset counter and define Bengali numerals */
+  body {
+    counter-reset: pageNumber;
+  }
+
+  .print-page-number::after {
+    counter-increment: pageNumber;
+    content: "পৃষ্ঠা: " counter(pageNumber);
     font-family: 'SolaimanLipi', serif;
   }
-  body {
-    counter-reset: page;
-  }
+
   .print-header {
     position: fixed;
     top: 0;
@@ -75,350 +90,188 @@
     text-align: center;
     border-bottom: 1px solid #e5e7eb;
   }
+
   .katex {
     font-size: 1em !important;
   }
-  
-  /* Page break controls for different question types in print */
-  .mcq-page {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
-  .cq-section, .sq-section {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    /* Force page break with additional properties */
-    display: block !important;
-    clear: both !important;
-  }
-  
-  /* Specific rule for SQ section to ensure it breaks after CQ */
-  .sq-section {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    /* Additional forcing properties */
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    display: block !important;
-    clear: both !important;
-  }
-  
-  /* Force page break before SQ section */
-  .sq-section::before {
-    content: "" !important;
-    display: block !important;
-    page-break-before: always !important;
-    break-before: page !important;
-  }
-  
-  /* Additional aggressive page break rules */
-  .sq-section {
-    /* Force page break with multiple approaches */
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-    
-    /* Additional forcing properties */
-    display: block !important;
-    clear: both !important;
-    float: none !important;
-    
-    /* Ensure it's at the top of a page */
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    min-height: 0 !important;
-  }
-  
-  /* Force page break with pseudo-element */
-  .sq-section::before {
-    content: "" !important;
-    display: block !important;
-    page-break-before: always !important;
-    break-before: page !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-  
-  /* Ultra-specific rule to force SQ page breaks */
-  .question-paper-container main .sq-section,
-  .answer-paper-container main .sq-section {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-    display: block !important;
-    clear: both !important;
-    float: none !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    min-height: 0 !important;
-  }
-  
-  /* Force page break for any SQ section that follows CQ */
-  .cq-section ~ .sq-section {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-  }
-  
-  /* ULTRA-AGGRESSIVE page break rule - highest specificity */
-  body div.question-paper-container main .sq-section,
-  body div.answer-paper-container main .sq-section,
-  body .print-page-container .question-paper-container main .sq-section,
-  body .print-page-container .answer-paper-container main .sq-section {
-    break-before: page !important;
-    page-break-before: always !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-    display: block !important;
-    clear: both !important;
-    float: none !important;
-    margin-top: 0 !important;
-    padding-top: 0 !important;
-    min-height: 0 !important;
-    /* Force page break with additional CSS properties */
-    position: relative !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: auto !important;
+
+  /* MCQ Two-Column Layout using CSS Columns */
+  .mcq-container {
+    columns: 2;
+    column-gap: 2rem;
+    column-fill: auto;
+    orphans: 3;
+    widows: 3;
   }
 
-  /* Force page break with multiple pseudo-elements */
-  .sq-section::before,
-  .sq-section::after {
-    content: "" !important;
+  /* MCQ Option Column Layouts */
+  .options-grid-1 {
+    display: block;
+    width: 100%;
+  }
+
+  .options-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .options-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.2rem;
+  }
+
+  /* Premium Section Headers */
+  .mcq-header,
+  h3 {
+    border-bottom: 2px solid #000 !important;
+    background: #f8fafc !important;
+    padding: 2px 8px !important;
+    margin-top: 1rem !important;
+    break-after: avoid !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  /* Instruction Box */
+  .instruction-box {
+    border: 1.5px solid #000;
+    padding: 8px 12px;
+    margin-bottom: 1.5rem;
+    background-color: #fdfdfd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* Signature Blocks */
+  .signature-container {
+    margin-top: 3rem;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2rem;
+    break-inside: avoid;
+  }
+
+  .signature-block {
+    text-align: center;
+    width: 200px;
+  }
+
+  .signature-line {
+    border-top: 1.5px solid #000;
+    margin-bottom: 4px;
+  }
+
+  /* Security Watermark */
+  .watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 8rem;
+    color: rgba(0, 0, 0, 0.03);
+    pointer-events: none;
+    z-index: -1;
+    white-space: nowrap;
+    text-transform: uppercase;
+    font-weight: bold;
+    user-select: none;
+  }
+
+  /* QR Code Container Refinement */
+  .qr-container {
+    padding: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: white;
+  }
+
+  .mcq-page {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Relaxed page breaks - only break if necessary or specifically requested */
+  .cq-section,
+  .sq-section {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    margin-top: 1.5rem !important;
+    padding-top: 0 !important;
     display: block !important;
-    page-break-before: always !important;
-    break-before: page !important;
-    -webkit-break-before: page !important;
-    -moz-break-before: page !important;
-    -ms-break-before: page !important;
-    height: 0 !important;
-    margin: 0 !important;
-    padding: 0 !important;
     clear: both !important;
   }
-  
-  .cq-question, .sq-question {
+
+  /* Remove aggressive forced page breaks */
+  .sq-section::before,
+  .sq-section::after {
+    content: none !important;
+    display: none !important;
+  }
+
+  .cq-section~.sq-section {
+    break-before: auto !important;
+    page-break-before: auto !important;
+  }
+
+  .cq-question,
+  .sq-question {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
-    margin-bottom: 1rem !important;
+    margin-bottom: 0.75rem !important;
   }
-  
-  .mcq-header, h3 {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-  }
-  
+
   .question-block {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
+    margin-bottom: 0.4rem !important;
   }
 }
 
-/* Tighter question and option spacing */
+/* Global Optimizations */
 .question-block {
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.4rem;
+  break-inside: avoid;
 }
+
 .question-options {
-  margin-left: 1.2rem;
-  gap: 0.7rem;
-  margin-top: 0.2rem;
+  margin-left: 1.5rem;
+  margin-top: 0.1rem;
+}
+
+.option-item {
+  font-size: 0.85rem;
+  font-weight: 500;
 }
 
 /* Page break controls for different question types */
 .mcq-page {
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
+  break-inside: auto !important;
+  page-break-inside: auto !important;
 }
 
-.cq-section, .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  /* Force page break with additional properties */
-  display: block !important;
-  clear: both !important;
-}
-
-/* Specific rule for SQ section to ensure it breaks after CQ */
+.cq-section,
 .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  /* Additional forcing properties */
-  margin-top: 0 !important;
+  break-before: auto !important;
+  page-break-before: auto !important;
+  margin-top: 1.5rem !important;
   padding-top: 0 !important;
   display: block !important;
   clear: both !important;
 }
 
-/* Force page break before SQ section */
-.sq-section::before {
-  content: "" !important;
-  display: block !important;
-  page-break-before: always !important;
-  break-before: page !important;
-}
-
-/* Additional spacing and page break controls */
-.cq-section {
-  margin-top: 2rem !important;
-  padding-top: 1rem !important;
-}
-
-.sq-section {
-  margin-top: 2rem !important;
-  padding-top: 1rem !important;
-}
-
-/* Force page breaks with additional selectors */
-main > .cq-section,
-main > .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-}
-
-/* Ensure sections don't flow together */
-.cq-section + .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-}
-
-/* Additional aggressive page break rules */
-.sq-section {
-  /* Force page break with multiple approaches */
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-  
-  /* Additional forcing properties */
-  display: block !important;
-  clear: both !important;
-  float: none !important;
-  
-  /* Ensure it's at the top of a page */
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  min-height: 0 !important;
-}
-
-/* Force page break with pseudo-element */
-.sq-section::before {
-  content: "" !important;
-  display: block !important;
-  page-break-before: always !important;
-  break-before: page !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
-/* Ultra-specific rule to force SQ page breaks */
-.question-paper-container main .sq-section,
-.answer-paper-container main .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-  display: block !important;
-  clear: both !important;
-  float: none !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  min-height: 0 !important;
-}
-
-/* Force page break for any SQ section that follows CQ */
-.cq-section ~ .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-}
-
-/* ULTRA-AGGRESSIVE page break rule - highest specificity */
-body div.question-paper-container main .sq-section,
-body div.answer-paper-container main .sq-section,
-body .print-page-container .question-paper-container main .sq-section,
-body .print-page-container .answer-paper-container main .sq-section {
-  break-before: page !important;
-  page-break-before: always !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-  display: block !important;
-  clear: both !important;
-  float: none !important;
-  margin-top: 0 !important;
-  padding-top: 0 !important;
-  min-height: 0 !important;
-  /* Force page break with additional CSS properties */
-  position: relative !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: auto !important;
-}
-
-/* Force page break with multiple pseudo-elements */
-.sq-section::before,
-.sq-section::after {
-  content: "" !important;
-  display: block !important;
-  page-break-before: always !important;
-  break-before: page !important;
-  -webkit-break-before: page !important;
-  -moz-break-before: page !important;
-  -ms-break-before: page !important;
-  height: 0 !important;
-  margin: 0 !important;
-  padding: 0 !important;
-  clear: both !important;
-}
-
-.cq-question, .sq-question {
+.cq-question,
+.sq-question {
   break-inside: avoid !important;
   page-break-inside: avoid !important;
   margin-bottom: 1rem !important;
 }
 
-.mcq-header, h3 {
+.mcq-header,
+h3 {
   break-inside: avoid !important;
   page-break-inside: avoid !important;
 }
@@ -428,7 +281,8 @@ body .print-page-container .answer-paper-container main .sq-section {
   padding-bottom: 0.5rem !important;
 }
 
-.question-block, h3 {
+.question-block,
+h3 {
   margin-bottom: 1rem !important;
 }
 
@@ -449,4 +303,4 @@ body .print-page-container .answer-paper-container main .sq-section {
   max-width: 80%;
   margin-left: auto;
   margin-right: auto;
-} 
+}
