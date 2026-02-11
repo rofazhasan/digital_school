@@ -282,6 +282,7 @@ export default function SuperUserDashboardPage() {
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>([]);
   const [aiUsageData, setAiUsageData] = useState<AIUsage[]>([]);
+  const [systemStats, setSystemStats] = useState<any>(null);
 
   useEffect(() => {
     // Check for saved dark mode preference
@@ -318,7 +319,6 @@ export default function SuperUserDashboardPage() {
       .then(data => { if (data.institute) setInstitute(data.institute); })
       .catch(console.error);
 
-    // Fetch initial settings
     fetch('/api/settings')
       .then(res => res.json())
       .then(data => {
@@ -334,54 +334,18 @@ export default function SuperUserDashboardPage() {
       .catch(console.error);
 
     fetch('/api/super-user/recent-exams')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch recent exams');
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setRecentExams(data);
-        } else {
-          console.warn('Invalid recent exams data:', data);
-          setRecentExams([]);
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching recent exams:', error);
-        setRecentExams([]);
-      });
+      .then(res => res.json())
+      .then(data => Array.isArray(data) && setRecentExams(data))
+      .catch(console.error);
 
     fetch('/api/super-user/activity-logs')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch activity logs');
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setActivityLogs(data);
-        } else {
-          console.warn('Invalid activity logs data:', data);
-          setActivityLogs([]);
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching activity logs:', error);
-        setActivityLogs([]);
-      });
+      .then(res => res.json())
+      .then(data => Array.isArray(data) && setActivityLogs(data))
+      .catch(console.error);
 
     fetch('/api/super-user/pending-approvals')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch pending approvals');
-        }
-        return res.json();
-      })
+      .then(res => res.json())
       .then(data => {
-        // Transform the API response to match the expected format
         const transformedApprovals = [
           ...(data.pendingUsers || []).map((user: any) => ({
             id: user.id,
@@ -402,30 +366,25 @@ export default function SuperUserDashboardPage() {
         ];
         setPendingApprovals(transformedApprovals);
       })
-      .catch(error => {
-        console.error('Error fetching pending approvals:', error);
-        setPendingApprovals([]);
-      });
+      .catch(console.error);
 
     fetch('/api/super-user/ai-usage')
-      .then(res => {
-        if (!res.ok) {
-          throw new Error('Failed to fetch AI usage');
-        }
-        return res.json();
-      })
-      .then(data => {
-        if (Array.isArray(data)) {
-          setAiUsageData(data);
-        } else {
-          console.warn('Invalid AI usage data:', data);
-          setAiUsageData([]);
-        }
-      })
-      .catch(error => {
-        console.error('Error fetching AI usage:', error);
-        setAiUsageData([]);
-      });
+      .then(res => res.json())
+      .then(data => Array.isArray(data) && setAiUsageData(data))
+      .catch(console.error);
+
+    // System Stats fetching
+    const fetchSystemStats = () => {
+      fetch('/api/super-user/system-stats')
+        .then(res => res.json())
+        .then(data => setSystemStats(data))
+        .catch(console.error);
+    };
+
+    fetchSystemStats();
+    const interval = setInterval(fetchSystemStats, 30000);
+
+    return () => clearInterval(interval);
   }, [router]);
 
   const handleLogout = async () => {
@@ -673,6 +632,22 @@ export default function SuperUserDashboardPage() {
                   transition={{ duration: 0.3 }}
                 >
                   <div className="space-y-4 md:space-y-6">
+                    {/* System Status Banner */}
+                    {systemStats && (
+                      <Card className={`border-none shadow-sm bg-gradient-to-r ${systemStats.status === 'Operational' ? 'from-emerald-500/10 to-emerald-500/5 border border-emerald-500/20' : 'from-rose-500/10 to-rose-500/5 border border-rose-500/20'}`}>
+                        <CardContent className="py-3 px-4 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`h-2 w-2 rounded-full animate-pulse ${systemStats.status === 'Operational' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                            <span className="text-sm font-semibold">System {systemStats.status}</span>
+                            <span className="text-xs text-muted-foreground hidden md:inline">• {systemStats.latency}ms Latency • {systemStats.uptime} Uptime</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] opacity-70">
+                            Last Refreshed: {new Date().toLocaleTimeString()}
+                          </Badge>
+                        </CardContent>
+                      </Card>
+                    )}
+
                     {/* Stats Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                       {[
@@ -1029,7 +1004,7 @@ export default function SuperUserDashboardPage() {
                   {activeTab === 'approvals' && <ApprovalsTab approvals={pendingApprovals} />}
                   {activeTab === 'ai-usage' && <AiUsageTab data={aiUsageData} />}
                   {activeTab === 'logs' && <SystemLogsTab logs={activityLogs} />}
-                  {activeTab === 'analytics' && <AnalyticsTab />}
+                  {activeTab === 'analytics' && <AnalyticsTab systemStats={systemStats} />}
                   {activeTab === 'profile' && <ProfileTab user={user} />}
 
                   {!['overview', 'settings', 'approvals', 'ai-usage', 'logs', 'analytics', 'profile'].includes(activeTab) && (

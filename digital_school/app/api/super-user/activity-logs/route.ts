@@ -5,7 +5,7 @@ import { getDatabaseClient } from '@/lib/db-init';
 export async function GET(request: NextRequest) {
   try {
     const authData = await getTokenFromRequest(request);
-    
+
     if (!authData || authData.user.role !== 'SUPER_USER') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
 
     const prismadb = await getDatabaseClient();
 
-    // Get recent activity logs (last 20)
+    // Get recent activity logs (last 100)
     const activityLogs = await prismadb.log.findMany({
-      take: 20,
+      take: 100,
       orderBy: { timestamp: 'desc' },
       select: {
         id: true,
@@ -35,14 +35,23 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform data to match frontend expectations
-    const transformedLogs = activityLogs.map(log => ({
-      id: log.id,
-      action: log.action,
-      user: log.user?.name || 'Unknown',
-      details: JSON.stringify(log.context || {}),
-      timestamp: log.timestamp,
-      type: 'SYSTEM' // Default type, could be determined from action
-    }));
+    const transformedLogs = activityLogs.map(log => {
+      const action = log.action.toString();
+      let type: 'EXAM' | 'USER' | 'SYSTEM' | 'AI' = 'SYSTEM';
+
+      if (action.includes('EXAM') || action.includes('SUBMISSION')) type = 'EXAM';
+      else if (action.includes('USER') || action.includes('LOGIN') || action.includes('REGISTER')) type = 'USER';
+      else if (action.includes('AI') || action.includes('GENERAT')) type = 'AI';
+
+      return {
+        id: log.id,
+        action: log.action,
+        user: log.user?.name || 'Unknown',
+        details: JSON.stringify(log.context || {}),
+        timestamp: log.timestamp,
+        type: type
+      };
+    });
 
     return NextResponse.json(transformedLogs);
   } catch (error) {
