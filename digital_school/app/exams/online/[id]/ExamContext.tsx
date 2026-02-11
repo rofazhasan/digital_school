@@ -158,7 +158,7 @@ export function ExamContextProvider({
     if (Object.keys(answers).length > 0) {
       saveAnswers(answers);
     }
-  }, [answers, saveAnswers], 2000); // 2 second debounce
+  }, [answers, saveAnswers], 5000); // Increased to 5 second debounce for 1000+ parallel users
 
   // Enhanced navigation with performance optimizations
   const navigateToQuestion = useCallback((index: number) => {

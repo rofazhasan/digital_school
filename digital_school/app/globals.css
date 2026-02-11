@@ -6,18 +6,33 @@
 @source "../components";
 @source "../lib";
 
-/* Bengali text styling */
+/* Bengali and Global text styling */
 .font-noto-sans-bengali {
-  font-family: 'Noto Serif Bengali', serif;
+  font-family: var(--font-hind-siliguri), var(--font-inter), sans-serif;
   font-size: 1rem;
   line-height: 1.8;
-  letter-spacing: 0.02em;
-  word-spacing: 0.1em;
+  letter-spacing: 0.01em;
 }
 
-/* Bengali text in dark mode */
-.dark .font-noto-sans-bengali {
-  color: #e5e7eb;
+/* Learning App Premium Hierarchy */
+@layer base {
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-outfit), var(--font-baloo), sans-serif;
+    letter-spacing: -0.01em;
+    @apply font-semibold;
+  }
+
+  body {
+    font-family: var(--font-inter), var(--font-hind-siliguri), sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv05", "cv11";
+  }
 }
 
 /* Line clamp utility for text truncation */
@@ -212,11 +227,6 @@
   * {
     @apply border-border outline-ring/50;
   }
-
-  body {
-    font-family: 'Noto Serif Bengali', var(--font-sans), serif;
-    @apply bg-background text-foreground;
-  }
 }
 
 .animated-gradient-bg {
@@ -370,4 +380,26 @@
 .premium-option:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Premium Button & Card effects */
+.btn-premium {
+  @apply transition-all duration-300 active:scale-95 hover:shadow-md;
+}
+
+.card-premium {
+  @apply transition-all duration-300 hover:shadow-lg hover:border-primary/20 dark:hover:border-primary/40;
+}
+
+/* Custom Scrollbar for premium feel */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40 transition-colors;
 }
