@@ -1348,7 +1348,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
