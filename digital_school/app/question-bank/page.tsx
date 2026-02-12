@@ -37,7 +37,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'CQ' | 'SQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
@@ -648,6 +648,7 @@ export default function QuestionBankPage() {
                             <SelectContent className="rounded-2xl">
                               <SelectItem value="all">All Types</SelectItem>
                               <SelectItem value="MCQ">MCQ</SelectItem>
+                              <SelectItem value="MC">MC (Multiple Correct)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
                             </SelectContent>

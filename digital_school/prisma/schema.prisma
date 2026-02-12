@@ -167,6 +167,10 @@ model Exam {
   instructions          String?
   // Negative marking for MCQs (percentage)
   mcqNegativeMarking    Float?                    @default(0)
+  // Negative marking for Multiple Correct (percentage)
+  mcNegativeMarking     Float?                    @default(0)
+  // Partial marking for Multiple Correct
+  mcPartialMarking      Boolean?                  @default(true)
   // Question selection settings
   cqTotalQuestions      Int?                      @default(8)
   cqRequiredQuestions   Int?                      @default(5)
@@ -755,6 +759,7 @@ enum Role {
 
 enum QuestionType {
   MCQ
+  MC   // Multiple Correct
   CQ
   SQ
 }
