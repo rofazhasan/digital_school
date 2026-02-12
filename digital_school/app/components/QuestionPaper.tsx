@@ -13,6 +13,11 @@ interface MCQ {
   options: { text: string }[];
   marks?: number;
 }
+interface MC {
+  q: string;
+  options: { text: string; isCorrect?: boolean }[];
+  marks?: number;
+}
 interface CQ {
   questionText: string;
   marks?: number;
@@ -42,6 +47,7 @@ interface QuestionPaperProps {
   };
   questions: {
     mcq: MCQ[];
+    mc: MC[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -71,11 +77,13 @@ const Text = ({ children }: { children: string }) => (
 const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
   ({ examInfo, questions, qrData }, ref) => {
     const mcqs = questions.mcq || [];
+    const mcs = questions.mc || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
 
     // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const mcTotal = mcs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
 
@@ -193,6 +201,52 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className={`mt-1 question-options ${gridClass}`}>
                             {(q.options || []).map((opt: any, oidx: number) => (
                               <div key={oidx} className="option-item">
+                                <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* MC (Multiple Correct) Section */}
+          {mcs.length > 0 && (
+            <>
+              {/* MC Header */}
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header mt-6">
+                <h3>বহুনির্বাচনি প্রশ্ন - একাধিক সঠিক (MC)</h3>
+                <div className="text-right">
+                  <div>মোট নম্বর: {toBengaliNumerals(mcTotal)}</div>
+                  {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 ? (
+                    <div className="text-red-600 text-sm">(প্রতিটি ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
+                  ) : null}
+                  <div className="text-blue-600 text-sm">(সকল সঠিক উত্তর নির্বাচন করতে হবে)</div>
+                </div>
+              </div>
+
+              <div className="mcq-container">
+                {mcs.map((q, idx) => {
+                  // Dynamic column calculation based on option length
+                  const totalOptionsLength = (q.options || []).reduce((acc, opt) => acc + (opt.text || '').length, 0);
+                  let gridClass = "options-grid-4"; // Default for short options
+                  if (totalOptionsLength > 60) gridClass = "options-grid-1";
+                  else if (totalOptionsLength > 30) gridClass = "options-grid-2";
+
+                  return (
+                    <div key={idx} className="mb-4 text-left question-block">
+                      <div className="flex items-start">
+                        <span className="font-bold mr-2 text-base">{toBengaliNumerals(idx + 1)}.</span>
+                        <div className="flex-1 text-base">
+                          <Text>{`${q.q} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
+                          <div className={`mt-1 question-options ${gridClass}`}>
+                            {(q.options || []).map((opt: any, oidx: number) => (
+                              <div key={oidx} className="option-item flex items-start gap-1">
+                                <span>☐</span>
                                 <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
                               </div>
                             ))}

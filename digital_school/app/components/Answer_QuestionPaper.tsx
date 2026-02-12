@@ -14,6 +14,13 @@ interface MCQ {
   explanation?: string;
   questionText?: string;
 }
+interface MC {
+  q: string;
+  options: { text: string; isCorrect?: boolean }[];
+  marks?: number;
+  explanation?: string;
+  questionText?: string;
+}
 interface CQ {
   questionText: string;
   marks?: number;
@@ -44,6 +51,7 @@ interface AnswerQuestionPaperProps {
   };
   questions: {
     mcq: MCQ[];
+    mc: MC[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -74,11 +82,13 @@ const Text = ({ children }: { children: string }) => (
 const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>(
   ({ examInfo, questions, qrData }, ref) => {
     const mcqs = questions.mcq || [];
+    const mcs = questions.mc || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
 
     // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const mcTotal = mcs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
 
@@ -208,6 +218,62 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           {q.explanation && (
                             <div className="mt-1 text-black text-xs bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
                               <span className="font-bold text-gray-800">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* MC (Multiple Correct) Section */}
+          {mcs.length > 0 && (
+            <>
+              {/* MC Header */}
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header mt-6">
+                <h3>বহুনির্বাচনি প্রশ্নের উত্তর - একাধিক সঠিক (MC Answers)</h3>
+                <div className="text-right">
+                  <div>মোট নম্বর: {toBengaliNumerals(mcTotal)}</div>
+                  {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 ? (
+                    <div className="text-red-600 text-sm">(প্রতিটি ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mcq-container">
+                {mcs.map((q, idx) => {
+                  const totalOptionsLength = (q.options || []).reduce((acc, opt) => acc + (opt.text || '').length, 0);
+                  let gridClass = "options-grid-4";
+                  if (totalOptionsLength > 60) gridClass = "options-grid-1";
+                  else if (totalOptionsLength > 30) gridClass = "options-grid-2";
+
+                  return (
+                    <div key={idx} className="mb-6 text-left question-block">
+                      <div className="flex items-start">
+                        <span className="font-bold mr-2 text-base">{toBengaliNumerals(idx + 1)}.</span>
+                        <div className="flex-1 text-base">
+                          <div className="mb-1 text-black">
+                            <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                            <Text>{q.q || q.questionText || ''}</Text>
+                          </div>
+                          <div className={`mt-1 question-options ${gridClass}`}>
+                            {(q.options || []).map((opt: any, oidx: number) => (
+                              <div
+                                key={oidx}
+                                className={`option-item flex items-start gap-1 ${opt.isCorrect ? 'bg-green-100 border-2 border-green-500 font-bold text-green-800' : ''}`}
+                              >
+                                <span>{opt.isCorrect ? '☑' : '☐'}</span>
+                                <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
+                              </div>
+                            ))}
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 p-2 bg-blue-50 border-l-4 border-blue-500">
+                              <span className="font-bold text-blue-800">ব্যাখ্যা: </span>
+                              <Text>{q.explanation}</Text>
                             </div>
                           )}
                         </div>
