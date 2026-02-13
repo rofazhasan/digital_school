@@ -4,6 +4,7 @@ import QRCode from "react-qr-code";
 interface OMRSheetProps {
   questions: {
     mcq: { q: string; options: string[] }[];
+    mc?: { q: string; options: string[] }[];
     cq?: any[];
     sq?: any[];
   };
