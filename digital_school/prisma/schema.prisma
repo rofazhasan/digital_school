@@ -228,6 +228,9 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
+  assertion              String?  // AR: Statement A
+  reason                 String?  // AR: Statement R
+  correctOption          Int?     // AR: Correct option (1-5)
   isForPractice          Boolean                  @default(false)
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
@@ -761,6 +764,7 @@ enum QuestionType {
   MCQ
   MC   // Multiple Correct
   INT
+  AR
   CQ
   SQ
 }
