@@ -48,7 +48,9 @@ type Question = {
   questionText: string; hasMath: boolean;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
-  modelAnswer?: string | null; class: { id: string; name: string }; createdBy: { id: string; name: string };
+  modelAnswer?: string | null;
+  assertion?: string | null; reason?: string | null; correctOption?: number | null;
+  class: { id: string; name: string }; createdBy: { id: string; name: string };
   questionBanks: QuestionBank[]; createdAt: string; isAiGenerated?: boolean;
   images?: string[];
   isForPractice?: boolean;
@@ -1088,6 +1090,34 @@ const QuestionCard: React.FC<{
               </div>
             </div>
           )}
+
+          {/* AR (Assertion-Reason) Display */}
+          {question.type === 'AR' && (
+            <div className="mt-3 space-y-3">
+              <div className="p-4 rounded-2xl bg-blue-50/30 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">Assertion (A)</p>
+                </div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+                  <UniversalMathJax>{question.assertion}</UniversalMathJax>
+                </div>
+              </div>
+              <div className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-purple-500 rounded-full"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">Reason (R)</p>
+                </div>
+                <div className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
+                  <UniversalMathJax>{question.reason}</UniversalMathJax>
+                </div>
+              </div>
+              <div className="p-3 rounded-xl bg-green-50/50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 flex items-center justify-between">
+                <span className="text-xs font-bold text-green-700 dark:text-green-400">Correct Option</span>
+                <Badge className="bg-green-600 hover:bg-green-700">{question.correctOption}</Badge>
+              </div>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between px-6 py-4 bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 backdrop-blur-sm mt-auto">
@@ -1405,14 +1435,16 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       })) : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
         type === 'INT' ? correctAnswer.toString() : null,
+      assertion: type === 'AR' ? assertion.trim() : null,
+      reason: type === 'AR' ? reason.trim() : null,
+      correctOption: type === 'AR' ? correctOption : null,
       hasMath: /\\/.test(questionText) ||
         ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
         )) ||
-        (type === 'CQ' && subQuestions.some((sq: { question: string; marks: number; modelAnswer?: string }) =>
-          /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer))
-        )) ||
-        (type === 'SQ' && /\\/.test(modelAnswer)),
+        (type === 'CQ' && subQuestions.some(sq => /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer)))) ||
+        (type === 'SQ' && /\\/.test(modelAnswer)) ||
+        (type === 'AR' && (/\\/.test(assertion) || /\\/.test(reason))),
       questionBankIds: questionBankIds.length > 0 ? questionBankIds : null,
       images: images.length > 0 ? images : undefined,
     };

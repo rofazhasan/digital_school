@@ -6,6 +6,7 @@ interface OMRSheetProps {
     mcq: { q: string; options: string[] }[];
     mc?: { q: string; options: string[] }[];
     int?: { q: string }[];
+    ar?: any[];
     cq?: any[];
     sq?: any[];
   };

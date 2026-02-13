@@ -29,6 +29,12 @@ interface CQ {
   modelAnswer?: string;
   subQuestions?: any[];
 }
+interface AR {
+  assertion: string;
+  reason: string;
+  correctOption?: number;
+  marks?: number;
+}
 interface SQ {
   questionText: string;
   marks?: number;
@@ -54,6 +60,7 @@ interface QuestionPaperProps {
     mcq: MCQ[];
     mc: MC[];
     int: INT[];
+    ar: AR[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -85,6 +92,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const mcqs = questions.mcq || [];
     const mcs = questions.mc || [];
     const ints = questions.int || [];
+    const ars = questions.ar || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
 
@@ -92,6 +100,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const mcTotal = mcs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const intTotal = ints.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const arTotal = ars.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
 
@@ -292,6 +301,58 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       {/* Answer box */}
                       <div className="mt-2 ml-6 border-2 border-gray-400 rounded p-3 min-h-[40px] bg-gray-50">
                         <span className="text-sm text-gray-500">উত্তর: _________________</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* AR (Assertion-Reason) Section */}
+          {ars.length > 0 && (
+            <>
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header mt-6">
+                <h3>নিশ্চয়তা-কারণ প্রশ্ন (AR)</h3>
+                <div className="text-right">
+                  <div>মোট নম্বর: {toBengaliNumerals(arTotal)}</div>
+                </div>
+              </div>
+              <div className="mb-4 text-sm bg-gray-50 p-3 border border-gray-300 rounded break-inside-avoid">
+                <p className="font-bold mb-1 underline">নির্দেশনা:</p>
+                <p className="mb-2">প্রতিটি প্রশ্নে দুটি বিবৃতি দেওয়া আছে - নিশ্চয়তা (A) এবং কারণ (R)। নিচের বিকল্পগুলো থেকে সঠিকটি নির্বাচন করো:</p>
+                <div className="grid grid-cols-1 gap-1">
+                  <div>১. A এবং R উভয়ই সত্য এবং R হল A এর সঠিক ব্যাখ্যা।</div>
+                  <div>২. A এবং R উভয়ই সত্য কিন্তু R হল A এর সঠিক ব্যাখ্যা নয়।</div>
+                  <div>৩. A সত্য কিন্তু R মিথ্যা।</div>
+                  <div>৪. A মিথ্যা কিন্তু R সত্য।</div>
+                  <div>৫. A এবং R উভয়ই মিথ্যা।</div>
+                </div>
+              </div>
+              <div className="space-y-6">
+                {ars.map((q, idx) => {
+                  const qNum = idx + 1;
+                  return (
+                    <div key={idx} className="break-inside-avoid">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <span className="font-bold whitespace-nowrap">{toBengaliNumerals(qNum)}.</span>
+                            <div>
+                              <div className="mb-2"><strong>নিশ্চয়তা (A):</strong> <UniversalMathJax inline>{q.assertion}</UniversalMathJax></div>
+                              <div><strong>কারণ (R):</strong> <UniversalMathJax inline>{q.reason}</UniversalMathJax></div>
+                            </div>
+                          </div>
+                        </div>
+                        <span className="ml-4 font-bold">{toBengaliNumerals(q.marks || 1)}</span>
+                      </div>
+                      <div className="mt-3 ml-8 flex gap-4">
+                        {[1, 2, 3, 4, 5].map(opt => (
+                          <div key={opt} className="flex items-center gap-1 border border-gray-400 px-2 py-1 rounded text-xs">
+                            <span className="font-bold">{toBengaliNumerals(opt)}</span>
+                            <div className="w-3 h-3 rounded-full border border-black"></div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   );

@@ -37,6 +37,9 @@ const questionSchema = z.object({
         image: z.string().optional().nullable()
     })).nullable().default(null),
     modelAnswer: z.string().optional().nullable(),
+    assertion: z.string().optional().nullable(),
+    reason: z.string().optional().nullable(),
+    correctOption: z.coerce.number().int().min(1).max(5).optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
     images: z.array(z.string()).optional().nullable(),
 });
@@ -276,13 +279,20 @@ async function handleAIGeneration(body: any) {
                 }),
                 ...(questionType === 'SQ' && {
                     modelAnswer: { type: "STRING", description: "MUST contain a model answer for an SQ question." }
-                })
+                }),
+                ...(questionType === 'AR' && {
+                    assertion: { type: "STRING", description: "The assertion statement (A)." },
+                    reason: { type: "STRING", description: "The reason statement (R)." },
+                    correctOption: { type: "NUMBER", description: "The correct option (1-5)." }
+                }),
+                explanation: { type: "STRING", description: "Explanation of why the answer is correct." }
             },
             required: ["questionText", "marks"].concat(
                 (questionType === 'MCQ' || questionType === 'MC') ? ['options'] :
                     questionType === 'INT' ? ['modelAnswer'] :
-                        questionType === 'CQ' ? ['subQuestions'] :
-                            questionType === 'SQ' ? ['modelAnswer'] : []
+                        questionType === 'AR' ? ['assertion', 'reason', 'correctOption'] :
+                            questionType === 'CQ' ? ['subQuestions'] :
+                                questionType === 'SQ' ? ['modelAnswer'] : []
             )
         }
     };
@@ -339,6 +349,22 @@ SQ (SHORT) QUESTIONS:
 - Question should be clear and direct
 ${includeAnswers ? '- Provide comprehensive \'modelAnswer\' with detailed solution steps and reasoning' : ''}
 - Use LaTeX for mathematical expressions and solutions` : ''}
+
+${questionType === 'AR' ? `
+AR (ASSERTION-REASON) QUESTIONS:
+- Create two statements: Assertion (A) and Reason (R)
+- Both statements must be factual and clear
+- Students must evaluate both statements and their relationship
+- Provide the correct relationship as option 1-5:
+  1. Both A and R are true, and R is the correct explanation of A
+  2. Both A and R are true, but R is NOT the correct explanation of A
+  3. A is true, but R is false
+  4. A is false, but R is true
+  5. Both A and R are false
+- Put Assertion in 'assertion' field and Reason in 'reason' field
+- Put the correct number (1-5) in 'correctOption' field
+${includeAnswers ? '- Include a detailed \'explanation\' of why the selected relationship is correct' : ''}
+- Use LaTeX for mathematical expressions in both statements` : ''}
 
 MATHEMATICAL CONTENT AND FORMATTING:
 - For any mathematical content, use proper LaTeX notation
