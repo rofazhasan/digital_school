@@ -23,6 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MCQuestionForm } from "@/app/components/MCQuestionForm";
+import { INTQuestionForm } from "@/app/components/INTQuestionForm";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -38,7 +39,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'CQ' | 'SQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
@@ -1071,6 +1072,21 @@ const QuestionCard: React.FC<{
               </div>
             </div>
           )}
+
+          {/* INT Answer */}
+          {question.type === 'INT' && question.modelAnswer && (
+            <div className="mt-3">
+              <div className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 group-hover:border-purple-300 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-purple-500 rounded-full"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">Correct Answer</p>
+                </div>
+                <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
+                  {question.modelAnswer}
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between px-6 py-4 bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 backdrop-blur-sm mt-auto">
@@ -1148,6 +1164,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '', image: '' }]
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
+  const [correctAnswer, setCorrectAnswer] = useState<number>(initialData?.modelAnswer ? parseInt(initialData.modelAnswer) : 0);
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1310,6 +1327,15 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       }
     }
 
+    // Validate INT (Integer Type) answer
+    if (type === 'INT') {
+      if (correctAnswer === undefined || correctAnswer === null || isNaN(correctAnswer)) {
+        toast({ variant: "destructive", title: "Validation Error", description: "INT question must have a valid integer answer" });
+        setIsSaving(false);
+        return;
+      }
+    }
+
     // Validate CQ sub-questions
     if (type === 'CQ') {
       if (!subQuestions || subQuestions.length < 1) {
@@ -1354,7 +1380,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         modelAnswer: sq.modelAnswer?.trim() || undefined,
         image: sq.image || undefined
       })) : null,
-      modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() : null,
+      modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
+        type === 'INT' ? correctAnswer.toString() : null,
       hasMath: /\\/.test(questionText) ||
         ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
@@ -1583,6 +1610,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 MathToolbar={MathToolbar}
                 handleInsertSymbol={handleInsertSymbol}
                 handleFieldImageUpload={handleFieldImageUpload}
+                textareaRefs={textareaRefs}
+                makeFocusHandler={makeFocusHandler}
+              />
+            )}
+            {type === 'INT' && (
+              <INTQuestionForm
+                correctAnswer={correctAnswer}
+                setCorrectAnswer={setCorrectAnswer}
+                modelAnswer={modelAnswer}
+                setModelAnswer={setModelAnswer}
+                MathToolbar={MathToolbar}
+                handleInsertSymbol={handleInsertSymbol}
                 textareaRefs={textareaRefs}
                 makeFocusHandler={makeFocusHandler}
               />
