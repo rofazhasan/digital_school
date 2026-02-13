@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { MCQuestionForm } from "@/app/components/MCQuestionForm";
 import { INTQuestionForm } from "@/app/components/INTQuestionForm";
+import { ARQuestionForm } from "@/app/components/ARQuestionForm";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -39,7 +40,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'CQ' | 'SQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
@@ -1165,6 +1166,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState<number>(initialData?.modelAnswer ? parseInt(initialData.modelAnswer) : 0);
+  const [assertion, setAssertion] = useState(initialData?.assertion || '');
+  const [reason, setReason] = useState(initialData?.reason || '');
+  const [correctOption, setCorrectOption] = useState(initialData?.correctOption || 1);
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1331,6 +1335,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
     if (type === 'INT') {
       if (correctAnswer === undefined || correctAnswer === null || isNaN(correctAnswer)) {
         toast({ variant: "destructive", title: "Validation Error", description: "INT question must have a valid integer answer" });
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    // Validate AR (Assertion-Reason) fields
+    if (type === 'AR') {
+      if (!assertion || assertion.trim().length < 5) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Assertion must be at least 5 characters" });
+        setIsSaving(false);
+        return;
+      }
+      if (!reason || reason.trim().length < 5) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Reason must be at least 5 characters" });
+        setIsSaving(false);
+        return;
+      }
+      if (!correctOption || correctOption < 1 || correctOption > 5) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Please select a valid correct option (1-5)" });
         setIsSaving(false);
         return;
       }
@@ -1620,6 +1643,22 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 setCorrectAnswer={setCorrectAnswer}
                 modelAnswer={modelAnswer}
                 setModelAnswer={setModelAnswer}
+                MathToolbar={MathToolbar}
+                handleInsertSymbol={handleInsertSymbol}
+                textareaRefs={textareaRefs}
+                makeFocusHandler={makeFocusHandler}
+              />
+            )}
+            {type === 'AR' && (
+              <ARQuestionForm
+                assertion={assertion}
+                setAssertion={setAssertion}
+                reason={reason}
+                setReason={setReason}
+                correctOption={correctOption}
+                setCorrectOption={setCorrectOption}
+                explanation={explanation}
+                setExplanation={setExplanation}
                 MathToolbar={MathToolbar}
                 handleInsertSymbol={handleInsertSymbol}
                 textareaRefs={textareaRefs}
