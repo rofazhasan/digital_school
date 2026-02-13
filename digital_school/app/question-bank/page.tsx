@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { MCQuestionForm } from "@/app/components/MCQuestionForm";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -978,6 +979,44 @@ const QuestionCard: React.FC<{
             </div>
           )}
 
+          {/* MC Options */}
+          {question.type === 'MC' && (
+            <div className="grid grid-cols-1 gap-2 mt-2">
+              {((question.options || [])).map((opt: any, i: number) => (
+                <div
+                  key={i}
+                  className={`relative p-3 rounded-2xl border transition-all duration-200 ${opt.isCorrect ? 'bg-emerald-50/50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800 shadow-sm' : 'bg-gray-50/50 border-gray-100 dark:bg-gray-800/30 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700'}`}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox checked={opt.isCorrect} disabled className="mt-0.5" />
+                    <div className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
+                      {opt.image && (
+                        <div className="mt-2 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden shadow-sm">
+                          <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 w-full object-contain bg-white" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {opt.isCorrect && opt.explanation && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3 pl-9 pr-2 overflow-hidden"
+                    >
+                      <div className="bg-emerald-100/50 dark:bg-emerald-900/40 p-2.5 rounded-xl border border-emerald-200/50 dark:border-emerald-800/50">
+                        <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Explanation</p>
+                        <p className="text-xs text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                          <UniversalMathJax inline>{opt.explanation}</UniversalMathJax>
+                        </p>
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* CQ Sub questions */}
           {question.type === 'CQ' && (
             <div className="space-y-3 mt-2">
@@ -1248,6 +1287,29 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       }
     }
 
+    // Validate MC (Multiple Correct) options
+    if (type === 'MC') {
+      if (!options || options.length < 4) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MC must have at least 4 options" });
+        setIsSaving(false);
+        return;
+      }
+
+      const validOptions = options.filter(opt => opt.text.trim() !== '');
+      if (validOptions.length < 4) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MC must have at least 4 valid options" });
+        setIsSaving(false);
+        return;
+      }
+
+      const correctOptions = validOptions.filter(opt => opt.isCorrect);
+      if (correctOptions.length < 2) {
+        toast({ variant: "destructive", title: "Validation Error", description: "MC must have at least 2 correct options" });
+        setIsSaving(false);
+        return;
+      }
+    }
+
     // Validate CQ sub-questions
     if (type === 'CQ') {
       if (!subQuestions || subQuestions.length < 1) {
@@ -1280,7 +1342,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       classId,
       questionText: questionText.trim(),
       isAiGenerated: !!initialData?.isAiGenerated,
-      options: type === 'MCQ' ? options.filter(opt => opt.text.trim() !== '').map(opt => ({
+      options: (type === 'MCQ' || type === 'MC') ? options.filter(opt => opt.text.trim() !== '').map(opt => ({
         text: opt.text.trim(),
         isCorrect: opt.isCorrect,
         explanation: opt.explanation?.trim() || undefined,
@@ -1294,7 +1356,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       })) : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() : null,
       hasMath: /\\/.test(questionText) ||
-        (type === 'MCQ' && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
+        ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
         )) ||
         (type === 'CQ' && subQuestions.some((sq: { question: string; marks: number; modelAnswer?: string }) =>
@@ -1513,6 +1575,17 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   <PlusCircle className="mr-2 h-4 w-4" />Add Option
                 </Button>
               </div>
+            )}
+            {type === 'MC' && (
+              <MCQuestionForm
+                options={options}
+                setOptions={setOptions}
+                MathToolbar={MathToolbar}
+                handleInsertSymbol={handleInsertSymbol}
+                handleFieldImageUpload={handleFieldImageUpload}
+                textareaRefs={textareaRefs}
+                makeFocusHandler={makeFocusHandler}
+              />
             )}
             {type === 'SQ' && (
               <div>
