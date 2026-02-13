@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { intQuestionSchema } from './intQuestion.schema';
 
 export const mcqQuestionSchema = z.object({
   type: z.literal("MCQ"),
@@ -62,11 +63,25 @@ export const sqQuestionSchema = z.object({
   images: z.array(z.string()).optional(),
 });
 
-export const questionSchema = z.union([
+export const intQuestionSchema = z.object({
+  type: z.literal("INT"),
+  subject: z.string().min(2),
+  topic: z.string().optional(),
+  marks: z.number().min(1).max(10),
+  difficulty: z.enum(["EASY", "MEDIUM", "HARD"]),
+  questionText: z.string().min(10),
+  modelAnswer: z.number(),
+  tags: z.array(z.string()).optional(),
+  hasMath: z.boolean().optional(),
+  images: z.array(z.string()).optional(),
+});
+
+export const questionSchema = z.discriminatedUnion("type", [
   mcqQuestionSchema,
   mcQuestionSchema,
+  intQuestionSchema,
   cqQuestionSchema,
   sqQuestionSchema,
 ]);
 
-export type QuestionFormData = z.infer<typeof questionSchema>; 
+export type QuestionFormData = z.infer<typeof questionSchema>;

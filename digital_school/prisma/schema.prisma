@@ -760,6 +760,7 @@ enum Role {
 enum QuestionType {
   MCQ
   MC   // Multiple Correct
+  INT
   CQ
   SQ
 }
