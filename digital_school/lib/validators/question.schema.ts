@@ -63,10 +63,13 @@ export const sqQuestionSchema = z.object({
   images: z.array(z.string()).optional(),
 });
 
+import { arQuestionSchema } from './arQuestion.schema';
+
 export const questionSchema = z.discriminatedUnion("type", [
   mcqQuestionSchema,
   mcQuestionSchema,
   intQuestionSchema,
+  arQuestionSchema,
   cqQuestionSchema,
   sqQuestionSchema,
 ]);
