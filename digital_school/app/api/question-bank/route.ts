@@ -280,8 +280,9 @@ async function handleAIGeneration(body: any) {
             },
             required: ["questionText", "marks"].concat(
                 (questionType === 'MCQ' || questionType === 'MC') ? ['options'] :
-                    questionType === 'CQ' ? ['subQuestions'] :
-                        questionType === 'SQ' ? ['modelAnswer'] : []
+                    questionType === 'INT' ? ['modelAnswer'] :
+                        questionType === 'CQ' ? ['subQuestions'] :
+                            questionType === 'SQ' ? ['modelAnswer'] : []
             )
         }
     };
@@ -314,6 +315,15 @@ MC (MULTIPLE CORRECT) QUESTIONS:
 ${includeAnswers ? '- Include detailed \'explanation\' for EACH correct option explaining the reasoning' : ''}
 - Use LaTeX for mathematical expressions: $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, etc.
 - Students must select ALL correct options to get full marks` : ''}
+
+${questionType === 'INT' ? `
+INT (INTEGER TYPE) QUESTIONS:
+- The answer MUST be a single integer (whole number)
+- Question should have a clear numerical answer
+- Provide the correct integer answer in 'modelAnswer' field as a number
+${includeAnswers ? '- Include detailed \'explanation\' showing step-by-step solution' : ''}
+- Use LaTeX for mathematical expressions in the question and explanation
+- Examples: "What is the value of $5^3$?", "How many prime numbers are there between 1 and 20?"` : ''}
 
 ${questionType === 'CQ' ? `
 CQ (COMPREHENSIVE) QUESTIONS:
