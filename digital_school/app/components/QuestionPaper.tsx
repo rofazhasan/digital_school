@@ -18,6 +18,11 @@ interface MC {
   options: { text: string; isCorrect?: boolean }[];
   marks?: number;
 }
+interface INT {
+  q: string;
+  marks?: number;
+  modelAnswer?: string;
+}
 interface CQ {
   questionText: string;
   marks?: number;
@@ -48,6 +53,7 @@ interface QuestionPaperProps {
   questions: {
     mcq: MCQ[];
     mc: MC[];
+    int: INT[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -78,12 +84,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
   ({ examInfo, questions, qrData }, ref) => {
     const mcqs = questions.mcq || [];
     const mcs = questions.mc || [];
+    const ints = questions.int || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
 
     // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const mcTotal = mcs.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const intTotal = ints.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
 
@@ -252,6 +260,38 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             ))}
                           </div>
                         </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* INT (Integer Type) Section */}
+          {ints.length > 0 && (
+            <>
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header mt-6">
+                <h3>সংখ্যাসূচক প্রশ্ন (INT)</h3>
+                <div className="text-right">
+                  <div>মোট নম্বর: {toBengaliNumerals(intTotal)}</div>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {ints.map((q, idx) => {
+                  const qNum = idx + 1;
+                  return (
+                    <div key={idx} className="break-inside-avoid">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <span className="font-bold">{toBengaliNumerals(qNum)}. </span>
+                          <UniversalMathJax inline>{q.q}</UniversalMathJax>
+                        </div>
+                        <span className="ml-4 font-bold">{toBengaliNumerals(q.marks || 1)}</span>
+                      </div>
+                      {/* Answer box */}
+                      <div className="mt-2 ml-6 border-2 border-gray-400 rounded p-3 min-h-[40px] bg-gray-50">
+                        <span className="text-sm text-gray-500">উত্তর: _________________</span>
                       </div>
                     </div>
                   );
