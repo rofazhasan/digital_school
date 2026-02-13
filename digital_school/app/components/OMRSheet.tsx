@@ -103,6 +103,39 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
     </table>
   );
 
+  // Render MC (Multiple Correct) questions - each question has checkboxes for all options
+  const renderMCColumn = (startIdx: number, endIdx: number, mcQuestions: { q: string; options: string[] }[]) => (
+    <table className="w-full text-center border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+      <thead>
+        <tr>
+          <th className="border-b-2 border-black text-base py-1 font-bold">প্রশ্ন</th>
+          {mcqOptionLabels.map((l, i) => (
+            <th key={i} className="border-b-2 border-black text-base py-1 font-bold">{l}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+          if (idx >= mcQuestions.length) return null;
+          return (
+            <tr key={idx} className="">
+              <td className="border-b border-gray-400 text-base py-1 px-1 font-bold" style={{ height: '28px' }}>{idx + 1}</td>
+              {mcqOptionLabels.map((l, oidx) => (
+                <td key={oidx} className="border-b border-gray-300 py-1 px-1" style={{ height: '28px' }}>
+                  <div
+                    className="border-2 border-black rounded-sm flex items-center justify-center mx-auto bg-white text-sm font-bold"
+                    style={{ width: answerBubbleSize - 2, height: answerBubbleSize - 2, fontSize: (answerBubbleSize - 2) * 0.5, fontWeight: 700 }}
+                    aria-label={`MC ${idx + 1} option ${l}`}
+                  >☐</div>
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
   return (
     <div className="w-full h-full flex flex-col items-stretch p-0 gap-0 omr-bg-pink relative" style={{ fontFamily, borderRadius: 8, border: '2px solid #222', maxWidth: '8.27in', minHeight: '11.69in', background: '#ffb6e6', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
       {/* Header: Exam info, logo, confidential, etc. */}

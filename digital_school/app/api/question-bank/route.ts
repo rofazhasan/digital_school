@@ -279,7 +279,7 @@ async function handleAIGeneration(body: any) {
                 })
             },
             required: ["questionText", "marks"].concat(
-                questionType === 'MCQ' ? ['options'] :
+                (questionType === 'MCQ' || questionType === 'MC') ? ['options'] :
                     questionType === 'CQ' ? ['subQuestions'] :
                         questionType === 'SQ' ? ['modelAnswer'] : []
             )
@@ -304,6 +304,16 @@ MCQ QUESTIONS:
 - Make incorrect options plausible but clearly wrong
 ${includeAnswers ? '- Include detailed \'explanation\' for the correct option explaining the reasoning and solution steps' : ''}
 - Use LaTeX for mathematical expressions: $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, etc.` : ''}
+
+${questionType === 'MC' ? `
+MC (MULTIPLE CORRECT) QUESTIONS:
+- Provide exactly 4-6 options
+- At least TWO options should have 'isCorrect: true'
+- Remaining options should have 'isCorrect: false'
+- Make incorrect options plausible but clearly wrong
+${includeAnswers ? '- Include detailed \'explanation\' for EACH correct option explaining the reasoning' : ''}
+- Use LaTeX for mathematical expressions: $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, etc.
+- Students must select ALL correct options to get full marks` : ''}
 
 ${questionType === 'CQ' ? `
 CQ (COMPREHENSIVE) QUESTIONS:
