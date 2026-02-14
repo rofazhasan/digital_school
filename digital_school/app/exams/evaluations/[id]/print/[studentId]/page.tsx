@@ -144,6 +144,22 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
             ...q,
             q: q.text // Component expects 'q' for text
         })),
+        mc: examData.questions.filter((q: any) => q.type === 'mc').map((q: any) => ({
+            ...q,
+            q: q.text
+        })),
+        int: examData.questions.filter((q: any) => q.type === 'int').map((q: any) => ({
+            ...q,
+            q: q.text
+        })),
+        ar: examData.questions.filter((q: any) => q.type === 'ar').map((q: any) => ({
+            ...q,
+            // AR fields (assertion, reason) should be in ...q
+        })),
+        mtf: examData.questions.filter((q: any) => q.type === 'mtf').map((q: any) => ({
+            ...q,
+            q: q.text
+        })),
         cq: examData.questions.filter((q: any) => q.type === 'cq').map((q: any) => ({
             ...q,
             questionText: q.text // Component expects 'questionText'

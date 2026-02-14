@@ -278,3 +278,21 @@
   font-size: 0.85rem;
   font-weight: 500;
 }
+
+/* Screen-only adjustments for Print Preview to prevent content touching edges */
+@media screen {
+  .print-page-container {
+    padding: 2rem;
+    margin: 1rem auto;
+    background: white;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    max-width: 8.5in;
+    /* Standard width preview */
+  }
+
+  .omr-sheet-wrapper {
+    padding: 0 !important;
+    /* OMR wrapper handles its own internal layout */
+    overflow: hidden;
+  }
+}

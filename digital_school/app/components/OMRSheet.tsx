@@ -18,6 +18,7 @@ interface OMRSheetProps {
   fontFamily?: string; // default 'Noto Serif Bengali, serif'
   extraFields?: Array<{ label: string; width?: number }>;
   mcqOptionLabels?: string[]; // default ['ক','খ','গ','ঘ']
+  mcqOptionsCount?: number; // default 4
   setName?: string; // set name for display
   logoUrl?: string;
   instituteName?: string;
@@ -38,6 +39,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   fontFamily = 'Noto Serif Bengali, serif',
   extraFields = [],
   mcqOptionLabels = MCQ_LABELS,
+  mcqOptionsCount = 4, // Default to 4 options
   setName,
   logoUrl,
   instituteName = 'শিক্ষা প্রতিষ্ঠান',
@@ -85,7 +87,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <thead>
         <tr className="bg-black text-white">
           <th className="text-[10px] font-black py-0.5 w-8">প্রশ্ন</th>
-          {mcqOptionLabels.slice(0, 4).map((l, i) => (
+          {mcqOptionLabels.slice(0, mcqOptionsCount).map((l, i) => (
             <th key={i} className="text-[10px] font-black py-0.5">{l}</th>
           ))}
         </tr>
@@ -93,11 +95,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <tbody className="divide-y divide-black/10">
         {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => (
           <tr key={idx} className="hover:bg-gray-50">
-            <td className="text-[11px] font-black py-[2px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
-            {mcqOptionLabels.slice(0, 4).map((l, oidx) => (
-              <td key={oidx} className="py-[1px]">
+            <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+            {mcqOptionLabels.slice(0, mcqOptionsCount).map((l, oidx) => (
+              <td key={oidx} className="py-[0px]">
                 <div
-                  className="w-[18px] h-[18px] border-[1.5px] border-black rounded-full flex items-center justify-center mx-auto bg-white text-[10px] font-black pb-[1px]"
+                  className="w-[17px] h-[17px] border-[1.5px] border-black rounded-full flex items-center justify-center mx-auto bg-white text-[9px] font-black pb-[1px]"
                   aria-label={`MCQ ${idx + 1} option ${l}`}
                 >{l}</div>
               </td>
@@ -124,11 +126,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           if (idx >= mcQuestions.length) return null;
           return (
             <tr key={idx} className="hover:bg-gray-100">
-              <td className="text-[11px] font-black py-[2px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+              <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
               {mcqOptionLabels.slice(0, 5).map((l, oidx) => (
-                <td key={oidx} className="py-[1px]">
+                <td key={oidx} className="py-[0px]">
                   <div
-                    className="w-[16px] h-[16px] border-[1.5px] border-black rounded-sm flex items-center justify-center mx-auto bg-white"
+                    className="w-[15px] h-[15px] border-[1.5px] border-black rounded-sm flex items-center justify-center mx-auto bg-white"
                     aria-label={`MC ${idx + 1} option ${l}`}
                   ></div>
                 </td>
@@ -159,11 +161,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
             if (idx >= arQuestions.length) return null;
             return (
               <tr key={idx} className="hover:bg-gray-100">
-                <td className="text-[11px] font-black py-[2px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+                <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
                 {bengaliLabels.map((l, oidx) => (
-                  <td key={oidx} className="py-[1px]">
+                  <td key={oidx} className="py-[0px]">
                     <div
-                      className="w-[16px] h-[16px] border-[1.5px] border-black rounded-full flex items-center justify-center mx-auto bg-white text-[8px] font-black pb-[1px]"
+                      className="w-[15px] h-[15px] border-[1.5px] border-black rounded-full flex items-center justify-center mx-auto bg-white text-[8px] font-black pb-[1px]"
                     >{l}</div>
                   </td>
                 ))}
@@ -196,9 +198,9 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
             <tbody>
               {q.leftColumn.map((lc: any) => (
                 <tr key={lc.id}>
-                  <td className="border-b border-black/10 text-[10px] font-black py-[2px]">{lc.id}</td>
+                  <td className="border-b border-black/10 text-[10px] font-black py-[1px]">{lc.id}</td>
                   {q.rightColumn.map((rc: any) => (
-                    <td key={rc.id} className="border-b border-black/10 py-[2px] text-center">
+                    <td key={rc.id} className="border-b border-black/10 py-[1px] text-center">
                       <div className="w-3 h-3 rounded-full border border-black mx-auto hover:bg-black transition-colors duration-200"></div>
                     </td>
                   ))}
@@ -225,11 +227,11 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           if (idx >= intQuestions.length) return null;
           return (
             <tr key={idx} className="hover:bg-gray-100">
-              <td className="text-[11px] font-black py-2 border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
-              <td className="py-1 flex justify-center gap-1">
+              <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+              <td className="py-[1px] flex justify-center gap-1">
                 {[1, 2, 3].map(pos => (
-                  <div key={pos} className="flex flex-col gap-[2px] bg-gray-100 p-[2px] border border-black rounded-[2px]">
-                    <div className="w-full h-3 bg-white border border-black flex items-center justify-center text-[7px] font-black mb-[1px]">▢</div>
+                  <div key={pos} className="flex flex-col gap-[1px] bg-gray-100 p-[1px] border border-black rounded-[2px]">
+                    <div className="w-full h-2.5 bg-white border border-black flex items-center justify-center text-[7px] font-black mb-[1px]">▢</div>
                     <div className="grid grid-cols-2 gap-[1px]">
                       {DIGITS.map(d => (
                         <div key={d} className="w-2.5 h-2.5 border-[0.5px] border-black rounded-full text-[6px] font-black flex items-center justify-center bg-white pb-[1px]">{toBengaliNumerals(d)}</div>
@@ -248,45 +250,45 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   return (
     <div className="w-full h-full flex flex-col items-stretch p-0 gap-0 bg-white relative print:m-0" style={{ fontFamily, border: '2px solid #000', maxWidth: '8.27in', minHeight: '11.69in', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
 
-      {/* Precision Timing Tracks (Adjusted position) */}
+      {/* Precision Timing Tracks (Visible for Scanning) */}
       <div className="absolute left-1 top-0 bottom-0 w-3 flex flex-col justify-around py-12 z-20 pointer-events-none">
         {Array.from({ length: 48 }).map((_, i) => (
-          <div key={i} className="w-3 h-1.5 bg-black"></div>
+          <div key={i} className="w-3 h-1.5 bg-black my-1"></div>
         ))}
       </div>
       <div className="absolute right-1 top-0 bottom-0 w-3 flex flex-col justify-around py-12 z-20 pointer-events-none">
         {Array.from({ length: 48 }).map((_, i) => (
-          <div key={i} className="w-3 h-1.5 bg-black"></div>
+          <div key={i} className="w-3 h-1.5 bg-black my-1"></div>
         ))}
       </div>
 
       {/* Reduced Size L-Stones (Moved slightly inwards) */}
       {/* Top-Left */}
-      <div className="absolute left-5 top-5 z-30">
+      <div className="absolute left-6 top-6 z-30">
         <div className="w-8 h-2 bg-black"></div>
         <div className="w-2 h-6 bg-black"></div>
       </div>
       {/* Top-Right */}
-      <div className="absolute right-5 top-5 flex flex-col items-end z-30">
+      <div className="absolute right-6 top-6 flex flex-col items-end z-30">
         <div className="w-8 h-2 bg-black"></div>
         <div className="w-2 h-6 bg-black"></div>
       </div>
       {/* Bottom-Left */}
-      <div className="absolute left-5 bottom-5 flex flex-col items-start z-30">
+      <div className="absolute left-6 bottom-6 flex flex-col items-start z-30">
         <div className="w-2 h-6 bg-black"></div>
         <div className="w-8 h-2 bg-black"></div>
       </div>
       {/* Bottom-Right */}
-      <div className="absolute right-5 bottom-5 flex flex-col items-end z-30">
+      <div className="absolute right-6 bottom-6 flex flex-col items-end z-30">
         <div className="w-2 h-6 bg-black"></div>
         <div className="w-8 h-2 bg-black"></div>
       </div>
 
       {/* Header Area */}
-      <div className="w-full flex flex-row items-center justify-between px-12 pt-6 pb-2 border-b-2 border-black bg-white">
+      <div className="w-full flex flex-row items-center justify-between px-14 pt-8 pb-3 border-b-2 border-black bg-white">
         <div className="flex items-center gap-3">
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="h-10 w-10 object-contain" />
+            <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain" />
           )}
           <div className="flex flex-col">
             <span className="text-sm font-black text-black uppercase tracking-widest">{instituteName}</span>
@@ -295,46 +297,45 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
         </div>
 
         <div className="flex flex-col items-center flex-1">
-          <span className="text-lg font-black text-black uppercase">{examTitle}</span>
+          <span className="text-xl font-black text-black uppercase">{examTitle}</span>
           <div className="flex gap-4 mt-1">
-            <span className="text-[10px] bg-black text-white px-2 py-0.5 font-bold uppercase">{subjectName}</span>
-            <span className="text-[10px] border-2 border-black px-2 py-0.5 font-bold uppercase">{toBengaliNumerals(examDate)}</span>
+            <span className="text-[11px] bg-black text-white px-3 py-0.5 font-bold uppercase">{subjectName}</span>
+            <span className="text-[11px] border-2 border-black px-3 py-0.5 font-bold uppercase">{toBengaliNumerals(examDate)}</span>
           </div>
         </div>
 
-        <div className="flex flex-col items-end border-l-2 border-black pl-3 gap-1">
-          {/* Repositioned Unique Code - Visible and clean */}
+        <div className="flex flex-col items-end border-l-2 border-black pl-3 gap-2">
           {uniqueCode && (
-            <div className="text-[9px] font-mono border border-gray-400 px-1 rounded bg-gray-50 text-gray-500">
+            <div className="text-[10px] font-mono border border-gray-400 px-2 rounded bg-gray-50 text-gray-500">
               ID: {uniqueCode}
             </div>
           )}
-          <div className="text-[11px] font-black bg-gray-100 px-2 py-0.5 border border-black">SET: {setName || 'NULL'}</div>
+          <div className="text-[12px] font-black bg-gray-100 px-3 py-1 border border-black">SET: {setName || 'NULL'}</div>
         </div>
       </div>
 
-      {/* Main Container */}
-      <div className="flex-1 flex flex-row items-stretch mx-8 my-3 gap-4">
+      {/* Main Container - Adjusted Spacing */}
+      <div className="flex-1 flex flex-row items-stretch mx-10 my-4 gap-4">
 
-        {/* Left Section: Answer Grid - OPTIMIZED SPACING */}
+        {/* Left Section: Answer Grid - OPTIMIZED SPACING - Tight grid */}
         <div className="flex-[5] flex flex-col gap-2">
-          {/* Main 100 Q Grid */}
-          <div className="grid grid-cols-4 gap-x-2 gap-y-0 border-4 border-black p-1 bg-white rounded shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
-            <div className="border-r-2 border-black pr-1">
+          {/* Main 100 Q Grid - Tighter gaps */}
+          <div className="grid grid-cols-4 gap-x-1.5 gap-y-0 border-4 border-black p-1 bg-white rounded shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)] h-full">
+            <div className="border-r-2 border-black pr-1 h-full">
               {renderMCQColumn(0, 25)}
             </div>
-            <div className="border-r-2 border-black pr-1">
+            <div className="border-r-2 border-black pr-1 h-full">
               {renderMCQColumn(25, 50)}
             </div>
-            <div className="border-r-2 border-black pr-1">
+            <div className="border-r-2 border-black pr-1 h-full">
               {renderMCQColumn(50, 75)}
             </div>
-            <div className="pl-0">
+            <div className="pl-0 h-full">
               {renderMCQColumn(75, 100)}
             </div>
           </div>
 
-          {/* Special Type Questions - Compact Grid */}
+          {/* Special Type Questions */}
           <div className="grid grid-cols-3 gap-2">
             {questions.mc && questions.mc.length > 0 && (
               <div className="border-2 border-black p-1 rounded bg-gray-50">
@@ -364,36 +365,36 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           )}
         </div>
 
-        {/* Right Section: Student Data - COMPACTED */}
-        <div className="flex-[2] flex flex-col gap-3 border-4 border-black bg-gray-50 p-2 rounded relative overflow-hidden">
+        {/* Right Section: Student Data */}
+        <div className="flex-[2] flex flex-col gap-4 border-4 border-black bg-gray-50 p-3 rounded relative overflow-hidden">
           {/* Subtle Watermark */}
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none -rotate-45">
             <span className="text-3xl font-black">CONFIDENTIAL</span>
           </div>
 
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center pt-2">
             {verticalField('রোল নম্বর', rollDigits, 'Noto Serif Bengali, serif', rollDigits, 'bg-white border p-1 rounded shadow-sm', 12)}
           </div>
 
           <div className="w-full border-t border-black border-dashed opacity-50"></div>
 
-          <div className="flex flex-row justify-center gap-2 items-start">
+          <div className="flex flex-row justify-center gap-4 items-start">
             <div className="flex flex-col items-center">
-              <div className="text-[9px] font-black mb-1">সেট কোড</div>
+              <div className="text-[10px] font-black mb-1">সেট কোড</div>
               <div className="p-1 border bg-white rounded flex flex-col items-center gap-1 shadow-sm">
-                <div className="w-5 h-5 border-2 border-black mb-0.5 bg-gray-100 flex items-center justify-center text-[10px] font-bold">▢</div>
-                {mcqOptionLabels.map((l) => (
-                  <div key={l} className="w-4 h-4 border border-black rounded-full flex items-center justify-center text-[9px] font-black hover:bg-black hover:text-white cursor-pointer transition-colors duration-200 pb-[1px]">
+                <div className="w-6 h-6 border-2 border-black mb-1 bg-gray-100 flex items-center justify-center text-[12px] font-bold">▢</div>
+                {mcqOptionLabels.slice(0, 4).map((l) => (
+                  <div key={l} className="w-5 h-5 border border-black rounded-full flex items-center justify-center text-[10px] font-black hover:bg-black hover:text-white cursor-pointer transition-colors duration-200 pb-[1px]">
                     {l}
                   </div>
                 ))}
               </div>
             </div>
-            <div className="flex flex-col items-center justify-center pt-2">
-              <div className="bg-white p-1 border border-black rounded">
-                <QRCode value={JSON.stringify(qrData)} size={56} />
+            <div className="flex flex-col items-center justify-center pt-4">
+              <div className="bg-white p-1 border border-black rounded shadow-sm">
+                <QRCode value={JSON.stringify(qrData)} size={64} />
               </div>
-              <span className="text-[7px] font-mono mt-0.5 opacity-50 uppercase tracking-widest">Secured QR</span>
+              <span className="text-[8px] font-mono mt-1 opacity-50 uppercase tracking-widest">Secured QR</span>
             </div>
           </div>
 
@@ -403,21 +404,21 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
             {verticalField('বিষয় কোড', 3, 'Noto Serif Bengali, serif', 3, 'bg-white border p-1 rounded shadow-sm', 12)}
           </div>
 
-          <div className="mt-auto space-y-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[8px] font-black uppercase text-gray-500">Student's Signature / শিক্ষার্থীর স্বাক্ষর</span>
-              <div className="h-8 border-2 border-black bg-white rounded shadow-inner"></div>
+          <div className="mt-auto space-y-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase text-gray-500">Student's Signature / শিক্ষার্থীর স্বাক্ষর</span>
+              <div className="h-10 border-2 border-black bg-white rounded shadow-inner"></div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[8px] font-black uppercase text-gray-500">Invigilator's Signature / পরিদর্শকের স্বাক্ষর</span>
-              <div className="h-8 border-2 border-black bg-white rounded shadow-inner"></div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase text-gray-500">Invigilator's Signature / পরিদর্শকের স্বাক্ষর</span>
+              <div className="h-10 border-2 border-black bg-white rounded shadow-inner"></div>
             </div>
           </div>
 
-          {/* New Optimized Instructions Block */}
-          <div className="mt-3 p-1.5 border border-black bg-white text-[8px] leading-tight rounded shadow-sm">
+          {/* Instructions Block */}
+          <div className="mt-4 p-2 border border-black bg-white text-[9px] leading-tight rounded shadow-sm">
             <div className="font-black text-center mb-1 border-b border-black pb-0.5">INSTRUCTIONS / নিয়মাবলি</div>
-            <ul className="space-y-0.5 font-bold">
+            <ul className="space-y-1 font-bold">
               <li className="flex items-start gap-1">
                 <span className="text-blue-500">•</span>
                 <span>কালো কালির বলপয়েন্ট কলম ব্যবহার করুন।</span>
@@ -440,7 +441,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
       </div>
 
-      {/* Bottom Timing Tracks (Adjusted) */}
+      {/* Bottom Timing Tracks (Visible) */}
       <div className="absolute bottom-1 left-0 right-0 h-3 flex flex-row justify-around px-16 z-20 pointer-events-none">
         {Array.from({ length: 32 }).map((_, i) => (
           <div key={i} className="w-1.5 h-3 bg-black"></div>

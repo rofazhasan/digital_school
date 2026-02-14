@@ -244,6 +244,13 @@ export default function PrintExamPage() {
 const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, language: 'bn' | 'en' }) => {
   const [uniqueCode] = useState(() => uuidv4());
 
+  // Calculate max options count (either 4 or 5) based on actual question data
+  const mcqOptionsCount = React.useMemo(() => {
+    if (!set.mcq || set.mcq.length === 0) return 4;
+    const maxOptions = Math.max(...set.mcq.map((q: any) => q.options?.length || 0));
+    return maxOptions > 4 ? 5 : 4;
+  }, [set.mcq]);
+
   return (
     <div className="print-page-container legal-paper omr-sheet-wrapper">
       <OMRSheet
@@ -252,6 +259,7 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
         rollDigits={6}
         fontFamily={language === 'bn' ? 'SolaimanLipi, serif' : 'Times New Roman, serif'}
         mcqOptionLabels={language === 'bn' ? ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'] : ['A', 'B', 'C', 'D', 'E', 'F']}
+        mcqOptionsCount={mcqOptionsCount}
         setName={set.setName}
         bubbleSize={16}
         instituteName={examInfo.schoolName}
