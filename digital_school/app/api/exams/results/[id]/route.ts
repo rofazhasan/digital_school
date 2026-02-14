@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
 import { calculateGrade, calculatePercentage } from '@/lib/utils';
+import { evaluateMCQuestion } from '@/lib/evaluation/mcEvaluation';
+import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
+import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
+import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
 
 export async function GET(
   request: NextRequest,
@@ -312,6 +316,33 @@ export async function GET(
             negativeMarking: exam.mcqNegativeMarking
           });
         }
+      } else if (question.type === 'MC' || question.type === 'AR' || question.type === 'INT' || question.type === 'NUMERIC' || question.type === 'MTF') {
+        const type = question.type.toUpperCase();
+        if (type === 'MC') {
+          awardedMarks = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
+            negativeMarking: (exam as any).mcqNegativeMarking || 0,
+            partialMarking: true
+          });
+          isCorrect = awardedMarks === maxMarks;
+        } else if (type === 'INT' || type === 'NUMERIC') {
+          const res = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
+          awardedMarks = res.score;
+          isCorrect = res.isCorrect;
+          if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+            awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+          }
+        } else if (type === 'AR') {
+          const res = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
+          awardedMarks = res.score;
+          isCorrect = res.isCorrect;
+          if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+            awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+          }
+        } else if (type === 'MTF') {
+          const res = evaluateMTFQuestion(question, studentAnswer || {});
+          awardedMarks = res.score;
+          isCorrect = res.isCorrect;
+        }
       } else {
         // For CQ/SQ, marks are manually awarded
         // Get marks from submission answers
@@ -430,8 +461,9 @@ export async function GET(
       console.log(`🚫 Student suspended - giving zero marks in all sections`);
     } else {
       // Always recalculate percentage and grade to ensure accuracy
-      if (totalMarks > 0) {
-        percentage = calculatePercentage(totalMarks, exam.totalMarks);
+      if (totalMarks > 0 || (result && result.total > 0)) {
+        const currentTotal = totalMarks || result?.total || 0;
+        percentage = calculatePercentage(currentTotal, exam.totalMarks);
         grade = calculateGrade(percentage);
 
         console.log(`📊 Grade Recalculation Debug:`, {
@@ -456,16 +488,17 @@ export async function GET(
         totalMarks = 0;
 
         processedQuestions.forEach((question: any) => {
-          if (question.type === 'MCQ') {
-            mcqMarks += question.awardedMarks;
-            totalMarks += question.awardedMarks;
-            console.log(`MCQ Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
-          } else if (question.type === 'CQ') {
-            cqMarks += question.awardedMarks;
-            totalMarks += question.awardedMarks;
-          } else if (question.type === 'SQ') {
-            sqMarks += question.awardedMarks;
-            totalMarks += question.awardedMarks;
+          const type = (question.type || '').toUpperCase();
+          if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
+            mcqMarks += question.awardedMarks || 0;
+            totalMarks += question.awardedMarks || 0;
+            console.log(`${type} Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
+          } else if (type === 'CQ') {
+            cqMarks += question.awardedMarks || 0;
+            totalMarks += question.awardedMarks || 0;
+          } else if (type === 'SQ') {
+            sqMarks += question.awardedMarks || 0;
+            totalMarks += question.awardedMarks || 0;
           }
         });
 
@@ -560,8 +593,8 @@ export async function GET(
       } : null,
       reviewRequest: reviewRequest ? {
         id: reviewRequest.id,
-        status: (result as any).status || 'PUBLISHED',
-        suspensionReason: (result as any).suspensionReason,
+        status: (result as any)?.status || 'PUBLISHED',
+        suspensionReason: (result as any)?.suspensionReason,
         studentComment: reviewRequest.studentComment,
         evaluatorComment: reviewRequest.evaluatorComment,
         requestedAt: reviewRequest.requestedAt,
