@@ -135,7 +135,16 @@ export async function PUT(
     }
 
     // Use questionsWithNegativeMarks if provided, otherwise use selectedQuestions
-    const questionsToSave = questionsWithNegativeMarks || selectedQuestions;
+    let questionsToSave = questionsWithNegativeMarks || selectedQuestions;
+
+    // Sanitize: Ensure MTF questions do not have negative marks
+    questionsToSave = questionsToSave.map((q: any) => {
+      if (q.type === 'MTF') {
+        const { negativeMarks, ...rest } = q;
+        return rest;
+      }
+      return q;
+    });
 
     const newExamSet = await prisma.examSet.create({
       data: {

@@ -180,7 +180,6 @@ export async function GET(
         }
       }) : Promise.resolve(-1)
     ]);
-
     const totalStudents = stats._count._all;
     const averageScore = stats._avg.total || 0;
     const highestScore = stats._max.total || 0;
@@ -477,54 +476,53 @@ export async function GET(
         });
       }
 
-      // Only recalculate if result doesn't have proper values
-      if (!result || result.total === 0) {
-        console.log('🔄 Recalculating marks from processed questions...');
+      // Recalculate marks from processed questions to ensure data consistency
+      // This acts as a "lazy fix" for any corrupted negative marking data in the DB
+      console.log('🔄 Verifying/Recalculating marks from processed questions...');
 
-        const allCqScores: number[] = [];
-        const allSqScores: number[] = [];
+      const allCqScores: number[] = [];
+      const allSqScores: number[] = [];
 
-        mcqMarks = 0; // Reset mcqMarks for recalculation
-        cqMarks = 0; // Reset cqMarks for recalculation
-        sqMarks = 0; // Reset sqMarks for recalculation
+      let calculatedMcqMarks = 0;
+      let calculatedCqMarks = 0;
+      let calculatedSqMarks = 0;
 
-        processedQuestions.forEach((question: any) => {
-          const type = (question.type || '').toUpperCase();
-          if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
-            mcqMarks += question.awardedMarks || 0;
-            console.log(`${type} Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
-          } else if (type === 'CQ') {
-            allCqScores.push(question.awardedMarks || 0);
-          } else if (type === 'SQ') {
-            allSqScores.push(question.awardedMarks || 0);
-          }
-        });
+      processedQuestions.forEach((question: any) => {
+        const type = (question.type || '').toUpperCase();
+        if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
+          calculatedMcqMarks += question.awardedMarks || 0;
+        } else if (type === 'CQ') {
+          allCqScores.push(question.awardedMarks || 0);
+        } else if (type === 'SQ') {
+          allSqScores.push(question.awardedMarks || 0);
+        }
+      });
 
-        // Pick best scores based on limits
-        const cqReq = exam.cqRequiredQuestions || allCqScores.length;
-        const sqReq = exam.sqRequiredQuestions || allSqScores.length;
+      // Pick best scores based on limits
+      const cqReq = exam.cqRequiredQuestions || allCqScores.length;
+      const sqReq = exam.sqRequiredQuestions || allSqScores.length;
 
-        cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((sum, s) => sum + s, 0);
-        sqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((sum, s) => sum + s, 0);
+      calculatedCqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((sum, s) => sum + s, 0);
+      calculatedSqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((sum, s) => sum + s, 0);
 
-        totalMarks = mcqMarks + cqMarks + sqMarks;
+      let calculatedTotalMarks = calculatedMcqMarks + calculatedCqMarks + calculatedSqMarks;
+      calculatedTotalMarks = Math.max(0, calculatedTotalMarks);
 
-        // Ensure total marks doesn't go below 0
-        totalMarks = Math.max(0, totalMarks);
+      // Check if we need to update stored result
+      // We update if result is missing, total is 0, OR if there's a significant mismatch (e.g. due to negative marking fix)
+      const needsUpdate = !result || result.total === 0 || Math.abs(calculatedTotalMarks - (result.total || 0)) > 0.01;
 
-        // Calculate percentage and grade
+      if (needsUpdate) {
+        console.log(`⚠️ Mark Mismatch Detected (Stored: ${result?.total}, Calc: ${calculatedTotalMarks}) - Triggering Auto-Repair`);
+
+        mcqMarks = calculatedMcqMarks;
+        cqMarks = calculatedCqMarks;
+        sqMarks = calculatedSqMarks;
+        totalMarks = calculatedTotalMarks;
+
+        // Recalculate percentage and grade
         percentage = calculatePercentage(totalMarks, exam.totalMarks);
         grade = calculateGrade(percentage);
-
-        console.log(`📊 Grade Calculation Debug:`, {
-          totalMarks,
-          examTotalMarks: exam.totalMarks,
-          percentage,
-          grade,
-          mcqMarks,
-          cqMarks,
-          sqMarks
-        });
 
         // Update result with calculated marks if it exists
         if (result) {
@@ -542,6 +540,8 @@ export async function GET(
           });
         }
       }
+
+      // Removed the old strict if (!result || result.total === 0) block as it's subsumed by the logic above
     }
 
     console.log(`📊 Results API - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalMarks}, Suspended: ${isSuspended}`);
