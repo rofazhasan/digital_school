@@ -89,7 +89,7 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 // Helper to render text with diagrams support
 const Text = ({ children }: { children: string }) => (
   <UniversalMathJax inline dynamic>
-    <UniversalMathJax inline>{cleanupMath(children)}</UniversalMathJax>
+    {cleanupMath(children)}
   </UniversalMathJax>
 );
 

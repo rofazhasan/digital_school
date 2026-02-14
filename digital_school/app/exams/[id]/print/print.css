@@ -245,6 +245,22 @@
     height: 100% !important;
     overflow: hidden !important;
   }
+
+  /* MathJax Print Fixes - Force inline behavior and remove margins */
+  mjx-container[display="true"],
+  .mjx-chtml[display="true"] {
+    display: inline-block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: auto !important;
+    text-align: left !important;
+    vertical-align: middle !important;
+  }
+
+  /* Ensure text flows around math */
+  .force-inline-math {
+    display: inline-block !important;
+  }
 }
 
 /* Global Optimizations (Non-Print) */
