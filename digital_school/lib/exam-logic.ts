@@ -147,7 +147,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 });
                 mcqMarks += score;
                 totalScore += score;
-            } else if (type === 'INT') {
+            } else if (type === 'INT' || type === 'NUMERIC') {
                 const result = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
                 let finalScore = result.score;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
@@ -213,7 +213,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         }
     });
 
-    return { totalScore, percentage, grade };
+    return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks };
 }
 
 /**

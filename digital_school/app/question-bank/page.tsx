@@ -2496,13 +2496,14 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
     },
     {
       "type": "AR",
-      "assertion": "Diamond is the hardest natural substance.",
-      "reason": "Diamond is an allotrope of carbon with a 3D network structure.",
-      "marks": 1,
+      "marks": 2,
       "difficulty": "MEDIUM",
       "subject": "Chemistry",
-      "className": "Class 10",
-      "correctOption": 1
+      "className": "Class 12",
+      "assertion": "Diamond is the hardest natural substance.",
+      "reason": "Diamond is an allotrope of carbon with a stable 3D network structure.",
+      "correctOption": 1,
+      "explanation": "Both statements are true, and the structure of diamond explains its hardness."
     },
     {
       "type": "MTF",

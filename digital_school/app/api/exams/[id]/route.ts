@@ -3,6 +3,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient, Question, QuestionType, Difficulty } from '@prisma/client';
 import { z } from 'zod';
+import { shuffleArray } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 
@@ -205,16 +206,31 @@ export async function POST(
       return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 }); // 409 Conflict
     }
 
-    // Calculate negative marks for MCQ questions
+    // Process questions: Shuffle options and calculate negative marks
     const generatedSetWithNegativeMarks = generatedSet.map(q => {
-      if (q.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-        const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
-        return {
-          ...q,
-          negativeMarks: parseFloat(negativeMarks.toFixed(2))
-        };
+      const processedQuestion = { ...q } as any;
+
+      // 1. Shuffle options for MCQ and MC
+      if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
+        if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          processedQuestion.options = shuffleArray(processedQuestion.options);
+        }
       }
-      return q;
+
+      // 2. Shuffle right column for MTF
+      if (processedQuestion.type === 'MTF') {
+        if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
+        }
+      }
+
+      // 3. Negative marking for MCQ (Single Correct)
+      if (processedQuestion.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+        const negativeMarks = (processedQuestion.marks * exam.mcqNegativeMarking) / 100;
+        processedQuestion.negativeMarks = parseFloat(negativeMarks.toFixed(2));
+      }
+
+      return processedQuestion;
     });
 
     const newExamSet = await prisma.examSet.create({

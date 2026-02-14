@@ -28,7 +28,7 @@ export async function GET() {
             ["FIELD GUIDE BY TYPE:", ""],
             ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
             ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
-            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-5)."],
+            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5). Symbols: 1: Both true & explanation, 2: Both true not explanation, 3: A true R false, 4: A false R true, 5: Both false."],
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
             ["CQ (Creative)", "Fill 'Question Text' (passage) and 'Sub-Question' fields."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'."],
