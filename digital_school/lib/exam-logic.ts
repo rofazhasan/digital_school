@@ -114,7 +114,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             if (!studentAnswer && type !== 'MTF' && type !== 'MC') continue;
 
             if (type === 'MCQ') {
-                const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+                const normalize = (s: any) => String(s || '').trim().toLowerCase().normalize();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
@@ -136,7 +136,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                     mcqMarks += marks;
                     totalScore += marks;
                 } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    const negativeMarks = (question.marks * exam.mcqNegativeMarking) / 100;
+                    const negativeMarks = (Number(question.marks || 0) * exam.mcqNegativeMarking) / 100;
                     mcqMarks -= negativeMarks;
                     totalScore -= negativeMarks;
                 }
@@ -145,28 +145,29 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                     negativeMarking: exam.mcqNegativeMarking || 0,
                     partialMarking: true
                 });
-                mcqMarks += score;
-                totalScore += score;
+                mcqMarks += Number(score) || 0;
+                totalScore += Number(score) || 0;
             } else if (type === 'INT' || type === 'NUMERIC') {
                 const result = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
-                let finalScore = result.score;
+                let finalScore = Number(result.score) || 0;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    finalScore = -((question.marks * exam.mcqNegativeMarking) / 100);
+                    finalScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
                 mcqMarks += finalScore;
                 totalScore += finalScore;
             } else if (type === 'AR') {
                 const result = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
-                let finalScore = result.score;
+                let finalScore = Number(result.score) || 0;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    finalScore = -((question.marks * exam.mcqNegativeMarking) / 100);
+                    finalScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
                 mcqMarks += finalScore;
                 totalScore += finalScore;
             } else if (type === 'MTF') {
                 const result = evaluateMTFQuestion(question, studentAnswer || {});
-                mcqMarks += result.score;
-                totalScore += result.score;
+                const finalScore = Number(result.score) || 0;
+                mcqMarks += finalScore;
+                totalScore += finalScore;
             }
         }
     }
