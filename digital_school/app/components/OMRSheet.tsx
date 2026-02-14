@@ -260,10 +260,8 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
     <div className="w-full h-full flex flex-col pt-6 px-8 bg-white relative print:m-0 print:p-0"
       style={{
         fontFamily,
-        width: '8.27in',
-        height: '11.69in',
-        maxWidth: '8.27in',
-        maxHeight: '11.69in',
+        width: '100%',
+        height: '100%',
         boxSizing: 'border-box',
         border: 'none',
         position: 'relative'
@@ -274,13 +272,13 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
       <div className="absolute top-6 left-6 w-1 h-8 bg-black"></div>
       <div className="absolute top-6 right-6 w-8 h-1 bg-black"></div>
       <div className="absolute top-6 right-6 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-6 left-6 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-6 left-6 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-6 right-6 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-6 right-6 w-1 h-8 bg-black"></div>
+      <div className="absolute bottom-8 left-6 w-8 h-1 bg-black"></div>
+      <div className="absolute bottom-8 left-6 w-1 h-8 bg-black"></div>
+      <div className="absolute bottom-8 right-6 w-8 h-1 bg-black"></div>
+      <div className="absolute bottom-8 right-6 w-1 h-8 bg-black"></div>
 
       {/* --- CONTENT CONTAINER --- */}
-      <div className="flex flex-col h-full mx-2 my-2 border-[2px] border-black rounded-sm overflow-visible">
+      <div className="flex flex-col h-full mx-2 my-2 mb-8 border-[2px] border-black rounded-sm overflow-visible">
 
         {/* HEADER - Top Down 1/3 */}
         <header className="flex flex-col border-b-[2px] border-black bg-white">
@@ -315,7 +313,7 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
               <span className="text-[9px] font-black uppercase tracking-widest mb-1">SET CODE: {setName || 'A'}</span>
               <div className="flex gap-1.5">
                 {mcqOptionLabels.slice(0, 4).map(l => (
-                  <div key={l} className={`w - 5 h - 5 rounded - full border border - black flex items - center justify - center text - [9px] font - black ${l === setName ? 'bg-black text-white' : 'bg-white'} `}>{l}</div>
+                  <div key={l} className={`w-5 h-5 rounded-full border border-black flex items-center justify-center text-[9px] font-black ${l === setName ? 'bg-black text-white' : 'bg-white'}`}>{l}</div>
                 ))}
               </div>
             </div>
