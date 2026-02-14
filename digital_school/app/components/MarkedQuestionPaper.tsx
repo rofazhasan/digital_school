@@ -202,57 +202,52 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
 
         const getMTFMark = (q: MTF, userAnswer: any) => {
-            const matches = Array.isArray(userAnswer?.matches) ? userAnswer.matches : (Array.isArray(userAnswer) ? userAnswer : []);
+            try {
+                const matches = Array.isArray(userAnswer?.matches) ? userAnswer.matches : (Array.isArray(userAnswer) ? userAnswer : []);
 
-            // 1. New Schema (left/right columns + matches)
-            if (q.leftColumn && q.rightColumn && q.matches) {
-                if (!matches || matches.length === 0) return 0;
-                let correctCount = 0;
-                const correctMatches = q.matches;
+                // 1. New Schema (left/right columns + matches)
+                if (q.leftColumn && q.rightColumn) {
+                    const stdMatches = userAnswer || {};
+                    let score = 0;
+                    const totalPairs = q.leftColumn.length;
+                    if (totalPairs === 0) return 0;
+                    const marksPerPair = (q.marks || 1) / totalPairs;
 
-                // Normalize student answer (array vs object)
-                let studentMatches: any = {};
-                if (Array.isArray(matches)) {
-                    matches.forEach((m: any) => {
-                        // Try to resolve leftId
-                        // Safe navigation for array access
-                        const leftItem = (q.leftColumn && q.leftColumn[m.leftIndex]);
-                        const rightItem = (q.rightColumn && q.rightColumn[m.rightIndex]);
+                    // Normalize student answer check
+                    if (!Array.isArray(stdMatches.matches)) {
+                        q.leftColumn.forEach((leftItem: any) => {
+                            const studentRightId = stdMatches[leftItem.id];
+                            // Use correctMatches from q if available, fallback to finding pairs logic if structure implies it
+                            const correctMatches = (q.matches || {});
+                            const correctRightId = correctMatches[leftItem.id];
 
-                        const leftId = m.leftId || (leftItem ? leftItem.id : null);
-                        const rightId = m.rightId || (rightItem ? rightItem.id : null);
-
-                        if (leftId && rightId) studentMatches[leftId] = rightId;
-                    });
-                } else {
-                    studentMatches = matches;
+                            if (studentRightId && correctRightId && studentRightId === correctRightId) {
+                                score += marksPerPair;
+                            }
+                        });
+                        return Number(score.toFixed(2));
+                    }
                 }
 
-                Object.keys(correctMatches).forEach(leftId => {
-                    if (studentMatches[leftId] === correctMatches[leftId]) correctCount++;
+                // 2. Legacy Schema (pairs)
+                if (!matches || matches.length === 0) return 0;
+                const pairs = q.pairs || [];
+                if (pairs.length === 0) return 0;
+
+                let legacyCorrectCount = 0;
+                matches.forEach((m: any) => {
+                    const leftPart = pairs[m.leftIndex]?.left;
+                    const rightPart = pairs[m.rightIndex]?.right;
+                    const actualRight = pairs.find(p => p.left === leftPart)?.right;
+                    if (rightPart === actualRight) legacyCorrectCount++;
                 });
 
-                const totalPairs = q.leftColumn.length;
-                return (correctCount / totalPairs) * (q.marks || 1);
+                return Number(((legacyCorrectCount / pairs.length) * (q.marks || 1)).toFixed(2));
+            } catch (e) {
+                console.error("Error in getMTFMark:", e);
+                return 0;
             }
-
-            // 2. Legacy Schema (pairs)
-            if (!matches || matches.length === 0) return 0;
-            const pairs = q.pairs || [];
-            if (pairs.length === 0) return 0;
-
-            let legacyCorrectCount = 0;
-            matches.forEach((m: any) => {
-                const leftPart = pairs[m.leftIndex]?.left;
-                const rightPart = pairs[m.rightIndex]?.right;
-                const actualRight = pairs.find(p => p.left === leftPart)?.right;
-                if (rightPart === actualRight) legacyCorrectCount++;
-            });
-
-            const score = (legacyCorrectCount / pairs.length) * (q.marks || 1);
-            return score;
         };
-
         const formatMark = (m: number) => {
             return Number(m).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
         };
@@ -444,34 +439,55 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const qMark = getARMark(q, ans);
 
                                             return (
-
                                                 <div key={q.id || idx} className="break-inside-avoid col-span-full">
-                                                    <div className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} shadow-sm relative`}>
+                                                    <div className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : (selectedOption ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')} shadow-sm relative`}>
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                        <div className="flex items-start">
+                                                        <div className="flex items-start mb-4">
                                                             <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                            <div className="flex-1">
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                                                                    <div className="p-2 bg-indigo-50/50 rounded border border-indigo-100">
+                                                            <div className="flex-1 space-y-3">
+                                                                {/* Assertion & Reason Boxes */}
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                    <div className="p-2 bg-indigo-50 border-l-4 border-indigo-500 rounded-r">
                                                                         <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
-                                                                        <div className="text-sm"><Text>{q.assertion}</Text></div>
+                                                                        <div className="text-sm font-medium"><Text>{q.assertion}</Text></div>
                                                                     </div>
-                                                                    <div className="p-2 bg-purple-50/50 rounded border border-purple-100">
+                                                                    <div className="p-2 bg-purple-50 border-l-4 border-purple-500 rounded-r">
                                                                         <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
-                                                                        <div className="text-sm"><Text>{q.reason}</Text></div>
+                                                                        <div className="text-sm font-medium"><Text>{q.reason}</Text></div>
                                                                     </div>
                                                                 </div>
-                                                                <div className="text-xs flex flex-col gap-1 mt-2">
-                                                                    <div className={`${isCorrect ? 'text-green-700' : 'text-red-700'} font-bold`}>
-                                                                        Your: {getAROptionText(selectedOption)}
-                                                                    </div>
-                                                                    <div className="text-green-700 font-bold italic">
-                                                                        Correct: {getAROptionText(correctOption)}
-                                                                    </div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        {!isCorrect && <XCircle className="w-4 h-4 text-red-600" />}
-                                                                        {isCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
-                                                                    </div>
+
+                                                                {/* Options List */}
+                                                                <div className="space-y-1">
+                                                                    {[
+                                                                        "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                                                        "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                                                        "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                                        "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                                        "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                                                    ].map((optText, i) => {
+                                                                        const optionId = i + 1;
+                                                                        const isSelected = selectedOption === optionId;
+                                                                        const isOptionCorrect = correctOption === optionId;
+
+                                                                        let bgClass = "bg-white border-gray-200";
+                                                                        if (isOptionCorrect) bgClass = "bg-green-50 border-green-500 ring-1 ring-green-500";
+                                                                        if (isSelected && !isOptionCorrect) bgClass = "bg-red-50 border-red-500 ring-1 ring-red-500";
+                                                                        if (isSelected && isOptionCorrect) bgClass = "bg-green-100 border-green-600 ring-2 ring-green-600";
+
+                                                                        return (
+                                                                            <div key={i} className={`p-2 rounded border flex items-center gap-2 text-xs ${bgClass}`}>
+                                                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border ${isSelected || isOptionCorrect ? 'bg-white border-gray-300' : 'bg-gray-100 text-gray-500'}`}>
+                                                                                    {optionId}
+                                                                                </div>
+                                                                                <div className={`flex-1 ${isOptionCorrect ? 'font-bold text-green-800' : isSelected ? 'text-red-800' : 'text-gray-700'}`}>
+                                                                                    {optText}
+                                                                                </div>
+                                                                                {isOptionCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
+                                                                                {isSelected && !isOptionCorrect && <XCircle className="w-4 h-4 text-red-600" />}
+                                                                            </div>
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -495,34 +511,32 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         // MTF Rendering
                                         if (q.type === 'MTF') {
                                             const normalizedMatches = Array.isArray(ans?.matches) ? ans.matches : (Array.isArray(ans) ? ans : []);
-
                                             const qMark = getMTFMark(q, ans);
 
                                             return (
-
                                                 <div key={q.id || idx} className="break-inside-avoid col-span-full">
-                                                    <div className="p-3 rounded border border-gray-200 bg-white shadow-sm relative">
+                                                    <div className="p-4 rounded border border-gray-200 bg-white shadow-sm relative">
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                        <div className="font-bold mb-2 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
+                                                        <div className="font-bold mb-3 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
 
                                                         {/* MTF Content: Columns + Table */}
-                                                        <div className="space-y-4">
+                                                        <div className="space-y-6">
                                                             {/* Columns Display */}
-                                                            <div className="grid grid-cols-2 gap-4">
+                                                            <div className="grid grid-cols-2 gap-6 bg-gray-50 p-2 rounded border border-dashed border-gray-200">
                                                                 <div className="space-y-2">
-                                                                    <div className="text-xs font-bold text-gray-400 uppercase">Column A</div>
+                                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b pb-1 mb-2">Column A</div>
                                                                     {(q.leftColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[30px] flex items-center">
-                                                                            <span className="font-bold mr-2">{i + 1}.</span>
+                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[36px] flex items-center shadow-sm">
+                                                                            <span className="font-bold mr-2 w-5 h-5 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-600">{i + 1}</span>
                                                                             <Text>{item.text}</Text>
                                                                         </div>
                                                                     ))}
                                                                 </div>
                                                                 <div className="space-y-2">
-                                                                    <div className="text-xs font-bold text-gray-400 uppercase">Column B</div>
+                                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b pb-1 mb-2">Column B</div>
                                                                     {(q.rightColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[30px] flex items-center">
-                                                                            <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[36px] flex items-center shadow-sm">
+                                                                            <span className="font-bold mr-2 w-5 h-5 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-600">{String.fromCharCode(65 + i)}</span>
                                                                             <Text>{item.text}</Text>
                                                                         </div>
                                                                     ))}
@@ -530,59 +544,73 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                             </div>
 
                                                             {/* Match Analysis Table */}
-                                                            <div className="rounded border border-indigo-100 overflow-hidden">
-                                                                <table className="w-full text-xs">
-                                                                    <thead className="bg-indigo-50 text-indigo-800 font-bold">
-                                                                        <tr>
-                                                                            <th className="p-1 text-left w-1/3 border-r border-indigo-100">Left</th>
-                                                                            <th className="p-1 text-left w-1/3 border-r border-indigo-100">Your Match</th>
-                                                                            <th className="p-1 text-left w-1/3">Correct Match</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-gray-100">
-                                                                        {(q.leftColumn || []).map((lCol: any, cidx: number) => {
-                                                                            const correctMatches = (q.matches || {});
+                                                            <div>
+                                                                <div className="text-[10px] font-bold text-indigo-600 uppercase mb-2 flex items-center gap-1">
+                                                                    <span>Match Analysis</span>
+                                                                    <div className="h-px bg-indigo-100 flex-1"></div>
+                                                                </div>
+                                                                <div className="rounded border border-gray-200 overflow-hidden">
+                                                                    <table className="w-full text-xs">
+                                                                        <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200">
+                                                                            <tr>
+                                                                                <th className="p-2 text-left w-1/3 border-r border-gray-100">Item (Left)</th>
+                                                                                <th className="p-2 text-left w-1/3 border-r border-gray-100">Your Match</th>
+                                                                                <th className="p-2 text-left w-1/3">Correct Match</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-100">
+                                                                            {(q.leftColumn || []).map((lCol: any, cidx: number) => {
+                                                                                const correctMatches = (q.matches || {});
 
-                                                                            // Normalize student answer (array vs object)
-                                                                            let studentRightId = null;
-                                                                            const studentMatches = normalizedMatches || [];
+                                                                                // Normalize student answer (array vs object)
+                                                                                let studentRightId = null;
+                                                                                const studentMatches = normalizedMatches || [];
 
-                                                                            if (Array.isArray(studentMatches)) {
-                                                                                const match = studentMatches.find((m: any) => m.leftIndex === cidx || m.leftId === lCol.id);
-                                                                                if (match) studentRightId = match.rightId || q.rightColumn?.[match.rightIndex]?.id;
-                                                                            } else {
-                                                                                // Object based matches
-                                                                                studentRightId = (ans?.matches || ans)?.[lCol.id];
-                                                                            }
+                                                                                if (Array.isArray(studentMatches)) {
+                                                                                    const match = studentMatches.find((m: any) => m.leftIndex === cidx || m.leftId === lCol.id);
+                                                                                    if (match) studentRightId = match.rightId || q.rightColumn?.[match.rightIndex]?.id;
+                                                                                } else {
+                                                                                    // Object based matches
+                                                                                    studentRightId = (ans?.matches || ans)?.[lCol.id];
+                                                                                }
 
-                                                                            const correctRightId = correctMatches[lCol.id];
-                                                                            const rightItem = q.rightColumn?.find((r: any) => r.id === studentRightId);
-                                                                            const correctRightItem = q.rightColumn?.find((r: any) => r.id === correctRightId);
+                                                                                // Fallback for simple ID-to-ID if structured columns are missing (Legacy)
+                                                                                if (!studentRightId && q.pairs) {
+                                                                                    // ... (legacy logic if needed, but we rely on new schema mostly here)
+                                                                                }
 
-                                                                            const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
-                                                                            const isUnanswered = !studentRightId;
+                                                                                const correctRightId = correctMatches[lCol.id];
+                                                                                const rightItem = q.rightColumn?.find((r: any) => r.id === studentRightId);
+                                                                                const correctRightItem = q.rightColumn?.find((r: any) => r.id === correctRightId);
 
-                                                                            return (
-                                                                                <tr key={cidx} className={isMatchCorrect ? "bg-green-50/50" : (isUnanswered ? "bg-white" : "bg-red-50/50")}>
-                                                                                    <td className="p-1 border-r border-gray-100 font-medium">
-                                                                                        <span className="font-bold mr-1">{cidx + 1}.</span>
-                                                                                        <Text>{lCol.text}</Text>
-                                                                                    </td>
-                                                                                    <td className="p-1 border-r border-gray-100">
-                                                                                        {isUnanswered ? <span className="text-gray-400 italic">No match</span> : (
-                                                                                            <span className={isMatchCorrect ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
-                                                                                                {rightItem ? <Text>{rightItem.text}</Text> : "Unknown"}
-                                                                                            </span>
-                                                                                        )}
-                                                                                    </td>
-                                                                                    <td className="p-1 text-green-700 font-bold">
-                                                                                        {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
-                                                                                    </td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                </table>
+                                                                                const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+                                                                                const isUnanswered = !studentRightId;
+
+                                                                                return (
+                                                                                    <tr key={cidx} className={isMatchCorrect ? "bg-green-50/30" : (isUnanswered ? "bg-white" : "bg-red-50/30")}>
+                                                                                        <td className="p-2 border-r border-gray-100 font-medium">
+                                                                                            <span className="font-bold mr-1 text-gray-500">{cidx + 1}.</span>
+                                                                                            <Text>{lCol.text}</Text>
+                                                                                        </td>
+                                                                                        <td className="p-2 border-r border-gray-100">
+                                                                                            {isUnanswered ? <span className="text-gray-400 italic text-[10px]">No match</span> : (
+                                                                                                <div className="flex items-center gap-1">
+                                                                                                    {isMatchCorrect ? <CheckCircle className="w-3 h-3 text-green-600" /> : <XCircle className="w-3 h-3 text-red-600" />}
+                                                                                                    <span className={isMatchCorrect ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
+                                                                                                        {rightItem ? <Text>{rightItem.text}</Text> : "Unknown"}
+                                                                                                    </span>
+                                                                                                </div>
+                                                                                            )}
+                                                                                        </td>
+                                                                                        <td className="p-2 text-green-700 font-bold">
+                                                                                            {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                );
+                                                                            })}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -606,27 +634,30 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         if (q.type === 'INT') {
                                             const studentVal = ans?.answer !== undefined ? ans.answer : ans;
                                             const isCorrect = String(studentVal) === String(q.answer);
-
                                             const qMark = getINTMark(q, ans);
 
                                             return (
-
                                                 <div key={q.id || idx} className="break-inside-avoid">
-                                                    <div className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} shadow-sm relative`}>
+                                                    <div className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : (studentVal ? 'bg-red-50 border-red-200' : 'bg-gray-50 border-gray-200')} shadow-sm relative`}>
                                                         <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                        <div className="flex items-start">
-                                                            <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                            <div className="flex-1">
-                                                                <div className="font-bold text-sm mb-1"><Text>{q.q}</Text></div>
-                                                                <div className="flex items-center gap-4 mt-2 bg-white/50 p-2 rounded border border-gray-100 w-fit">
-                                                                    <div className="text-xs font-bold text-gray-600">
-                                                                        Your: <span className={`ml-1 ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>{studentVal ?? 'Unanswered'}</span>
+                                                        <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                        <div className="font-bold text-sm mb-3 inline-block"><Text>{q.q}</Text></div>
+
+                                                        {/* Comparison Box */}
+                                                        <div className="flex bg-white rounded border border-gray-200 overflow-hidden">
+                                                            <div className={`w-1.5 ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                            <div className="flex-1 grid grid-cols-2 divide-x divide-gray-100">
+                                                                <div className="p-2">
+                                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Your Answer</div>
+                                                                    <div className={`text-xl font-black ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                                                        {studentVal ?? <span className="text-gray-300 text-sm italic">Empty</span>}
                                                                     </div>
-                                                                    <div className="w-px h-3 bg-gray-300"></div>
-                                                                    <div className="text-xs font-bold text-indigo-700">
-                                                                        Correct: {q.correctAnswer || q.answer}
+                                                                </div>
+                                                                <div className="p-2">
+                                                                    <div className="text-[10px] font-bold text-green-600 uppercase tracking-widest mb-1">Correct Key</div>
+                                                                    <div className="text-xl font-black text-green-700">
+                                                                        {q.correctAnswer || q.answer}
                                                                     </div>
-                                                                    {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
                                                                 </div>
                                                             </div>
                                                         </div>

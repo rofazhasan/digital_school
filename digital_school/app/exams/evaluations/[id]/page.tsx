@@ -1013,56 +1013,88 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const getAutoScore = (question: Question, answer: any) => {
     if (!answer) return 0;
-    const type = question.type.toLowerCase();
+    const type = (question.type || '').toLowerCase();
 
-    if (type === 'mcq') {
-      const userAnswer = answer;
-      if (question.options && Array.isArray(question.options)) {
-        const correctOption = question.options.find((opt: any) => opt.isCorrect);
-        if (correctOption && (userAnswer === correctOption.text || userAnswer === correctOption.value)) {
-          return question.marks;
+    try {
+      if (type === 'mcq') {
+        const userAnswer = answer;
+        // Robust check for option-based correct flag
+        if (question.options && Array.isArray(question.options)) {
+          const correctOptIndex = question.options.findIndex((opt: any) => opt.isCorrect);
+          if (correctOptIndex !== -1) {
+            const correctOpt = question.options[correctOptIndex];
+            // Check against text or index if answer is number
+            if (userAnswer === correctOpt.text || userAnswer === correctOpt.value || (typeof userAnswer === 'number' && userAnswer === correctOptIndex)) {
+              return question.marks;
+            }
+          }
+        }
+        // Fallback to simple correct answer check
+        const correctAnswer = question.correct;
+        if (correctAnswer !== undefined) {
+          if (String(userAnswer).trim() === String(correctAnswer).trim()) return question.marks;
+        }
+        return 0;
+      }
+
+      if (type === 'mc') {
+        const selected = answer.selectedOptions || [];
+        const corrects = question.options?.map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1) || [];
+        // Exact match required for full marks (partial marking logic can be added if needed)
+        if (selected.length === corrects.length && selected.every((v: number) => corrects.includes(v))) return question.marks;
+        return 0;
+      }
+
+      if (type === 'ar') {
+        const selected = Number(answer.selectedOption);
+        const correct = Number(question.correct || (question as any).correctOption || 0);
+        return selected === correct ? question.marks : 0;
+      }
+
+      if (type === 'int' || type === 'numeric') {
+        const studentVal = Number(answer.answer);
+        const correctVal = Number(question.correct || (question as any).answer || 0);
+        // Use epsilon for float comparison if needed, currently strict equality
+        return !isNaN(studentVal) && !isNaN(correctVal) && studentVal === correctVal ? question.marks : 0;
+      }
+
+      if (type === 'mtf') {
+        let score = 0;
+        const totalPairs = (question as any).leftColumn?.length || (question as any).pairs?.length || 0;
+        if (totalPairs === 0) return 0;
+        const marksPerPair = question.marks / totalPairs;
+
+        const stdMatches = answer || {};
+
+        // Strategy 1: Check Object-based matches (New Schema: { leftId: rightId })
+        // We iterate over the LEFT column and check if the student's mapped value is correct
+        if ((question as any).leftColumn && (question as any).rightColumn && !Array.isArray(stdMatches.matches)) {
+          (question as any).leftColumn.forEach((leftItem: any) => {
+            const studentRightId = stdMatches[leftItem.id];
+            const correctRightId = (question as any).correctMatches?.[leftItem.id];
+
+            if (studentRightId && correctRightId && studentRightId === correctRightId) {
+              score += marksPerPair;
+            }
+          });
+          return Math.floor(score); // Return floor to avoid partial decimals if preferred, or generic rounding
+        }
+
+        // Strategy 2: Legacy Array-based matches
+        const matches = stdMatches.matches || [];
+        const pairs = (question as any).pairs || [];
+        if (pairs.length > 0) {
+          matches.forEach((m: any) => {
+            if (pairs[m.leftIndex]?.right === pairs[m.rightIndex]?.right) {
+              score += marksPerPair;
+            }
+          });
+          return Math.floor(score);
         }
       }
-      const correctAnswer = question.correct;
-      if (correctAnswer !== undefined) {
-        if (typeof correctAnswer === 'number') return userAnswer === correctAnswer ? question.marks : 0;
-        if (typeof correctAnswer === 'object' && correctAnswer !== null) return userAnswer === correctAnswer.text ? question.marks : 0;
-        if (Array.isArray(correctAnswer)) return correctAnswer.includes(userAnswer) ? question.marks : 0;
-        return userAnswer === String(correctAnswer) ? question.marks : 0;
-      }
-    }
-
-    if (type === 'mc') {
-      // Logic handled by the API mostly, but here for UI badges
-      const selected = answer.selectedOptions || [];
-      const corrects = question.options?.map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1) || [];
-      if (selected.length === corrects.length && selected.every((v: number) => corrects.includes(v))) return question.marks;
-      // Partial marks would be complex here, usually we rely on the API's earnedMarks if available
-    }
-
-    if (type === 'ar') {
-      const selected = Number(answer.selectedOption);
-      const correct = Number(question.correct || (question as any).correctOption || 0);
-      return selected === correct ? question.marks : 0;
-    }
-
-    if (type === 'int' || type === 'numeric') {
-      const studentVal = Number(answer.answer);
-      const correctVal = Number(question.correct || (question as any).answer || 0);
-      return studentVal === correctVal ? question.marks : 0;
-    }
-
-    if (type === 'mtf') {
-      const matches = answer.matches || [];
-      const pairs = (question as any).pairs || [];
-      if (pairs.length === 0) return 0;
-      let score = 0;
-      matches.forEach((m: any) => {
-        if (pairs[m.leftIndex]?.right === pairs[m.rightIndex]?.right) {
-          score += (question.marks / pairs.length);
-        }
-      });
-      return Math.floor(score);
+    } catch (e) {
+      console.error("Error in getAutoScore:", e);
+      return 0;
     }
 
     return 0;
@@ -2531,85 +2563,178 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     <h5 className="font-semibold text-purple-700 flex items-center gap-2 border-b pb-2">
                                       <Star className="h-4 w-4" /> Assertion-Reason Analysis:
                                     </h5>
-                                    <div className="grid grid-cols-1 gap-3">
-                                      <div className="p-3 bg-indigo-50 border border-indigo-100 rounded">
+
+                                    {/* AR Statement Boxes */}
+                                    <div className="grid grid-cols-1 gap-3 mb-4">
+                                      <div className="p-3 bg-indigo-50 border-l-4 border-indigo-500 rounded-r shadow-sm">
                                         <div className="text-[10px] font-bold text-indigo-600 mb-1 leading-none uppercase tracking-wider">Assertion (A)</div>
-                                        <UniversalMathJax dynamic>{cleanupMath(currentQuestion.assertion || currentQuestion.questionText)}</UniversalMathJax>
+                                        <div className="text-gray-900 font-medium">
+                                          <UniversalMathJax dynamic>{cleanupMath(currentQuestion.assertion || currentQuestion.questionText)}</UniversalMathJax>
+                                        </div>
                                       </div>
-                                      <div className="p-3 bg-purple-50 border border-purple-100 rounded">
+                                      <div className="p-3 bg-purple-50 border-l-4 border-purple-500 rounded-r shadow-sm">
                                         <div className="text-[10px] font-bold text-purple-600 mb-1 leading-none uppercase tracking-wider">Reason (R)</div>
-                                        <UniversalMathJax dynamic>{cleanupMath(currentQuestion.reason)}</UniversalMathJax>
+                                        <div className="text-gray-900 font-medium">
+                                          <UniversalMathJax dynamic>{cleanupMath(currentQuestion.reason)}</UniversalMathJax>
+                                        </div>
                                       </div>
                                     </div>
-                                    <div className="flex gap-4 items-center bg-gray-50 p-3 rounded-lg border border-dashed text-sm">
-                                      <div className="flex-1 flex flex-col gap-1">
-                                        <span className="text-gray-500 text-[10px] font-bold uppercase">Student Picked</span>
-                                        <span className={`font-bold ${Number(currentAnswer?.selectedOption) === (currentQuestion.correct || (currentQuestion as any).correctOption) ? 'text-green-600' : 'text-red-600'}`}>
-                                          Option {currentAnswer?.selectedOption || 'None'}
-                                        </span>
-                                      </div>
-                                      <div className="flex-1 flex flex-col gap-1 border-l pl-4">
-                                        <span className="text-gray-500 text-[10px] font-bold uppercase">Correct Answer</span>
-                                        <span className="font-bold text-green-700">Option {currentQuestion.correct || (currentQuestion as any).correctOption}</span>
-                                      </div>
+
+                                    {/* Full Options List for AR */}
+                                    <div className="space-y-2">
+                                      {[
+                                        "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                        "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                        "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                        "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                        "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                      ].map((optText, i) => {
+                                        const optionId = i + 1;
+                                        const isSelected = Number(currentAnswer?.selectedOption) === optionId;
+                                        const isCorrect = Number(currentQuestion.correct || (currentQuestion as any).correctOption) === optionId;
+
+                                        let bgClass = "bg-white border-gray-200 hover:bg-gray-50";
+                                        if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
+                                        if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
+                                        if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
+
+                                        return (
+                                          <div key={i} className={`p-3 rounded-lg border transition-all flex items-center gap-3 ${bgClass}`}>
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${isSelected || isCorrect ? 'bg-white border-gray-300' : 'bg-gray-100 text-gray-400'}`}>
+                                              {optionId}
+                                            </div>
+                                            <span className={`text-sm flex-1 ${isCorrect ? 'font-medium text-green-900' : isSelected ? 'text-red-900' : 'text-gray-700'}`}>
+                                              {optText}
+                                            </span>
+                                            {isCorrect && <CheckCircle className="h-5 w-5 text-green-600" />}
+                                            {isSelected && !isCorrect && <XCircle className="h-5 w-5 text-red-600" />}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   </div>
                                 )}
 
                                 {(currentQuestion.type || "").toLowerCase() === 'mtf' && (
-                                  <div className="mb-4 space-y-4">
+                                  <div className="mb-4 space-y-6">
                                     <h5 className="font-semibold text-orange-700 flex items-center gap-2 border-b pb-2">
                                       <Activity className="h-4 w-4" /> Match the Following Grid:
                                     </h5>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      {(currentQuestion as any).pairs?.map((p: any, i: number) => {
-                                        const stdMatches = currentAnswer || {};
-                                        let isMatched = false;
 
-                                        if (Array.isArray(stdMatches.matches)) {
-                                          // Array-based (OMR/Indices)
-                                          isMatched = stdMatches.matches.some((m: any) => m.leftIndex === i && (currentQuestion as any).pairs[m.rightIndex]?.right === p.right);
-                                        } else {
-                                          // Object-based (Online/IDs)
-                                          const leftId = currentQuestion.leftColumn?.[i]?.id;
-                                          const studentRightId = stdMatches[leftId];
-                                          isMatched = studentRightId !== undefined && studentRightId === currentQuestion.rightColumn?.find((r: any) => r.text === p.right)?.id;
-                                          // Fallback for simple ID-to-ID if structured columns are missing
-                                          if (!isMatched && studentRightId) {
-                                            isMatched = studentRightId === currentQuestion.pairs?.find((pair: any) => pair.left === p.left)?.right;
-                                          }
-                                        }
-
-                                        return (
-                                          <div key={i} className={`flex items-center justify-between p-2 rounded-lg border-2 ${isMatched ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-dashed border-gray-200 opacity-80'}`}>
-                                            <div className="text-xs font-semibold px-2 py-1 bg-white border rounded shadow-sm">{p.left}</div>
-                                            <div className="h-px bg-gray-300 flex-1 mx-2 relative">
-                                              {isMatched && <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 bg-green-500 text-[8px] text-white px-1 rounded font-bold uppercase">Matched</div>}
-                                            </div>
-                                            <div className="text-xs font-bold px-2 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded shadow-sm">{p.right}</div>
+                                    {/* 2-Column Grid Layout (Question View) */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column A</div>
+                                        {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: p.left, text: p.left })))?.map((item: any, i: number) => (
+                                          <div key={i} className="p-3 bg-white border rounded shadow-sm text-sm min-h-[40px] flex items-center">
+                                            <span className="font-bold mr-2 text-gray-500">{i + 1}.</span>
+                                            <UniversalMathJax inline>{cleanupMath(item.text || item.id)}</UniversalMathJax>
                                           </div>
-                                        );
-                                      })}
+                                        ))}
+                                      </div>
+                                      <div className="space-y-2">
+                                        <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column B</div>
+                                        {((currentQuestion as any).rightColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: p.right, text: p.right })))?.map((item: any, i: number) => (
+                                          <div key={i} className="p-3 bg-white border rounded shadow-sm text-sm min-h-[40px] flex items-center">
+                                            <span className="font-bold mr-2 text-gray-500">{String.fromCharCode(65 + i)}.</span>
+                                            <UniversalMathJax inline>{cleanupMath(item.text || item.id)}</UniversalMathJax>
+                                          </div>
+                                        ))}
+                                      </div>
                                     </div>
-                                    <div className="bg-gray-50 p-2 rounded text-[10px] text-gray-500 font-mono">
-                                      Student Answer Raw: {JSON.stringify(currentAnswer?.matches || [])}
+
+                                    {/* Match Analysis Table */}
+                                    <div className="overflow-hidden rounded-lg border border-gray-200">
+                                      <table className="w-full text-sm">
+                                        <thead className="bg-gray-50 text-xs text-gray-500 font-bold uppercase text-left">
+                                          <tr>
+                                            <th className="px-3 py-2">Item</th>
+                                            <th className="px-3 py-2">Your Match</th>
+                                            <th className="px-3 py-2 text-center">Status</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                          {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: i, text: p.left })))?.map((leftItem: any, i: number) => {
+                                            // Determine Student's Match
+                                            let studentRightText = "Unmatched";
+                                            let isCorrect = false;
+
+                                            // Determine Correct Match for display if wrong
+                                            let correctRightText = "";
+
+                                            if ((currentQuestion as any).leftColumn) {
+                                              // New Schema
+                                              const studentRightId = currentAnswer?.[leftItem.id];
+                                              const rightItem = (currentQuestion as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                              studentRightText = rightItem?.text || (studentRightId ? "Invalid ID" : "Unmatched");
+
+                                              const correctRightId = (currentQuestion as any).correctMatches?.[leftItem.id];
+                                              isCorrect = studentRightId === correctRightId;
+
+                                              const correctItem = (currentQuestion as any).rightColumn?.find((r: any) => r.id === correctRightId);
+                                              correctRightText = correctItem?.text || "";
+
+                                            } else {
+                                              // Legacy Schema (Pairs)
+                                              // Try to find match in array
+                                              const pair = (currentQuestion as any).pairs[i];
+                                              const matchIndex = currentAnswer?.matches?.find((m: any) => m.leftIndex === i)?.rightIndex;
+
+                                              const rightPair = (currentQuestion as any).pairs[matchIndex];
+                                              studentRightText = rightPair?.right || "Unmatched";
+
+                                              isCorrect = pair.right === rightPair?.right;
+                                              correctRightText = pair.right;
+                                            }
+
+                                            return (
+                                              <tr key={i} className={isCorrect ? "bg-green-50/30" : "bg-red-50/30"}>
+                                                <td className="px-3 py-2 font-medium">
+                                                  <UniversalMathJax inline>{cleanupMath(leftItem.text || String(leftItem))}</UniversalMathJax>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                  <div className="flex flex-col">
+                                                    <span className={isCorrect ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>
+                                                      <UniversalMathJax inline>{cleanupMath(studentRightText)}</UniversalMathJax>
+                                                    </span>
+                                                    {!isCorrect && (
+                                                      <span className="text-xs text-gray-500 mt-0.5">
+                                                        Correct: <span className="text-green-600 font-medium"><UniversalMathJax inline>{cleanupMath(correctRightText)}</UniversalMathJax></span>
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                  {isCorrect ? <CheckCircle className="h-5 w-5 text-green-500 mx-auto" /> : <XCircle className="h-5 w-5 text-red-500 mx-auto" />}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
                                     </div>
                                   </div>
                                 )}
 
                                 {(['int', 'numeric'].includes((currentQuestion.type || "").toLowerCase())) && (
-                                  <div className="mb-4 p-4 bg-gray-50 rounded-xl border-2 border-dashed">
-                                    <div className="flex gap-6">
-                                      <div className="flex-1">
-                                        <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Student Answer</div>
-                                        <div className={`text-2xl font-black ${Number(currentAnswer?.answer) === Number(currentQuestion.correct || (currentQuestion as any).answer) ? 'text-green-600' : 'text-red-600'}`}>
-                                          {currentAnswer?.answer ?? 'NULL'}
-                                        </div>
-                                      </div>
-                                      <div className="flex-1 border-l pl-6">
-                                        <div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Correct Key</div>
-                                        <div className="text-2xl font-black text-green-700">
-                                          {currentQuestion.correct || (currentQuestion as any).answer}
+                                  <div className="mb-4">
+                                    <div className="flex flex-col sm:flex-row gap-4">
+                                      {/* Comparison Box */}
+                                      <div className="flex-1 bg-white border rounded-xl overflow-hidden shadow-sm flex">
+                                        <div className={`w-2 ${Number(currentAnswer?.answer) === Number(currentQuestion.correct || (currentQuestion as any).answer) ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                        <div className="flex-1 p-4 grid grid-cols-2 gap-4 divide-x">
+                                          <div className="pr-4">
+                                            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Your Answer</div>
+                                            <div className="text-2xl font-black text-gray-800">
+                                              {currentAnswer?.answer ?? <span className="text-gray-300 text-lg italic">Empty</span>}
+                                            </div>
+                                          </div>
+                                          <div className="pl-4">
+                                            <div className="text-[10px] font-bold text-green-500 uppercase tracking-widest mb-1">Correct Key</div>
+                                            <div className="text-2xl font-black text-green-600">
+                                              {currentQuestion.correct || (currentQuestion as any).answer}
+                                            </div>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
