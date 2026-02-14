@@ -499,8 +499,14 @@ export async function GET(
           explanation: explanation || null,
           assertion: q.assertion || null,
           reason: q.reason || null,
-          correctOption: q.correctOption || null,
-          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null)
+          correctOption: q.correctOption || q.correct || null,
+          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
+          // New fields for MTF
+          leftColumn: q.leftColumn,
+          rightColumn: q.rightColumn,
+          matches: q.matches,
+          // New INT field
+          correctAnswer: q.correctAnswer || q.answer
         };
       }),
       submissions: processedSubmissions
