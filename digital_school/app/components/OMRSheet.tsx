@@ -267,18 +267,19 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
         position: 'relative'
       }}>
 
-      {/* --- CORNER MARKERS --- */}
-      <div className="absolute top-6 left-6 w-8 h-1 bg-black"></div>
-      <div className="absolute top-6 left-6 w-1 h-8 bg-black"></div>
-      <div className="absolute top-6 right-6 w-8 h-1 bg-black"></div>
-      <div className="absolute top-6 right-6 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-8 left-6 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-8 left-6 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-8 right-6 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-8 right-6 w-1 h-8 bg-black"></div>
+      {/* --- CORNER MARKERS - MOVED INWARD FOR SAFETY (World Class Safe Zone) --- */}
+      <div className="absolute top-10 left-10 w-8 h-1 bg-black"></div>
+      <div className="absolute top-10 left-10 w-1 h-8 bg-black"></div>
+      <div className="absolute top-10 right-10 w-8 h-1 bg-black"></div>
+      <div className="absolute top-10 right-10 w-1 h-8 bg-black"></div>
+      <div className="absolute bottom-10 left-10 w-8 h-1 bg-black"></div>
+      <div className="absolute bottom-10 left-10 w-1 h-8 bg-black"></div>
+      <div className="absolute bottom-10 right-10 w-8 h-1 bg-black"></div>
+      <div className="absolute bottom-10 right-10 w-1 h-8 bg-black"></div>
 
       {/* --- CONTENT CONTAINER --- */}
-      <div className="flex flex-col h-full mx-2 my-2 mb-8 border-[2px] border-black rounded-sm overflow-visible">
+      {/* Adjusted margins to sit inside the new corner markers */}
+      <div className="flex flex-col h-full mx-6 my-4 mb-16 border-[2px] border-black rounded-sm overflow-visible z-10 relative">
 
         {/* HEADER - Top Down 1/3 */}
         <header className="flex flex-col border-b-[2px] border-black bg-white">
