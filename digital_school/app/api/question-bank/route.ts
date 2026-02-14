@@ -449,7 +449,14 @@ Generate questions that will challenge students appropriately for ${difficulty} 
             topic: topic || q.topic,
             difficulty: difficulty || q.difficulty,
             isAiGenerated: true,
-            hasMath: /\\/.test(q.questionText || '') || (q.options && q.options.some((o: any) => /\\/.test(o.text)))
+            hasMath: Boolean(
+                /\\/.test(q.questionText || '') ||
+                /\\/.test(q.modelAnswer || '') ||
+                /\\/.test(q.assertion || '') ||
+                /\\/.test(q.reason || '') ||
+                (q.options ? q.options.some((o: any) => /\\/.test(o.text)) : false) ||
+                (q.subQuestions ? q.subQuestions.some((sq: any) => /\\/.test(sq.question)) : false)
+            )
         }));
         return NextResponse.json({ questions: finalQuestions });
     } catch (error) {
