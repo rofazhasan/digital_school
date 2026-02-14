@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
+import { evaluateMCQuestion } from "@/lib/evaluation/mcEvaluation";
+import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
 
 export async function GET(
   req: NextRequest,
@@ -288,16 +290,16 @@ export async function GET(
         totalMarks += question.marks;
 
         const answer = fixedAnswers[question.id];
-        if (question.type === 'MCQ') {
+        const type = (question.type || "").toUpperCase();
+        if (type === 'MCQ') {
           // Auto-grade MCQ
           if (answer) {
-            const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+            const normalize = (s: string) => String(s).trim().toLowerCase();
             const userAns = normalize(answer);
             let isCorrect = false;
 
             // Enhanced MCQ answer comparison logic
             if (question.options && Array.isArray(question.options)) {
-              // Check if student answer matches any option marked as correct
               const correctOption = question.options.find((opt: any) => opt.isCorrect);
               if (correctOption) {
                 const correctOptionText = normalize(correctOption.text || String(correctOption));
@@ -305,37 +307,61 @@ export async function GET(
               }
             }
 
-            // Fallback: Check if there's a direct correctAnswer field
             if (!isCorrect && question.correctAnswer) {
               const correctAnswer = question.correctAnswer;
-
               if (typeof correctAnswer === 'number') {
                 isCorrect = userAns === normalize(String(correctAnswer));
               } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
                 isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
               } else if (Array.isArray(correctAnswer)) {
-                // Handle array format (e.g., ["answer1", "answer2"])
                 isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
               } else {
                 isCorrect = userAns === normalize(String(correctAnswer));
               }
             }
 
-            // Final fallback: use question.correct
-            if (!isCorrect && question.correct) {
+            if (!isCorrect && (question.correct !== undefined)) {
               const correctAns = normalize(String(question.correct));
               isCorrect = userAns === correctAns;
             }
 
             if (isCorrect) {
               earnedMarks += question.marks;
-            } else {
-              // Apply negative marking for wrong answers
-              if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-                const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
-                earnedMarks -= negativeMarks;
-              }
+            } else if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+              const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
+              earnedMarks -= negativeMarks;
             }
+          }
+        } else if (type === 'MC') {
+          // Auto-grade Multiple Correct
+          if (answer && answer.selectedOptions) {
+            const score = evaluateMCQuestion(
+              question,
+              answer,
+              {
+                partialMarking: true, // Defaulting to true for now
+                negativeMarking: (exam as any).mcqNegativeMarking || 0
+              }
+            );
+            earnedMarks += score;
+          }
+        } else if (type === 'AR') {
+          // Auto-grade Assertion-Reason
+          if (answer && answer.selectedOption) {
+            const isCorrect = Number(answer.selectedOption) === Number(question.correct || question.correctOption);
+            if (isCorrect) earnedMarks += question.marks;
+          }
+        } else if (type === 'MTF') {
+          // Auto-grade Match the Following
+          if (answer) {
+            const result = evaluateMTFQuestion(question, answer);
+            earnedMarks += result.score;
+          }
+        } else if (type === 'INT' || type === 'NUMERIC') {
+          // Auto-grade Integer
+          if (answer && answer.answer !== undefined) {
+            const isCorrect = Number(answer.answer) === Number(question.correct || question.answer);
+            if (isCorrect) earnedMarks += question.marks;
           }
         } else {
           // For CQ/SQ, get manually assigned marks
@@ -470,7 +496,11 @@ export async function GET(
           options: q.options,
           subQuestions: parsedSubQuestions,
           modelAnswer: q.modelAnswer || null,
-          explanation: explanation || null
+          explanation: explanation || null,
+          assertion: q.assertion || null,
+          reason: q.reason || null,
+          correctOption: q.correctOption || null,
+          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null)
         };
       }),
       submissions: processedSubmissions

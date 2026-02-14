@@ -234,6 +234,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         marks: q.marks,
         correct: q.options?.find((o: any) => o.isCorrect)?.text
       })),
+      mc: result.questions.filter(q => (q.type || "").toLowerCase() === 'mc').map(q => ({
+        id: q.id,
+        q: q.questionText,
+        options: q.options || [],
+        marks: q.marks
+      })),
+      ar: result.questions.filter(q => (q.type || "").toLowerCase() === 'ar').map(q => ({
+        id: q.id,
+        assertion: (q as any).assertion || q.questionText,
+        reason: (q as any).reason || "",
+        marks: q.marks,
+        correct: Number((q as any).correct || (q as any).correctOption || 0)
+      })),
+      mtf: result.questions.filter(q => (q.type || "").toLowerCase() === 'mtf').map(q => ({
+        id: q.id,
+        q: q.questionText,
+        marks: q.marks,
+        pairs: (q as any).pairs || []
+      })),
+      int: result.questions.filter(q => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric').map(q => ({
+        id: q.id,
+        q: q.questionText,
+        marks: q.marks,
+        answer: (q as any).answer || (q as any).correct || 0
+      })),
       cq: result.questions.filter(q => q.type === 'CQ').map(q => ({
         id: q.id,
         questionText: q.questionText,
@@ -622,10 +647,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   // Calculate marks breakdown
   const mcqQuestions = result?.questions?.filter((q: Question) => q.type === 'MCQ') || [];
+  const mcQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mc') || [];
+  const arQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'ar') || [];
+  const mtfQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
+  const intQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
   const cqQuestions = result?.questions?.filter((q: Question) => q.type === 'CQ') || [];
   const sqQuestions = result?.questions?.filter((q: Question) => q.type === 'SQ') || [];
 
-  const totalMcqMarks = mcqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions];
+  const totalObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
   const totalCqMarks = cqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
   const totalSqMarks = sqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
 
@@ -990,11 +1020,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <h3 className="text-xl font-semibold text-gray-800 mb-4">Marks Breakdown</h3>
 
                       <div className="space-y-4">
-                        {mcqQuestions.length > 0 && (
+                        {objectiveQuestions.length > 0 && (
                           <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <CheckSquare className="h-5 w-5 text-blue-600" />
-                              <span className="font-medium">MCQ Marks</span>
+                              <span className="font-medium">Objective Marks</span>
                               {result.result.mcqMarks < 0 && (
                                 <Badge variant="destructive" className="text-xs">
                                   Negative Marks Applied
@@ -1003,10 +1033,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <div className="text-right">
                               <div className={`text-2xl font-bold ${result.result.mcqMarks < 0 ? 'text-red-600' : 'text-blue-600'}`}>
-                                {result.result.mcqMarks}/{totalMcqMarks}
+                                {result.result.mcqMarks}/{totalObjectiveMarks}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {totalMcqMarks > 0 ? ((result.result.mcqMarks / totalMcqMarks) * 100).toFixed(1) : '0.0'}%
+                                {totalObjectiveMarks > 0 ? ((result.result.mcqMarks / totalObjectiveMarks) * 100).toFixed(1) : '0.0'}%
                               </div>
                               {result.result.mcqMarks < 0 && (
                                 <div className="text-xs text-red-600 font-medium">
@@ -1577,6 +1607,224 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   )}
                                 </motion.div>
                               ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* MC Section */}
+                    {result.questions.filter(q => {
+                      if ((q.type || "").toLowerCase() !== 'mc') return false;
+                      const hasAnswer = q.studentAnswer && (q as any).studentAnswer?.selectedOptions?.length > 0;
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div className="mt-8 border-t-2 border-indigo-100 pt-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                              <CheckSquare className="h-4 w-4 text-indigo-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Multiple Correct (MC)</h3>
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => (q.type || "").toLowerCase() === 'mc')
+                              .map((question, index) => {
+                                const ans = (question as any).studentAnswer || {};
+                                const selected = ans.selectedOptions || [];
+                                return (
+                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-indigo-50/30">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <Badge className="bg-indigo-100 text-indigo-800">MC</Badge>
+                                      <Badge variant={question.awardedMarks === question.marks ? 'default' : 'destructive'}>
+                                        {question.awardedMarks}/{question.marks}
+                                      </Badge>
+                                    </div>
+                                    <h4 className="font-semibold mb-2"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
+                                    <div className="space-y-2">
+                                      {question.options?.map((opt, oidx) => {
+                                        const isSelected = selected.includes(oidx);
+                                        const isCorrect = opt.isCorrect;
+                                        return (
+                                          <div key={oidx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') : (isCorrect ? 'bg-green-50 border-green-200 opacity-80' : 'bg-white border-gray-100')}`}>
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">{String.fromCharCode(65 + oidx)}</span>
+                                              <span className="text-sm"><UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax></span>
+                                            </div>
+                                            {isSelected && (isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />)}
+                                            {!isSelected && isCorrect && <CheckCircle className="w-4 h-4 text-green-500/50" />}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* AR Section */}
+                    {result.questions.filter(q => {
+                      if ((q.type || "").toLowerCase() !== 'ar') return false;
+                      const hasAnswer = (q as any).studentAnswer?.selectedOption !== undefined;
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div className="mt-8 border-t-2 border-purple-100 pt-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                              <Star className="h-4 w-4 text-purple-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Assertion-Reason (AR)</h3>
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => (q.type || "").toLowerCase() === 'ar')
+                              .map((question: any) => {
+                                const selected = Number(question.studentAnswer?.selectedOption || 0);
+                                const correct = Number(question.correct || question.correctOption || 0);
+                                return (
+                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-purple-50/30">
+                                    <div className="flex justify-between items-start mb-4">
+                                      <div className="space-y-2 flex-1">
+                                        <div className="p-3 bg-white/50 rounded border border-indigo-100">
+                                          <div className="text-[10px] font-bold text-indigo-600 mb-1 leading-none uppercase">ASSERTION</div>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || question.questionText)}</UniversalMathJax>
+                                        </div>
+                                        <div className="p-3 bg-white/50 rounded border border-purple-100">
+                                          <div className="text-[10px] font-bold text-purple-600 mb-1 leading-none uppercase">REASON</div>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.reason)}</UniversalMathJax>
+                                        </div>
+                                      </div>
+                                      <Badge className="ml-4" variant={selected === correct ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
+                                    </div>
+                                    <div className="flex gap-4 text-sm mt-4 p-3 bg-gray-100 rounded font-medium">
+                                      <div><span className="text-gray-500 mr-2">Your Ans:</span> Option {selected || 'None'}</div>
+                                      <div><span className="text-gray-500 mr-2">Correct Ans:</span> Option {correct}</div>
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* MTF Section */}
+                    {result.questions.filter(q => {
+                      if ((q.type || "").toLowerCase() !== 'mtf') return false;
+                      const hasAnswer = (q as any).studentAnswer?.matches?.length > 0;
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div className="mt-8 border-t-2 border-orange-100 pt-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                              <TrendingUp className="h-4 w-4 text-orange-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Match the Following</h3>
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => (q.type || "").toLowerCase() === 'mtf')
+                              .map((question: any) => {
+                                const ans = question.studentAnswer || {};
+                                const studentMatches = ans.matches || ans; // Handle both {matches:[]} and direct map {A:1}
+                                let normalizedMatches: any[] = [];
+                                if (Array.isArray(studentMatches)) {
+                                  normalizedMatches = studentMatches;
+                                } else if (studentMatches && typeof studentMatches === 'object' && studentMatches.matches) {
+                                  normalizedMatches = studentMatches.matches;
+                                } else if (studentMatches && typeof studentMatches === 'object' && !studentMatches.matches) {
+                                  // Convert ID-based map to index-based for uniform display
+                                  Object.entries(studentMatches).forEach(([leftId, rightId]) => {
+                                    const leftIndex = question.leftColumn?.findIndex((l: any) => l.id === leftId);
+                                    const rightIndex = question.rightColumn?.findIndex((r: any) => r.id === rightId);
+                                    if (leftIndex !== -1 && rightIndex !== -1) {
+                                      normalizedMatches.push({ leftIndex, rightIndex });
+                                    }
+                                  });
+                                }
+
+                                return (
+                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-orange-50/30">
+                                    <div className="flex justify-between items-center mb-4">
+                                      <h4 className="font-bold"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
+                                      <Badge variant={question.awardedMarks === question.marks ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {question.pairs?.map((p: any, i: number) => (
+                                        <div key={i} className="flex items-center justify-between p-2 bg-white rounded border">
+                                          <span className="text-sm font-medium"><UniversalMathJax inline dynamic>{cleanupMath(p.left)}</UniversalMathJax></span>
+                                          <ArrowLeft className="w-4 h-4 rotate-180 text-gray-400" />
+                                          <span className="text-sm font-bold text-indigo-600"><UniversalMathJax inline dynamic>{cleanupMath(p.right)}</UniversalMathJax></span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    <div className="mt-4 p-2 bg-gray-50 border border-dotted rounded text-xs text-gray-500">
+                                      <span className="font-bold mr-2">Your Matching:</span>
+                                      {normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `(${m.leftIndex + 1}→${m.rightIndex + 1})`).join(', ') : 'No matches made'}
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                    {/* Integer Section */}
+                    {result.questions.filter(q => {
+                      const t = (q.type || "").toLowerCase();
+                      if (t !== 'int' && t !== 'numeric') return false;
+                      const hasAnswer = (q as any).studentAnswer?.answer !== undefined;
+                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      switch (filterStatus) {
+                        case 'CORRECT': return isCorrect;
+                        case 'WRONG': return hasAnswer && !isCorrect;
+                        case 'UNANSWERED': return !hasAnswer;
+                        default: return true;
+                      }
+                    }).length > 0 && (
+                        <div className="mt-8 border-t-2 border-red-100 pt-8">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+                              <Target className="h-4 w-4 text-red-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-gray-800">Integer/Numeric</h3>
+                          </div>
+                          <div className="space-y-6">
+                            {result.questions
+                              .filter(q => { const t = (q.type || "").toLowerCase(); return t === 'int' || t === 'numeric'; })
+                              .map((question: any) => {
+                                const std = question.studentAnswer?.answer;
+                                const cor = question.correct || question.answer;
+                                return (
+                                  <motion.div key={question.id} className={`border rounded-lg p-6 ${std === cor ? 'bg-green-50/30' : 'bg-red-50/30'}`}>
+                                    <div className="flex justify-between mb-2">
+                                      <h4 className="font-semibold"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
+                                      <Badge variant={std === cor ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
+                                    </div>
+                                    <div className="flex gap-8 mt-2 text-sm font-medium">
+                                      <div className="p-3 bg-white rounded border flex-1 shadow-sm"><span className="text-gray-500 mr-2 uppercase text-[10px]">Your Answer:</span>{std ?? 'N/A'}</div>
+                                      <div className="p-3 bg-green-50 rounded border border-green-200 flex-1 shadow-sm"><span className="text-green-600 mr-2 uppercase text-[10px]">Correct Answer:</span>{cor}</div>
+                                    </div>
+                                  </motion.div>
+                                );
+                              })}
                           </div>
                         </div>
                       )}

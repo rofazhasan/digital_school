@@ -104,12 +104,12 @@ export function ExamContextProvider({
     localStorage.setItem(warningsKey, warnings.toString());
   }, [warnings, warningsKey]);
 
-  // CONSISTENT QUESTION SORTING (Groups MCQ -> CQ -> SQ -> Numeric)
+  // CONSISTENT QUESTION SORTING (Groups MCQ -> MC -> AR -> MTF -> CQ -> SQ -> Numeric)
   const sortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'cq', 'sq', 'numeric'];
-    const grouped: any = { mcq: [], cq: [], sq: [], numeric: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
@@ -119,8 +119,12 @@ export function ExamContextProvider({
 
     return [
       ...grouped.mcq,
+      ...grouped.mc,
+      ...grouped.ar,
+      ...grouped.mtf,
       ...grouped.cq,
       ...grouped.sq,
+      ...grouped.int,
       ...grouped.numeric,
       ...grouped.other
     ];

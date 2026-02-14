@@ -25,6 +25,7 @@ interface INT {
   q: string;
   marks?: number;
   modelAnswer?: string;
+  explanation?: string;
 }
 interface AR {
   assertion: string;
@@ -45,6 +46,13 @@ interface SQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
+}
+interface MTF {
+  leftColumn: { id: string; text: string }[];
+  rightColumn: { id: string; text: string }[];
+  matches: Record<string, string>;
+  marks?: number;
+  explanation?: string;
 }
 interface AnswerQuestionPaperProps {
   examInfo: {
@@ -67,6 +75,7 @@ interface AnswerQuestionPaperProps {
     mc: MC[];
     int: INT[];
     ar: AR[];
+    mtf: MTF[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -102,6 +111,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const ars = questions.ar || [];
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
+    const mtfs = questions.mtf || [];
 
     // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
@@ -110,6 +120,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const arTotal = ars.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
+    const mtfTotal = mtfs.reduce((sum, q) => sum + (q.marks || 1), 0);
 
     // Calculate highest possible marks for required questions
     const cqRequired = examInfo.cqRequiredQuestions || 0;
@@ -391,6 +402,52 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <div className="text-sm text-blue-900">
                             <UniversalMathJax>{q.explanation}</UniversalMathJax>
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* MTF Section */}
+          {mtfs.length > 0 && (
+            <>
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header mt-6">
+                <h3>বাম ও ডান স্তম্ভ মিলকরণ (MTF Answers)</h3>
+                <div className="text-right">
+                  <div>মোট নম্বর: {toBengaliNumerals(mtfTotal)}</div>
+                </div>
+              </div>
+              <div className="space-y-6">
+                {mtfs.map((q, idx) => {
+                  const qNum = idx + 1;
+                  return (
+                    <div key={idx} className="break-inside-avoid">
+                      <div className="flex justify-between items-start mb-2">
+                        <span className="font-bold">{toBengaliNumerals(qNum)}. স্তম্ভদ্বয় মিল করো:</span>
+                        <span className="font-bold">{toBengaliNumerals(q.marks || 1)}</span>
+                      </div>
+                      <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {Object.entries(q.matches).map(([leftId, rightId], matchIdx) => {
+                          const leftItem = q.leftColumn.find(l => l.id === leftId);
+                          const rightItem = q.rightColumn.find(r => r.id === rightId);
+                          return (
+                            <div key={matchIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                              <span className="font-bold text-green-700">{leftId}.</span>
+                              <span className="text-sm">→</span>
+                              <span className="font-bold text-green-700">{rightId}</span>
+                              <span className="text-xs text-gray-600 truncate">
+                                (<UniversalMathJax inline>{leftItem?.text || ''}</UniversalMathJax> - <UniversalMathJax inline>{rightItem?.text || ''}</UniversalMathJax>)
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {q.explanation && (
+                        <div className="mt-2 ml-6 p-2 bg-blue-50 border border-blue-100 rounded text-sm">
+                          <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax>{q.explanation}</UniversalMathJax>
                         </div>
                       )}
                     </div>

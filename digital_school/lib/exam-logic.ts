@@ -1,5 +1,9 @@
 import prisma from "@/lib/db";
 import { calculateGrade, calculatePercentage } from "@/lib/utils";
+import { evaluateMCQuestion } from "./evaluation/mcEvaluation";
+import { evaluateINTQuestion } from "./evaluation/intEvaluation";
+import { evaluateARQuestion } from "./evaluation/arEvaluation";
+import { evaluateMTFQuestion } from "./evaluation/mtfEvaluation";
 
 /**
  * Check if an exam consists only of MCQs
@@ -104,52 +108,57 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             : targetSet.questionsJson;
 
         for (const question of questions) {
-            if (question.type?.toUpperCase() === 'MCQ') {
-                const studentAnswer = answers[question.id];
-                if (studentAnswer) {
-                    const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
-                    const userAns = normalize(studentAnswer);
-                    let isCorrect = false;
+            const type = question.type?.toUpperCase();
+            const studentAnswer = answers[question.id];
 
-                    // Logic from submit-all/route.ts
-                    if (question.options && Array.isArray(question.options)) {
-                        const correctOption = question.options.find((opt: any) => opt.isCorrect);
-                        if (correctOption) {
-                            const correctOptionText = normalize(correctOption.text || String(correctOption));
-                            isCorrect = userAns === correctOptionText;
-                        }
-                    }
+            if (!studentAnswer && type !== 'MTF' && type !== 'MC') continue;
 
-                    if (!isCorrect && question.correctAnswer) {
-                        const correctAnswer = question.correctAnswer;
-                        if (typeof correctAnswer === 'number') {
-                            isCorrect = userAns === normalize(String(correctAnswer));
-                        } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-                            // @ts-ignore
-                            isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
-                        } else if (Array.isArray(correctAnswer)) {
-                            isCorrect = correctAnswer.some((ans: any) => normalize(String(ans)) === userAns);
-                        } else {
-                            isCorrect = userAns === normalize(String(correctAnswer));
-                        }
-                    }
+            if (type === 'MCQ') {
+                const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+                const userAns = normalize(studentAnswer);
+                let isCorrect = false;
 
-                    if (!isCorrect && question.correct) {
-                        const correctAns = normalize(String(question.correct));
-                        isCorrect = userAns === correctAns;
-                    }
-
-                    if (isCorrect) {
-                        mcqMarks += question.marks;
-                        totalScore += question.marks;
-                    } else {
-                        if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                            const negativeMarks = (question.marks * exam.mcqNegativeMarking) / 100;
-                            mcqMarks -= negativeMarks;
-                            totalScore -= negativeMarks;
-                        }
+                if (question.options && Array.isArray(question.options)) {
+                    const correctOption = question.options.find((opt: any) => opt.isCorrect);
+                    if (correctOption) {
+                        const correctOptionText = normalize(correctOption.text || String(correctOption));
+                        isCorrect = userAns === correctOptionText;
                     }
                 }
+
+                if (!isCorrect && (question.correctAnswer || question.correct)) {
+                    const correct = question.correctAnswer || question.correct;
+                    isCorrect = userAns === normalize(String(correct));
+                }
+
+                if (isCorrect) {
+                    const marks = Number(question.marks) || 0;
+                    mcqMarks += marks;
+                    totalScore += marks;
+                } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const negativeMarks = (question.marks * exam.mcqNegativeMarking) / 100;
+                    mcqMarks -= negativeMarks;
+                    totalScore -= negativeMarks;
+                }
+            } else if (type === 'MC') {
+                const score = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
+                    negativeMarking: exam.mcqNegativeMarking || 0,
+                    partialMarking: true
+                });
+                mcqMarks += score;
+                totalScore += score;
+            } else if (type === 'INT') {
+                const result = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
+                mcqMarks += result.score;
+                totalScore += result.score;
+            } else if (type === 'AR') {
+                const result = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
+                mcqMarks += result.score;
+                totalScore += result.score;
+            } else if (type === 'MTF') {
+                const result = evaluateMTFQuestion(question, studentAnswer || {});
+                mcqMarks += result.score;
+                totalScore += result.score;
             }
         }
     }

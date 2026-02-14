@@ -53,11 +53,11 @@ export function cleanupMath(text: string | null | undefined): string {
 
   let processed = text;
 
-  // Convert display math ($$...$$) to inline math ($...$)
-  // Convert LaTeX display delimiters (\[...\]) to inline (\(...\))
+  // PRESERVE display math ($$...$$) - stop converting to inline
+  // Convert LaTeX display delimiters (\[...\]) to standard display ($$...$$)
   processed = processed
-    .replace(/\$\$/g, '$')  // $$ -> $
-    .replace(/\\\[/g, '\\(').replace(/\\\]/g, '\\)'); // \[ -> \(, \] -> \)
+    .replace(/\\\[/g, '$$$$').replace(/\\\]/g, '$$$$') // \[ -> $$, \] -> $$
+    .replace(/\\\(/g, '$').replace(/\\\)/g, '$');   // \( -> $, \) -> $
 
   // Process Bangla text in tables (array, tabular environments)
   // This wraps Bangla Unicode characters in \text{} for proper rendering

@@ -29,6 +29,31 @@ interface CQ {
         image?: string;
     }[];
 }
+
+interface AR {
+    id?: string;
+    q?: string;
+    assertion: string;
+    reason: string;
+    marks: number;
+    correct: number;
+}
+
+interface MTF {
+    id: string;
+    q: string;
+    marks: number;
+    pairs: { left: string; right: string }[];
+    leftColumn?: { id: string; text: string }[];
+    rightColumn?: { id: string; text: string }[];
+}
+
+interface INT {
+    id: string;
+    q: string;
+    marks: number;
+    answer: number | string;
+}
 interface SQ {
     id?: string;
     questionText: string;
@@ -74,6 +99,10 @@ interface MarkedQuestionPaperProps {
     };
     questions: {
         mcq: MCQ[];
+        mc: MCQ[];
+        ar: AR[];
+        mtf: MTF[];
+        int: INT[];
         cq: CQ[];
         sq: SQ[];
     };
@@ -136,11 +165,15 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
         // Calculate total deducted marks
         let totalDeducted = 0;
-        mcqs.forEach(q => {
+        [...mcqs, ...(questions.mc || [])].forEach(q => {
             const ans = submission.answers[q.id || ''];
-            const status = getMCQStatus(q, ans);
-            if (status === 'incorrect') {
-                totalDeducted += (q.marks || 1) * negativeRate;
+            // For MC, negative marking logic might be different (partial marks etc)
+            // For now, simpler check
+            if (q.options?.some(o => o.isCorrect)) {
+                const status = getMCQStatus(q, ans);
+                if (status === 'incorrect') {
+                    totalDeducted += (q.marks || 1) * negativeRate;
+                }
             }
         });
 
@@ -203,26 +236,26 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                 {/* Main Content */}
                 <main>
-                    {/* MCQ Section */}
-                    {mcqs.length > 0 && (
+                    {/* MC Section */}
+                    {(questions.mc || []).length > 0 && (
                         <>
-                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1">
-                                <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                <h3>বহুনির্বাচনি প্রশ্ন (Multiple Correct)</h3>
                                 <div className="text-right">
-                                    <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {mcqTotal}</span>
+                                    <span>Marks: {questions.mc.length > 0 ? 'Checked' : '0'}</span>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                                {mcqs.map((q, idx) => {
-                                    const ans = submission.answers[q.id || ''];
-                                    const status = getMCQStatus(q, ans);
-                                    const mark = getObtainedMarkRaw(q, status, q.marks || 1);
-                                    const totalMark = q.marks || 1;
+                                {questions.mc.map((q, idx) => {
+                                    const ans = submission.answers[q.id || ''] || {};
+                                    const selectedIndices = ans.selectedOptions || [];
+                                    const correctIndices = q.options?.map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1) || [];
+                                    const isFullyCorrect = selectedIndices.length === correctIndices.length && selectedIndices.every((v: number) => correctIndices.includes(v));
 
                                     return (
-                                        <div key={idx} className={`mb-2 p-2 rounded border ${status === 'correct' ? 'bg-green-50 border-green-200' :
-                                            status === 'incorrect' ? 'bg-red-50 border-red-200' : 'border-dashed border-gray-300'
+                                        <div key={idx} className={`mb-2 p-2 rounded border ${isFullyCorrect ? 'bg-green-50 border-green-200' :
+                                            selectedIndices.length > 0 ? 'bg-red-50 border-red-200' : 'border-dashed border-gray-300'
                                             } break-inside-avoid relative`}>
                                             <div className="flex items-start justify-between">
                                                 <div className="flex items-start flex-1 min-w-0">
@@ -231,38 +264,145 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         <Text>{`${q.q}`}</Text>
                                                         <div className="mt-1 flex flex-wrap gap-2">
                                                             {(q.options || []).map((opt, oidx) => {
-                                                                const isSelected = ans === opt.text;
+                                                                const isSelected = selectedIndices.includes(oidx);
                                                                 const isCorrectOption = opt.isCorrect;
 
                                                                 let optionClass = "bg-gray-50 border-gray-200 text-gray-700";
                                                                 if (isSelected) {
                                                                     optionClass = isCorrectOption ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600";
-                                                                } else if (isCorrectOption && (status === 'incorrect' || status === 'unanswered')) {
-                                                                    // Highlight correct answer if user was wrong or unanswered
+                                                                } else if (isCorrectOption) {
                                                                     optionClass = "bg-green-100 text-green-900 border-green-300 ring-1 ring-green-400";
                                                                 }
 
                                                                 return (
-                                                                    <div key={oidx} className="flex flex-col">
-                                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
-                                                                            <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
-                                                                            <Text>{opt.text}</Text>
-                                                                            {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
-                                                                        </span>
-                                                                        {/* @ts-ignore */}
-                                                                        {opt.image && (
-                                                                            // @ts-ignore
-                                                                            <img src={opt.image} alt="Option" className="mt-1 h-32 w-auto object-contain border rounded bg-white" />
-                                                                        )}
-                                                                    </div>
+                                                                    <span key={oidx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
+                                                                        <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
+                                                                        <Text>{opt.text}</Text>
+                                                                        {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
+                                                                    </span>
                                                                 );
                                                             })}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className={`font-bold text-sm ml-2 whitespace-nowrap min-w-[3rem] text-right ${mark > 0 ? 'text-green-600' : mark < 0 ? 'text-red-600' : 'text-gray-400'}`}>
-                                                    {mark > 0 ? `${mark}/${totalMark}` : mark < 0 ? `${mark}/${totalMark}` : `0/${totalMark}`}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
+                    {/* AR Section */}
+                    {(questions.ar || []).length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                <h3>Assertion-Reason (AR)</h3>
+                            </div>
+
+                            <div className="space-y-4">
+                                {questions.ar.map((q, idx) => {
+                                    const ans = submission.answers[q.id || ''] || {};
+                                    const selectedOption = Number(ans.selectedOption || 0);
+                                    const correctOption = Number(q.correct || 0);
+                                    const isCorrect = selectedOption === correctOption;
+
+                                    return (
+                                        <div key={idx} className={`p-4 rounded border ${isCorrect ? 'bg-green-50' : 'bg-red-50'} break-inside-avoid shadow-sm`}>
+                                            <div className="mb-2 flex items-center justify-between">
+                                                <span className="font-bold">Q{idx + 1}. AR Question</span>
+                                                <span className="text-xs font-bold px-2 py-1 rounded bg-white border">{isCorrect ? 'Correct' : 'Incorrect'}</span>
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                                                <div className="p-2 bg-indigo-50 rounded border border-indigo-100">
+                                                    <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
+                                                    <div className="text-sm"><Text>{q.assertion}</Text></div>
                                                 </div>
+                                                <div className="p-2 bg-purple-50 rounded border border-purple-100">
+                                                    <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
+                                                    <div className="text-sm"><Text>{q.reason}</Text></div>
+                                                </div>
+                                            </div>
+                                            <div className="text-xs">
+                                                <span className="font-bold">Your Selection:</span> Option {selectedOption || 'N/A'}
+                                                <span className="mx-2">|</span>
+                                                <span className="font-bold">Correct:</span> Option {correctOption}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
+                    {/* MTF Section */}
+                    {(questions.mtf || []).length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                <h3>Match the Following (MTF)</h3>
+                            </div>
+
+                            <div className="space-y-4">
+                                {questions.mtf.map((q, idx) => {
+                                    const ans = submission.answers[q.id] || {};
+                                    const studentMatches = ans.matches || ans;
+                                    let normalizedMatches: any[] = [];
+                                    if (Array.isArray(studentMatches)) {
+                                        normalizedMatches = studentMatches;
+                                    } else if (studentMatches && typeof studentMatches === 'object' && studentMatches.matches) {
+                                        normalizedMatches = studentMatches.matches;
+                                    } else if (studentMatches && typeof studentMatches === 'object' && !studentMatches.matches) {
+                                        Object.entries(studentMatches).forEach(([leftId, rightId]) => {
+                                            const leftIndex = q.leftColumn?.findIndex((l: any) => l.id === leftId);
+                                            const rightIndex = q.rightColumn?.findIndex((r: any) => r.id === rightId);
+                                            if (leftIndex !== -1 && rightIndex !== -1) {
+                                                normalizedMatches.push({ leftIndex, rightIndex });
+                                            }
+                                        });
+                                    }
+
+                                    return (
+                                        <div key={idx} className="p-4 rounded border border-gray-200 bg-white break-inside-avoid">
+                                            <div className="font-bold mb-2">{idx + 1}. <Text>{q.q}</Text></div>
+                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                                {q.pairs.map((p, pidx) => (
+                                                    <div key={pidx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs border border-gray-100">
+                                                        <div className="font-medium"><Text>{p.left}</Text></div>
+                                                        <div className="px-2">→</div>
+                                                        <div className="font-medium text-blue-700"><Text>{p.right}</Text></div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="mt-3 text-[10px] text-gray-500 bg-blue-50 p-2 rounded">
+                                                <strong>Student Matchings:</strong> {normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `${m.leftIndex + 1}→${m.rightIndex + 1}`).join(', ') : 'No matches made'}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
+                    {/* INT Section */}
+                    {(questions.int || []).length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                <h3>Integer/Numeric Questions</h3>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {questions.int.map((q, idx) => {
+                                    const ans = submission.answers[q.id] || {};
+                                    const studentVal = ans.answer;
+                                    const isCorrect = Number(studentVal) === Number(q.answer);
+
+                                    return (
+                                        <div key={idx} className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} break-inside-avoid shadow-sm`}>
+                                            <div className="font-bold text-sm mb-1">{idx + 1}. <Text>{q.q}</Text></div>
+                                            <div className="flex items-center gap-4 mt-2">
+                                                <div className="text-xs"><span className="font-bold">Your Val:</span> {studentVal ?? 'N/A'}</div>
+                                                <div className="text-xs"><span className="font-bold">Correct:</span> {q.answer}</div>
+                                                {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
                                             </div>
                                         </div>
                                     );

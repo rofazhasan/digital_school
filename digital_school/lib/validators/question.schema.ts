@@ -64,12 +64,14 @@ export const sqQuestionSchema = z.object({
 });
 
 import { arQuestionSchema } from './arQuestion.schema';
+import { mtfQuestionSchema } from './mtfQuestion.schema';
 
 export const questionSchema = z.discriminatedUnion("type", [
   mcqQuestionSchema,
   mcQuestionSchema,
   intQuestionSchema,
   arQuestionSchema,
+  mtfQuestionSchema,
   cqQuestionSchema,
   sqQuestionSchema,
 ]);

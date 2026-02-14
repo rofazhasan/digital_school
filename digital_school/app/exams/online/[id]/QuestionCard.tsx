@@ -115,9 +115,185 @@ const MCQOption = memo(({
 
 MCQOption.displayName = 'MCQOption';
 
+// Multiple Correct Option Component
+const MCOption = memo(({
+  option,
+  index,
+  isSelected,
+  isCorrect,
+  showResult,
+  disabled,
+  submitted,
+  onSelect
+}: {
+  option: any;
+  index: number;
+  isSelected: boolean;
+  isCorrect: boolean;
+  showResult: boolean;
+  disabled: boolean;
+  submitted: boolean;
+  onSelect: (index: number) => void;
+}) => {
+  const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
+
+  const getStyles = () => {
+    const base = "w-full text-left p-4 rounded-xl border-2 flex items-start gap-4 transition-all duration-200 group relative overflow-hidden";
+    if (showResult) {
+      if (isCorrect) return `${base} bg-green-50/80 border-green-500 text-green-900 shadow-sm`;
+      if (isSelected && !isCorrect) return `${base} bg-red-50/80 border-red-500 text-red-900 shadow-sm`;
+      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-70 grayscale`;
+    }
+    if (isSelected) return `${base} bg-indigo-50/90 border-indigo-600 shadow-md ring-1 ring-indigo-600 scale-[1.01] z-10`;
+    return `${base} bg-white border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/30 hover:shadow-md hover:-translate-y-0.5`;
+  };
+
+  return (
+    <button
+      onClick={() => onSelect(index)}
+      disabled={disabled || submitted}
+      className={getStyles()}
+    >
+      <div className={`
+        flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
+        ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-300'}
+        ${showResult && isCorrect ? 'bg-green-600 border-green-600 shadow-green-100' : ''}
+        ${showResult && isSelected && !isCorrect ? 'bg-red-600 border-red-600 shadow-red-100' : ''}
+      `}>
+        {isSelected && <Check className="w-4 h-4" />}
+      </div>
+      <div className="flex-1 pt-0.5 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
+        <MathJax inline dynamic>
+          <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
+        </MathJax>
+      </div>
+      {/* Result Icons */}
+      {showResult && (
+        <div className="absolute right-3 top-4">
+          {isCorrect && <Check className="w-5 h-5 text-green-600" />}
+          {isSelected && !isCorrect && <X className="w-5 h-5 text-red-500" />}
+        </div>
+      )}
+    </button>
+  );
+});
+MCOption.displayName = 'MCOption';
+
+// Match the Following Section
+const MTFGrid = ({
+  question,
+  userAnswer,
+  showResult,
+  disabled,
+  onSelect
+}: {
+  question: any;
+  userAnswer: any;
+  showResult: boolean;
+  disabled: boolean;
+  onSelect: (leftId: string, rightId: string) => void;
+}) => {
+  const leftColumn = question.leftColumn || [];
+  const rightColumn = question.rightColumn || [];
+  const matches = userAnswer || {};
+  const correctMatches = question.matches || {};
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="p-4 text-left text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">Item</th>
+              {rightColumn.map((rc: any) => (
+                <th key={rc.id} className="p-4 text-center border-b border-gray-100">
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-indigo-50">
+                      {rc.id}
+                    </span>
+                    <div className="text-[10px] md:text-xs font-medium text-gray-500 max-w-[80px] truncate">
+                      <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
+                    </div>
+                  </div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {leftColumn.map((lc: any) => (
+              <tr key={lc.id} className="group hover:bg-indigo-50/20 transition-colors">
+                <td className="p-4 border-b border-gray-50">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-xs">
+                      {lc.id}
+                    </span>
+                    <div className="text-sm md:text-base font-semibold text-gray-800">
+                      <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                    </div>
+                  </div>
+                </td>
+                {rightColumn.map((rc: any) => {
+                  const isSelected = matches[lc.id] === rc.id;
+                  const isCorrect = showResult && correctMatches[lc.id] === rc.id;
+                  const isWrongSelection = showResult && isSelected && !isCorrect;
+                  const isMissedCorrect = showResult && !isSelected && correctMatches[lc.id] === rc.id;
+
+                  return (
+                    <td key={rc.id} className="p-4 text-center border-b border-gray-50">
+                      <button
+                        onClick={() => onSelect(lc.id, rc.id)}
+                        disabled={disabled || showResult}
+                        className={`
+                          w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center
+                          ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-md' : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'}
+                          ${showResult && isCorrect ? 'bg-green-600 border-green-600 text-white shadow-green-200' : ''}
+                          ${showResult && isWrongSelection ? 'bg-red-600 border-red-600 text-white shadow-red-200' : ''}
+                          ${showResult && isMissedCorrect ? 'border-green-500 border-dashed animate-pulse ring-2 ring-green-50' : ''}
+                          ${showResult && !isSelected && !isCorrect ? 'opacity-30 grayscale' : ''}
+                        `}
+                      >
+                        {isSelected && <Check className="w-4 h-4" />}
+                        {isMissedCorrect && <AlertCircle className="w-4 h-4 text-green-500" />}
+                      </button>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {showResult && (
+        <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+          <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Detailed Results</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {leftColumn.map((lc: any) => {
+              const uAns = matches[lc.id];
+              const cAns = correctMatches[lc.id];
+              const isCorrect = uAns === cAns;
+              return (
+                <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
+                  <span className="font-bold text-gray-500">{lc.id}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>{uAns || '?'}</span>
+                    <span className="text-gray-300">→</span>
+                    <span className="text-green-700 font-bold">{cAns}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
   const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading } = useExamContext();
   const questions = exam.questions || [];
+
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
 
@@ -127,7 +303,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const type = (question.type || "").toLowerCase();
   const subQuestions = question.subQuestions || question.sub_questions || [];
 
-  const handleMCQChange = useCallback(async (value: string) => {
+  const handleAnswerChange = useCallback(async (value: any) => {
     if (disabled) return;
     const updated = { ...answers, [question.id]: value };
     setAnswers(updated);
@@ -154,6 +330,14 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
   const userAnswer = answers[question.id];
   const showResult = submitted && result;
+
+  const arOptionLabels = [
+    "Both Assertion (A) and Reason (R) are true, and R is the correct explanation of A",
+    "Both Assertion (A) and Reason (R) are true, but R is NOT the correct explanation of A",
+    "Assertion (A) is true, but Reason (R) is false",
+    "Assertion (A) is false, but Reason (R) is true",
+    "Both Assertion (A) and Reason (R) are false"
+  ];
 
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
@@ -190,9 +374,30 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
           {/* Question Text */}
           <div className="prose prose-indigo max-w-none text-gray-800 text-base md:text-xl font-medium leading-relaxed mb-8">
-            <MathJax dynamic inline>
-              <UniversalMathJax inline dynamic>{cleanupMath(text || "")}</UniversalMathJax>
-            </MathJax>
+            {type === "ar" ? (
+              <div className="space-y-4">
+                <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-indigo-600 text-white hover:bg-indigo-700 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Assertion (A)</Badge>
+                  </div>
+                  <div className="text-base md:text-lg text-gray-800 leading-relaxed font-semibold">
+                    <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || text || "")}</UniversalMathJax>
+                  </div>
+                </div>
+                <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-100 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className="bg-purple-600 text-white hover:bg-purple-700 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Reason (R)</Badge>
+                  </div>
+                  <div className="text-base md:text-lg text-gray-800 leading-relaxed font-semibold">
+                    <UniversalMathJax inline dynamic>{cleanupMath(question.reason || "")}</UniversalMathJax>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <MathJax dynamic inline>
+                <UniversalMathJax inline dynamic>{cleanupMath(text || "")}</UniversalMathJax>
+              </MathJax>
+            )}
           </div>
 
           {/* Inputs */}
@@ -214,11 +419,76 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       userAnswer={userAnswer}
                       disabled={!!disabled}
                       submitted={!!submitted}
-                      onSelect={handleMCQChange}
+                      onSelect={(val) => handleAnswerChange(val)}
                     />
                   );
                 })}
               </div>
+            )}
+
+            {type === "mc" && (
+              <div className="grid grid-cols-1 gap-3">
+                {(question.options || []).map((opt: any, i: number) => {
+                  const isCorrect = opt.isCorrect === true;
+                  const currentSelected = userAnswer?.selectedOptions || [];
+                  const isSelected = currentSelected.includes(i);
+                  return (
+                    <MCOption
+                      key={i}
+                      option={opt}
+                      index={i}
+                      isSelected={isSelected}
+                      isCorrect={isCorrect}
+                      showResult={showResult}
+                      disabled={!!disabled}
+                      submitted={!!submitted}
+                      onSelect={(idx) => {
+                        const newSelection = isSelected
+                          ? currentSelected.filter((item: number) => item !== idx)
+                          : [...currentSelected, idx];
+                        handleAnswerChange({ selectedOptions: newSelection });
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {type === "ar" && (
+              <div className="grid grid-cols-1 gap-3">
+                {arOptionLabels.map((lbl, i) => {
+                  const val = i + 1;
+                  const isCorrect = question.correctOption === val;
+                  const isSelected = userAnswer?.selectedOption === val;
+                  return (
+                    <MCQOption
+                      key={i}
+                      option={lbl}
+                      index={i}
+                      isSelected={isSelected}
+                      isCorrect={isCorrect}
+                      showResult={showResult}
+                      userAnswer={userAnswer}
+                      disabled={!!disabled}
+                      submitted={!!submitted}
+                      onSelect={() => handleAnswerChange({ selectedOption: val })}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {type === "mtf" && (
+              <MTFGrid
+                question={question}
+                userAnswer={userAnswer}
+                showResult={showResult}
+                disabled={!!disabled}
+                onSelect={(leftId, rightId) => {
+                  const newMatches = { ...(userAnswer || {}), [leftId]: rightId };
+                  handleAnswerChange(newMatches);
+                }}
+              />
             )}
 
             {(type === "cq" || type === "sq") && (
@@ -494,14 +764,14 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
               </div>
             )}
 
-            {type === "numeric" && (
+            {(type === "int" || type === "numeric") && (
               <Input
                 type="number"
-                value={userAnswer || ""}
-                onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
+                value={userAnswer?.answer || ""}
+                onChange={(e) => handleAnswerChange({ answer: parseInt(e.target.value) || 0 })}
                 disabled={disabled || submitted}
-                className="w-full max-w-xs text-lg p-6"
-                placeholder="Enter number..."
+                className="w-full max-w-xs text-lg p-6 border-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                placeholder="Enter integer answer..."
               />
             )}
           </div>

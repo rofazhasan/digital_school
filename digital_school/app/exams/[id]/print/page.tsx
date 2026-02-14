@@ -139,7 +139,15 @@ export default function PrintExamPage() {
   const t = LANGS[language];
   const { examInfo, sets } = examData;
   const nonEmptySets = sets.filter(
-    (set: any) => (set.mcq?.length || set.cq?.length || set.sq?.length)
+    (set: any) => (
+      set.mcq?.length ||
+      set.mc?.length ||
+      set.int?.length ||
+      set.ar?.length ||
+      set.cq?.length ||
+      set.sq?.length ||
+      set.mtf?.length
+    )
   );
 
   return (
@@ -185,7 +193,15 @@ export default function PrintExamPage() {
                 <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
                   <QuestionPaper
                     examInfo={{ ...examInfo, set: set.setName }}
-                    questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
+                    questions={{
+                      mcq: set.mcq || [],
+                      mc: set.mc || [],
+                      int: set.int || [],
+                      ar: set.ar || [],
+                      cq: set.cq || [],
+                      sq: set.sq || [],
+                      mtf: set.mtf || []
+                    }}
                     qrData={set.qrData}
                   />
                 </div>
@@ -202,7 +218,15 @@ export default function PrintExamPage() {
               <div key={`answer-${set.setId}`} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
                 <AnswerQuestionPaper
                   examInfo={{ ...examInfo, set: set.setName }}
-                  questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
+                  questions={{
+                    mcq: set.mcq || [],
+                    mc: set.mc || [],
+                    int: set.int || [],
+                    ar: set.ar || [],
+                    cq: set.cq || [],
+                    sq: set.sq || [],
+                    mtf: set.mtf || []
+                  }}
                   qrData={set.qrData}
                 />
               </div>

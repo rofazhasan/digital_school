@@ -40,6 +40,12 @@ interface SQ {
   marks?: number;
   modelAnswer?: string;
 }
+interface MTF {
+  leftColumn: { id: string; text: string }[];
+  rightColumn: { id: string; text: string }[];
+  matches: Record<string, string>;
+  marks?: number;
+}
 interface QuestionPaperProps {
   examInfo: {
     schoolName: string;
@@ -61,6 +67,7 @@ interface QuestionPaperProps {
     mc: MC[];
     int: INT[];
     ar: AR[];
+    mtf: MTF[];
     cq: CQ[];
     sq: SQ[];
   };
@@ -484,6 +491,46 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 ))}
               </div>
             </>
+          )}
+
+          {/* MTF Section */}
+          {questions.mtf && questions.mtf.length > 0 && (
+            <div className="section mt-6">
+              <h2 className="section-title text-lg font-bold border-b-2 border-black pb-1 mb-4 flex justify-between items-center">
+                <span>বাম স্তম্ভের সাথে ডান স্তম্ভ মিল করে লেখ:</span>
+                {questions.mtf.some(q => q.marks) && (
+                  <span className="text-sm font-normal">
+                    [মান: {toBengaliNumerals(questions.mtf.reduce((acc, q) => acc + (q.marks || 0), 0))}]
+                  </span>
+                )}
+              </h2>
+              {questions.mtf.map((q, qIndex) => (
+                <div key={qIndex} className="question mb-6 avoid-break">
+                  <div className="grid grid-cols-2 gap-8 border border-black p-4 mt-2">
+                    {/* Left Column */}
+                    <div className="space-y-2 border-r border-black pr-4">
+                      <p className="font-bold text-center border-b border-black pb-1 mb-2">Column A (বাম স্তম্ভ)</p>
+                      {q.leftColumn.map((item, i) => (
+                        <div key={item.id} className="flex gap-2 text-sm leading-relaxed">
+                          <span className="font-bold">{toBengaliNumerals(i + 1)}.</span>
+                          <UniversalMathJax>{item.text}</UniversalMathJax>
+                        </div>
+                      ))}
+                    </div>
+                    {/* Right Column */}
+                    <div className="space-y-2">
+                      <p className="font-bold text-center border-b border-black pb-1 mb-2">Column B (ডান স্তম্ভ)</p>
+                      {q.rightColumn.map((item, i) => (
+                        <div key={item.id} className="flex gap-2 text-sm leading-relaxed">
+                          <span className="font-bold">{item.id}.</span>
+                          <UniversalMathJax>{item.text}</UniversalMathJax>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </main>
 

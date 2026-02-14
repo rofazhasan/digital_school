@@ -7,7 +7,19 @@ import { Card } from "@/components/ui/card";
 const getButtonColor = (q: any, answers: any, navigation: any, idx: number) => {
   if (navigation.current === idx) return "bg-black text-white ring-2 ring-offset-1 ring-black shadow-md scale-105";
   if (navigation.marked[q.id]) return "bg-amber-100 text-amber-700 border-amber-200 border";
-  if (answers[q.id]) return "bg-indigo-50 text-indigo-700 border-indigo-200 border";
+
+  const ans = answers[q.id];
+  const type = (q.type || q.questionType || "").toLowerCase();
+  let isAnswered = false;
+
+  if (ans) {
+    if (type === 'mc') isAnswered = ans.selectedOptions && ans.selectedOptions.length > 0;
+    else if (type === 'mtf') isAnswered = Object.keys(ans).length > 0;
+    else if (type === 'ar') isAnswered = !!ans.selectedOption;
+    else isAnswered = true;
+  }
+
+  if (isAnswered) return "bg-indigo-50 text-indigo-700 border-indigo-200 border";
   return "bg-white text-gray-500 border-gray-200 border hover:bg-gray-50 hover:border-gray-300";
 };
 
@@ -30,8 +42,16 @@ const QuestionButton = memo(({
 
   const getTooltipText = () => {
     const type = (question.type || question.questionType || "").toLowerCase();
-    const typeLabel = type === 'mcq' ? 'MCQ' : type === 'cq' ? 'CQ' : 'SQ';
-    return `${typeLabel} ${index + 1}`;
+    const labels: Record<string, string> = {
+      mcq: 'MCQ',
+      mc: 'MC',
+      ar: 'AR',
+      mtf: 'MTF',
+      cq: 'CQ',
+      sq: 'SQ',
+      numeric: 'INT'
+    };
+    return `${labels[type] || 'Q'} ${index + 1}`;
   };
 
   return (
@@ -56,12 +76,21 @@ export default function Navigator({ questions }: NavigatorProps) {
   const questionList = sortedQuestions || questions || exam.questions || [];
 
   const categorizedQuestions = useMemo(() => {
-    const mcqQuestions = questionList.filter((q: any) => (q.type || q.questionType || "").toLowerCase() === "mcq");
-    const cqQuestions = questionList.filter((q: any) => (q.type || q.questionType || "").toLowerCase() === "cq");
-    const sqQuestions = questionList.filter((q: any) => (q.type || q.questionType || "").toLowerCase() === "sq");
-    const numericQuestions = questionList.filter((q: any) => (q.type || q.questionType || "").toLowerCase() === "numeric");
+    const filter = (t: string) => questionList.filter((q: any) => {
+      const type = (q.type || q.questionType || "").toLowerCase();
+      if (t === 'numeric') return type === 'numeric' || type === 'int';
+      return type === t;
+    });
 
-    return { mcqQuestions, cqQuestions, sqQuestions, numericQuestions };
+    return {
+      mcq: filter("mcq"),
+      mc: filter("mc"),
+      ar: filter("ar"),
+      mtf: filter("mtf"),
+      cq: filter("cq"),
+      sq: filter("sq"),
+      numeric: filter("numeric")
+    };
   }, [questionList]);
 
   const handleNavigate = useCallback((index: number) => {
@@ -102,10 +131,13 @@ export default function Navigator({ questions }: NavigatorProps) {
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
       <h3 className="font-bold text-gray-900 mb-6">Question Navigator</h3>
 
-      {renderQuestionSection(categorizedQuestions.mcqQuestions, 'MCQ', 'Multiple Choice')}
-      {renderQuestionSection(categorizedQuestions.cqQuestions, 'CQ', 'Creative Questions')}
-      {renderQuestionSection(categorizedQuestions.sqQuestions, 'SQ', 'Short Questions')}
-      {renderQuestionSection(categorizedQuestions.numericQuestions, 'Numeric', 'Numeric Questions')}
+      {renderQuestionSection(categorizedQuestions.mcq, 'MCQ', 'Multiple Choice')}
+      {renderQuestionSection(categorizedQuestions.mc, 'MC', 'Multiple Correct')}
+      {renderQuestionSection(categorizedQuestions.ar, 'AR', 'Assertion Reason')}
+      {renderQuestionSection(categorizedQuestions.mtf, 'MTF', 'Match Following')}
+      {renderQuestionSection(categorizedQuestions.cq, 'CQ', 'Creative Questions')}
+      {renderQuestionSection(categorizedQuestions.sq, 'SQ', 'Short Questions')}
+      {renderQuestionSection(categorizedQuestions.numeric, 'Numeric', 'Numeric Questions')}
 
       <div className="mt-8 pt-6 border-t border-gray-100">
         <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">

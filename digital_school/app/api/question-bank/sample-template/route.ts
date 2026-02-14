@@ -25,13 +25,16 @@ export async function GET() {
             ["Step 4", "For Class Name, you MUST pick from the dropdown (these match your system classes)."],
             ["Step 5", "Save and upload this file back to the system."],
             [""],
-            ["FIELD GUIDE:", ""],
-            ["Type", "MCQ (Multiple Choice), CQ (Creative), SQ (Short Question)"],
-            ["Class Name", "Select from dropdown. Must exist in the system."],
+            ["FIELD GUIDE BY TYPE:", ""],
+            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
+            ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
+            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-5)."],
+            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
+            ["CQ (Creative)", "Fill 'Question Text' (passage) and 'Sub-Question' fields."],
+            ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'."],
+            [""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
-            ["Marks", "Number only."],
-            ["Correct Option", "A, B, C, or D (Only for MCQ)."],
-            ["Options A-D", "Required for MCQ. Leave blank for others."]
+            ["Marks", "Number only."]
         ];
 
         instructions.forEach(row => infoSheet.addRow(row));
@@ -62,33 +65,41 @@ export async function GET() {
 
         // Headers
         const columns = [
-            { header: "Type (MCQ/CQ/SQ)", key: "type", width: 20 },
-            { header: "Class Name", key: "className", width: 30 },
+            { header: "Type", key: "type", width: 10 },
+            { header: "Class Name", key: "className", width: 25 },
             { header: "Subject", key: "subject", width: 15 },
             { header: "Topic", key: "topic", width: 20 },
-            { header: "Difficulty", key: "difficulty", width: 15 },
-            { header: "Marks", key: "marks", width: 10 },
-            { header: "Question Text", key: "questionText", width: 50 },
-            { header: "Option A", key: "optionA", width: 20 },
-            { header: "Option B", key: "optionB", width: 20 },
-            { header: "Option C", key: "optionC", width: 20 },
-            { header: "Option D", key: "optionD", width: 20 },
-            { header: "Option E", key: "optionE", width: 20 },
+            { header: "Difficulty", key: "difficulty", width: 12 },
+            { header: "Marks", key: "marks", width: 8 },
+            { header: "Question Text", key: "questionText", width: 40 },
+            { header: "Option A", key: "optionA", width: 15 },
+            { header: "Option B", key: "optionB", width: 15 },
+            { header: "Option C", key: "optionC", width: 15 },
+            { header: "Option D", key: "optionD", width: 15 },
+            { header: "Option E", key: "optionE", width: 15 },
             { header: "Correct Option", key: "correctOption", width: 15 },
-            { header: "Explanation", key: "explanation", width: 30 },
-            { header: "Model Answer", key: "modelAnswer", width: 30 },
-            { header: "Sub-Question 1 Text", key: "sq1Text", width: 30 },
-            { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 15 },
-            { header: "Sub-Question 1 Model Answer", key: "sq1ModelAnswer", width: 30 },
-            { header: "Sub-Question 2 Text", key: "sq2Text", width: 30 },
-            { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 15 },
-            { header: "Sub-Question 2 Model Answer", key: "sq2ModelAnswer", width: 30 },
-            { header: "Sub-Question 3 Text", key: "sq3Text", width: 30 },
-            { header: "Sub-Question 3 Marks", key: "sq3Marks", width: 15 },
-            { header: "Sub-Question 3 Model Answer", key: "sq3ModelAnswer", width: 30 },
-            { header: "Sub-Question 4 Text", key: "sq4Text", width: 30 },
-            { header: "Sub-Question 4 Marks", key: "sq4Marks", width: 15 },
-            { header: "Sub-Question 4 Model Answer", key: "sq4ModelAnswer", width: 30 },
+            { header: "Correct Answer", key: "correctAnswer", width: 15 },
+            { header: "Assertion", key: "assertion", width: 20 },
+            { header: "Reason", key: "reason", width: 20 },
+            { header: "Left 1", key: "l1", width: 15 },
+            { header: "Left 2", key: "l2", width: 15 },
+            { header: "Left 3", key: "l3", width: 15 },
+            { header: "Left 4", key: "l4", width: 15 },
+            { header: "Left 5", key: "l5", width: 15 },
+            { header: "Right A", key: "ra", width: 15 },
+            { header: "Right B", key: "rb", width: 15 },
+            { header: "Right C", key: "rc", width: 15 },
+            { header: "Right D", key: "rd", width: 15 },
+            { header: "Right E", key: "re", width: 15 },
+            { header: "Matches", key: "matches", width: 15 },
+            { header: "Explanation", key: "explanation", width: 20 },
+            { header: "Model Answer", key: "modelAnswer", width: 20 },
+            { header: "sq1Text", key: "sq1Text", width: 20 },
+            { header: "sq1Marks", key: "sq1Marks", width: 10 },
+            { header: "sq1ModelAnswer", key: "sq1ModelAnswer", width: 20 },
+            { header: "sq2Text", key: "sq2Text", width: 20 },
+            { header: "sq2Marks", key: "sq2Marks", width: 10 },
+            { header: "sq2ModelAnswer", key: "sq2ModelAnswer", width: 20 },
         ];
         templateSheet.columns = columns;
 
@@ -103,11 +114,7 @@ export async function GET() {
         headerRow.alignment = { horizontal: 'center' };
 
         // DATA VALIDATION & DROPDOWNS
-        // We'll apply this to a reasonable number of rows (e.g., 500)
-        const rowCount = 500;
-
-        // A helper to get column letter from index (1-based)
-        // ExcelJS handles this, we can just iterate rows.
+        const rowCount = 200;
 
         for (let i = 2; i <= rowCount; i++) {
             const row = templateSheet.getRow(i);
@@ -116,24 +123,20 @@ export async function GET() {
             row.getCell(1).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"MCQ,CQ,SQ"'],
+                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ"'],
                 showErrorMessage: true,
                 errorTitle: 'Invalid Type',
-                error: 'Please select from the list: MCQ, CQ, SQ'
+                error: 'Select: MCQ, MC, INT, AR, MTF, CQ, SQ'
             };
 
-            // Class Name Dropdown (Col 2) - dynamic reference
-            // Refers to 'Valid Classes Reference'!$A$2:$A$N
+            // Class Name Dropdown (Col 2)
             if (classNames.length > 0) {
                 const lastRow = classNames.length + 1;
-                // Note: ExcelJS requires formula syntax for other sheets
                 row.getCell(2).dataValidation = {
                     type: 'list',
                     allowBlank: false,
                     formulae: [`'Valid Classes Reference'!$A$2:$A$${lastRow}`],
-                    showErrorMessage: true,
-                    errorTitle: 'Invalid Class',
-                    error: 'Please select a valid class from the dropdown.'
+                    showErrorMessage: true
                 };
             }
 
@@ -142,43 +145,29 @@ export async function GET() {
                 type: 'list',
                 allowBlank: true,
                 formulae: ['"EASY,MEDIUM,HARD"'],
-                showErrorMessage: true,
-                errorTitle: 'Invalid Difficulty',
-                error: 'Select EASY, MEDIUM, or HARD'
+                showErrorMessage: true
             };
 
-            // Correct Option Dropdown (Col 13 - Shifted by 1 due to Option E)
+            // Correct Option Dropdown (Col 13)
             row.getCell(13).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"A,B,C,D,E"'],
-                showErrorMessage: true,
-                errorTitle: 'Invalid Option',
-                error: 'Select A, B, C, D, or E'
+                formulae: ['"A,B,C,D,E,1,2,3,4,5"'],
+                showErrorMessage: true
             };
         }
 
-        // Add Sample Data
-        templateSheet.addRow([
-            "MCQ",
-            classNames[0] || "Class 10",
-            "Physics",
-            "Motion",
-            "EASY",
-            1,
-            "What is ...?",
-            "Option A", "Option B", "Option C", "Option D",
-            "A",
-            "Because...",
-            "", "", "", "", ""
-        ]);
+        // Add Samples
+        const sampleClass = classNames[0] || "Class 10";
+        templateSheet.addRow(["MCQ", sampleClass, "Physics", "Light", "EASY", 1, "What is light?", "Wave", "Particle", "Both", "None", "", "C", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Both theories are correct."]);
+        templateSheet.addRow(["MC", sampleClass, "Math", "Primes", "MEDIUM", 4, "Pick primes:", "2", "3", "4", "5", "9", "A, B, D", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2, 3, 5 are primes."]);
+        templateSheet.addRow(["INT", sampleClass, "Math", "Algebra", "EASY", 2, "2+2=?", "", "", "", "", "", "", "4"]);
+        templateSheet.addRow(["AR", sampleClass, "History", "Events", "MEDIUM", 1, "", "", "", "", "", "", "1", "", "S1 is true", "S2 is reason"]);
+        templateSheet.addRow(["MTF", sampleClass, "GK", "Capitals", "MEDIUM", 5, "Match capitals:", "", "", "", "", "", "", "", "", "", "India", "USA", "France", "", "", "Delhi", "Washington", "Paris", "", "", "1-A, 2-B, 3-C"]);
 
         // Freeze top row
-        templateSheet.views = [
-            { state: 'frozen', xSplit: 0, ySplit: 1 }
-        ];
+        templateSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
 
-        // Buffer write
         const buffer = await workbook.xlsx.writeBuffer();
 
         return new NextResponse(buffer, {
@@ -190,9 +179,6 @@ export async function GET() {
         });
     } catch (error) {
         console.error("Error creating sample template:", error);
-        return NextResponse.json(
-            { error: "Failed to generate sample template" },
-            { status: 500 }
-        );
+        return NextResponse.json({ error: "Failed to generate sample template" }, { status: 500 });
     }
 }

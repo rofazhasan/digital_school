@@ -9,6 +9,7 @@ interface OMRSheetProps {
     ar?: any[];
     cq?: any[];
     sq?: any[];
+    mtf?: any[];
   };
   qrData: any;
   rollDigits?: number; // default 6
@@ -50,22 +51,21 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
   // Vertical field helper with box, box and bubble same width
   const verticalField = (label: string, digits: number, fontClass: string = 'omr-bubble-font', width = 1, colClass = '', size = bubbleSize) => (
-    <div className={`flex flex-col items-center mx-0.5 ${colClass}`} style={{ minWidth: width * (size + 4) }}>
-      <div className="text-xs font-bold mb-0.5 text-center" style={{ fontWeight: 700 }}>{label}</div>
+    <div className={`flex flex-col items-center mx-0.5 ${colClass}`} style={{ minWidth: width * (size + 6) }}>
+      <div className="text-[10px] font-black mb-1 p-0.5 bg-black text-white w-full text-center uppercase tracking-tighter">{label}</div>
       {/* Box for hand-written entry, same width as bubble */}
-      <div className="flex flex-row gap-0.5 mb-0.5">
+      <div className="flex flex-row gap-1 mb-1">
         {Array.from({ length: width }).map((_, idx) => (
-          <div key={idx} className="border border-black bg-white" style={{ width: size, height: size * 0.9, fontSize: size * 0.5 }}></div>
+          <div key={idx} className="border-2 border-black bg-white flex items-center justify-center font-black" style={{ width: size, height: size + 4, fontSize: size * 0.7 }}></div>
         ))}
       </div>
-      <div className="flex flex-row gap-0.5">
+      <div className="flex flex-row gap-1 p-1 bg-white border-2 border-black rounded">
         {Array.from({ length: width }).map((_, idx) => (
-          <div key={idx} className="flex flex-col items-center gap-0.5">
+          <div key={idx} className="flex flex-col items-center gap-1">
             {DIGITS.map((d) => (
               <div
                 key={d}
-                className={`border-2 border-black rounded-full ${fontClass} flex items-center justify-center bg-white`}
-                style={{ width: size, height: size, fontSize: size * 0.6, fontWeight: 700 }}
+                className="w-4 h-4 border border-black rounded-full flex items-center justify-center text-[9px] font-black hover:bg-black hover:text-white"
                 aria-label={`${label} digit ${idx + 1} option ${d}`}
               >{d}</div>
             ))}
@@ -77,24 +77,23 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
   // Render a single column of 25 questions
   const renderMCQColumn = (startIdx: number, endIdx: number) => (
-    <table className="w-full text-center border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+    <table className="w-full text-center border-collapse" style={{ tableLayout: 'fixed' }}>
       <thead>
-        <tr>
-          <th className="border-b-2 border-black text-base py-1 font-bold">প্রশ্ন</th>
-          {mcqOptionLabels.map((l, i) => (
-            <th key={i} className="border-b-2 border-black text-base py-1 font-bold">{l}</th>
+        <tr className="bg-black text-white">
+          <th className="text-[10px] font-black py-0.5">Q</th>
+          {mcqOptionLabels.slice(0, 4).map((l, i) => (
+            <th key={i} className="text-[10px] font-black py-0.5">{l}</th>
           ))}
         </tr>
       </thead>
-      <tbody>
+      <tbody className="divide-y divide-black/10">
         {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => (
-          <tr key={idx} className="">
-            <td className="border-b border-gray-400 text-base py-1 px-1 font-bold" style={{ height: '28px' }}>{idx + 1}</td>
-            {mcqOptionLabels.map((l, oidx) => (
-              <td key={oidx} className="border-b border-gray-300 py-1 px-1" style={{ height: '28px' }}>
+          <tr key={idx} className="hover:bg-gray-50">
+            <td className="text-[10px] font-black py-1 border-r border-black/20">{idx + 1}</td>
+            {mcqOptionLabels.slice(0, 4).map((l, oidx) => (
+              <td key={oidx} className="py-1">
                 <div
-                  className="border-2 border-black rounded-full flex items-center justify-center mx-auto bg-white text-lg font-bold"
-                  style={{ width: answerBubbleSize, height: answerBubbleSize, fontSize: answerBubbleSize * 0.7, fontWeight: 700 }}
+                  className="w-5 h-5 border-2 border-black rounded-full flex items-center justify-center mx-auto bg-white text-[10px] font-black"
                   aria-label={`MCQ ${idx + 1} option ${l}`}
                 >{l}</div>
               </td>
@@ -107,28 +106,27 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
   // Render MC (Multiple Correct) questions - each question has checkboxes for all options
   const renderMCColumn = (startIdx: number, endIdx: number, mcQuestions: { q: string; options: string[] }[]) => (
-    <table className="w-full text-center border-collapse text-xs" style={{ tableLayout: 'fixed' }}>
+    <table className="w-full text-center border-collapse" style={{ tableLayout: 'fixed' }}>
       <thead>
-        <tr>
-          <th className="border-b-2 border-black text-base py-1 font-bold">প্রশ্ন</th>
-          {mcqOptionLabels.map((l, i) => (
-            <th key={i} className="border-b-2 border-black text-base py-1 font-bold">{l}</th>
+        <tr className="bg-gray-800 text-white font-black text-[10px]">
+          <th className="py-0.5">Q</th>
+          {mcqOptionLabels.slice(0, 5).map((l, i) => (
+            <th key={i} className="py-0.5">{l}</th>
           ))}
         </tr>
       </thead>
-      <tbody>
+      <tbody className="divide-y divide-black/10">
         {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
           if (idx >= mcQuestions.length) return null;
           return (
-            <tr key={idx} className="">
-              <td className="border-b border-gray-400 text-base py-1 px-1 font-bold" style={{ height: '28px' }}>{idx + 1}</td>
-              {mcqOptionLabels.map((l, oidx) => (
-                <td key={oidx} className="border-b border-gray-300 py-1 px-1" style={{ height: '28px' }}>
+            <tr key={idx} className="hover:bg-gray-100">
+              <td className="text-[10px] font-black py-1 border-r border-black/20">{idx + 1}</td>
+              {mcqOptionLabels.slice(0, 5).map((l, oidx) => (
+                <td key={oidx} className="py-1">
                   <div
-                    className="border-2 border-black rounded-sm flex items-center justify-center mx-auto bg-white text-sm font-bold"
-                    style={{ width: answerBubbleSize - 2, height: answerBubbleSize - 2, fontSize: (answerBubbleSize - 2) * 0.5, fontWeight: 700 }}
+                    className="w-4 h-4 border-2 border-black rounded-sm flex items-center justify-center mx-auto bg-white"
                     aria-label={`MC ${idx + 1} option ${l}`}
-                  >☐</div>
+                  ></div>
                 </td>
               ))}
             </tr>
@@ -138,126 +136,305 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
     </table>
   );
 
+  // Render AR (Assertion-Reason) - usually 5 options
+  const renderARColumn = (startIdx: number, endIdx: number, arQuestions: any[]) => {
+    const labels = ['1', '2', '3', '4', '5'];
+    return (
+      <table className="w-full text-center border-collapse" style={{ tableLayout: 'fixed' }}>
+        <thead>
+          <tr className="bg-gray-800 text-white font-black text-[10px]">
+            <th className="py-0.5">Q</th>
+            {labels.map((l, i) => (
+              <th key={i} className="py-0.5">{l}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-black/10">
+          {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+            if (idx >= arQuestions.length) return null;
+            return (
+              <tr key={idx} className="hover:bg-gray-100">
+                <td className="text-[10px] font-black py-1 border-r border-black/20">{idx + 1}</td>
+                {labels.map((l, oidx) => (
+                  <td key={oidx} className="py-1">
+                    <div
+                      className="w-4 h-4 border-2 border-black rounded-full flex items-center justify-center mx-auto bg-white text-[9px] font-black"
+                    >{l}</div>
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  };
+
+  // Render MTF (Match the Following) Grid
+  const renderMTFSection = (mtfQuestions: any[]) => (
+    <div className="mt-2 space-y-3">
+      {mtfQuestions.map((q, qIndex) => (
+        <div key={qIndex} className="border border-black p-1.5 rounded relative bg-white overflow-hidden">
+          <div className="text-[8px] font-black uppercase mb-1.5 border-b border-black pb-0.5 flex justify-between items-center bg-gray-100 -mx-1.5 px-1.5">
+            <span>MTF Question {qIndex + 1}</span>
+            <span className="opacity-50 text-[6px]">MATRIX TYPE</span>
+          </div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="border-b border-black/30 text-[8px]">#</th>
+                {q.rightColumn.map((rc: any) => (
+                  <th key={rc.id} className="border-b border-black/30 text-[10px] font-black">{rc.id}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {q.leftColumn.map((lc: any) => (
+                <tr key={lc.id}>
+                  <td className="border-b border-black/10 text-[10px] font-black py-1">{lc.id}</td>
+                  {q.rightColumn.map((rc: any) => (
+                    <td key={rc.id} className="border-b border-black/10 py-1 text-center">
+                      <div className="w-3.5 h-3.5 rounded-full border border-black mx-auto hover:bg-black transition-colors duration-200"></div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Render INT (Integer) Column
+  const renderINTColumn = (startIdx: number, endIdx: number, intQuestions: any[]) => (
+    <table className="w-full text-center border-collapse" style={{ tableLayout: 'fixed' }}>
+      <thead>
+        <tr className="bg-gray-800 text-white font-black text-[10px]">
+          <th className="py-0.5">Q</th>
+          <th className="py-0.5">Int Answer</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-black/10">
+        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+          if (idx >= intQuestions.length) return null;
+          return (
+            <tr key={idx} className="hover:bg-gray-100">
+              <td className="text-[10px] font-black py-2 border-r border-black/20">{idx + 1}</td>
+              <td className="py-2 flex justify-center gap-1">
+                {[1, 2, 3].map(pos => (
+                  <div key={pos} className="flex flex-col gap-0.5 bg-gray-200 p-0.5 border border-black rounded">
+                    <div className="w-4 h-4 bg-white border border-black flex items-center justify-center text-[8px] font-black">▢</div>
+                    <div className="grid grid-cols-2 gap-0.5">
+                      {DIGITS.map(d => (
+                        <div key={d} className="w-2.5 h-2.5 border border-black rounded-full text-[6px] font-black flex items-center justify-center bg-white">{d}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
   return (
-    <div className="w-full h-full flex flex-col items-stretch p-0 gap-0 omr-bg-pink relative" style={{ fontFamily, borderRadius: 8, border: '2px solid #222', maxWidth: '8.27in', minHeight: '11.69in', background: '#ffb6e6', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
-      {/* Header: Exam info, logo, confidential, etc. */}
-      <div className="w-full flex flex-row items-center justify-between px-2 pt-2 pb-1 border-b border-black bg-white" style={{ minHeight: 0, marginBottom: 2 }}>
-        {/* Left: Logo or watermark (if any) */}
-        <div className="flex items-center gap-1 min-w-0">
+    <div className="w-full h-full flex flex-col items-stretch p-0 gap-0 bg-white relative print:m-0" style={{ fontFamily, border: '2px solid #000', maxWidth: '8.27in', minHeight: '11.69in', pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+
+      {/* Precision Timing Track (Left) */}
+      <div className="absolute left-0 top-0 bottom-0 w-4 flex flex-col justify-around py-10 z-20 pointer-events-none">
+        {Array.from({ length: 48 }).map((_, i) => (
+          <div key={i} className="w-4 h-2 bg-black"></div>
+        ))}
+      </div>
+
+      {/* Precision Timing Track (Right) */}
+      <div className="absolute right-0 top-0 bottom-0 w-4 flex flex-col justify-around py-10 z-20 pointer-events-none">
+        {Array.from({ length: 48 }).map((_, i) => (
+          <div key={i} className="w-4 h-2 bg-black"></div>
+        ))}
+      </div>
+
+      {/* Precision Anchor: Top-Left L-Stone */}
+      <div className="absolute left-6 top-6 w-12 h-12 flex flex-col items-start justify-start z-30">
+        <div className="w-12 h-4 bg-black"></div>
+        <div className="w-4 h-8 bg-black"></div>
+      </div>
+
+      {/* Precision Anchor: Top-Right L-Stone */}
+      <div className="absolute right-6 top-6 w-12 h-12 flex flex-col items-end justify-start z-30">
+        <div className="w-12 h-4 bg-black"></div>
+        <div className="w-4 h-8 bg-black"></div>
+      </div>
+
+      {/* Precision Anchor: Bottom-Left L-Stone */}
+      <div className="absolute left-6 bottom-6 w-12 h-12 flex flex-col items-start justify-end z-30">
+        <div className="w-4 h-8 bg-black"></div>
+        <div className="w-12 h-4 bg-black"></div>
+      </div>
+
+      {/* Precision Anchor: Bottom-Right L-Stone */}
+      <div className="absolute right-6 bottom-6 w-12 h-12 flex flex-col items-end justify-end z-30">
+        <div className="w-4 h-8 bg-black"></div>
+        <div className="w-12 h-4 bg-black"></div>
+      </div>
+
+      {/* Header Area */}
+      <div className="w-full flex flex-row items-center justify-between px-16 pt-8 pb-4 border-b-2 border-black bg-white">
+        <div className="flex items-center gap-3">
           {logoUrl && (
-            <img src={logoUrl} alt="Logo" className="h-7 w-7 object-contain mr-1" style={{ maxHeight: 28 }} />
+            <img src={logoUrl} alt="Logo" className="h-12 w-12 object-contain" />
           )}
-          <span className="text-xs font-semibold text-gray-700 whitespace-nowrap leading-tight" style={{ lineHeight: 1.1 }}>{instituteName}</span>
+          <div className="flex flex-col">
+            <span className="text-sm font-black text-black uppercase tracking-widest">{instituteName}</span>
+            <span className="text-xs font-bold text-gray-600 uppercase tracking-tighter">OMR ANSWER SHEET</span>
+          </div>
         </div>
-        {/* Center: Exam title and info */}
-        <div className="flex flex-col items-center flex-1 min-w-0 px-1">
-          <span className="text-base font-bold text-black leading-tight" style={{ lineHeight: 1.1 }}>{examTitle}</span>
-          <span className="text-xs text-gray-700 font-medium leading-tight" style={{ lineHeight: 1.1 }}>{examDate} | {subjectName} | {setName}</span>
+
+        <div className="flex flex-col items-center flex-1">
+          <span className="text-xl font-black text-black uppercase">{examTitle}</span>
+          <div className="flex gap-4 mt-1">
+            <span className="text-xs bg-black text-white px-2 py-0.5 font-bold uppercase">{subjectName}</span>
+            <span className="text-xs border-2 border-black px-2 py-0.5 font-bold uppercase">{examDate}</span>
+          </div>
         </div>
-        {/* Right: Confidential */}
-        <div className="flex flex-col items-end min-w-0">
+
+        <div className="flex flex-col items-end border-l-2 border-black pl-4">
           {uniqueCode && (
-            <span className="text-[10px] text-gray-500 font-mono mt-0.5">#{uniqueCode}</span>
+            <span className="text-[10px] font-mono font-bold text-black transform rotate-90 origin-right translate-y-4">#{uniqueCode}</span>
           )}
+          <div className="text-xs font-black bg-gray-100 p-1 border border-black">SET: {setName || 'NULL'}</div>
         </div>
       </div>
-      {/* Anchors for Computer Vision - Large Solid Squares */}
-      {/* Top-Left */}
-      <div className="absolute left-2 top-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
-      {/* Top-Right */}
-      <div className="absolute right-2 top-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
-      {/* Bottom-Left */}
-      <div className="absolute left-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
-      {/* Bottom-Right */}
-      <div className="absolute right-2 bottom-2 w-6 h-6 bg-black rounded-none" style={{ zIndex: 10 }}></div>
 
-      {/* Main OMR body */}
-      <div className="flex-1 w-full flex flex-row items-stretch p-2 gap-0 omr-bg-pink">
-        {/* Left: Four-column MCQ Answer Table (fit 100 questions) */}
-        <div className="flex-[4] flex flex-row gap-0 border border-black rounded bg-white p-1 justify-between min-w-0">
-          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(0, 25)}</div>
-          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(25, 50)}</div>
-          <div className="w-1/4 min-w-0 border-r border-gray-400">{renderMCQColumn(50, 75)}</div>
-          <div className="w-1/4 min-w-0">{renderMCQColumn(75, 100)}</div>
+      {/* Main Container */}
+      <div className="flex-1 flex flex-row items-stretch mx-12 my-4 gap-6">
+
+        {/* Left Section: Answer Grid */}
+        <div className="flex-[5] flex flex-col gap-4">
+          <div className="grid grid-cols-4 gap-4 border-4 border-black p-2 bg-white rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,0.1)]">
+            <div className="border-r-2 border-black pr-2">
+              {renderMCQColumn(0, 25)}
+            </div>
+            <div className="border-r-2 border-black pr-2">
+              {renderMCQColumn(25, 50)}
+            </div>
+            <div className="border-r-2 border-black pr-2">
+              {renderMCQColumn(50, 75)}
+            </div>
+            <div className="pl-1">
+              {renderMCQColumn(75, 100)}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            {questions.mc && questions.mc.length > 0 && (
+              <div className="border-2 border-black p-2 rounded bg-gray-50">
+                <div className="text-[10px] font-black uppercase mb-1 border-b border-black">Multiple Correct (MC)</div>
+                {renderMCColumn(0, 10, questions.mc)}
+              </div>
+            )}
+            {questions.ar && questions.ar.length > 0 && (
+              <div className="border-2 border-black p-2 rounded bg-gray-50">
+                <div className="text-[10px] font-black uppercase mb-1 border-b border-black">Assertion-Reason (AR)</div>
+                {renderARColumn(0, 10, questions.ar)}
+              </div>
+            )}
+            {questions.int && questions.int.length > 0 && (
+              <div className="border-2 border-black p-2 rounded bg-gray-50">
+                <div className="text-[10px] font-black uppercase mb-1 border-b border-black">Integer Type (INT)</div>
+                {renderINTColumn(0, 10, questions.int)}
+              </div>
+            )}
+          </div>
+
+          {questions.mtf && questions.mtf.length > 0 && (
+            <div className="border-2 border-black p-2 rounded bg-white">
+              <div className="text-[10px] font-black uppercase mb-1 border-b border-black">Match The Following (MTF)</div>
+              {renderMTFSection(questions.mtf)}
+            </div>
+          )}
         </div>
-        {/* Vertical black bar between answer grid and right column */}
-        <div className="w-2 bg-black mx-1"></div>
-        {/* Right: Fields, QR, Signature, Instructions (compact, bold, boxed) */}
-        <div className="flex flex-col items-center justify-between min-w-[170px] max-w-[200px] border-4 border-black rounded bg-white p-2 h-full relative">
-          {/* Roll and set code, with separator */}
-          <div className="flex flex-row w-full justify-center mb-1">
-            {verticalField('রোল নম্বর', rollDigits, 'Noto Serif Bengali, serif', rollDigits, '', bubbleSize)}
+
+        {/* Right Section: Student Data */}
+        <div className="flex-[2] flex flex-col gap-4 border-4 border-black bg-gray-50 p-2 rounded-lg relative overflow-hidden">
+          {/* Subtle Watermark */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none -rotate-45">
+            <span className="text-4xl font-black">CONFIDENTIAL</span>
+          </div>
+
+          <div className="flex flex-col items-center">
+            {verticalField('রোল নম্বর', rollDigits, 'Noto Serif Bengali, serif', rollDigits, 'bg-white border p-1 rounded', 14)}
+          </div>
+
+          <div className="w-full border-t border-black border-dashed"></div>
+
+          <div className="flex flex-row justify-center gap-2">
             <div className="flex flex-col items-center">
-              <div className="text-xs font-semibold mb-1">সেট কোড</div>
-              <div className="flex flex-col items-center gap-1">
-                <div className="border border-black w-7 h-7 mb-1 bg-white"></div>
+              <div className="text-[10px] font-black mb-1">সেট কোড</div>
+              <div className="p-1 border bg-white rounded flex flex-col items-center gap-1">
+                <div className="w-6 h-6 border-2 border-black mb-1 bg-gray-100 flex items-center justify-center text-xs font-bold">▢</div>
                 {mcqOptionLabels.map((l) => (
-                  <div
-                    key={l}
-                    className="border-2 border-black rounded-full flex items-center justify-center bg-white text-lg font-bold"
-                    style={{ width: bubbleSize, height: bubbleSize, fontSize: bubbleSize * 0.7, fontWeight: 700 }}
-                  >
+                  <div key={l} className="w-5 h-5 border border-black rounded-full flex items-center justify-center text-[10px] font-black hover:bg-black hover:text-white cursor-pointer transition-colors duration-200">
                     {l}
                   </div>
                 ))}
               </div>
             </div>
-          </div>
-          <div className="w-full border-t-2 border-black my-1"></div>
-          {/* Registration and subject code, with separator */}
-          <div className="flex flex-row w-full justify-center mb-1">
-            {verticalField('রেজিস্ট্রেশন নম্বর', 6, 'Times New Roman', 6, '', bubbleSize)}
-            {verticalField('বিষয় কোড', 3, 'Noto Serif Bengali, serif', 3, '', bubbleSize)}
-          </div>
-          <div className="w-full border-t-2 border-black my-1"></div>
-          {/* QR and Set */}
-          <div className="flex flex-col items-center mb-1">
-            <QRCode value={JSON.stringify(qrData)} size={90} />
-            {setName && <div className="text-xs font-bold mt-1">সেট: {setName}</div>}
-          </div>
-          <div className="flex flex-row justify-between w-full gap-2 mt-1">
-            <div className="flex flex-col items-center flex-1">
-              <div className="  w-12 h-6"></div>
-
+            <div className="flex flex-col items-center justify-center pt-4">
+              <QRCode value={JSON.stringify(qrData)} size={64} />
+              <span className="text-[8px] font-mono mt-1 opacity-50 uppercase">Secured QR</span>
             </div>
           </div>
-          <div className="flex flex-row justify-between w-full gap-2 mt-1">
-            <div className="flex flex-col items-center flex-1">
-              <div className="  w-12 h-6"></div>
 
+          <div className="w-full border-t border-black border-dashed"></div>
+
+          <div className="flex flex-col items-center">
+            {verticalField('বিষয় কোড', 3, 'Noto Serif Bengali, serif', 3, 'bg-white border p-1 rounded', 14)}
+          </div>
+
+          <div className="mt-auto space-y-4">
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase text-gray-500">Student's Signature</span>
+              <div className="h-10 border-2 border-black bg-white rounded shadow-inner"></div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[9px] font-black uppercase text-gray-500">Invigilator's Signature</span>
+              <div className="h-10 border-2 border-black bg-white rounded shadow-inner"></div>
             </div>
           </div>
-          {/* Signature box */}
-          <div className="flex flex-row justify-between w-full gap-2 mt-1">
-            <div className="flex flex-col items-center flex-1">
-              <div className="border border-black w-full h-10 flex flex-col justify-center items-center"></div>
 
-            </div>
-          </div>
-          <div className="flex flex-col items-center w-full mt-2 mb-1">
-            <div className="">
-              <span className="text-xs font-bold">কক্ষ পরিদর্শকের স্বাক্ষর ও তারিখ</span>
-            </div>
-
-          </div>
-          {/* Large instruction block at bottom */}
-          <div className="w-full mt-2 p-2 border-2 border-black rounded bg-white text-xs font-bold text-center leading-tight" style={{ fontWeight: 700 }}>
-            <div>নিয়মাবলি</div>
-            <ol className="list-decimal list-inside text-left mt-1">
-              <li>
-                সঠিক পদ্ধতি
-                <span className="inline-block w-4 h-4 border-2 border-black rounded-full bg-black align-middle mx-1"></span>
-                ভুল পদ্ধতি
-                <span className="inline-block w-4 h-4 border-2 border-black rounded-full bg-cross-mark align-middle mx-1"></span>
+          {/* New Optimized Space Algorithm for Instructions */}
+          <div className="mt-4 p-2 border border-black bg-white text-[9px] leading-tight rounded">
+            <div className="font-black text-center mb-1 border-b border-black pb-0.5">INSTRUCTIONS / নিয়মাবলি</div>
+            <ul className="space-y-1 font-bold">
+              <li className="flex items-start gap-1">
+                <span className="text-blue-500">•</span>
+                <span>Use Black Ball-Point Pen only.</span>
               </li>
-              <li> অংশবিশেষ ভরাট করতে হবে।</li>
-              <li>উত্তরপত্রে নির্ধারিত স্থানে ব্যতীত কোন অতিরিক্ত দাগ বা লেখা যাবে না।</li>
-              <li>শুধুমাত্র কালো বল-পয়েন্ট কলম দিয়ে বাবল ভরাট করতে হবে।</li>
-              <li>সেট কোড না লিখলে/ভুল ভরাট করলে উত্তরপত্র বাতিল হবে।</li>
-            </ol>
+              <li className="flex items-start gap-1">
+                <span className="text-red-500">•</span>
+                <span>Filling more than one bubble per row is invalid.</span>
+              </li>
+              <li className="flex items-start gap-1">
+                <span className="text-green-500">•</span>
+                <span>Darken the bubble completely: ⬤</span>
+              </li>
+            </ul>
           </div>
         </div>
+
       </div>
+
+      {/* Bottom Timing Track (Horizontal) */}
+      <div className="absolute bottom-0 left-0 right-0 h-4 flex flex-row justify-around px-20 z-20 pointer-events-none">
+        {Array.from({ length: 32 }).map((_, i) => (
+          <div key={i} className="w-2 h-4 bg-black"></div>
+        ))}
+      </div>
+
     </div>
   );
 };

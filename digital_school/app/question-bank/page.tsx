@@ -25,6 +25,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { MCQuestionForm } from "@/app/components/MCQuestionForm";
 import { INTQuestionForm } from "@/app/components/INTQuestionForm";
 import { ARQuestionForm } from "@/app/components/ARQuestionForm";
+import { MTFQuestionForm } from "@/app/components/MTFQuestionForm";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -40,7 +41,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
@@ -50,6 +51,9 @@ type Question = {
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
   modelAnswer?: string | null;
   assertion?: string | null; reason?: string | null; correctOption?: number | null;
+  leftColumn?: Array<{ id: string; text: string }>;
+  rightColumn?: Array<{ id: string; text: string }>;
+  matches?: Record<string, string>;
   class: { id: string; name: string }; createdBy: { id: string; name: string };
   questionBanks: QuestionBank[]; createdAt: string; isAiGenerated?: boolean;
   images?: string[];
@@ -140,62 +144,62 @@ const ThreeJSBackground: React.FC = () => {
 const MathToolbar = ({ onInsert }: { onInsert: (text: string) => void }) => {
   const symbols = [
     // Basic operations
-    { display: '√x', latex: '$\\sqrt{}$' },
-    { display: 'x²', latex: '$^{2}$' },
-    { display: 'x/y', latex: '$\\frac{}{}$' },
-    { display: '±', latex: '$\\pm$' },
-    { display: '≠', latex: '$\\neq$' },
-    { display: '≤', latex: '$\\leq$' },
-    { display: '≥', latex: '$\\geq$' },
+    { display: '√x', latex: '$$\\sqrt{}$$' },
+    { display: 'x²', latex: '$$^{2}$$' },
+    { display: 'x/y', latex: '$$\\frac{}{}$$' },
+    { display: '±', latex: '$$\\pm$$' },
+    { display: '≠', latex: '$$\\neq$$' },
+    { display: '≤', latex: '$$\\leq$$' },
+    { display: '≥', latex: '$$\\geq$$' },
 
     // Greek letters
-    { display: 'α', latex: '$\\alpha$' },
-    { display: 'β', latex: '$\\beta$' },
-    { display: 'π', latex: '$\\pi$' },
-    { display: 'θ', latex: '$\\theta$' },
-    { display: 'φ', latex: '$\\phi$' },
-    { display: 'Δ', latex: '$\\Delta$' },
+    { display: 'α', latex: '$$\\alpha$$' },
+    { display: 'β', latex: '$$\\beta$$' },
+    { display: 'π', latex: '$$\\pi$$' },
+    { display: 'θ', latex: '$$\\theta$$' },
+    { display: 'φ', latex: '$$\\phi$$' },
+    { display: 'Δ', latex: '$$\\Delta$$' },
 
     // Calculus
-    { display: '∑', latex: '$\\sum_{i=1}^{n}$' },
-    { display: '∫', latex: '$\\int_{a}^{b}$' },
-    { display: 'dx', latex: '$dx$' },
-    { display: 'dy/dx', latex: '$\\frac{dy}{dx}$' },
-    { display: 'lim', latex: '$\\lim_{x \\to a}$' },
+    { display: '∑', latex: '$$\\sum_{i=1}^{n}$$' },
+    { display: '∫', latex: '$$\\int_{a}^{b}$$' },
+    { display: 'dx', latex: '$$dx$$' },
+    { display: 'dy/dx', latex: '$$\\frac{dy}{dx}$$' },
+    { display: 'lim', latex: '$$\\lim_{x \\to a}$$' },
 
     // Arrows and logic
-    { display: '→', latex: '$\\rightarrow$' },
-    { display: '←', latex: '$\\leftarrow$' },
-    { display: '↔', latex: '$\\leftrightarrow$' },
-    { display: '∴', latex: '$\\therefore$' },
-    { display: '∵', latex: '$\\because$' },
+    { display: '→', latex: '$$\\rightarrow$$' },
+    { display: '←', latex: '$$\\leftarrow$$' },
+    { display: '↔', latex: '$$\\leftrightarrow$$' },
+    { display: '∴', latex: '$$\\therefore$$' },
+    { display: '∵', latex: '$$\\because$$' },
 
     // Sets and logic
-    { display: '∈', latex: '$\\in$' },
-    { display: '∉', latex: '$\\notin$' },
-    { display: '⊂', latex: '$\\subset$' },
-    { display: '∪', latex: '$\\cup$' },
-    { display: '∩', latex: '$\\cap$' },
+    { display: '∈', latex: '$$\\in$$' },
+    { display: '∉', latex: '$$\\notin$$' },
+    { display: '⊂', latex: '$$\\subset$$' },
+    { display: '∪', latex: '$$\\cup$$' },
+    { display: '∩', latex: '$$\\cap$$' },
 
     // Tables and matrices
-    { display: 'Table', latex: '$\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$' },
-    { display: 'Matrix', latex: '$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$' },
-    { display: 'Det', latex: '$\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$' },
+    { display: 'Table', latex: '$$\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$$' },
+    { display: 'Matrix', latex: '$$\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$$' },
+    { display: 'Det', latex: '$$\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$$' },
 
     // Geometry
-    { display: '△', latex: '$\\triangle$' },
-    { display: '⊙', latex: '$\\odot$' },
-    { display: '□', latex: '$\\square$' },
-    { display: '∠', latex: '$\\angle$' },
-    { display: '∥', latex: '$\\parallel$' },
-    { display: '⊥', latex: '$\\perp$' },
+    { display: '△', latex: '$$\\triangle$$' },
+    { display: '⊙', latex: '$$\\odot$$' },
+    { display: '□', latex: '$$\\square$$' },
+    { display: '∠', latex: '$$\\angle$$' },
+    { display: '∥', latex: '$$\\parallel$$' },
+    { display: '⊥', latex: '$$\\perp$$' },
 
     // Common expressions
-    { display: 'x²+y²', latex: '$x^2 + y^2$' },
-    { display: 'ax²+bx+c', latex: '$ax^2 + bx + c$' },
-    { display: 'sin(x)', latex: '$\\sin(x)$' },
-    { display: 'cos(x)', latex: '$\\cos(x)$' },
-    { display: 'tan(x)', latex: '$\\tan(x)$' },
+    { display: 'x²+y²', latex: '$$x^2 + y^2$$' },
+    { display: 'ax²+bx+c', latex: '$$ax^2 + bx + c$$' },
+    { display: 'sin(x)', latex: '$$\\sin(x)$' },
+    { display: 'cos(x)', latex: '$$\\cos(x)$' },
+    { display: 'tan(x)', latex: '$$\\tan(x)$' },
   ];
 
   return (
@@ -1118,6 +1122,59 @@ const QuestionCard: React.FC<{
               </div>
             </div>
           )}
+
+          {/* MTF Display */}
+          {question.type === 'MTF' && question.leftColumn && (
+            <div className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-3 bg-blue-500 rounded-full"></div>
+                    <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400">Column A</p>
+                  </div>
+                  <div className="bg-blue-50/20 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/50 rounded-xl p-3 space-y-2">
+                    {(question.leftColumn || []).map((item: any) => (
+                      <div key={item.id} className="text-xs flex gap-2">
+                        <span className="font-bold text-blue-600">{item.id}.</span>
+                        <UniversalMathJax>{item.text}</UniversalMathJax>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1 h-3 bg-purple-500 rounded-full"></div>
+                    <p className="text-[10px] font-black uppercase text-purple-700 dark:text-purple-400">Column B</p>
+                  </div>
+                  <div className="bg-purple-50/20 dark:bg-purple-900/10 border border-purple-100/50 dark:border-blue-800/50 rounded-xl p-3 space-y-2">
+                    {(question.rightColumn || []).map((item: any) => (
+                      <div key={item.id} className="text-xs flex gap-2">
+                        <span className="font-bold text-purple-600">{item.id}.</span>
+                        <UniversalMathJax>{item.text}</UniversalMathJax>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Correct Matches Summary */}
+              {question.matches && (
+                <div className="p-3 bg-green-50/30 dark:bg-green-900/20 border border-green-100 dark:border-green-800 rounded-2xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1 h-3 bg-green-500 rounded-full"></div>
+                    <p className="text-[10px] font-black uppercase text-green-700 dark:text-green-400">Correct Matches</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(question.matches || {}).map(([leftId, rightId]) => (
+                      <Badge key={leftId} variant="outline" className="text-[10px] bg-white dark:bg-gray-950 font-mono">
+                        {String(leftId)} → {String(rightId)}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex items-center justify-between px-6 py-4 bg-gray-50/80 dark:bg-gray-800/80 border-t border-gray-100 dark:border-gray-800 backdrop-blur-sm mt-auto">
@@ -1159,8 +1216,8 @@ const QuestionCard: React.FC<{
             </Button>
           </div>
         </CardFooter>
-      </Card>
-    </motion.div>
+      </Card >
+    </motion.div >
   );
 };
 
@@ -1199,6 +1256,18 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   const [assertion, setAssertion] = useState(initialData?.assertion || '');
   const [reason, setReason] = useState(initialData?.reason || '');
   const [correctOption, setCorrectOption] = useState(initialData?.correctOption || 1);
+  const [leftColumn, setLeftColumn] = useState<any[]>(initialData?.leftColumn || [
+    { id: '1', text: '' },
+    { id: '2', text: '' },
+    { id: '3', text: '' }
+  ]);
+  const [rightColumn, setRightColumn] = useState<any[]>(initialData?.rightColumn || [
+    { id: 'A', text: '' },
+    { id: 'B', text: '' },
+    { id: 'C', text: '' }
+  ]);
+  const [matches, setMatches] = useState<Record<string, string>>(initialData?.matches || {});
+  const [explanation, setExplanation] = useState((initialData as any)?.explanation || '');
   const [images, setImages] = useState<string[]>(initialData?.images || []);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1370,6 +1439,20 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       }
     }
 
+    // Validate MTF
+    if (type === 'MTF') {
+      if (leftColumn.some(item => !item.text.trim()) || rightColumn.some(item => !item.text.trim())) {
+        toast({ variant: "destructive", title: "Validation Error", description: "All MTF items must have text" });
+        setIsSaving(false);
+        return;
+      }
+      if (Object.keys(matches).length === 0) {
+        toast({ variant: "destructive", title: "Validation Error", description: "At least one match must be defined" });
+        setIsSaving(false);
+        return;
+      }
+    }
+
     // Validate AR (Assertion-Reason) fields
     if (type === 'AR') {
       if (!assertion || assertion.trim().length < 5) {
@@ -1438,6 +1521,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       assertion: type === 'AR' ? assertion.trim() : null,
       reason: type === 'AR' ? reason.trim() : null,
       correctOption: type === 'AR' ? correctOption : null,
+      leftColumn: type === 'MTF' ? leftColumn : null,
+      rightColumn: type === 'MTF' ? rightColumn : null,
+      matches: type === 'MTF' ? matches : null,
+      explanation: (type === 'AR' || type === 'MTF' || type === 'INT') ? explanation.trim() : undefined,
       hasMath: /\\/.test(questionText) ||
         ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
@@ -1492,7 +1579,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="CQ">CQ</SelectItem><SelectItem value="SQ">SQ</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -1697,6 +1784,22 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 makeFocusHandler={makeFocusHandler}
               />
             )}
+            {type === 'MTF' && (
+              <MTFQuestionForm
+                leftColumn={leftColumn}
+                setLeftColumn={setLeftColumn}
+                rightColumn={rightColumn}
+                setRightColumn={setRightColumn}
+                matches={matches}
+                setMatches={setMatches}
+                explanation={explanation}
+                setExplanation={setExplanation}
+                MathToolbar={MathToolbar}
+                handleInsertSymbol={handleInsertSymbol}
+                textareaRefs={textareaRefs}
+                makeFocusHandler={makeFocusHandler}
+              />
+            )}
             {type === 'SQ' && (
               <div>
                 <Label>Model Answer</Label>
@@ -1832,27 +1935,117 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
             <div className="prose dark:prose-invert max-w-none">
               <UniversalMathJax>{questionText || ''}</UniversalMathJax>
-              {type === 'MCQ' && (
+              {(type === 'MCQ' || type === 'MC') && (
                 <div className="mt-4">
-                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options:</p>
-                  <ul className="list-disc pl-5 space-y-2">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options ({type === 'MC' ? 'Multiple Correct' : 'Single Correct'}):</p>
+                  <ul className="list-none pl-0 space-y-2">
                     {(options || []).map((opt: { text: string; isCorrect: boolean; explanation?: string; image?: string }, i: number) => (
-                      <li key={i} className={`${opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}`}>
-                        <UniversalMathJax inline>{opt.text || `(Option ${i + 1})`}</UniversalMathJax>
-                        {opt.image && (
-                          <div className="my-2">
-                            <img src={opt.image} alt={`Option ${i + 1}`} className="max-h-32 rounded border" />
-                          </div>
-                        )}
-                        {opt.isCorrect && opt.explanation && (
-                          <div className="mt-1 ml-4 p-2 bg-green-50 dark:bg-green-900/20 rounded-md">
-                            <p className="text-xs font-semibold text-green-700 dark:text-green-300 mb-1">Explanation:</p>
-                            <p className="text-xs text-green-600 dark:text-green-400"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></p>
-                          </div>
-                        )}
+                      <li key={i} className={`flex items-start gap-2 p-2 rounded-md border ${opt.isCorrect ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800' : 'bg-white border-gray-100 dark:bg-gray-900/20 dark:border-gray-800'}`}>
+                        <div className={`mt-1 h-4 w-4 rounded flex-shrink-0 flex items-center justify-center text-[10px] text-white font-bold ${opt.isCorrect ? 'bg-green-500' : 'bg-gray-200 dark:bg-gray-700'}`}>
+                          {String.fromCharCode(65 + i)}
+                        </div>
+                        <div className="flex-1">
+                          <UniversalMathJax inline>{opt.text || `(Option ${String.fromCharCode(65 + i)})`}</UniversalMathJax>
+                          {opt.image && (
+                            <div className="my-2">
+                              <img src={opt.image} alt={`Option ${String.fromCharCode(65 + i)}`} className="max-h-32 rounded border shadow-sm" />
+                            </div>
+                          )}
+                          {opt.isCorrect && opt.explanation && (
+                            <div className="mt-2 p-2 bg-green-100/50 dark:bg-green-800/20 rounded border border-green-200/50 dark:border-green-700/50">
+                              <p className="text-[10px] font-bold text-green-700 dark:text-green-300 uppercase leading-none mb-1">Explanation</p>
+                              <div className="text-xs text-green-800 dark:text-green-200"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></div>
+                            </div>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
+                </div>
+              )}
+
+              {type === 'INT' && (
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:border-indigo-800">INTEGER TYPE</Badge>
+                  </div>
+                  <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900">
+                    <p className="text-sm font-bold text-indigo-900 dark:text-indigo-100 mb-1">Correct Answer:</p>
+                    <div className="text-2xl font-black text-indigo-600 dark:text-indigo-400 font-mono tracking-widest">{correctAnswer}</div>
+                    {(modelAnswer || explanation) && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Solution/Explanation</p>
+                        <div className="text-sm p-3 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
+                          <UniversalMathJax>{modelAnswer || explanation}</UniversalMathJax>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {type === 'AR' && (
+                <div className="mt-6 space-y-4">
+                  <div className="p-4 rounded-xl border-2 border-orange-100 bg-orange-50/30 dark:border-orange-900 dark:bg-orange-900/10">
+                    <div className="space-y-4">
+                      <div>
+                        <Badge className="mb-2 bg-orange-500">ASSERTION (A)</Badge>
+                        <div className="text-sm font-medium pl-2 border-l-2 border-orange-200"><UniversalMathJax>{assertion || "Enter assertion statement..."}</UniversalMathJax></div>
+                      </div>
+                      <div>
+                        <Badge className="mb-2 bg-blue-500">REASON (R)</Badge>
+                        <div className="text-sm font-medium pl-2 border-l-2 border-blue-200"><UniversalMathJax>{reason || "Enter reason statement..."}</UniversalMathJax></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-gray-900 text-white shadow-lg">
+                    <div className="text-[10px] font-black tracking-widest text-gray-400 uppercase mb-2">Model Selection</div>
+                    <div className="text-sm font-bold text-orange-400">
+                      Option {correctOption}: {
+                        correctOption === 1 ? "Both A and R are true, and R is the correct explanation of A." :
+                          correctOption === 2 ? "Both A and R are true, but R is NOT the correct explanation of A." :
+                            correctOption === 3 ? "A is true, but R is false." :
+                              correctOption === 4 ? "A is false, but R is true." :
+                                correctOption === 5 ? "Both A and R are false." : "Please select..."
+                      }
+                    </div>
+                    {explanation && (
+                      <div className="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-300">
+                        <span className="font-bold text-white">Explanation: </span>
+                        <UniversalMathJax>{explanation}</UniversalMathJax>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {type === 'MTF' && (
+                <div className="mt-6 space-y-4">
+                  <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">MATCH THE FOLLOWING</Badge>
+                  <div className="grid grid-cols-1 gap-3">
+                    {leftColumn.map((left, idx) => {
+                      const rightId = matches[left.id];
+                      const rightItem = rightColumn.find(r => r.id === rightId);
+                      return (
+                        <div key={left.id} className="flex items-stretch gap-2 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
+                          <div className="flex-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between">
+                            <span className="text-[10px] font-black text-blue-400 mr-2 uppercase">{left.id}</span>
+                            <div className="text-sm font-medium"><UniversalMathJax inline>{left.text || "???"}</UniversalMathJax></div>
+                          </div>
+                          <div className="flex items-center text-gray-300"><ArrowRight className="w-4 h-4" /></div>
+                          <div className="flex-1 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl flex items-center gap-2">
+                            <div className="text-sm font-bold text-purple-700 dark:text-purple-300 flex-1 text-right"><UniversalMathJax inline>{rightItem?.text || "???"}</UniversalMathJax></div>
+                            <span className="text-[10px] font-black text-purple-400 ml-2 uppercase">{rightId || "?"}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {explanation && (
+                    <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-500">
+                      <strong>Note: </strong> <UniversalMathJax>{explanation}</UniversalMathJax>
+                    </div>
+                  )}
                 </div>
               )}
               {type === 'CQ' && (
@@ -2250,6 +2443,59 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       ]
     },
     {
+      "questionText": "Select all prime numbers less than 10.",
+      "type": "MC",
+      "marks": 4,
+      "difficulty": "MEDIUM",
+      "subject": "Mathematics",
+      "className": "Class 10",
+      "options": [
+        { "text": "$$2$$", "isCorrect": true },
+        { "text": "$$3$$", "isCorrect": true },
+        { "text": "$$5$$", "isCorrect": true },
+        { "text": "$$7$$", "isCorrect": true },
+        { "text": "$$9$$", "isCorrect": false }
+      ]
+    },
+    {
+      "type": "INT",
+      "questionText": "What is the value of $$5!$$?",
+      "marks": 2,
+      "difficulty": "EASY",
+      "subject": "Mathematics",
+      "className": "Class 10",
+      "modelAnswer": "120"
+    },
+    {
+      "type": "AR",
+      "assertion": "Diamond is the hardest natural substance.",
+      "reason": "Diamond is an allotrope of carbon with a 3D network structure.",
+      "marks": 1,
+      "difficulty": "MEDIUM",
+      "subject": "Chemistry",
+      "className": "Class 10",
+      "correctOption": 1
+    },
+    {
+      "type": "MTF",
+      "questionText": "Match the following historical events with their years.",
+      "marks": 5,
+      "difficulty": "MEDIUM",
+      "subject": "History",
+      "className": "Class 9",
+      "leftColumn": [
+        { "id": "1", "text": "French Revolution" },
+        { "id": "2", "text": "World War I Start" },
+        { "id": "3", "text": "Indian Independence" }
+      ],
+      "rightColumn": [
+        { "id": "A", "text": "1789" },
+        { "id": "B", "text": "1914" },
+        { "id": "C", "text": "1947" }
+      ],
+      "matches": { "1": "A", "2": "B", "3": "C" }
+    },
+    {
       "questionText": "Explain the laws of motion.",
       "type": "CQ",
       "marks": 10,
@@ -2258,18 +2504,8 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
       "className": "Class 10",
       "subQuestions": [
         { "question": "Define inertia.", "marks": 2, "modelAnswer": "Inertia is the tendency of an object to resist changes in its state of motion." },
-        { "question": "State Newton's Second Law of Motion and provide its mathematical formula.", "marks": 4, "modelAnswer": "Newton's Second Law states that the acceleration of an object is directly proportional to the net force acting on it and inversely proportional to its mass. The formula is $F = ma$, where F is force, m is mass, and a is acceleration." },
-        { "question": "Describe Newton's Third Law of Motion with an example.", "marks": 4, "modelAnswer": "Newton's Third Law states that for every action, there is an equal and opposite reaction. For example, when you push against a wall, the wall pushes back on you with an equal and opposite force." }
+        { "question": "State Newton's Second Law and provide its mathematical formula.", "marks": 4, "modelAnswer": "Newton's Second Law states that $F = ma$." }
       ]
-    },
-    {
-      "questionText": "What is the powerhouse of the cell?",
-      "type": "SQ",
-      "marks": 2,
-      "difficulty": "EASY",
-      "subject": "Biology",
-      "className": "Class 9",
-      "modelAnswer": "Mitochondria"
     }
   ];
 
@@ -2563,6 +2799,7 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                     <TableHead className="w-[180px]">Class</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead className="w-[300px]">Question Text</TableHead>
+                    <TableHead className="w-[150px]">Rendered Preview</TableHead>
                     <TableHead className="w-[50px]">Marks</TableHead>
                     <TableHead className="text-right">Action</TableHead>
                   </TableRow>
@@ -2605,8 +2842,24 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                         <Input
                           value={row.data.subject}
                           onChange={(e) => handleEditRow(index, 'subject', e.target.value)}
-                          className="h-8 text-xs"
+                          className="h-16 text-xs"
                         />
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-[150px] overflow-hidden">
+                          <UniversalMathJax inline dynamic>{row.data.questionText}</UniversalMathJax>
+                          {row.data.type === 'AR' && (
+                            <div className="mt-1 border-t pt-1 text-[10px] space-y-1">
+                              <div className="text-orange-600 font-bold">A: <UniversalMathJax inline>{row.data.assertion}</UniversalMathJax></div>
+                              <div className="text-blue-600 font-bold">R: <UniversalMathJax inline>{row.data.reason}</UniversalMathJax></div>
+                            </div>
+                          )}
+                          {row.data.type === 'MTF' && (
+                            <div className="mt-1 border-t pt-1 text-[10px] text-gray-500 italic">
+                              {row.data.leftColumn?.length || 0} items matching...
+                            </div>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Textarea
