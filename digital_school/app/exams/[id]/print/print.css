@@ -61,6 +61,156 @@
   }
 
   /* ... (header styles) ... */
+  .print-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 40px;
+    background: white;
+    z-index: 100;
+    text-align: center;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .katex {
+    font-size: 1em !important;
+  }
+
+  /* MCQ Two-Column Layout using CSS Columns */
+  /* RESTORED: This is what the user asked for */
+  .mcq-container {
+    columns: 2;
+    column-gap: 2rem;
+    column-fill: auto;
+    orphans: 3;
+    widows: 3;
+  }
+
+  /* MCQ Option Column Layouts */
+  .options-grid-1 {
+    display: block;
+    width: 100%;
+  }
+
+  .options-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .options-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.2rem;
+  }
+
+  /* Premium Section Headers */
+  .mcq-header,
+  h3 {
+    border-bottom: 2px solid #000 !important;
+    background: #f8fafc !important;
+    padding: 2px 8px !important;
+    margin-top: 1rem !important;
+    break-after: avoid !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+  }
+
+  /* Instruction Box */
+  .instruction-box {
+    border: 1.5px solid #000;
+    padding: 8px 12px;
+    margin-bottom: 1.5rem;
+    background-color: #fdfdfd;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* Signature Blocks */
+  .signature-container {
+    margin-top: 3rem;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2rem;
+    break-inside: avoid;
+  }
+
+  .signature-block {
+    text-align: center;
+    width: 200px;
+  }
+
+  .signature-line {
+    border-top: 1.5px solid #000;
+    margin-bottom: 4px;
+  }
+
+  /* Security Watermark */
+  .watermark {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 8rem;
+    color: rgba(0, 0, 0, 0.03);
+    pointer-events: none;
+    z-index: -1;
+    white-space: nowrap;
+    text-transform: uppercase;
+    font-weight: bold;
+    user-select: none;
+  }
+
+  /* QR Code Container Refinement */
+  .qr-container {
+    padding: 4px;
+    border: 1px solid #e5e7eb;
+    border-radius: 4px;
+    background: white;
+  }
+
+  .mcq-page {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Relaxed page breaks */
+  .cq-section,
+  .sq-section {
+    break-before: auto !important;
+    page-break-before: auto !important;
+    margin-top: 1.5rem !important;
+    padding-top: 0 !important;
+    display: block !important;
+    clear: both !important;
+  }
+
+  .sq-section::before,
+  .sq-section::after {
+    content: none !important;
+    display: none !important;
+  }
+
+  .cq-section~.sq-section {
+    break-before: auto !important;
+    page-break-before: auto !important;
+  }
+
+  .cq-question,
+  .sq-question {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .question-block {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    margin-bottom: 0.4rem !important;
+  }
 
   /* OMR Specific Adjustments */
   .omr-sheet-wrapper {
