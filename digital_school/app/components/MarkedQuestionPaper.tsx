@@ -54,6 +54,7 @@ interface INT {
     q: string;
     marks: number;
     answer: number | string;
+    correctAnswer?: number | string;
 }
 interface SQ {
     id?: string;
@@ -378,40 +379,58 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 isCorrect = selectedIndices.length === correctIndices.length && selectedIndices.every((v: number) => correctIndices.includes(v));
                                             }
 
-                                            const statusColor = isCorrect ? 'bg-green-50' : (ans ? 'bg-red-50' : 'bg-gray-50');
+                                            const selectedAny = q.type === 'MC' ? (ans?.selectedOptions?.length > 0) : (ans !== undefined && ans !== null && ans !== '');
+                                            const m = q.type === 'MC' ? getMCMark(q, ans) : getMCQMark(q, ans);
 
-                                            const qMark = q.type === 'MC' ? getMCMark(q, ans) : getMCQMark(q, ans);
-
+                                            // Explanation Rendering (Shared Logic for MCQ)
                                             return (
-                                                <div key={q.id || idx} className={`p-2 rounded border ${statusColor} break-inside-avoid relative`}>
-                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                    <div className="flex items-start">
-                                                        <span className="font-bold mr-2 text-sm">{qNum}.{q.type === 'MC' ? '*' : ''}</span>
-                                                        <div className="flex-1 text-sm">
-                                                            <Text>{q.q || q.questionText}</Text>
-                                                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
-                                                                {(q.options || []).map((opt: any, oidx: number) => {
-                                                                    const isSelected = q.type === 'MC' ? selectedIndices.includes(oidx) : String(singleSelected) === String(opt.text);
-                                                                    const isCorrectOpt = opt.isCorrect || String(opt.text) === String(correctText);
+                                                <div key={q.id || idx}>
+                                                    <div className={`p-3 rounded border ${selectedAny ? (m > 0 ? (m === q.marks ? 'bg-green-50' : 'bg-yellow-50') : 'bg-red-50') : 'bg-gray-50'} break-inside-avoid shadow-sm relative`}>
+                                                        <MarkDisplay earned={m} total={q.marks || 1} />
+                                                        <div className="flex items-start mb-2">
+                                                            <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                            <div className="flex-1 font-bold text-sm"><Text>{q.q}</Text></div>
+                                                        </div>
 
-                                                                    let optClass = "text-gray-700";
-                                                                    if (isSelected) {
-                                                                        optClass = isCorrectOpt ? "text-green-700 font-bold" : "text-red-700 font-bold line-through";
+                                                        {/* Options Grid */}
+                                                        <div className="ml-6 mt-1">
+                                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                                                {(q.options || []).map((opt: any, oidx: number) => {
+                                                                    const isCorrectOpt = opt.isCorrect || (q.correct && q.correct.includes(oidx));
+                                                                    const isSelected = ans?.selectedOptions?.includes(oidx);
+
+                                                                    let optClass = "text-gray-600";
+                                                                    if (isSelected && isCorrectOpt) {
+                                                                        optClass = "text-green-700 font-bold bg-green-100";
+                                                                    } else if (isSelected && !isCorrectOpt) {
+                                                                        optClass = "text-red-600 font-bold line-through decoration-red-500";
                                                                     } else if (isCorrectOpt) {
-                                                                        optClass = "text-green-700 font-bold italic underline";
+                                                                        optClass = "text-green-700 font-bold italic underline decoration-green-500";
                                                                     }
 
                                                                     return (
                                                                         <div key={oidx} className={`flex items-center gap-1 px-1 rounded ${optClass}`}>
                                                                             <span className="font-bold">{MCQ_LABELS[oidx]}.</span>
                                                                             <Text>{opt.text}</Text>
-                                                                            {isSelected && (isCorrectOpt ? <CheckCircle className="w-3 h-3 ml-1 inline" /> : <XCircle className="w-3 h-3 ml-1 inline" />)}
+                                                                            {isSelected && (isCorrectOpt ? <CheckCircle className="w-3 h-3 ml-1 inline text-green-600" /> : <XCircle className="w-3 h-3 ml-1 inline text-red-600" />)}
                                                                         </div>
                                                                     );
                                                                 })}
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Explanation */}
+                                                    {(q as any).explanation && (
+                                                        <div className="mt-1 ml-6 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs break-inside-avoid">
+                                                            <div className="font-bold text-yellow-800 mb-1 flex items-center gap-1">
+                                                                <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
+                                                            </div>
+                                                            <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
+                                                                <Text>{(q as any).explanation}</Text>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         }
@@ -425,35 +444,50 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const qMark = getARMark(q, ans);
 
                                             return (
-                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm col-span-full relative`}>
-                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                    <div className="flex items-start">
-                                                        <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                        <div className="flex-1">
-                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
-                                                                <div className="p-2 bg-indigo-50/50 rounded border border-indigo-100">
-                                                                    <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
-                                                                    <div className="text-sm"><Text>{q.assertion}</Text></div>
+
+                                                <div key={q.id || idx} className="break-inside-avoid col-span-full">
+                                                    <div className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} shadow-sm relative`}>
+                                                        <MarkDisplay earned={qMark} total={q.marks || 1} />
+                                                        <div className="flex items-start">
+                                                            <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                            <div className="flex-1">
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                                                                    <div className="p-2 bg-indigo-50/50 rounded border border-indigo-100">
+                                                                        <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
+                                                                        <div className="text-sm"><Text>{q.assertion}</Text></div>
+                                                                    </div>
+                                                                    <div className="p-2 bg-purple-50/50 rounded border border-purple-100">
+                                                                        <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
+                                                                        <div className="text-sm"><Text>{q.reason}</Text></div>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="p-2 bg-purple-50/50 rounded border border-purple-100">
-                                                                    <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
-                                                                    <div className="text-sm"><Text>{q.reason}</Text></div>
-                                                                </div>
-                                                            </div>
-                                                            <div className="text-xs flex flex-col gap-1 mt-2">
-                                                                <div className={`${isCorrect ? 'text-green-700' : 'text-red-700'} font-bold`}>
-                                                                    Your: {getAROptionText(selectedOption)}
-                                                                </div>
-                                                                <div className="text-green-700 font-bold italic">
-                                                                    Correct: {getAROptionText(correctOption)}
-                                                                </div>
-                                                                <div className="flex items-center gap-2">
-                                                                    {!isCorrect && <XCircle className="w-4 h-4 text-red-600" />}
-                                                                    {isCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
+                                                                <div className="text-xs flex flex-col gap-1 mt-2">
+                                                                    <div className={`${isCorrect ? 'text-green-700' : 'text-red-700'} font-bold`}>
+                                                                        Your: {getAROptionText(selectedOption)}
+                                                                    </div>
+                                                                    <div className="text-green-700 font-bold italic">
+                                                                        Correct: {getAROptionText(correctOption)}
+                                                                    </div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        {!isCorrect && <XCircle className="w-4 h-4 text-red-600" />}
+                                                                        {isCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Explanation */}
+                                                    {(q as any).explanation && (
+                                                        <div className="mt-1 ml-6 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs">
+                                                            <div className="font-bold text-yellow-800 mb-1 flex items-center gap-1">
+                                                                <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
+                                                            </div>
+                                                            <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
+                                                                <Text>{(q as any).explanation}</Text>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         }
@@ -465,69 +499,105 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const qMark = getMTFMark(q, ans);
 
                                             return (
-                                                <div key={q.id || idx} className="p-3 rounded border border-gray-200 bg-white break-inside-avoid col-span-full relative">
-                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                    <div className="font-bold mb-2 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
 
-                                                    {/* Check if pairs exist, otherwise use columns */}
-                                                    {q.pairs && q.pairs.length > 0 ? (
-                                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
-                                                            {q.pairs.map((p: any, pidx: number) => (
-                                                                <div key={pidx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs border border-gray-100">
-                                                                    <div className="font-medium"><Text>{p.left}</Text></div>
-                                                                    <div className="px-2">→</div>
-                                                                    <div className="font-medium text-blue-700"><Text>{p.right}</Text></div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mt-2">
-                                                            <div className="grid grid-cols-2 gap-4 text-xs">
-                                                                <div>
-                                                                    <div className="font-bold border-b mb-1">Column A</div>
-                                                                    {(q.leftColumn || []).map((col: any, cidx: number) => (
-                                                                        <div key={cidx} className="p-1 border-b border-dashed"><Text>{col.text}</Text></div>
+                                                <div key={q.id || idx} className="break-inside-avoid col-span-full">
+                                                    <div className="p-3 rounded border border-gray-200 bg-white shadow-sm relative">
+                                                        <MarkDisplay earned={qMark} total={q.marks || 1} />
+                                                        <div className="font-bold mb-2 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
+
+                                                        {/* MTF Content: Columns + Table */}
+                                                        <div className="space-y-4">
+                                                            {/* Columns Display */}
+                                                            <div className="grid grid-cols-2 gap-4">
+                                                                <div className="space-y-2">
+                                                                    <div className="text-xs font-bold text-gray-400 uppercase">Column A</div>
+                                                                    {(q.leftColumn || []).map((item: any, i: number) => (
+                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[30px] flex items-center">
+                                                                            <span className="font-bold mr-2">{i + 1}.</span>
+                                                                            <Text>{item.text}</Text>
+                                                                        </div>
                                                                     ))}
                                                                 </div>
-                                                                <div>
-                                                                    <div className="font-bold border-b mb-1">Column B (Correct Matches)</div>
-                                                                    {(q.matches && q.rightColumn) ? (
-                                                                        (q.leftColumn || []).map((lCol: any, cidx: number) => {
-                                                                            const correctRightId = q.matches ? q.matches[lCol.id] : null;
-                                                                            const correctRight = q.rightColumn?.find((r: any) => r.id === correctRightId);
-                                                                            return (
-                                                                                <div key={cidx} className="p-1 border-b border-dashed text-green-700 font-medium">
-                                                                                    {correctRight ? <Text>{correctRight.text}</Text> : '-'}
-                                                                                </div>
-                                                                            );
-                                                                        })
-                                                                    ) : (
-                                                                        (q.rightColumn || []).map((col: any, cidx: number) => (
-                                                                            <div key={cidx} className="p-1 border-b border-dashed"><Text>{col.text}</Text></div>
-                                                                        ))
-                                                                    )}
+                                                                <div className="space-y-2">
+                                                                    <div className="text-xs font-bold text-gray-400 uppercase">Column B</div>
+                                                                    {(q.rightColumn || []).map((item: any, i: number) => (
+                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[30px] flex items-center">
+                                                                            <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                                                            <Text>{item.text}</Text>
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
+                                                            </div>
+
+                                                            {/* Match Analysis Table */}
+                                                            <div className="rounded border border-indigo-100 overflow-hidden">
+                                                                <table className="w-full text-xs">
+                                                                    <thead className="bg-indigo-50 text-indigo-800 font-bold">
+                                                                        <tr>
+                                                                            <th className="p-1 text-left w-1/3 border-r border-indigo-100">Left</th>
+                                                                            <th className="p-1 text-left w-1/3 border-r border-indigo-100">Your Match</th>
+                                                                            <th className="p-1 text-left w-1/3">Correct Match</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-gray-100">
+                                                                        {(q.leftColumn || []).map((lCol: any, cidx: number) => {
+                                                                            const correctMatches = (q.matches || {});
+
+                                                                            // Normalize student answer (array vs object)
+                                                                            let studentRightId = null;
+                                                                            const studentMatches = normalizedMatches || [];
+
+                                                                            if (Array.isArray(studentMatches)) {
+                                                                                const match = studentMatches.find((m: any) => m.leftIndex === cidx || m.leftId === lCol.id);
+                                                                                if (match) studentRightId = match.rightId || q.rightColumn?.[match.rightIndex]?.id;
+                                                                            } else {
+                                                                                // Object based matches
+                                                                                studentRightId = (ans?.matches || ans)?.[lCol.id];
+                                                                            }
+
+                                                                            const correctRightId = correctMatches[lCol.id];
+                                                                            const rightItem = q.rightColumn?.find((r: any) => r.id === studentRightId);
+                                                                            const correctRightItem = q.rightColumn?.find((r: any) => r.id === correctRightId);
+
+                                                                            const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+                                                                            const isUnanswered = !studentRightId;
+
+                                                                            return (
+                                                                                <tr key={cidx} className={isMatchCorrect ? "bg-green-50/50" : (isUnanswered ? "bg-white" : "bg-red-50/50")}>
+                                                                                    <td className="p-1 border-r border-gray-100 font-medium">
+                                                                                        <span className="font-bold mr-1">{cidx + 1}.</span>
+                                                                                        <Text>{lCol.text}</Text>
+                                                                                    </td>
+                                                                                    <td className="p-1 border-r border-gray-100">
+                                                                                        {isUnanswered ? <span className="text-gray-400 italic">No match</span> : (
+                                                                                            <span className={isMatchCorrect ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
+                                                                                                {rightItem ? <Text>{rightItem.text}</Text> : "Unknown"}
+                                                                                            </span>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td className="p-1 text-green-700 font-bold">
+                                                                                        {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            );
+                                                                        })}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Explanation */}
+                                                    {(q as any).explanation && (
+                                                        <div className="mt-1 ml-6 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs">
+                                                            <div className="font-bold text-yellow-800 mb-1 flex items-center gap-1">
+                                                                <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
+                                                            </div>
+                                                            <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
+                                                                <Text>{(q as any).explanation}</Text>
                                                             </div>
                                                         </div>
                                                     )}
-
-                                                    <div className="mt-2 text-[10px] text-gray-500 bg-blue-50/50 p-2 rounded italic">
-                                                        <strong>Student:</strong> {
-                                                            q.pairs && q.pairs.length > 0
-                                                                ? (normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `${m.leftIndex + 1}→${m.rightIndex + 1}`).join(', ') : 'No matches')
-                                                                : (function () {
-                                                                    if (!normalizedMatches || normalizedMatches.length === 0) return 'No matches';
-                                                                    // Try to render match pairs for new schema
-                                                                    if (Array.isArray(normalizedMatches)) {
-                                                                        return normalizedMatches.map((m: any) => {
-                                                                            // Best effort display
-                                                                            return `${m.leftIndex + 1}→${m.rightIndex !== undefined ? m.rightIndex + 1 : '?'}`;
-                                                                        }).join(', ');
-                                                                    }
-                                                                    return 'Matches submitted';
-                                                                })()
-                                                        }
-                                                    </div>
                                                 </div>
                                             );
                                         }
@@ -540,21 +610,39 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const qMark = getINTMark(q, ans);
 
                                             return (
-                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm relative`}>
-                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
-                                                    <div className="flex items-start">
-                                                        <span className="font-bold mr-2 text-sm">{qNum}.</span>
-                                                        <div className="flex-1">
-                                                            <div className="font-bold text-sm mb-1"><Text>{q.q}</Text></div>
-                                                            <div className="flex items-center gap-4 mt-2">
-                                                                <div className="text-xs font-bold">
-                                                                    Your: <span className={isCorrect ? 'text-green-700' : 'text-red-700'}>{studentVal ?? 'N/A'}</span>
+
+                                                <div key={q.id || idx} className="break-inside-avoid">
+                                                    <div className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} shadow-sm relative`}>
+                                                        <MarkDisplay earned={qMark} total={q.marks || 1} />
+                                                        <div className="flex items-start">
+                                                            <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                            <div className="flex-1">
+                                                                <div className="font-bold text-sm mb-1"><Text>{q.q}</Text></div>
+                                                                <div className="flex items-center gap-4 mt-2 bg-white/50 p-2 rounded border border-gray-100 w-fit">
+                                                                    <div className="text-xs font-bold text-gray-600">
+                                                                        Your: <span className={`ml-1 ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>{studentVal ?? 'Unanswered'}</span>
+                                                                    </div>
+                                                                    <div className="w-px h-3 bg-gray-300"></div>
+                                                                    <div className="text-xs font-bold text-indigo-700">
+                                                                        Correct: {q.correctAnswer || q.answer}
+                                                                    </div>
+                                                                    {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
                                                                 </div>
-                                                                <div className="text-xs font-bold text-green-700 italic">Correct: {q.correctAnswer || q.answer}</div>
-                                                                {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
                                                             </div>
                                                         </div>
                                                     </div>
+
+                                                    {/* Explanation */}
+                                                    {(q as any).explanation && (
+                                                        <div className="mt-1 ml-6 p-2 bg-yellow-50 rounded border border-yellow-200 text-xs">
+                                                            <div className="font-bold text-yellow-800 mb-1 flex items-center gap-1">
+                                                                <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
+                                                            </div>
+                                                            <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
+                                                                <Text>{(q as any).explanation}</Text>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             );
                                         }

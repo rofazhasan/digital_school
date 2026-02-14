@@ -353,7 +353,8 @@ export async function GET(
           }
         } else if (type === 'MTF') {
           const res = evaluateMTFQuestion(question, studentAnswer || {});
-          awardedMarks = res.score;
+          // Ensure no negative marking for MTF (Partial marking only)
+          awardedMarks = Math.max(0, res.score);
           isCorrect = res.isCorrect;
         }
       } else {

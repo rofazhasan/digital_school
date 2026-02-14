@@ -352,10 +352,10 @@ export async function GET(
             if (isCorrect) earnedMarks += question.marks;
           }
         } else if (type === 'MTF') {
-          // Auto-grade Match the Following
+          // Auto-grade Match the Following (Partial marking only, no negative)
           if (answer) {
             const result = evaluateMTFQuestion(question, answer);
-            earnedMarks += result.score;
+            earnedMarks += Math.max(0, result.score);
           }
         } else if (type === 'INT' || type === 'NUMERIC') {
           // Auto-grade Integer
