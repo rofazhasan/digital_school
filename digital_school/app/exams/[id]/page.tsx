@@ -662,18 +662,12 @@ export default function ExamBuilderPage() {
             }
           }
 
-          // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF)
-          // MTF doesn't have negative marking per user request, so we exclude it here or set to 0
-          if (['MCQ', 'MC', 'AR', 'INT'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+          // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC)
+          if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
             const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
             processedQuestion = {
               ...processedQuestion,
               negativeMarks: parseFloat(negativeMarks.toFixed(2))
-            };
-          } else if (q.type === 'MTF') {
-            processedQuestion = {
-              ...processedQuestion,
-              negativeMarks: 0 // No negative marking for MTF per user request
             };
           }
 

@@ -1548,7 +1548,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   {(type === 'MCQ' || type === 'MC' || type === 'AR') && question.options ? (
                                     <div className="space-y-2">
                                       {question.options.map((option, optIndex) => {
-                                        const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === (question as any).correct);
+                                        const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === ((question as any).correctOption || (question as any).correct));
                                         const isSelected = type === 'MC'
                                           ? (question.studentAnswer as any)?.selectedOptions?.includes(optIndex)
                                           : type === 'AR'
@@ -1576,8 +1576,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <span className="flex-1">
                                                 <UniversalMathJax inline dynamic>
                                                   {type === 'AR' ? [
-                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
-                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
                                                     "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
                                                     "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                     "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
@@ -1592,13 +1592,87 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       })}
                                     </div>
                                   ) : (type === 'INT' || type === 'NUMERIC') ? (
-                                    <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-wrap items-center justify-between gap-4">
-                                      <div className="flex items-center gap-4">
-                                        <div className="text-sm font-bold text-gray-600">Your Answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{(question.studentAnswer as any)?.answer || question.studentAnswer || 'N/A'}</span></div>
-                                        <div className="w-px h-4 bg-gray-200" />
-                                        <div className="text-sm font-bold text-indigo-600">Correct: {(question as any).answer || (question as any).correct}</div>
+                                    <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-col gap-4">
+                                      <div className="flex items-center justify-between gap-4">
+                                        <div className="flex items-center gap-4">
+                                          <div className="text-sm font-bold text-gray-600">Your Answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : (question.studentAnswer || 'N/A')}</span></div>
+                                          <div className="w-px h-4 bg-gray-200" />
+                                          <div className="text-sm font-bold text-indigo-600">Correct Answer: {(question as any).correctAnswer || (question as any).modelAnswer || (question as any).correct}</div>
+                                        </div>
+                                        {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : hasAnswer && <XCircle className="h-5 w-5 text-red-600" />}
                                       </div>
-                                      {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : hasAnswer && <XCircle className="h-5 w-5 text-red-600" />}
+                                    </div>
+                                  ) : type === 'MTF' ? (
+                                    <div className="space-y-4">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                          <div className="text-xs font-bold text-gray-400 uppercase">Column A</div>
+                                          {(question as any).leftColumn?.map((item: any, i: number) => (
+                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2">{i + 1}.</span>
+                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="space-y-2">
+                                          <div className="text-xs font-bold text-gray-400 uppercase">Column B</div>
+                                          {(question as any).rightColumn?.map((item: any, i: number) => (
+                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                      <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+                                        <div className="text-xs font-bold text-indigo-700 uppercase mb-3 text-center">Your Matches vs Correct Matches</div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                          {(question as any).leftColumn?.map((item: any, i: number) => {
+                                            const correctMatches = (question as any).matches || {};
+                                            const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
+
+                                            // Normalize student answer (handle different formats from evaluation logic)
+                                            let studentRightId = null;
+                                            if (Array.isArray(studentMatches)) {
+                                              const match = studentMatches.find((m: any) => m.leftIndex === i || m.leftId === item.id);
+                                              if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
+                                            } else {
+                                              studentRightId = studentMatches[item.id];
+                                            }
+
+                                            const correctRightId = correctMatches[item.id];
+                                            const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+
+                                            const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                            const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
+
+                                            return (
+                                              <div key={i} className={`p-2 rounded border flex flex-col gap-1 ${isMatchCorrect ? 'bg-green-100 border-green-200' : studentRightId ? 'bg-red-100 border-red-200' : 'bg-gray-100 border-gray-200 opacity-60'}`}>
+                                                <div className="flex justify-between items-center text-xs font-bold">
+                                                  <span>Match {i + 1}</span>
+                                                  {isMatchCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : studentRightId && <XCircle className="h-3 w-3 text-red-600" />}
+                                                </div>
+                                                <div className="text-[10px] space-y-1">
+                                                  <div className="flex gap-1 items-center">
+                                                    <span className="text-gray-500 w-12">You:</span>
+                                                    <span className={isMatchCorrect ? 'text-green-700' : 'text-red-700'}>
+                                                      {item.text.substring(0, 10)}... → {rightItem ? rightItem.text.substring(0, 10) + '...' : 'None'}
+                                                    </span>
+                                                  </div>
+                                                  {!isMatchCorrect && (
+                                                    <div className="flex gap-1 items-center">
+                                                      <span className="text-gray-500 w-12">Correct:</span>
+                                                      <span className="text-green-700">
+                                                        {item.text.substring(0, 10)}... → {correctRightItem ? correctRightItem.text.substring(0, 10) + '...' : 'N/A'}
+                                                      </span>
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
                                     </div>
                                   ) : null}
 

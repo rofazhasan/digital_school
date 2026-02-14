@@ -49,43 +49,13 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
     let sqMarks = 0;
     const answers = submission.answers as any;
 
-    // 1. Calculate Manual Marks (CQ/SQ)
-    for (const key in answers) {
-        if (key.endsWith('_marks') && typeof answers[key] === 'number') {
-            const questionId = key.replace('_marks', '');
+    // Initialize section-wise scores
+    const allCqScores: number[] = [];
+    const allSqScores: number[] = [];
 
-            // Determine question type
-            let questionType = 'CQ'; // Default
-            for (const examSet of examSets) {
-                if (examSet.questionsJson) {
-                    const questions = typeof examSet.questionsJson === 'string'
-                        ? JSON.parse(examSet.questionsJson)
-                        : examSet.questionsJson;
-
-                    const question = questions.find((q: any) => q.id === questionId);
-                    if (question) {
-                        questionType = question.type?.toUpperCase() || 'CQ';
-                        break;
-                    }
-                }
-            }
-
-            if (questionType === 'SQ') {
-                sqMarks += answers[key];
-                totalScore += answers[key];
-            } else if (questionType === 'CQ') {
-                cqMarks += answers[key];
-                totalScore += answers[key];
-            }
-        }
-    }
-
-    // 2. Calculate MCQ Marks (Auto-grading)
+    // 1. Determine Exam Set
     const studentExamMap = await prisma.examStudentMap.findFirst({
-        where: {
-            studentId: submission.studentId,
-            examId: exam.id
-        }
+        where: { studentId: submission.studentId, examId: exam.id }
     });
 
     let assignedExamSet = null;
@@ -99,9 +69,9 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         });
     }
 
-    // Use the assigned set, or fallback to first set if only one exists (common in simple exams)
     const targetSet = assignedExamSet || (examSets.length === 1 ? examSets[0] : null);
 
+    // 2. Main Evaluation Loop
     if (targetSet?.questionsJson) {
         const questions = typeof targetSet.questionsJson === 'string'
             ? JSON.parse(targetSet.questionsJson)
@@ -110,10 +80,20 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         for (const question of questions) {
             const type = question.type?.toUpperCase();
             const studentAnswer = answers[question.id];
+            const manualMark = answers[`${question.id}_marks`];
 
-            if (!studentAnswer && type !== 'MTF' && type !== 'MC') continue;
+            // A. Handle Manual Grading (CQ/SQ)
+            if (type === 'CQ' || type === 'SQ') {
+                const score = typeof manualMark === 'number' ? manualMark : 0;
+                if (type === 'CQ') allCqScores.push(score);
+                else allSqScores.push(score);
+                continue;
+            }
 
+            // B. Auto-grading (Objective Types)
+            let questionScore = 0;
             if (type === 'MCQ') {
+                if (!studentAnswer) continue;
                 const normalize = (s: any) => String(s || '').trim().toLowerCase().normalize();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
@@ -132,45 +112,60 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 }
 
                 if (isCorrect) {
-                    const marks = Number(question.marks) || 0;
-                    mcqMarks += marks;
-                    totalScore += marks;
+                    questionScore = Number(question.marks) || 0;
                 } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    const negativeMarks = (Number(question.marks || 0) * exam.mcqNegativeMarking) / 100;
-                    mcqMarks -= negativeMarks;
-                    totalScore -= negativeMarks;
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             } else if (type === 'MC') {
-                const score = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
+                const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
+                if (!hasSelected) continue;
+                questionScore = Number(evaluateMCQuestion(question, studentAnswer, {
                     negativeMarking: exam.mcqNegativeMarking || 0,
                     partialMarking: true
-                });
-                mcqMarks += Number(score) || 0;
-                totalScore += Number(score) || 0;
+                })) || 0;
             } else if (type === 'INT' || type === 'NUMERIC') {
-                const result = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
-                let finalScore = Number(result.score) || 0;
+                const isAnswered = studentAnswer && (studentAnswer.answer !== undefined && studentAnswer.answer !== null && studentAnswer.answer !== "");
+                if (!isAnswered) continue;
+                const result = evaluateINTQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    finalScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
-                mcqMarks += finalScore;
-                totalScore += finalScore;
             } else if (type === 'AR') {
-                const result = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
-                let finalScore = Number(result.score) || 0;
+                const isAnswered = studentAnswer && studentAnswer.selectedOption > 0;
+                if (!isAnswered) continue;
+                const result = evaluateARQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    finalScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
-                mcqMarks += finalScore;
-                totalScore += finalScore;
             } else if (type === 'MTF') {
-                const result = evaluateMTFQuestion(question, studentAnswer || {});
-                const finalScore = Number(result.score) || 0;
-                mcqMarks += finalScore;
-                totalScore += finalScore;
+                const hasMatches = studentAnswer && (
+                    (studentAnswer.matches && Array.isArray(studentAnswer.matches) && studentAnswer.matches.length > 0) ||
+                    (Object.keys(studentAnswer).length > 0 && !studentAnswer.matches)
+                );
+                if (!hasMatches) continue;
+                const result = evaluateMTFQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
+                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore -= (Number(question.marks || 0) * exam.mcqNegativeMarking) / 100;
+                }
             }
+
+            mcqMarks += questionScore;
+            totalScore += questionScore;
         }
     }
+
+    // 3. Select Best N for CQ and SQ
+    const cqRequired = exam.cqRequiredQuestions || allCqScores.length;
+    const sqRequired = exam.sqRequiredQuestions || allSqScores.length;
+
+    // Sort descending to pick highest marks
+    cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqRequired).reduce((sum, s) => sum + s, 0);
+    sqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqRequired).reduce((sum, s) => sum + s, 0);
+
+    totalScore += cqMarks + sqMarks;
 
     // 3. Update Submission
     const percentage = calculatePercentage(totalScore, exam.totalMarks);

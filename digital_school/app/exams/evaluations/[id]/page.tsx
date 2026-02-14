@@ -1894,13 +1894,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </div>
                           <div className="text-right">
                             <div className="text-lg font-bold text-green-600">
-                              {currentStudent.result?.cqMarks ||
-                                exam.questions
-                                  .filter(q => q.type === 'cq')
-                                  .reduce((total, q) => total + (currentStudent.answers[`${q.id}_marks`] || 0), 0)}
+                              {(() => {
+                                if (currentStudent.result?.cqMarks) return currentStudent.result.cqMarks;
+                                const allCqScores = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'cq')
+                                  .map(q => currentStudent.answers[`${q.id}_marks`] || 0);
+
+                                const req = (exam as any).cqRequiredQuestions || allCqScores.length;
+                                return allCqScores.sort((a, b) => b - a).slice(0, req).reduce((s, m) => s + m, 0);
+                              })()}
                             </div>
                             <div className="text-xs text-green-600">
-                              / {exam.questions.filter(q => q.type === 'cq').reduce((total, q) => total + q.marks, 0)}
+                              / {(() => {
+                                const allCqMarks = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'cq')
+                                  .map(q => q.marks);
+                                const req = (exam as any).cqRequiredQuestions || allCqMarks.length;
+                                return allCqMarks.sort((a, b) => b - a).slice(0, req).reduce((s, m) => s + m, 0);
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -1913,13 +1924,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </div>
                           <div className="text-right">
                             <div className="text-lg font-bold text-yellow-600">
-                              {currentStudent.result?.sqMarks ||
-                                exam.questions
-                                  .filter(q => q.type === 'sq')
-                                  .reduce((total, q) => total + (currentStudent.answers[`${q.id}_marks`] || 0), 0)}
+                              {(() => {
+                                if (currentStudent.result?.sqMarks) return currentStudent.result.sqMarks;
+                                const allSqScores = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'sq')
+                                  .map(q => currentStudent.answers[`${q.id}_marks`] || 0);
+
+                                const req = (exam as any).sqRequiredQuestions || allSqScores.length;
+                                return allSqScores.sort((a, b) => b - a).slice(0, req).reduce((s, m) => s + m, 0);
+                              })()}
                             </div>
                             <div className="text-xs text-yellow-600">
-                              / {exam.questions.filter(q => q.type === 'sq').reduce((total, q) => total + q.marks, 0)}
+                              / {(() => {
+                                const allSqMarks = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'sq')
+                                  .map(q => q.marks);
+                                const req = (exam as any).sqRequiredQuestions || allSqMarks.length;
+                                return allSqMarks.sort((a, b) => b - a).slice(0, req).reduce((s, m) => s + m, 0);
+                              })()}
                             </div>
                           </div>
                         </div>
@@ -1932,16 +1954,28 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </div>
                           <div className="text-right">
                             <div className="text-lg font-bold text-purple-600">
-                              {currentStudent.result?.total ||
-                                (exam.questions
+                              {(() => {
+                                if (currentStudent.result?.total) return currentStudent.result.total;
+
+                                // Recalculate if result not present
+                                const mcq = exam.questions
                                   .filter(q => ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q.type.toLowerCase()))
-                                  .reduce((total, q) => total + (currentStudent.answers[`${q.id}_marks`] || getAutoScore(q, currentStudent.answers[q.id])), 0) +
-                                  exam.questions
-                                    .filter(q => q.type === 'cq')
-                                    .reduce((total, q) => total + (currentStudent.answers[`${q.id}_marks`] || 0), 0) +
-                                  exam.questions
-                                    .filter(q => q.type === 'sq')
-                                    .reduce((total, q) => total + (currentStudent.answers[`${q.id}_marks`] || 0), 0))}
+                                  .reduce((total, q) => total + getAutoScore(q, currentStudent.answers[q.id]), 0);
+
+                                const cqScores = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'cq')
+                                  .map(q => currentStudent.answers[`${q.id}_marks`] || 0);
+                                const cqReq = (exam as any).cqRequiredQuestions || cqScores.length;
+                                const cq = cqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((s, m) => s + m, 0);
+
+                                const sqScores = exam.questions
+                                  .filter(q => q.type.toLowerCase() === 'sq')
+                                  .map(q => currentStudent.answers[`${q.id}_marks`] || 0);
+                                const sqReq = (exam as any).sqRequiredQuestions || sqScores.length;
+                                const sq = sqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((s, m) => s + m, 0);
+
+                                return mcq + cq + sq;
+                              })()}
                             </div>
                             <div className="text-xs text-purple-600">
                               / {totalMarks}
@@ -2630,35 +2664,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         </Badge>
                                       </div>
 
-                                      {/* Manual Override for non-MCQ auto-types */}
-                                      {currentQuestion.type !== 'mcq' && (
-                                        <div className="space-y-2 border-t pt-2 mt-1">
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-sm font-medium text-gray-700">Manual Override:</span>
-                                            {canEditMarks() ? (
-                                              <Badge className="bg-green-100 text-green-800 text-[10px]">Editable</Badge>
-                                            ) : (
-                                              <Badge className="bg-gray-100 text-gray-800 text-[10px]">Locked</Badge>
-                                            )}
-                                          </div>
-                                          <div className="flex flex-wrap gap-1">
-                                            {Array.from({ length: currentQuestion.marks + 1 }, (_, i) => i).map((mark) => {
-                                              const currentMarks = currentStudent.answers[`${currentQuestion.id}_marks`] || 0;
-                                              const isSelected = currentMarks === mark;
-                                              return (
-                                                <button
-                                                  key={mark}
-                                                  onClick={() => updateMarks(currentQuestion.id, mark)}
-                                                  disabled={!canEditMarks()}
-                                                  className={`px-3 py-1 rounded text-xs font-semibold ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-indigo-50'}`}
-                                                >
-                                                  {mark}
-                                                </button>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
+                                      {/* No manual override for objective types per user request */}
                                     </div>
                                   ) : (
                                     <div className="flex flex-col gap-3">

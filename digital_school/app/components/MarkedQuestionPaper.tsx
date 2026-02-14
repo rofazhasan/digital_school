@@ -140,41 +140,91 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         // Negative marking calculation helper
         const negativeRate = examInfo.mcqNegativeMarking ? examInfo.mcqNegativeMarking / 100 : 0;
 
-        const getMCQStatus = (q: MCQ, userAnswer: any) => {
-            if (!userAnswer) return 'unanswered';
-
-            // Find correct option
-            const correctOption = q.options?.find(opt => opt.isCorrect);
-            let isCorrect = false;
-
-            if (correctOption) {
-                isCorrect = userAnswer === correctOption.text;
-            } else if (q.correct) {
-                // Fallback to correct field
-                isCorrect = String(q.correct) === String(userAnswer);
-            }
-
-            return isCorrect ? 'correct' : 'incorrect';
+        const getMCQMark = (q: MCQ, userAnswer: any) => {
+            if (!userAnswer) return 0;
+            const correctText = q.correct || q.options?.find(opt => opt.isCorrect)?.text;
+            const isCorrect = String(userAnswer) === String(correctText);
+            if (isCorrect) return q.marks || 1;
+            return -((q.marks || 1) * negativeRate);
         };
 
-        const getObtainedMarkRaw = (q: MCQ, status: string, marks: number) => {
-            if (status === 'correct') return marks;
-            if (status === 'incorrect') return -(marks * negativeRate);
-            return 0; // Unanswered
+        const getMCMark = (q: MCQ, userAnswer: any) => {
+            if (!userAnswer || !userAnswer.selectedOptions || userAnswer.selectedOptions.length === 0) return 0;
+            const selected = userAnswer.selectedOptions;
+            const corrects = (q.options || []).map((o: any, i: number) => o.isCorrect ? i : -1).filter((i: number) => i !== -1);
+
+            const totalCorrect = corrects.length;
+            if (totalCorrect === 0) return 0;
+
+            const correctSelected = selected.filter((idx: number) => corrects.includes(idx)).length;
+            const wrongSelected = selected.filter((idx: number) => !corrects.includes(idx)).length;
+
+            const marks = q.marks || 1;
+            const partialMark = (correctSelected / totalCorrect) * marks;
+            const penalty = wrongSelected * negativeRate * marks;
+
+            return Math.max(-marks, partialMark - penalty);
         };
 
-        // Calculate total deducted marks
+        const getARMark = (q: AR, userAnswer: any) => {
+            if (!userAnswer || userAnswer.selectedOption === undefined) return 0;
+            const selected = Number(userAnswer.selectedOption);
+            const correct = Number(q.correct || 0);
+            if (selected === correct) return q.marks || 1;
+            return -((q.marks || 1) * negativeRate);
+        };
+
+        const getINTMark = (q: INT, userAnswer: any) => {
+            const val = userAnswer?.answer !== undefined ? userAnswer.answer : userAnswer;
+            if (val === undefined || val === null || val === '') return 0;
+            const isCorrect = String(val) === String(q.answer);
+            if (isCorrect) return q.marks || 1;
+            return -((q.marks || 1) * negativeRate);
+        };
+
+        const getMTFMark = (q: MTF, userAnswer: any) => {
+            const matches = Array.isArray(userAnswer?.matches) ? userAnswer.matches : (Array.isArray(userAnswer) ? userAnswer : []);
+            if (matches.length === 0) return 0;
+
+            const pairs = q.pairs || [];
+            if (pairs.length === 0) return 0;
+
+            let correctCount = 0;
+            matches.forEach((m: any) => {
+                const leftPart = pairs[m.leftIndex]?.left;
+                const rightPart = pairs[m.rightIndex]?.right;
+                const actualRight = pairs.find(p => p.left === leftPart)?.right;
+                if (rightPart === actualRight) correctCount++;
+            });
+
+            const score = (correctCount / pairs.length) * (q.marks || 1);
+            return score;
+        };
+
+        const formatMark = (m: number) => {
+            return Number(m).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        };
+
+        const MarkDisplay = ({ earned, total }: { earned: number, total: number }) => {
+            const colorClass = earned > 0 ? "text-green-700 font-black" : (earned < 0 ? "text-red-700 font-black" : "text-gray-500 font-bold");
+            return (
+                <div className={`absolute top-1 right-1 px-1.5 py-0.5 rounded border border-current bg-white/80 text-[10px] ${colorClass} shadow-sm z-10`}>
+                    {earned > 0 ? '+' : ''}{formatMark(earned)}/{total}
+                </div>
+            );
+        };
+
+        // Calculate total deducted marks for header display
         let totalDeducted = 0;
-        [...mcqs, ...(questions.mc || [])].forEach(q => {
+        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || [])].forEach(q => {
             const ans = submission.answers[q.id || ''];
-            // For MC, negative marking logic might be different (partial marks etc)
-            // For now, simpler check
-            if (q.options?.some(o => o.isCorrect)) {
-                const status = getMCQStatus(q, ans);
-                if (status === 'incorrect') {
-                    totalDeducted += (q.marks || 1) * negativeRate;
-                }
-            }
+            let m = 0;
+            if ((q as any).type === 'MCQ') m = getMCQMark(q as MCQ, ans);
+            else if ((q as any).type === 'MC') m = getMCMark(q as MCQ, ans);
+            else if ((q as any).type === 'AR') m = getARMark(q as AR, ans);
+            else if ((q as any).type === 'INT') m = getINTMark(q as INT, ans);
+
+            if (m < 0) totalDeducted += Math.abs(m);
         });
 
         // Safe Date Parsing
@@ -279,8 +329,11 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                             const statusColor = isCorrect ? 'bg-green-50' : (ans ? 'bg-red-50' : 'bg-gray-50');
 
+                                            const qMark = q.type === 'MC' ? getMCMark(q, ans) : getMCQMark(q, ans);
+
                                             return (
                                                 <div key={q.id || idx} className={`p-2 rounded border ${statusColor} break-inside-avoid relative`}>
+                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                     <div className="flex items-start">
                                                         <span className="font-bold mr-2 text-sm">{qNum}.{q.type === 'MC' ? '*' : ''}</span>
                                                         <div className="flex-1 text-sm">
@@ -318,8 +371,11 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const correctOption = Number(q.correct || 0);
                                             const isCorrect = selectedOption === correctOption;
 
+                                            const qMark = getARMark(q, ans);
+
                                             return (
-                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm col-span-full`}>
+                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm col-span-full relative`}>
+                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                     <div className="flex items-start">
                                                         <span className="font-bold mr-2 text-sm">{qNum}.</span>
                                                         <div className="flex-1">
@@ -353,8 +409,11 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         if (q.type === 'MTF') {
                                             const normalizedMatches = Array.isArray(ans?.matches) ? ans.matches : (Array.isArray(ans) ? ans : []);
 
+                                            const qMark = getMTFMark(q, ans);
+
                                             return (
-                                                <div key={q.id || idx} className="p-3 rounded border border-gray-200 bg-white break-inside-avoid col-span-full">
+                                                <div key={q.id || idx} className="p-3 rounded border border-gray-200 bg-white break-inside-avoid col-span-full relative">
+                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                     <div className="font-bold mb-2 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
                                                         {q.pairs.map((p: any, pidx: number) => (
@@ -377,8 +436,11 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             const studentVal = ans?.answer !== undefined ? ans.answer : ans;
                                             const isCorrect = String(studentVal) === String(q.answer);
 
+                                            const qMark = getINTMark(q, ans);
+
                                             return (
-                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm`}>
+                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm relative`}>
+                                                    <MarkDisplay earned={qMark} total={q.marks || 1} />
                                                     <div className="flex items-start">
                                                         <span className="font-bold mr-2 text-sm">{qNum}.</span>
                                                         <div className="flex-1">

@@ -368,47 +368,21 @@ export async function GET(
             modelAnswer = correctOption.text;
           }
         }
-        // Fallback to question-level explanation if no option explanation
-        if (!explanation) {
-          explanation = question.explanation || question.reason || '';
-        }
       } else if (question.type === 'CQ') {
-        // For CQ, get model answers and student answers for each sub-question
-        if (question.subQuestions && Array.isArray(question.subQuestions)) {
-          question.subQuestions = question.subQuestions.map((subQ: any, idx: number) => {
-            // Get student answer text for this sub-question
-            const subKey = `${questionId}_sub_${idx}`;
-            const subAnswerText = studentAnswers[subKey] || '';
-
-            // Get student images for this sub-question
-            const subImages: string[] = [];
-            const singleImg = studentAnswers[`${subKey}_image`];
-            const multipleImgs = studentAnswers[`${subKey}_images`];
-
-            if (singleImg) subImages.push(singleImg);
-            if (multipleImgs && Array.isArray(multipleImgs)) subImages.push(...multipleImgs);
-
-            // Get drawings for this sub-question (indices from idx*100 to idx*100+99)
-            const subDrawings = allDrawingsForQuestion.filter((d: any) =>
-              d.imageIndex >= idx * 100 && d.imageIndex < (idx + 1) * 100
-            ).map((d: any) => ({
-              imageIndex: d.imageIndex,
-              imageData: d.imageData,
-              originalImagePath: d.originalImagePath
-            }));
-
-            return {
-              ...subQ,
-              modelAnswer: subQ.modelAnswer || subQ.answer || '',
-              studentAnswer: subAnswerText,
-              studentImages: subImages,
-              drawings: subDrawings
-            };
-          });
-        }
+        // ... (existing CQ logic handled elsewhere or uses question.explanation)
       } else if (question.type === 'SQ') {
-        // For SQ, model answer is already in question.modelAnswer
         modelAnswer = question.modelAnswer || question.answer || '';
+      } else if (question.type === 'INT' || question.type === 'NUMERIC') {
+        modelAnswer = question.modelAnswer || question.answer || question.correctAnswer || '';
+      } else if (question.type === 'AR') {
+        modelAnswer = `Option ${question.correctOption || question.correct}`;
+      } else if (question.type === 'MTF') {
+        modelAnswer = "See matches below";
+      }
+
+      // Universal fallback for explanation
+      if (!explanation) {
+        explanation = question.explanation || question.reason || '';
       }
 
       return {
@@ -482,25 +456,33 @@ export async function GET(
       if (!result || result.total === 0) {
         console.log('🔄 Recalculating marks from processed questions...');
 
-        mcqMarks = 0;
-        cqMarks = 0;
-        sqMarks = 0;
-        totalMarks = 0;
+        const allCqScores: number[] = [];
+        const allSqScores: number[] = [];
+
+        mcqMarks = 0; // Reset mcqMarks for recalculation
+        cqMarks = 0; // Reset cqMarks for recalculation
+        sqMarks = 0; // Reset sqMarks for recalculation
 
         processedQuestions.forEach((question: any) => {
           const type = (question.type || '').toUpperCase();
           if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
             mcqMarks += question.awardedMarks || 0;
-            totalMarks += question.awardedMarks || 0;
             console.log(`${type} Question ${question.id} marks: ${question.awardedMarks} (running total: ${mcqMarks})`);
           } else if (type === 'CQ') {
-            cqMarks += question.awardedMarks || 0;
-            totalMarks += question.awardedMarks || 0;
+            allCqScores.push(question.awardedMarks || 0);
           } else if (type === 'SQ') {
-            sqMarks += question.awardedMarks || 0;
-            totalMarks += question.awardedMarks || 0;
+            allSqScores.push(question.awardedMarks || 0);
           }
         });
+
+        // Pick best scores based on limits
+        const cqReq = exam.cqRequiredQuestions || allCqScores.length;
+        const sqReq = exam.sqRequiredQuestions || allSqScores.length;
+
+        cqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((sum, s) => sum + s, 0);
+        sqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((sum, s) => sum + s, 0);
+
+        totalMarks = mcqMarks + cqMarks + sqMarks;
 
         // Ensure total marks doesn't go below 0
         totalMarks = Math.max(0, totalMarks);
