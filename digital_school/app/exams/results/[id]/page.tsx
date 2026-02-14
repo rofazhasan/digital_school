@@ -111,7 +111,7 @@ interface Question {
   marks: number;
   awardedMarks: number;
   isCorrect: boolean;
-  studentAnswer?: string;
+  studentAnswer?: any;
   studentAnswerImages?: string[];
   drawingData?: {
     imageData: string;
@@ -489,7 +489,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         // Check if the question has been evaluated (has awarded marks)
         // Only consider unevaluated if student provided an answer but got 0 marks
         const hasStudentAnswer = question.studentAnswer &&
-          question.studentAnswer.trim() !== '' &&
+          (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) &&
           question.studentAnswer !== 'No answer provided';
 
         return question.awardedMarks === 0 && question.marks > 0 && hasStudentAnswer;
@@ -505,7 +505,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       if (question.type === 'CQ' || question.type === 'SQ') {
         // Check if student didn't answer the question
         const hasStudentAnswer = question.studentAnswer &&
-          question.studentAnswer.trim() !== '' &&
+          (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) &&
           question.studentAnswer !== 'No answer provided';
 
         return question.marks > 0 && !hasStudentAnswer;
@@ -1183,7 +1183,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <div className="text-2xl font-bold text-purple-600">
                               {(() => {
                                 const answered = result.questions.filter(q =>
-                                  q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided'
+                                  q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided'
                                 ).length;
                                 const correct = result.questions.filter(q =>
                                   q.awardedMarks === q.marks && q.marks > 0
@@ -1450,7 +1450,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const type = (q.type || "").toUpperCase();
                         if (!objectiveTypes.includes(type)) return false;
 
-                        const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                        const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
                         const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
 
                         switch (filterStatus) {
@@ -1478,7 +1478,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             {filteredQuestions.map((question, index) => {
                               const type = (question.type || "").toUpperCase();
                               const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                              const hasAnswer = question.studentAnswer && question.studentAnswer.trim() !== '' && question.studentAnswer !== 'No answer provided';
+                              const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
 
                               return (
                                 <motion.div
