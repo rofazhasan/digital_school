@@ -13,6 +13,7 @@ export interface MCAnswer {
 export interface MCEvaluationSettings {
     negativeMarking: number; // percentage (0-100)
     partialMarking: boolean; // whether to allow partial marks
+    hasAttempted?: boolean; // whether the student has attempted the question
 }
 
 /**
@@ -41,6 +42,11 @@ export function evaluateMCQuestion(
     const correctIndices = question.options
         .map((opt, idx) => (opt.isCorrect ? idx : -1))
         .filter(idx => idx !== -1);
+
+    // If not attempted and setting is passed, return 0 immediately
+    if (settings.hasAttempted === false) {
+        return 0;
+    }
 
     const selectedSet = new Set(answer.selectedOptions);
     const correctSet = new Set(correctIndices);

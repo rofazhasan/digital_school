@@ -321,22 +321,35 @@ export async function GET(
         if (type === 'MC') {
           awardedMarks = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
             negativeMarking: (exam as any).mcqNegativeMarking || 0,
-            partialMarking: true
+            partialMarking: true,
+            hasAttempted: !!studentAnswer // Only apply negative marking if attempted
           });
           isCorrect = awardedMarks === maxMarks;
         } else if (type === 'INT' || type === 'NUMERIC') {
-          const res = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
-          awardedMarks = res.score;
-          isCorrect = res.isCorrect;
-          if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-            awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+          const hasAnswer = studentAnswer && (studentAnswer.answer !== undefined && studentAnswer.answer !== null && studentAnswer.answer !== '');
+          if (!hasAnswer) {
+            awardedMarks = 0;
+            isCorrect = false;
+          } else {
+            const res = evaluateINTQuestion(question, studentAnswer);
+            awardedMarks = res.score;
+            isCorrect = res.isCorrect;
+            if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+              awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+            }
           }
         } else if (type === 'AR') {
-          const res = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
-          awardedMarks = res.score;
-          isCorrect = res.isCorrect;
-          if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-            awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+          const hasAnswer = studentAnswer && (studentAnswer.selectedOption !== undefined && studentAnswer.selectedOption !== null && studentAnswer.selectedOption !== 0);
+          if (!hasAnswer) {
+            awardedMarks = 0;
+            isCorrect = false;
+          } else {
+            const res = evaluateARQuestion(question, studentAnswer);
+            awardedMarks = res.score;
+            isCorrect = res.isCorrect;
+            if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+              awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+            }
           }
         } else if (type === 'MTF') {
           const res = evaluateMTFQuestion(question, studentAnswer || {});

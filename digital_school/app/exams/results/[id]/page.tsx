@@ -1549,44 +1549,61 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-2">
                                       {question.options.map((option, optIndex) => {
                                         const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === ((question as any).correctOption || (question as any).correct));
-                                        const isSelected = type === 'MC'
-                                          ? (question.studentAnswer as any)?.selectedOptions?.includes(optIndex)
-                                          : type === 'AR'
-                                            ? (question.studentAnswer as any)?.selectedOption === (optIndex + 1)
-                                            : question.studentAnswer === option.text;
 
-                                        const isUnanswered = !question.studentAnswer;
+                                        // Determine if selected based on type format
+                                        let isSelected = false;
+                                        if (type === 'MC') {
+                                          const selectedOpts = (question.studentAnswer as any)?.selectedOptions;
+                                          isSelected = Array.isArray(selectedOpts) && selectedOpts.includes(optIndex);
+                                        } else if (type === 'AR') {
+                                          const selectedOpt = (question.studentAnswer as any)?.selectedOption;
+                                          isSelected = selectedOpt === (optIndex + 1);
+                                        } else {
+                                          // MCQ basic string match
+                                          isSelected = question.studentAnswer === option.text;
+                                        }
+
+                                        // Determine Style
+                                        let containerStyle = "border-gray-100 bg-white"; // default unselected
+                                        let icon = null;
+
+                                        if (isCorrectOpt && isSelected) {
+                                          // Correct & Selected -> Green + Check
+                                          containerStyle = "border-green-500 bg-green-50 ring-1 ring-green-500";
+                                          icon = <CheckCircle className="h-5 w-5 text-green-600" />;
+                                        } else if (isCorrectOpt && !isSelected) {
+                                          // Correct & Missed -> Dashed Green border + Info
+                                          containerStyle = "border-green-400 border-dashed bg-green-50/50";
+                                          icon = <div className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-full">Correct Answer</div>;
+                                        } else if (!isCorrectOpt && isSelected) {
+                                          // Wrong & Selected -> Red + X
+                                          containerStyle = "border-red-500 bg-red-50 ring-1 ring-red-500";
+                                          icon = <XCircle className="h-5 w-5 text-red-600" />;
+                                        } else {
+                                          // Wrong & Unselected -> Default
+                                          containerStyle = "border-gray-100 bg-white text-gray-500 opacity-60";
+                                        }
 
                                         return (
                                           <div
                                             key={optIndex}
-                                            className={`p-3 rounded-lg border-2 transition-all ${isCorrectOpt && isSelected
-                                              ? 'border-green-500 bg-green-50'
-                                              : isCorrectOpt && isUnanswered
-                                                ? 'border-blue-500 bg-blue-50 opacity-60'
-                                                : isSelected && !isCorrectOpt
-                                                  ? 'border-red-500 bg-red-50'
-                                                  : isCorrectOpt
-                                                    ? 'border-green-500 bg-green-50'
-                                                    : 'border-gray-100 bg-white'
-                                              }`}
+                                            className={`p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${containerStyle}`}
                                           >
-                                            <div className="flex items-center gap-2">
-                                              <span className="font-bold text-gray-500">{String.fromCharCode(0x0995 + optIndex)}.</span>
-                                              <span className="flex-1">
-                                                <UniversalMathJax inline dynamic>
-                                                  {type === 'AR' ? [
-                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
-                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
-                                                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                                                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                                                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                  ][optIndex] : cleanupMath(option.text)}
-                                                </UniversalMathJax>
-                                              </span>
-                                              {isCorrectOpt && <CheckCircle className="h-4 w-4 text-green-600" />}
-                                              {isSelected && !isCorrectOpt && <XCircle className="h-4 w-4 text-red-600" />}
-                                            </div>
+                                            <span className={`font-bold ${isSelected || isCorrectOpt ? 'text-gray-800' : 'text-gray-400'}`}>
+                                              {String.fromCharCode(0x0995 + optIndex)}.
+                                            </span>
+                                            <span className="flex-1 font-medium">
+                                              <UniversalMathJax inline dynamic>
+                                                {type === 'AR' ? [
+                                                  "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
+                                                  "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
+                                                  "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                  "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                  "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                                ][optIndex] : cleanupMath(option.text)}
+                                              </UniversalMathJax>
+                                            </span>
+                                            {icon}
                                           </div>
                                         );
                                       })}
@@ -1595,11 +1612,22 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-col gap-4">
                                       <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-4">
-                                          <div className="text-sm font-bold text-gray-600">Your Answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : (question.studentAnswer || 'N/A')}</span></div>
+                                          <div className="text-sm font-bold text-gray-600">
+                                            Your Answer:
+                                            {(question.studentAnswer as any)?.answer !== undefined || (typeof question.studentAnswer === 'string' && question.studentAnswer) ? (
+                                              <span className={`ml-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
+                                                {(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : question.studentAnswer}
+                                              </span>
+                                            ) : (
+                                              <span className="ml-2 text-gray-400 italic">Unanswered</span>
+                                            )}
+                                          </div>
                                           <div className="w-px h-4 bg-gray-200" />
-                                          <div className="text-sm font-bold text-indigo-600">Correct Answer: {(question as any).correctAnswer || (question as any).modelAnswer || (question as any).correct}</div>
+                                          <div className="text-sm font-bold text-indigo-600">
+                                            Correct Answer: <span className="ml-2">{(question as any).correctAnswer || (question as any).modelAnswer || (question as any).correct}</span>
+                                          </div>
                                         </div>
-                                        {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : hasAnswer && <XCircle className="h-5 w-5 text-red-600" />}
+                                        {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : (question.studentAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : null)}
                                       </div>
                                     </div>
                                   ) : type === 'MTF' ? (
@@ -1625,52 +1653,68 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </div>
                                       </div>
                                       <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                                        <div className="text-xs font-bold text-indigo-700 uppercase mb-3 text-center">Your Matches vs Correct Matches</div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                          {(question as any).leftColumn?.map((item: any, i: number) => {
-                                            const correctMatches = (question as any).matches || {};
-                                            const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
+                                        <div className="text-xs font-bold text-indigo-700 uppercase mb-3 text-center">Match Analysis</div>
+                                        <div className="overflow-hidden rounded-lg border border-indigo-200">
+                                          <table className="w-full text-sm">
+                                            <thead className="bg-indigo-100 text-indigo-800">
+                                              <tr>
+                                                <th className="p-2 text-left w-1/3">Question (Left)</th>
+                                                <th className="p-2 text-left w-1/3">Your Match</th>
+                                                <th className="p-2 text-left w-1/3">Correct Match</th>
+                                              </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-indigo-100 bg-white">
+                                              {(question as any).leftColumn?.map((item: any, i: number) => {
+                                                const correctMatches = (question as any).matches || {};
+                                                const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
 
-                                            // Normalize student answer (handle different formats from evaluation logic)
-                                            let studentRightId = null;
-                                            if (Array.isArray(studentMatches)) {
-                                              const match = studentMatches.find((m: any) => m.leftIndex === i || m.leftId === item.id);
-                                              if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
-                                            } else {
-                                              studentRightId = studentMatches[item.id];
-                                            }
+                                                // Normalize student answer
+                                                let studentRightId = null;
+                                                if (Array.isArray(studentMatches)) {
+                                                  const match = studentMatches.find((m: any) => m.leftIndex === i || m.leftId === item.id);
+                                                  if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
+                                                } else {
+                                                  studentRightId = studentMatches[item.id];
+                                                }
 
-                                            const correctRightId = correctMatches[item.id];
-                                            const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+                                                const correctRightId = correctMatches[item.id];
+                                                const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+                                                const isUnanswered = !studentRightId;
 
-                                            const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
-                                            const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
+                                                const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                                const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
 
-                                            return (
-                                              <div key={i} className={`p-2 rounded border flex flex-col gap-1 ${isMatchCorrect ? 'bg-green-100 border-green-200' : studentRightId ? 'bg-red-100 border-red-200' : 'bg-gray-100 border-gray-200 opacity-60'}`}>
-                                                <div className="flex justify-between items-center text-xs font-bold">
-                                                  <span>Match {i + 1}</span>
-                                                  {isMatchCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : studentRightId && <XCircle className="h-3 w-3 text-red-600" />}
-                                                </div>
-                                                <div className="text-[10px] space-y-1">
-                                                  <div className="flex gap-1 items-center">
-                                                    <span className="text-gray-500 w-12">You:</span>
-                                                    <span className={isMatchCorrect ? 'text-green-700' : 'text-red-700'}>
-                                                      {item.text.substring(0, 10)}... → {rightItem ? rightItem.text.substring(0, 10) + '...' : 'None'}
-                                                    </span>
-                                                  </div>
-                                                  {!isMatchCorrect && (
-                                                    <div className="flex gap-1 items-center">
-                                                      <span className="text-gray-500 w-12">Correct:</span>
-                                                      <span className="text-green-700">
-                                                        {item.text.substring(0, 10)}... → {correctRightItem ? correctRightItem.text.substring(0, 10) + '...' : 'N/A'}
-                                                      </span>
-                                                    </div>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
+                                                // Row styling
+                                                const rowClass = isMatchCorrect
+                                                  ? "bg-green-50"
+                                                  : isUnanswered
+                                                    ? "bg-gray-50 opacity-90"
+                                                    : "bg-red-50";
+
+                                                return (
+                                                  <tr key={i} className={rowClass}>
+                                                    <td className="p-2 border-r border-indigo-100 font-medium">
+                                                      <span className="font-bold mr-1">{i + 1}.</span>
+                                                      <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                    </td>
+                                                    <td className={`p-2 border-r border-indigo-100 ${isMatchCorrect ? 'text-green-700 font-bold' : isUnanswered ? 'text-gray-400 italic' : 'text-red-600 font-bold'}`}>
+                                                      {isUnanswered ? (
+                                                        "No selection"
+                                                      ) : (
+                                                        <>
+                                                          {rightItem ? <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax> : "Unknown"}
+                                                          {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1" /> : <XCircle className="inline h-4 w-4 ml-1" />}
+                                                        </>
+                                                      )}
+                                                    </td>
+                                                    <td className="p-2 text-green-700 font-medium">
+                                                      {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                    </td>
+                                                  </tr>
+                                                );
+                                              })}
+                                            </tbody>
+                                          </table>
                                         </div>
                                       </div>
                                     </div>
