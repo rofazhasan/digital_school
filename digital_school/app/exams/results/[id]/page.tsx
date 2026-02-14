@@ -1545,68 +1545,87 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   )}
 
                                   {/* Result Rendering Logic */}
-                                  {(type === 'MCQ' || type === 'MC' || type === 'AR') && question.options ? (
+                                  {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
                                     <div className="space-y-2">
-                                      {question.options.map((option, optIndex) => {
-                                        const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === ((question as any).correctOption || (question as any).correct));
-
-                                        // Determine if selected based on type format
-                                        let isSelected = false;
-                                        if (type === 'MC') {
-                                          const selectedOpts = (question.studentAnswer as any)?.selectedOptions;
-                                          isSelected = Array.isArray(selectedOpts) && selectedOpts.includes(optIndex);
-                                        } else if (type === 'AR') {
-                                          const selectedOpt = (question.studentAnswer as any)?.selectedOption;
-                                          isSelected = selectedOpt === (optIndex + 1);
-                                        } else {
-                                          // MCQ basic string match
-                                          isSelected = question.studentAnswer === option.text;
+                                      {(function () {
+                                        // Handle options for AR specifically if missing
+                                        let optionsToRender = question.options;
+                                        if (type === 'AR' && (!optionsToRender || optionsToRender.length === 0)) {
+                                          optionsToRender = [
+                                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+                                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+                                            { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+                                            { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false },
+                                            { text: "Assertion (A) ও Reason (R) উভয়ই মিথ্যা", isCorrect: false }
+                                          ];
+                                          // Mark correct option based on correctOption index
+                                          const correctIdx = ((question as any).correctOption || (question as any).correct) - 1;
+                                          if (correctIdx >= 0 && correctIdx < optionsToRender.length) {
+                                            optionsToRender[correctIdx].isCorrect = true;
+                                          }
                                         }
 
-                                        // Determine Style
-                                        let containerStyle = "border-gray-100 bg-white"; // default unselected
-                                        let icon = null;
+                                        return (optionsToRender || []).map((option: any, optIndex: number) => {
+                                          const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === ((question as any).correctOption || (question as any).correct));
 
-                                        if (isCorrectOpt && isSelected) {
-                                          // Correct & Selected -> Green + Check
-                                          containerStyle = "border-green-500 bg-green-50 ring-1 ring-green-500";
-                                          icon = <CheckCircle className="h-5 w-5 text-green-600" />;
-                                        } else if (isCorrectOpt && !isSelected) {
-                                          // Correct & Missed -> Dashed Green border + Info
-                                          containerStyle = "border-green-400 border-dashed bg-green-50/50";
-                                          icon = <div className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-full">Correct Answer</div>;
-                                        } else if (!isCorrectOpt && isSelected) {
-                                          // Wrong & Selected -> Red + X
-                                          containerStyle = "border-red-500 bg-red-50 ring-1 ring-red-500";
-                                          icon = <XCircle className="h-5 w-5 text-red-600" />;
-                                        } else {
-                                          // Wrong & Unselected -> Default
-                                          containerStyle = "border-gray-100 bg-white text-gray-500 opacity-60";
-                                        }
+                                          // Determine if selected based on type format
+                                          let isSelected = false;
+                                          if (type === 'MC') {
+                                            const selectedOpts = (question.studentAnswer as any)?.selectedOptions;
+                                            isSelected = Array.isArray(selectedOpts) && selectedOpts.includes(optIndex);
+                                          } else if (type === 'AR') {
+                                            const selectedOpt = (question.studentAnswer as any)?.selectedOption;
+                                            isSelected = selectedOpt === (optIndex + 1);
+                                          } else {
+                                            // MCQ basic string match
+                                            isSelected = question.studentAnswer === option.text;
+                                          }
 
-                                        return (
-                                          <div
-                                            key={optIndex}
-                                            className={`p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${containerStyle}`}
-                                          >
-                                            <span className={`font-bold ${isSelected || isCorrectOpt ? 'text-gray-800' : 'text-gray-400'}`}>
-                                              {String.fromCharCode(0x0995 + optIndex)}.
-                                            </span>
-                                            <span className="flex-1 font-medium">
-                                              <UniversalMathJax inline dynamic>
-                                                {type === 'AR' ? [
-                                                  "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
-                                                  "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
-                                                  "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
-                                                  "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
-                                                  "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                ][optIndex] : cleanupMath(option.text)}
-                                              </UniversalMathJax>
-                                            </span>
-                                            {icon}
-                                          </div>
-                                        );
-                                      })}
+                                          // Determine Style
+                                          let containerStyle = "border-gray-100 bg-white"; // default unselected
+                                          let icon = null;
+
+                                          if (isCorrectOpt && isSelected) {
+                                            // Correct & Selected -> Green + Check
+                                            containerStyle = "border-green-500 bg-green-50 ring-1 ring-green-500";
+                                            icon = <CheckCircle className="h-5 w-5 text-green-600" />;
+                                          } else if (isCorrectOpt && !isSelected) {
+                                            // Correct & Missed -> Dashed Green border + Info
+                                            containerStyle = "border-green-400 border-dashed bg-green-50/50";
+                                            icon = <div className="text-xs text-green-600 font-medium px-2 py-0.5 bg-green-100 rounded-full">Correct Answer</div>;
+                                          } else if (!isCorrectOpt && isSelected) {
+                                            // Wrong & Selected -> Red + X
+                                            containerStyle = "border-red-500 bg-red-50 ring-1 ring-red-500";
+                                            icon = <XCircle className="h-5 w-5 text-red-600" />;
+                                          } else {
+                                            // Wrong & Unselected -> Default
+                                            containerStyle = "border-gray-100 bg-white text-gray-500 opacity-60";
+                                          }
+
+                                          return (
+                                            <div
+                                              key={optIndex}
+                                              className={`p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${containerStyle}`}
+                                            >
+                                              <span className={`font-bold ${isSelected || isCorrectOpt ? 'text-gray-800' : 'text-gray-400'}`}>
+                                                {String.fromCharCode(0x0995 + optIndex)}.
+                                              </span>
+                                              <span className="flex-1 font-medium">
+                                                <UniversalMathJax inline dynamic>
+                                                  {type === 'AR' ? [
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়",
+                                                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                                  ][optIndex] : cleanupMath(option.text)}
+                                                </UniversalMathJax>
+                                              </span>
+                                              {icon}
+                                            </div>
+                                          );
+                                        }); // map ends here
+                                      })()} // IIFE ends here
                                     </div>
                                   ) : (type === 'INT' || type === 'NUMERIC') ? (
                                     <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-col gap-4">
@@ -1624,7 +1643,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           </div>
                                           <div className="w-px h-4 bg-gray-200" />
                                           <div className="text-sm font-bold text-indigo-600">
-                                            Correct Answer: <span className="ml-2">{(question as any).correctAnswer || (question as any).modelAnswer || (question as any).correct}</span>
+                                            Correct Answer: <span className="ml-2">{(question as any).correctAnswer}</span>
                                           </div>
                                         </div>
                                         {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : (question.studentAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : null)}

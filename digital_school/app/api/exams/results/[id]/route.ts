@@ -421,7 +421,18 @@ export async function GET(
         explanation: explanation,
         subQuestions: question.subQuestions,
         feedback,
-        images: question.images || []
+        images: question.images || [],
+        // AR Specific Fields
+        assertion: (question as any).assertion,
+        reason: (question as any).reason,
+        correctOption: (question as any).correctOption || (question as any).correct,
+        // MTF Specific Fields
+        leftColumn: (question as any).leftColumn,
+        rightColumn: (question as any).rightColumn,
+        matches: (question as any).matches,
+        // INT Specific Fields
+        correctAnswer: (question as any).correctAnswer || (question as any).answer,
+        tolerance: (question as any).tolerance
       };
     });
 
