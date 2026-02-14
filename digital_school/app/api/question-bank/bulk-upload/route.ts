@@ -175,9 +175,9 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         } else if (data.type === 'CQ') {
             data.subQuestions = [];
             for (let i = 1; i <= 4; i++) {
-                const q = s(getValue(row, [`Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
+                const q = s(getValue(row, [`Sub-Question ${i} Text`, `Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
                 const m = n(getValue(row, [`Sub-Question ${i} Marks`, `SQ${i} Marks`]));
-                const a = s(getValue(row, [`Sub-Question ${i} Answer`, `SQ${i} Answer`]));
+                const a = s(getValue(row, [`Sub-Question ${i} Model Answer`, `Sub-Question ${i} Answer`, `SQ${i} Answer`]));
                 if (q) data.subQuestions.push({ question: q, marks: m, modelAnswer: a });
             }
 

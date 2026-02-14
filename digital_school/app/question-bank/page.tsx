@@ -1932,9 +1932,9 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             )}
           </motion.div></AnimatePresence>
           <Label>Live Preview</Label>
-          <Card className="h-full min-h-[200px] p-4 bg-gray-50 dark:bg-gray-800/50">
+          <Card className="h-full min-h-[200px] p-6 bg-gray-50 dark:bg-gray-800/50 shadow-inner">
             <div className="prose dark:prose-invert max-w-none">
-              <UniversalMathJax>{questionText || ''}</UniversalMathJax>
+              <UniversalMathJax dynamic>{cleanupMath(questionText || '')}</UniversalMathJax>
               {(type === 'MCQ' || type === 'MC') && (
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Options ({type === 'MC' ? 'Multiple Correct' : 'Single Correct'}):</p>
@@ -1945,7 +1945,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           {String.fromCharCode(65 + i)}
                         </div>
                         <div className="flex-1">
-                          <UniversalMathJax inline>{opt.text || `(Option ${String.fromCharCode(65 + i)})`}</UniversalMathJax>
+                          <UniversalMathJax inline dynamic>{cleanupMath(opt.text || `(Option ${String.fromCharCode(65 + i)})`)}</UniversalMathJax>
                           {opt.image && (
                             <div className="my-2">
                               <img src={opt.image} alt={`Option ${String.fromCharCode(65 + i)}`} className="max-h-32 rounded border shadow-sm" />
@@ -1954,7 +1954,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           {opt.isCorrect && opt.explanation && (
                             <div className="mt-2 p-2 bg-green-100/50 dark:bg-green-800/20 rounded border border-green-200/50 dark:border-green-700/50">
                               <p className="text-[10px] font-bold text-green-700 dark:text-green-300 uppercase leading-none mb-1">Explanation</p>
-                              <div className="text-xs text-green-800 dark:text-green-200"><UniversalMathJax inline>{opt.explanation}</UniversalMathJax></div>
+                              <div className="text-xs text-green-800 dark:text-green-200"><UniversalMathJax inline dynamic>{cleanupMath(opt.explanation)}</UniversalMathJax></div>
                             </div>
                           )}
                         </div>
@@ -1976,7 +1976,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                       <div className="mt-4 space-y-2">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Solution/Explanation</p>
                         <div className="text-sm p-3 bg-white dark:bg-gray-950 rounded-lg border border-gray-200 dark:border-gray-800 shadow-sm">
-                          <UniversalMathJax>{modelAnswer || explanation}</UniversalMathJax>
+                          <UniversalMathJax dynamic>{cleanupMath(modelAnswer || explanation || '')}</UniversalMathJax>
                         </div>
                       </div>
                     )}
@@ -1990,11 +1990,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     <div className="space-y-4">
                       <div>
                         <Badge className="mb-2 bg-orange-500">ASSERTION (A)</Badge>
-                        <div className="text-sm font-medium pl-2 border-l-2 border-orange-200"><UniversalMathJax>{assertion || "Enter assertion statement..."}</UniversalMathJax></div>
+                        <div className="text-sm font-medium pl-2 border-l-2 border-orange-200"><UniversalMathJax dynamic>{cleanupMath(assertion || "Enter assertion statement...")}</UniversalMathJax></div>
                       </div>
                       <div>
                         <Badge className="mb-2 bg-blue-500">REASON (R)</Badge>
-                        <div className="text-sm font-medium pl-2 border-l-2 border-blue-200"><UniversalMathJax>{reason || "Enter reason statement..."}</UniversalMathJax></div>
+                        <div className="text-sm font-medium pl-2 border-l-2 border-blue-200"><UniversalMathJax dynamic>{cleanupMath(reason || "Enter reason statement...")}</UniversalMathJax></div>
                       </div>
                     </div>
                   </div>
@@ -2012,7 +2012,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     {explanation && (
                       <div className="mt-3 pt-3 border-t border-gray-800 text-xs text-gray-300">
                         <span className="font-bold text-white">Explanation: </span>
-                        <UniversalMathJax>{explanation}</UniversalMathJax>
+                        <UniversalMathJax dynamic>{cleanupMath(explanation || '')}</UniversalMathJax>
                       </div>
                     )}
                   </div>
@@ -2030,11 +2030,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         <div key={left.id} className="flex items-stretch gap-2 animate-in fade-in slide-in-from-left-2 duration-300" style={{ animationDelay: `${idx * 100}ms` }}>
                           <div className="flex-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl flex items-center justify-between">
                             <span className="text-[10px] font-black text-blue-400 mr-2 uppercase">{left.id}</span>
-                            <div className="text-sm font-medium"><UniversalMathJax inline>{left.text || "???"}</UniversalMathJax></div>
+                            <div className="text-sm font-medium"><UniversalMathJax inline dynamic>{cleanupMath(left.text || "???")}</UniversalMathJax></div>
                           </div>
                           <div className="flex items-center text-gray-300"><ArrowRight className="w-4 h-4" /></div>
                           <div className="flex-1 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-xl flex items-center gap-2">
-                            <div className="text-sm font-bold text-purple-700 dark:text-purple-300 flex-1 text-right"><UniversalMathJax inline>{rightItem?.text || "???"}</UniversalMathJax></div>
+                            <div className="text-sm font-bold text-purple-700 dark:text-purple-300 flex-1 text-right"><UniversalMathJax inline dynamic>{cleanupMath(rightItem?.text || "???")}</UniversalMathJax></div>
                             <span className="text-[10px] font-black text-purple-400 ml-2 uppercase">{rightId || "?"}</span>
                           </div>
                         </div>
@@ -2043,7 +2043,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   </div>
                   {explanation && (
                     <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-dashed border-gray-300 dark:border-gray-700 text-xs text-gray-500">
-                      <strong>Note: </strong> <UniversalMathJax>{explanation}</UniversalMathJax>
+                      <strong>Note: </strong> <UniversalMathJax dynamic>{cleanupMath(explanation || '')}</UniversalMathJax>
                     </div>
                   )}
                 </div>
@@ -2055,7 +2055,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                     {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
                       <li key={i} className="space-y-2">
                         <div>
-                          <UniversalMathJax>{sq.question || `(Sub-question ${i + 1})`}</UniversalMathJax>
+                          <UniversalMathJax dynamic>{cleanupMath(sq.question || `(Sub-question ${i + 1})`)}</UniversalMathJax>
                           {sq.image && (
                             <div className="my-2">
                               <img src={sq.image} alt={`Sub-question ${i + 1}`} className="max-h-32 rounded border" />
@@ -2066,7 +2066,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                         {sq.modelAnswer && (
                           <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
-                            <UniversalMathJax>{sq.modelAnswer}</UniversalMathJax>
+                            <UniversalMathJax dynamic>{cleanupMath(sq.modelAnswer || '')}</UniversalMathJax>
                           </div>
                         )}
                       </li>
@@ -2078,7 +2078,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-                    <UniversalMathJax>{modelAnswer}</UniversalMathJax>
+                    <UniversalMathJax dynamic>{cleanupMath(modelAnswer || '')}</UniversalMathJax>
                   </div>
                 </div>
               )}
@@ -2281,7 +2281,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
         </form>
         <div className="space-y-4">
           <CardTitle>Generated Preview</CardTitle>
-          <Card className="h-full min-h-[300px] p-2 bg-gray-50 dark:bg-gray-800/50">
+          <Card className="h-full min-h-[400px] p-6 bg-gray-50 dark:bg-gray-800/50">
             {isGenerating && <div className="flex items-center justify-center h-full"><Loader2 className="h-8 w-8 animate-spin text-indigo-500" /></div>}
             {generatedQuestions.length > 0 && <div className="space-y-2 max-h-[400px] overflow-y-auto p-2">
               {generatedQuestions.map((q) => (
@@ -2842,16 +2842,16 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                         <Input
                           value={row.data.subject}
                           onChange={(e) => handleEditRow(index, 'subject', e.target.value)}
-                          className="h-16 text-xs"
+                          className="h-12 text-xs"
                         />
                       </TableCell>
                       <TableCell>
                         <div className="max-w-[150px] overflow-hidden">
-                          <UniversalMathJax inline dynamic>{row.data.questionText}</UniversalMathJax>
+                          <UniversalMathJax inline dynamic>{cleanupMath(row.data.questionText || '')}</UniversalMathJax>
                           {row.data.type === 'AR' && (
                             <div className="mt-1 border-t pt-1 text-[10px] space-y-1">
-                              <div className="text-orange-600 font-bold">A: <UniversalMathJax inline>{row.data.assertion}</UniversalMathJax></div>
-                              <div className="text-blue-600 font-bold">R: <UniversalMathJax inline>{row.data.reason}</UniversalMathJax></div>
+                              <div className="text-orange-600 font-bold">A: <UniversalMathJax inline dynamic>{cleanupMath(row.data.assertion || '')}</UniversalMathJax></div>
+                              <div className="text-blue-600 font-bold">R: <UniversalMathJax inline dynamic>{cleanupMath(row.data.reason || '')}</UniversalMathJax></div>
                             </div>
                           )}
                           {row.data.type === 'MTF' && (
@@ -2865,7 +2865,7 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                         <Textarea
                           value={row.data.questionText}
                           onChange={(e) => handleEditRow(index, 'questionText', e.target.value)}
-                          className="min-h-[60px] text-xs"
+                          className="min-h-[80px] text-xs font-mono"
                         />
                       </TableCell>
                       <TableCell>{row.data.marks}</TableCell>

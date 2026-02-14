@@ -35,13 +35,25 @@
     margin: 15mm;
   }
 
-  /* Premium Typography Refinements */
-  body,
-  .question-paper-container,
-  .answer-paper-container {
+  body {
     font-family: 'SolaimanLipi', 'Times New Roman', serif !important;
     line-height: 1.4 !important;
     letter-spacing: 0.01em !important;
+    background: white !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .print-page-container {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+
+  .question-paper-container,
+  .answer-paper-container {
+    font-family: inherit !important;
   }
 
   .print-header {
@@ -194,26 +206,6 @@
     page-break-inside: avoid !important;
     margin-bottom: 0.4rem !important;
   }
-}
-
-@media print {
-  @page {
-    size: legal;
-    margin: 10mm;
-  }
-
-  body {
-    background: white !important;
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
-  }
-
-  .print-page-container {
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-  }
 
   /* Professional OMR Print Refinements */
   .omr-sheet-wrapper {
@@ -244,4 +236,29 @@
   .rounded-full {
     border-width: 1.5px !important;
   }
+
+  /* OMR Specific Adjustments */
+  .omr-sheet-wrapper {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+}
+
+/* Global Optimizations (Non-Print) */
+.question-block {
+  margin-bottom: 0.4rem;
+  break-inside: avoid;
+}
+
+.question-options {
+  margin-left: 1.5rem;
+  margin-top: 0.1rem;
+}
+
+.option-item {
+  font-size: 0.85rem;
+  font-weight: 500;
 }

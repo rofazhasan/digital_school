@@ -170,7 +170,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const mcqPages = getMCQPages();
 
     return (
-      <div ref={ref} className="answer-paper-container bg-white p-8 rounded-lg shadow-lg relative overflow-hidden" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+      <div ref={ref} className="answer-paper-container bg-white relative overflow-hidden" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
         <div className="watermark print-only">{examInfo.schoolName}</div>
 
         {/* Header */}
