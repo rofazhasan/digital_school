@@ -466,7 +466,7 @@ export default function QuestionBankPage() {
         return isWithinInterval(qDate, { start, end });
       })
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, topicFilter, dateRange]);
+  }, [questions, searchTerm, classFilter, subjectFilter, difficultyFilter, typeFilter, topicFilter, dateRange]);
 
   // Reset pagination when filters change
   useEffect(() => {
