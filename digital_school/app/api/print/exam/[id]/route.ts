@@ -152,7 +152,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     } else if (set.questions && Array.isArray(set.questions)) {
       questionsArr = set.questions;
     }
-    const mcq = questionsArr.filter((q: any) => q.type === 'MCQ').map((q: any) => {
+    const mcq = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => {
       // Extract correct answer index from MCQ options and map to Bengali labels
       let correctAnswer = 'ক'; // Default fallback
 
@@ -174,15 +174,37 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       }
 
       return {
+        ...q,
         q: q.questionText,
         options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
-        marks: q.marks,
         correctAnswer: correctAnswer,
-        explanation: explanation, // Prefer fresh from DB, then JSON fallback, then Option fallback
+        explanation: explanation,
       };
     });
+
+    const mc = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MC').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+      options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
+    }));
+
+    const int = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'INT' || (q.type || "").toUpperCase() === 'NUMERIC').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+    }));
+
+    const ar = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'AR').map((q: any) => ({
+      ...q,
+      q: q.questionText || q.assertion,
+    }));
+
+    const mtf = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MTF').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+    }));
+
     // Process CQ questions with subsection-aware shuffling
-    let cq = questionsArr.filter((q: any) => q.type === 'CQ');
+    let cq = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'CQ');
 
     // If there are subsections, process them according to subsection rules
     if (exam.cqSubsections && Array.isArray(exam.cqSubsections) && exam.cqSubsections.length > 1) {
@@ -206,40 +228,47 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       // Single subsection - can shuffle all CQ questions
       cq = shuffleArray([...cq]);
     }
-    // If no subsections, keep original order
 
     const cqWithAnswers = cq.map((q: any) => {
       const subAnswers = (q.subQuestions || []).map((sub: any) => {
-        // Try different possible field names for the answer
         const answer = sub.modelAnswer || sub.answer || sub.text || sub.content || 'উত্তর দেওয়া হবে';
         return answer;
       });
 
       return {
-        questionText: q.questionText,
-        marks: q.marks,
-        modelAnswer: q.modelAnswer,
-        subQuestions: q.subQuestions || [],
+        ...q,
         subAnswers: subAnswers,
       };
     });
 
     cq = cqWithAnswers;
+
     const sq = questionsArr.filter((q: any) => q.type === 'SQ').map((q: any) => ({
-      questionText: q.questionText,
-      marks: q.marks,
-      modelAnswer: q.modelAnswer,
+      ...q,
     }));
+
     return {
-      setId: set.id, // Use ExamSet.id for QR/barcode
-      setName: set.name, // For display (A/B/C...)
+      setId: set.id,
+      setName: set.name,
       mcq,
+      mc,
+      int,
+      ar,
+      mtf,
       cq,
       sq,
       qrData: { examId, setId: set.id, classId: exam.classId },
       barcode: `${examId}|${set.id}|${exam.classId}`,
     };
-  }).filter(set => (set.mcq && set.mcq.length) || (set.cq && set.cq.length) || (set.sq && set.sq.length));
+  }).filter(set =>
+    set.mcq?.length ||
+    set.mc?.length ||
+    set.int?.length ||
+    set.ar?.length ||
+    set.mtf?.length ||
+    set.cq?.length ||
+    set.sq?.length
+  );
 
   return NextResponse.json({ examInfo, sets });
-} 
+}

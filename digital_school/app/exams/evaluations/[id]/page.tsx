@@ -48,6 +48,9 @@ import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
+
 interface LiveStudent {
   id: string;
   studentName: string;
@@ -774,7 +777,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       isCorrect ? 'bg-green-50 border-green-200' : 'bg-gray-50'
                                       }`}>
                                       <div className="flex items-start">
-                                        <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                                        <span className="font-bold mr-2">{MCQ_LABELS[i]}.</span>
                                         <div className="flex-1">
                                           <UniversalMathJax inline dynamic key={`opt-${i}`}>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
                                           {opt.image && (
@@ -2217,7 +2220,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 return (
                                                   <div key={idx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-gray-50 border-gray-200 opacity-60'}`}>
                                                     <div className="flex items-center gap-2">
-                                                      <span className="font-bold text-gray-500 w-5">{String.fromCharCode(65 + idx)}.</span>
+                                                      <span className="font-bold text-gray-500 w-5">{MCQ_LABELS[idx]}.</span>
                                                       <UniversalMathJax inline dynamic>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
                                                     </div>
                                                     {isSelected && (isCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />)}
@@ -2234,11 +2237,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <div className="text-sm text-gray-700 italic">
                                                 {(() => {
                                                   const labels = [
-                                                    "Both Assertion (A) and Reason (R) are true, and R is the correct explanation of A",
-                                                    "Both Assertion (A) and Reason (R) are true, but R is NOT the correct explanation of A",
-                                                    "Assertion (A) is true, but Reason (R) is false",
-                                                    "Assertion (A) is false, but Reason (R) is true",
-                                                    "Both Assertion (A) and Reason (R) are false"
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
                                                   ];
                                                   return labels[currentAnswer.selectedOption - 1] || "Unknown Option";
                                                 })()}
@@ -2436,7 +2439,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           <div key={idx} className={`p-3 rounded border ${bgClass} flex flex-col gap-2`}>
                                             <div className="flex items-center justify-between w-full">
                                               <div className="flex items-center gap-2">
-                                                <span className="font-bold text-gray-500 w-6">{String.fromCharCode(65 + idx)}.</span>
+                                                <span className="font-bold text-gray-500 w-6">{MCQ_LABELS[idx]}.</span>
                                                 <div className="flex-1">
                                                   <span className={`text-sm md:text-base ${isCorrect ? "font-medium text-green-900" : isSelected ? "text-red-900" : ""}`}>
                                                     <UniversalMathJax dynamic>{cleanupMath(optText)}</UniversalMathJax>
@@ -2475,7 +2478,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         return (
                                           <div key={oidx} className={`p-3 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400') : (isCorrect ? 'bg-green-100/50 border-dashed border-green-300 opacity-60' : 'bg-gray-50 border-gray-100')}`}>
                                             <div className="flex items-center gap-2">
-                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-white flex items-center justify-center border">{String.fromCharCode(65 + oidx)}</span>
+                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-white flex items-center justify-center border">{MCQ_LABELS[oidx]}</span>
                                               <span className="text-sm"><UniversalMathJax dynamic>{cleanupMath(opt.text)}</UniversalMathJax></span>
                                             </div>
                                             <div className="flex gap-1">

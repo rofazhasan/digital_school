@@ -140,31 +140,31 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     // ... (questions mapping)
 
     const questions = {
-        mcq: examData.questions.filter((q: any) => q.type === 'mcq').map((q: any) => ({
+        mcq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MCQ').map((q: any) => ({
             ...q,
             q: q.text // Component expects 'q' for text
         })),
-        mc: examData.questions.filter((q: any) => q.type === 'mc').map((q: any) => ({
+        mc: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MC').map((q: any) => ({
             ...q,
             q: q.text
         })),
-        int: examData.questions.filter((q: any) => q.type === 'int').map((q: any) => ({
+        int: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'INT').map((q: any) => ({
             ...q,
             q: q.text
         })),
-        ar: examData.questions.filter((q: any) => q.type === 'ar').map((q: any) => ({
+        ar: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'AR').map((q: any) => ({
             ...q,
             // AR fields (assertion, reason) should be in ...q
         })),
-        mtf: examData.questions.filter((q: any) => q.type === 'mtf').map((q: any) => ({
+        mtf: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MTF').map((q: any) => ({
             ...q,
             q: q.text
         })),
-        cq: examData.questions.filter((q: any) => q.type === 'cq').map((q: any) => ({
+        cq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'CQ').map((q: any) => ({
             ...q,
             questionText: q.text // Component expects 'questionText'
         })),
-        sq: examData.questions.filter((q: any) => q.type === 'sq').map((q: any) => ({
+        sq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'SQ').map((q: any) => ({
             ...q,
             questionText: q.text
         }))

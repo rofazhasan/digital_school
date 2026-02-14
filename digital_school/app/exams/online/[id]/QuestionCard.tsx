@@ -332,11 +332,11 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const showResult = submitted && result;
 
   const arOptionLabels = [
-    "Both Assertion (A) and Reason (R) are true, and R is the correct explanation of A",
-    "Both Assertion (A) and Reason (R) are true, but R is NOT the correct explanation of A",
-    "Assertion (A) is true, but Reason (R) is false",
-    "Assertion (A) is false, but Reason (R) is true",
-    "Both Assertion (A) and Reason (R) are false"
+    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
   ];
 
   return (

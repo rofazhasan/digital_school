@@ -236,180 +236,172 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                 {/* Main Content */}
                 <main>
-                    {/* MC Section */}
-                    {(questions.mc || []).length > 0 && (
-                        <>
-                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
-                                <h3>বহুনির্বাচনি প্রশ্ন (Multiple Correct)</h3>
-                                <div className="text-right">
-                                    <span>Marks: {questions.mc.length > 0 ? 'Checked' : '0'}</span>
+                    {/* Objective Questions Section */}
+                    {(() => {
+                        const allObjective = [
+                            ...(questions.mcq || []).map(q => ({ ...q, type: 'MCQ' })),
+                            ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
+                            ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
+                            ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
+                            ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' }))
+                        ];
+
+                        if (allObjective.length === 0) return null;
+
+                        return (
+                            <>
+                                <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
+                                    <h3>বহুনির্বাচনি/অবজেক্টিভ প্রশ্ন (Objective Questions)</h3>
+                                    <div className="text-right">
+                                        <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {mcqTotal}</span>
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2">
-                                {questions.mc.map((q, idx) => {
-                                    const ans = submission.answers[q.id || ''] || {};
-                                    const selectedIndices = ans.selectedOptions || [];
-                                    const correctIndices = q.options?.map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1) || [];
-                                    const isFullyCorrect = selectedIndices.length === correctIndices.length && selectedIndices.every((v: number) => correctIndices.includes(v));
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                    {allObjective.map((q: any, idx) => {
+                                        const qNum = idx + 1;
+                                        const ans = submission.answers[q.id || ''];
 
-                                    return (
-                                        <div key={idx} className={`mb-2 p-2 rounded border ${isFullyCorrect ? 'bg-green-50 border-green-200' :
-                                            selectedIndices.length > 0 ? 'bg-red-50 border-red-200' : 'border-dashed border-gray-300'
-                                            } break-inside-avoid relative`}>
-                                            <div className="flex items-start justify-between">
-                                                <div className="flex items-start flex-1 min-w-0">
-                                                    <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
-                                                    <div className="flex-1 text-sm overflow-hidden">
-                                                        <Text>{`${q.q}`}</Text>
-                                                        <div className="mt-1 flex flex-wrap gap-2">
-                                                            {(q.options || []).map((opt, oidx) => {
-                                                                const isSelected = selectedIndices.includes(oidx);
-                                                                const isCorrectOption = opt.isCorrect;
+                                        // MCQ / MC Rendering
+                                        if (q.type === 'MCQ' || q.type === 'MC') {
+                                            const selectedIndices = q.type === 'MC' ? (ans?.selectedOptions || []) : [];
+                                            const singleSelected = q.type === 'MCQ' ? ans : null;
 
-                                                                let optionClass = "bg-gray-50 border-gray-200 text-gray-700";
-                                                                if (isSelected) {
-                                                                    optionClass = isCorrectOption ? "bg-green-600 text-white border-green-600" : "bg-red-600 text-white border-red-600";
-                                                                } else if (isCorrectOption) {
-                                                                    optionClass = "bg-green-100 text-green-900 border-green-300 ring-1 ring-green-400";
-                                                                }
+                                            const correctIndices = (q.options || []).map((o: any, i: number) => o.isCorrect ? i : -1).filter((i: number) => i !== -1);
+                                            const correctText = q.correct || q.options?.find((o: any) => o.isCorrect)?.text;
 
-                                                                return (
-                                                                    <span key={oidx} className={`inline-flex items-center px-2 py-0.5 rounded text-xs border ${optionClass}`}>
-                                                                        <span className="font-bold mr-1">{MCQ_LABELS[oidx]}.</span>
-                                                                        <Text>{opt.text}</Text>
-                                                                        {isSelected && (isCorrectOption ? <CheckCircle className="inline w-3 h-3 ml-1" /> : <XCircle className="inline w-3 h-3 ml-1" />)}
-                                                                    </span>
-                                                                );
-                                                            })}
+                                            let isCorrect = false;
+                                            if (q.type === 'MCQ') {
+                                                isCorrect = String(ans) === String(correctText);
+                                            } else {
+                                                isCorrect = selectedIndices.length === correctIndices.length && selectedIndices.every((v: number) => correctIndices.includes(v));
+                                            }
+
+                                            const statusColor = isCorrect ? 'bg-green-50' : (ans ? 'bg-red-50' : 'bg-gray-50');
+
+                                            return (
+                                                <div key={q.id || idx} className={`p-2 rounded border ${statusColor} break-inside-avoid relative`}>
+                                                    <div className="flex items-start">
+                                                        <span className="font-bold mr-2 text-sm">{qNum}.{q.type === 'MC' ? '*' : ''}</span>
+                                                        <div className="flex-1 text-sm">
+                                                            <Text>{q.q || q.questionText}</Text>
+                                                            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                                                                {(q.options || []).map((opt: any, oidx: number) => {
+                                                                    const isSelected = q.type === 'MC' ? selectedIndices.includes(oidx) : String(singleSelected) === String(opt.text);
+                                                                    const isCorrectOpt = opt.isCorrect || String(opt.text) === String(correctText);
+
+                                                                    let optClass = "text-gray-700";
+                                                                    if (isSelected) {
+                                                                        optClass = isCorrectOpt ? "text-green-700 font-bold" : "text-red-700 font-bold line-through";
+                                                                    } else if (isCorrectOpt) {
+                                                                        optClass = "text-green-700 font-bold italic underline";
+                                                                    }
+
+                                                                    return (
+                                                                        <div key={oidx} className={`flex items-center gap-1 px-1 rounded ${optClass}`}>
+                                                                            <span className="font-bold">{MCQ_LABELS[oidx]}.</span>
+                                                                            <Text>{opt.text}</Text>
+                                                                            {isSelected && (isCorrectOpt ? <CheckCircle className="w-3 h-3 ml-1 inline" /> : <XCircle className="w-3 h-3 ml-1 inline" />)}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
+                                            );
+                                        }
 
-                    {/* AR Section */}
-                    {(questions.ar || []).length > 0 && (
-                        <>
-                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
-                                <h3>Assertion-Reason (AR)</h3>
-                            </div>
+                                        // AR Rendering
+                                        if (q.type === 'AR') {
+                                            const selectedOption = Number(ans?.selectedOption || 0);
+                                            const correctOption = Number(q.correct || 0);
+                                            const isCorrect = selectedOption === correctOption;
 
-                            <div className="space-y-4">
-                                {questions.ar.map((q, idx) => {
-                                    const ans = submission.answers[q.id || ''] || {};
-                                    const selectedOption = Number(ans.selectedOption || 0);
-                                    const correctOption = Number(q.correct || 0);
-                                    const isCorrect = selectedOption === correctOption;
-
-                                    return (
-                                        <div key={idx} className={`p-4 rounded border ${isCorrect ? 'bg-green-50' : 'bg-red-50'} break-inside-avoid shadow-sm`}>
-                                            <div className="mb-2 flex items-center justify-between">
-                                                <span className="font-bold">Q{idx + 1}. AR Question</span>
-                                                <span className="text-xs font-bold px-2 py-1 rounded bg-white border">{isCorrect ? 'Correct' : 'Incorrect'}</span>
-                                            </div>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
-                                                <div className="p-2 bg-indigo-50 rounded border border-indigo-100">
-                                                    <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
-                                                    <div className="text-sm"><Text>{q.assertion}</Text></div>
-                                                </div>
-                                                <div className="p-2 bg-purple-50 rounded border border-purple-100">
-                                                    <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
-                                                    <div className="text-sm"><Text>{q.reason}</Text></div>
-                                                </div>
-                                            </div>
-                                            <div className="text-xs">
-                                                <span className="font-bold">Your Selection:</span> Option {selectedOption || 'N/A'}
-                                                <span className="mx-2">|</span>
-                                                <span className="font-bold">Correct:</span> Option {correctOption}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
-
-                    {/* MTF Section */}
-                    {(questions.mtf || []).length > 0 && (
-                        <>
-                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
-                                <h3>Match the Following (MTF)</h3>
-                            </div>
-
-                            <div className="space-y-4">
-                                {questions.mtf.map((q, idx) => {
-                                    const ans = submission.answers[q.id] || {};
-                                    const studentMatches = ans.matches || ans;
-                                    let normalizedMatches: any[] = [];
-                                    if (Array.isArray(studentMatches)) {
-                                        normalizedMatches = studentMatches;
-                                    } else if (studentMatches && typeof studentMatches === 'object' && studentMatches.matches) {
-                                        normalizedMatches = studentMatches.matches;
-                                    } else if (studentMatches && typeof studentMatches === 'object' && !studentMatches.matches) {
-                                        Object.entries(studentMatches).forEach(([leftId, rightId]) => {
-                                            const leftIndex = q.leftColumn?.findIndex((l: any) => l.id === leftId);
-                                            const rightIndex = q.rightColumn?.findIndex((r: any) => r.id === rightId);
-                                            if (leftIndex !== -1 && rightIndex !== -1) {
-                                                normalizedMatches.push({ leftIndex, rightIndex });
-                                            }
-                                        });
-                                    }
-
-                                    return (
-                                        <div key={idx} className="p-4 rounded border border-gray-200 bg-white break-inside-avoid">
-                                            <div className="font-bold mb-2">{idx + 1}. <Text>{q.q}</Text></div>
-                                            <div className="grid grid-cols-2 gap-2 mt-2">
-                                                {q.pairs.map((p, pidx) => (
-                                                    <div key={pidx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs border border-gray-100">
-                                                        <div className="font-medium"><Text>{p.left}</Text></div>
-                                                        <div className="px-2">→</div>
-                                                        <div className="font-medium text-blue-700"><Text>{p.right}</Text></div>
+                                            return (
+                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (selectedOption ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm col-span-full`}>
+                                                    <div className="flex items-start">
+                                                        <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                        <div className="flex-1">
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+                                                                <div className="p-2 bg-indigo-50/50 rounded border border-indigo-100">
+                                                                    <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
+                                                                    <div className="text-sm"><Text>{q.assertion}</Text></div>
+                                                                </div>
+                                                                <div className="p-2 bg-purple-50/50 rounded border border-purple-100">
+                                                                    <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
+                                                                    <div className="text-sm"><Text>{q.reason}</Text></div>
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-xs flex gap-4 mt-2">
+                                                                <div className={`${isCorrect ? 'text-green-700' : 'text-red-700'} font-bold`}>
+                                                                    Your: Option {selectedOption || 'N/A'}
+                                                                </div>
+                                                                <div className="text-green-700 font-bold italic">
+                                                                    Correct: Option {correctOption}
+                                                                </div>
+                                                                {!isCorrect && <XCircle className="w-4 h-4 text-red-600" />}
+                                                                {isCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
+                                                            </div>
+                                                        </div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                            <div className="mt-3 text-[10px] text-gray-500 bg-blue-50 p-2 rounded">
-                                                <strong>Student Matchings:</strong> {normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `${m.leftIndex + 1}→${m.rightIndex + 1}`).join(', ') : 'No matches made'}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
+                                                </div>
+                                            );
+                                        }
 
-                    {/* INT Section */}
-                    {(questions.int || []).length > 0 && (
-                        <>
-                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
-                                <h3>Integer/Numeric Questions</h3>
-                            </div>
+                                        // MTF Rendering
+                                        if (q.type === 'MTF') {
+                                            const normalizedMatches = Array.isArray(ans?.matches) ? ans.matches : (Array.isArray(ans) ? ans : []);
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {questions.int.map((q, idx) => {
-                                    const ans = submission.answers[q.id] || {};
-                                    const studentVal = ans.answer;
-                                    const isCorrect = Number(studentVal) === Number(q.answer);
+                                            return (
+                                                <div key={q.id || idx} className="p-3 rounded border border-gray-200 bg-white break-inside-avoid col-span-full">
+                                                    <div className="font-bold mb-2 text-sm">{idx + 1}. <Text>{q.q}</Text></div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+                                                        {q.pairs.map((p: any, pidx: number) => (
+                                                            <div key={pidx} className="flex items-center justify-between p-2 bg-gray-50 rounded text-xs border border-gray-100">
+                                                                <div className="font-medium"><Text>{p.left}</Text></div>
+                                                                <div className="px-2">→</div>
+                                                                <div className="font-medium text-blue-700"><Text>{p.right}</Text></div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                    <div className="mt-2 text-[10px] text-gray-500 bg-blue-50/50 p-2 rounded italic">
+                                                        <strong>Student:</strong> {normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `${m.leftIndex + 1}→${m.rightIndex + 1}`).join(', ') : 'No matches made'}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
 
-                                    return (
-                                        <div key={idx} className={`p-4 rounded border ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'} break-inside-avoid shadow-sm`}>
-                                            <div className="font-bold text-sm mb-1">{idx + 1}. <Text>{q.q}</Text></div>
-                                            <div className="flex items-center gap-4 mt-2">
-                                                <div className="text-xs"><span className="font-bold">Your Val:</span> {studentVal ?? 'N/A'}</div>
-                                                <div className="text-xs"><span className="font-bold">Correct:</span> {q.answer}</div>
-                                                {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </>
-                    )}
+                                        // INT Rendering
+                                        if (q.type === 'INT') {
+                                            const studentVal = ans?.answer !== undefined ? ans.answer : ans;
+                                            const isCorrect = String(studentVal) === String(q.answer);
+
+                                            return (
+                                                <div key={q.id || idx} className={`p-3 rounded border ${isCorrect ? 'bg-green-50' : (studentVal ? 'bg-red-50' : 'bg-gray-50')} break-inside-avoid shadow-sm`}>
+                                                    <div className="flex items-start">
+                                                        <span className="font-bold mr-2 text-sm">{qNum}.</span>
+                                                        <div className="flex-1">
+                                                            <div className="font-bold text-sm mb-1"><Text>{q.q}</Text></div>
+                                                            <div className="flex items-center gap-4 mt-2">
+                                                                <div className="text-xs font-bold">
+                                                                    Your: <span className={isCorrect ? 'text-green-700' : 'text-red-700'}>{studentVal ?? 'N/A'}</span>
+                                                                </div>
+                                                                <div className="text-xs font-bold text-green-700 italic">Correct: {q.answer}</div>
+                                                                {isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        return null;
+                                    })}
+                                </div>
+                            </>
+                        );
+                    })()}
 
                     {/* CQ Section */}
                     {cqs.length > 0 && (

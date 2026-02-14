@@ -104,11 +104,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const sqs = questions.sq || [];
 
     const allObjective = [
-      ...(mcqs.map(q => ({ ...q, type: 'MCQ' }))),
-      ...(mcs.map(q => ({ ...q, type: 'MC' }))),
-      ...(ints.map(q => ({ ...q, type: 'INT' }))),
-      ...(ars.map(q => ({ ...q, type: 'AR' }))),
-      ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' }))
+      ...(mcqs.map(q => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
+      ...(mcs.map(q => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
+      ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
+      ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
+      ...(questions.mtf || []).map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))
     ];
 
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
@@ -213,7 +213,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     );
                   }
 
-                  if (q.type === 'INT') {
+                  if (q.type === 'INT' || q.type === 'NUMERIC') {
                     return (
                       <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start">

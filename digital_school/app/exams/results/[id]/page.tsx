@@ -1443,391 +1443,183 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
 
                   <div className="space-y-12">
-                    {/* MCQ Section */}
-                    {result.questions.filter(q => {
-                      if (q.type !== 'MCQ') return false;
-                      // Filter Logic
-                      const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                    {/* Unified Objective Section */}
+                    {(() => {
+                      const objectiveTypes = ['MCQ', 'MC', 'AR', 'MTF', 'INT', 'NUMERIC'];
+                      const filteredQuestions = result.questions.filter(q => {
+                        const type = (q.type || "").toUpperCase();
+                        if (!objectiveTypes.includes(type)) return false;
 
-                      switch (filterStatus) {
-                        case 'CORRECT': return isCorrect;
-                        case 'WRONG': return hasAnswer && !isCorrect;
-                        case 'UNANSWERED': return !hasAnswer;
-                        default: return true;
-                      }
-                    }).length > 0 && (
+                        const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
+                        const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+
+                        switch (filterStatus) {
+                          case 'CORRECT': return isCorrect;
+                          case 'WRONG': return hasAnswer && !isCorrect;
+                          case 'UNANSWERED': return !hasAnswer;
+                          default: return true;
+                        }
+                      });
+
+                      if (filteredQuestions.length === 0) return null;
+
+                      return (
                         <div>
                           <div className="flex items-center gap-3 mb-6">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                               <CheckSquare className="h-4 w-4 text-blue-600" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Multiple Choice Questions (MCQ)</h3>
+                            <h3 className="text-2xl font-bold text-gray-800">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
                             <Badge className="bg-blue-100 text-blue-800">
-                              {result.questions.filter(q => q.type === 'MCQ').length} Questions
+                              {filteredQuestions.length} Questions
                             </Badge>
-                            {result.questions.some(q => q.type === 'MCQ' && q.awardedMarks < 0) && (
-                              <Badge variant="destructive" className="text-xs">
-                                Negative Marking Applied
-                              </Badge>
-                            )}
                           </div>
                           <div className="space-y-6">
-                            {result.questions
-                              .filter(q => {
-                                if (q.type !== 'MCQ') return false;
-                                // Filter Logic
-                                const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                                const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                            {filteredQuestions.map((question, index) => {
+                              const type = (question.type || "").toUpperCase();
+                              const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
+                              const hasAnswer = question.studentAnswer && question.studentAnswer.trim() !== '' && question.studentAnswer !== 'No answer provided';
 
-                                switch (filterStatus) {
-                                  case 'CORRECT': return isCorrect;
-                                  case 'WRONG': return hasAnswer && !isCorrect;
-                                  case 'UNANSWERED': return !hasAnswer;
-                                  default: return true;
-                                }
-                              })
-                              .map((question, index) => (
+                              return (
                                 <motion.div
                                   key={question.id}
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: 0.1 * index }}
-                                  className="border rounded-lg p-6 bg-blue-50/50"
+                                  className={`border rounded-lg p-6 ${isCorrect ? 'bg-green-50/30 border-green-200' : hasAnswer ? 'bg-red-50/30 border-red-200' : 'bg-gray-50 border-gray-200'}`}
                                 >
                                   {/* Question Header */}
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
                                       <Badge className="bg-blue-100 text-blue-800">
-                                        MCQ
+                                        {type}
                                       </Badge>
-                                      <span className="text-sm text-gray-600">Question {index + 1}</span>
+                                      <span className="text-sm text-gray-600 font-bold">Question {index + 1}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <span className="text-sm text-gray-600">Marks:</span>
-                                      <Badge variant={question.isCorrect ? 'default' : 'destructive'}>
-                                        {question.awardedMarks}/{question.marks}
+                                      <Badge variant={isCorrect ? 'default' : 'destructive'}>
+                                        {Number(question.awardedMarks).toFixed(1).replace(/\.0$/, '')}/{question.marks}
                                       </Badge>
-                                      {question.awardedMarks < 0 && (
-                                        <Badge variant="destructive" className="text-xs">
-                                          Negative
-                                        </Badge>
-                                      )}
                                     </div>
                                   </div>
 
-                                  {/* Question Text */}
-                                  <div className="mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                    <div className="text-gray-700">
-                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                    </div>
-                                    {question.awardedMarks < 0 && (
-                                      <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-lg">
-                                        <div className="flex items-center gap-2">
-                                          <Minus className="h-4 w-4 text-red-600" />
-                                          <span className="text-sm text-red-700 font-medium">
-                                            Negative marks applied for incorrect answer: {question.awardedMarks} marks
-                                          </span>
+                                  {/* AR Specific Rendering */}
+                                  {type === 'AR' ? (
+                                    <div className="mb-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
+                                          <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
+                                          <div className="text-sm">
+                                            <UniversalMathJax dynamic>{(question as any).assertion || question.questionText}</UniversalMathJax>
+                                          </div>
                                         </div>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  {/* MCQ Options */}
-                                  {question.options && (
-                                    <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Options:</h4>
-                                      <div className="space-y-2">
-                                        {question.options.map((option, optIndex) => {
-                                          const isCorrect = option.isCorrect;
-                                          const isSelected = question.studentAnswer === option.text;
-                                          const isUnanswered = !question.studentAnswer;
-
-                                          return (
-                                            <div
-                                              key={optIndex}
-                                              className={`p-3 rounded-lg border-2 transition-all ${isCorrect && isSelected
-                                                ? 'border-green-500 bg-green-50'
-                                                : isCorrect && isUnanswered
-                                                  ? 'border-blue-500 bg-blue-50' // Different color for correct answer when unanswered
-                                                  : isSelected && !isCorrect
-                                                    ? 'border-red-500 bg-red-50'
-                                                    : isCorrect
-                                                      ? 'border-green-500 bg-green-50'
-                                                      : 'border-gray-200 bg-white'
-                                                }`}
-                                            >
-                                              <div className="flex items-center gap-2">
-                                                <span className="font-medium">{String.fromCharCode(0x0995 + optIndex)}.</span>
-                                                <span className={isCorrect && isUnanswered ? 'text-blue-700 font-medium' : ''}>
-                                                  <UniversalMathJax inline dynamic>
-                                                    {cleanupMath(option.text)}
-                                                  </UniversalMathJax>
-                                                </span>
-                                                {isCorrect && (
-                                                  <CheckCircle className="h-4 w-4 text-green-600" />
-                                                )}
-                                                {isSelected && !isCorrect && (
-                                                  <XCircle className="h-4 w-4 text-red-600" />
-                                                )}
-                                                {isCorrect && isUnanswered && (
-                                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                                    Correct Answer
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Explanation */}
-                                  {question.explanation && (
-                                    <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Explanation:</h4>
-                                      <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                        <div className="text-gray-700">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                        <div className="p-3 bg-purple-50/50 rounded-lg border border-purple-100">
+                                          <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
+                                          <div className="text-sm">
+                                            <UniversalMathJax dynamic>{(question as any).reason || ""}</UniversalMathJax>
+                                          </div>
                                         </div>
                                       </div>
                                     </div>
-                                  )}
-
-                                  {/* Feedback */}
-                                  {question.feedback && (
+                                  ) : type === 'MTF' ? (
                                     <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                      <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                        <p className="text-gray-700">{question.feedback}</p>
+                                      <div className="text-gray-800 mb-4 font-medium">
+                                        <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                      </div>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                        {(question as any).pairs?.map((p: any, pidx: number) => (
+                                          <div key={pidx} className="flex items-center justify-between p-2 bg-white rounded text-xs border border-gray-100 shadow-sm">
+                                            <div className="font-medium"><UniversalMathJax dynamic>{p.left}</UniversalMathJax></div>
+                                            <div className="px-2">→</div>
+                                            <div className="font-medium text-blue-700"><UniversalMathJax dynamic>{p.right}</UniversalMathJax></div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="mb-4">
+                                      <div className="text-lg font-medium text-gray-800">
+                                        <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                     </div>
                                   )}
-                                </motion.div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
 
-                    {/* MC Section */}
-                    {result.questions.filter(q => {
-                      if ((q.type || "").toLowerCase() !== 'mc') return false;
-                      const hasAnswer = q.studentAnswer && (q as any).studentAnswer?.selectedOptions?.length > 0;
-                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
-                      switch (filterStatus) {
-                        case 'CORRECT': return isCorrect;
-                        case 'WRONG': return hasAnswer && !isCorrect;
-                        case 'UNANSWERED': return !hasAnswer;
-                        default: return true;
-                      }
-                    }).length > 0 && (
-                        <div className="mt-8 border-t-2 border-indigo-100 pt-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
-                              <CheckSquare className="h-4 w-4 text-indigo-600" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Multiple Correct (MC)</h3>
-                          </div>
-                          <div className="space-y-6">
-                            {result.questions
-                              .filter(q => (q.type || "").toLowerCase() === 'mc')
-                              .map((question, index) => {
-                                const ans = (question as any).studentAnswer || {};
-                                const selected = ans.selectedOptions || [];
-                                return (
-                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-indigo-50/30">
-                                    <div className="flex items-center justify-between mb-4">
-                                      <Badge className="bg-indigo-100 text-indigo-800">MC</Badge>
-                                      <Badge variant={question.awardedMarks === question.marks ? 'default' : 'destructive'}>
-                                        {question.awardedMarks}/{question.marks}
-                                      </Badge>
-                                    </div>
-                                    <h4 className="font-semibold mb-2"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
+                                  {/* Result Rendering Logic */}
+                                  {(type === 'MCQ' || type === 'MC' || type === 'AR') && question.options ? (
                                     <div className="space-y-2">
-                                      {question.options?.map((opt, oidx) => {
-                                        const isSelected = selected.includes(oidx);
-                                        const isCorrect = opt.isCorrect;
+                                      {question.options.map((option, optIndex) => {
+                                        const isCorrectOpt = option.isCorrect || (type === 'AR' && (optIndex + 1) === (question as any).correct);
+                                        const isSelected = type === 'MC'
+                                          ? (question.studentAnswer as any)?.selectedOptions?.includes(optIndex)
+                                          : type === 'AR'
+                                            ? (question.studentAnswer as any)?.selectedOption === (optIndex + 1)
+                                            : question.studentAnswer === option.text;
+
+                                        const isUnanswered = !question.studentAnswer;
+
                                         return (
-                                          <div key={oidx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') : (isCorrect ? 'bg-green-50 border-green-200 opacity-80' : 'bg-white border-gray-100')}`}>
+                                          <div
+                                            key={optIndex}
+                                            className={`p-3 rounded-lg border-2 transition-all ${isCorrectOpt && isSelected
+                                              ? 'border-green-500 bg-green-50'
+                                              : isCorrectOpt && isUnanswered
+                                                ? 'border-blue-500 bg-blue-50 opacity-60'
+                                                : isSelected && !isCorrectOpt
+                                                  ? 'border-red-500 bg-red-50'
+                                                  : isCorrectOpt
+                                                    ? 'border-green-500 bg-green-50'
+                                                    : 'border-gray-100 bg-white'
+                                              }`}
+                                          >
                                             <div className="flex items-center gap-2">
-                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center">{String.fromCharCode(65 + oidx)}</span>
-                                              <span className="text-sm"><UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax></span>
+                                              <span className="font-bold text-gray-500">{String.fromCharCode(0x0995 + optIndex)}.</span>
+                                              <span className="flex-1">
+                                                <UniversalMathJax inline dynamic>
+                                                  {type === 'AR' ? [
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
+                                                    "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
+                                                    "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
+                                                    "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
+                                                    "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
+                                                  ][optIndex] : cleanupMath(option.text)}
+                                                </UniversalMathJax>
+                                              </span>
+                                              {isCorrectOpt && <CheckCircle className="h-4 w-4 text-green-600" />}
+                                              {isSelected && !isCorrectOpt && <XCircle className="h-4 w-4 text-red-600" />}
                                             </div>
-                                            {isSelected && (isCorrect ? <CheckCircle className="w-4 h-4 text-green-600" /> : <XCircle className="w-4 h-4 text-red-600" />)}
-                                            {!isSelected && isCorrect && <CheckCircle className="w-4 h-4 text-green-500/50" />}
                                           </div>
                                         );
                                       })}
                                     </div>
-                                  </motion.div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* AR Section */}
-                    {result.questions.filter(q => {
-                      if ((q.type || "").toLowerCase() !== 'ar') return false;
-                      const hasAnswer = (q as any).studentAnswer?.selectedOption !== undefined;
-                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
-                      switch (filterStatus) {
-                        case 'CORRECT': return isCorrect;
-                        case 'WRONG': return hasAnswer && !isCorrect;
-                        case 'UNANSWERED': return !hasAnswer;
-                        default: return true;
-                      }
-                    }).length > 0 && (
-                        <div className="mt-8 border-t-2 border-purple-100 pt-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                              <Star className="h-4 w-4 text-purple-600" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Assertion-Reason (AR)</h3>
-                          </div>
-                          <div className="space-y-6">
-                            {result.questions
-                              .filter(q => (q.type || "").toLowerCase() === 'ar')
-                              .map((question: any) => {
-                                const selected = Number(question.studentAnswer?.selectedOption || 0);
-                                const correct = Number(question.correct || question.correctOption || 0);
-                                return (
-                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-purple-50/30">
-                                    <div className="flex justify-between items-start mb-4">
-                                      <div className="space-y-2 flex-1">
-                                        <div className="p-3 bg-white/50 rounded border border-indigo-100">
-                                          <div className="text-[10px] font-bold text-indigo-600 mb-1 leading-none uppercase">ASSERTION</div>
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || question.questionText)}</UniversalMathJax>
-                                        </div>
-                                        <div className="p-3 bg-white/50 rounded border border-purple-100">
-                                          <div className="text-[10px] font-bold text-purple-600 mb-1 leading-none uppercase">REASON</div>
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.reason)}</UniversalMathJax>
-                                        </div>
+                                  ) : (type === 'INT' || type === 'NUMERIC') ? (
+                                    <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-wrap items-center justify-between gap-4">
+                                      <div className="flex items-center gap-4">
+                                        <div className="text-sm font-bold text-gray-600">Your Answer: <span className={isCorrect ? 'text-green-600' : 'text-red-600'}>{(question.studentAnswer as any)?.answer || question.studentAnswer || 'N/A'}</span></div>
+                                        <div className="w-px h-4 bg-gray-200" />
+                                        <div className="text-sm font-bold text-indigo-600">Correct: {(question as any).answer || (question as any).correct}</div>
                                       </div>
-                                      <Badge className="ml-4" variant={selected === correct ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
+                                      {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : hasAnswer && <XCircle className="h-5 w-5 text-red-600" />}
                                     </div>
-                                    <div className="flex gap-4 text-sm mt-4 p-3 bg-gray-100 rounded font-medium">
-                                      <div><span className="text-gray-500 mr-2">Your Ans:</span> Option {selected || 'None'}</div>
-                                      <div><span className="text-gray-500 mr-2">Correct Ans:</span> Option {correct}</div>
+                                  ) : null}
+
+                                  {/* Explanation */}
+                                  {question.explanation && (
+                                    <div className="mt-4 p-4 rounded-lg bg-green-50 border border-green-100">
+                                      <div className="text-xs font-bold text-green-700 uppercase mb-2">Explanation</div>
+                                      <div className="text-sm text-gray-700">
+                                        <UniversalMathJax dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                      </div>
                                     </div>
-                                  </motion.div>
-                                );
-                              })}
+                                  )}
+                                </motion.div>
+                              );
+                            })}
                           </div>
                         </div>
-                      )}
+                      );
+                    })()}
 
-                    {/* MTF Section */}
-                    {result.questions.filter(q => {
-                      if ((q.type || "").toLowerCase() !== 'mtf') return false;
-                      const hasAnswer = (q as any).studentAnswer?.matches?.length > 0;
-                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
-                      switch (filterStatus) {
-                        case 'CORRECT': return isCorrect;
-                        case 'WRONG': return hasAnswer && !isCorrect;
-                        case 'UNANSWERED': return !hasAnswer;
-                        default: return true;
-                      }
-                    }).length > 0 && (
-                        <div className="mt-8 border-t-2 border-orange-100 pt-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                              <TrendingUp className="h-4 w-4 text-orange-600" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Match the Following</h3>
-                          </div>
-                          <div className="space-y-6">
-                            {result.questions
-                              .filter(q => (q.type || "").toLowerCase() === 'mtf')
-                              .map((question: any) => {
-                                const ans = question.studentAnswer || {};
-                                const studentMatches = ans.matches || ans; // Handle both {matches:[]} and direct map {A:1}
-                                let normalizedMatches: any[] = [];
-                                if (Array.isArray(studentMatches)) {
-                                  normalizedMatches = studentMatches;
-                                } else if (studentMatches && typeof studentMatches === 'object' && studentMatches.matches) {
-                                  normalizedMatches = studentMatches.matches;
-                                } else if (studentMatches && typeof studentMatches === 'object' && !studentMatches.matches) {
-                                  // Convert ID-based map to index-based for uniform display
-                                  Object.entries(studentMatches).forEach(([leftId, rightId]) => {
-                                    const leftIndex = question.leftColumn?.findIndex((l: any) => l.id === leftId);
-                                    const rightIndex = question.rightColumn?.findIndex((r: any) => r.id === rightId);
-                                    if (leftIndex !== -1 && rightIndex !== -1) {
-                                      normalizedMatches.push({ leftIndex, rightIndex });
-                                    }
-                                  });
-                                }
 
-                                return (
-                                  <motion.div key={question.id} className="border rounded-lg p-6 bg-orange-50/30">
-                                    <div className="flex justify-between items-center mb-4">
-                                      <h4 className="font-bold"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
-                                      <Badge variant={question.awardedMarks === question.marks ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
-                                    </div>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                      {question.pairs?.map((p: any, i: number) => (
-                                        <div key={i} className="flex items-center justify-between p-2 bg-white rounded border">
-                                          <span className="text-sm font-medium"><UniversalMathJax inline dynamic>{cleanupMath(p.left)}</UniversalMathJax></span>
-                                          <ArrowLeft className="w-4 h-4 rotate-180 text-gray-400" />
-                                          <span className="text-sm font-bold text-indigo-600"><UniversalMathJax inline dynamic>{cleanupMath(p.right)}</UniversalMathJax></span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                    <div className="mt-4 p-2 bg-gray-50 border border-dotted rounded text-xs text-gray-500">
-                                      <span className="font-bold mr-2">Your Matching:</span>
-                                      {normalizedMatches.length > 0 ? normalizedMatches.map((m: any) => `(${m.leftIndex + 1}→${m.rightIndex + 1})`).join(', ') : 'No matches made'}
-                                    </div>
-                                  </motion.div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      )}
-
-                    {/* Integer Section */}
-                    {result.questions.filter(q => {
-                      const t = (q.type || "").toLowerCase();
-                      if (t !== 'int' && t !== 'numeric') return false;
-                      const hasAnswer = (q as any).studentAnswer?.answer !== undefined;
-                      const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
-                      switch (filterStatus) {
-                        case 'CORRECT': return isCorrect;
-                        case 'WRONG': return hasAnswer && !isCorrect;
-                        case 'UNANSWERED': return !hasAnswer;
-                        default: return true;
-                      }
-                    }).length > 0 && (
-                        <div className="mt-8 border-t-2 border-red-100 pt-8">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                              <Target className="h-4 w-4 text-red-600" />
-                            </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Integer/Numeric</h3>
-                          </div>
-                          <div className="space-y-6">
-                            {result.questions
-                              .filter(q => { const t = (q.type || "").toLowerCase(); return t === 'int' || t === 'numeric'; })
-                              .map((question: any) => {
-                                const std = question.studentAnswer?.answer;
-                                const cor = question.correct || question.answer;
-                                return (
-                                  <motion.div key={question.id} className={`border rounded-lg p-6 ${std === cor ? 'bg-green-50/30' : 'bg-red-50/30'}`}>
-                                    <div className="flex justify-between mb-2">
-                                      <h4 className="font-semibold"><UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
-                                      <Badge variant={std === cor ? 'default' : 'destructive'}>{question.awardedMarks}/{question.marks}</Badge>
-                                    </div>
-                                    <div className="flex gap-8 mt-2 text-sm font-medium">
-                                      <div className="p-3 bg-white rounded border flex-1 shadow-sm"><span className="text-gray-500 mr-2 uppercase text-[10px]">Your Answer:</span>{std ?? 'N/A'}</div>
-                                      <div className="p-3 bg-green-50 rounded border border-green-200 flex-1 shadow-sm"><span className="text-green-600 mr-2 uppercase text-[10px]">Correct Answer:</span>{cor}</div>
-                                    </div>
-                                  </motion.div>
-                                );
-                              })}
-                          </div>
-                        </div>
-                      )}
 
                     {/* CQ Section */}
                     {result.questions.filter(q => {

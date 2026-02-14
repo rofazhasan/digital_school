@@ -114,11 +114,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const mtfs = questions.mtf || [];
 
     const allObjective = [
-      ...(mcqs.map(q => ({ ...q, type: 'MCQ' }))),
-      ...(mcs.map(q => ({ ...q, type: 'MC' }))),
-      ...(ints.map(q => ({ ...q, type: 'INT' }))),
-      ...(ars.map(q => ({ ...q, type: 'AR' }))),
-      ...(mtfs.map(q => ({ ...q, type: 'MTF' })))
+      ...(mcqs.map(q => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
+      ...(mcs.map(q => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
+      ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
+      ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
+      ...(mtfs.map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() })))
     ];
 
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
@@ -231,7 +231,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     );
                   }
 
-                  if (q.type === 'INT') {
+                  if (q.type === 'INT' || q.type === 'NUMERIC') {
                     return (
                       <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start">
