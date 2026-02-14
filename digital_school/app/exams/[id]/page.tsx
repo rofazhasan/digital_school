@@ -28,7 +28,7 @@ import { cleanupMath } from "@/lib/utils";
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -45,6 +45,12 @@ interface Question {
   negativeMarks?: number;
   topic?: string | null;
   correctAnswer?: string; // Should store A, B, C, D...
+  assertion?: string;
+  reason?: string;
+  correctOption?: number;
+  leftColumn?: any;
+  rightColumn?: any;
+  matches?: any;
 }
 
 interface ExamSet {
@@ -104,14 +110,89 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
     <div className="flex justify-between items-start gap-4">
       <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
         <h4 className="font-semibold text-sm mb-1 leading-snug"><UniversalMathJax inline>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
-        {question.type === 'MCQ' && Array.isArray(question.options) && (
+
+        {(question.type === 'MCQ' || question.type === 'MC') && Array.isArray(question.options) && (
           <ul className="list-disc pl-5 mt-2 space-y-1">
             {question.options.map((opt: any, i: number) => (
-              <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
+              <li key={i} className={opt.isCorrect || String(opt.isCorrect) === 'true' ? 'font-bold text-green-600 dark:text-green-400' : ''}>
                 <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax>
+                {(opt.isCorrect || String(opt.isCorrect) === 'true') && opt.explanation && (
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium italic mt-0.5">
+                    {opt.explanation}
+                  </p>
+                )}
               </li>
             ))}
           </ul>
+        )}
+
+        {question.type === 'AR' && (
+          <div className="mt-2 space-y-2 border-l-2 border-blue-200 dark:border-blue-800 pl-3 py-1">
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">Assertion (A)</span>
+              <div className="text-sm font-medium"><UniversalMathJax inline>{cleanupMath(question.assertion || '')}</UniversalMathJax></div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Reason (R)</span>
+              <div className="text-sm font-medium"><UniversalMathJax inline>{cleanupMath(question.reason || '')}</UniversalMathJax></div>
+            </div>
+            {question.correctOption && (
+              <div className="mt-1 pt-1 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-[10px] font-bold text-green-600">Correct Answer: Option {question.correctOption}</span>
+                <p className="text-[10px] italic text-gray-500">
+                  {question.correctOption === 1 ? "Both A and R are true, and R is the correct explanation of A." :
+                    question.correctOption === 2 ? "Both A and R are true, but R is NOT the correct explanation of A." :
+                      question.correctOption === 3 ? "A is true, but R is false." :
+                        question.correctOption === 4 ? "A is false, but R is true." :
+                          question.correctOption === 5 ? "Both A and R are false." : ""}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {question.type === 'MTF' && (
+          <div className="mt-2 space-y-3">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Column A</span>
+                {Array.isArray(question.leftColumn) && question.leftColumn.map((item: any, i: number) => (
+                  <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
+                    <span className="font-bold text-blue-600">{i + 1}.</span>
+                    <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-1">
+                <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Column B</span>
+                {Array.isArray(question.rightColumn) && question.rightColumn.map((item: any, i: number) => (
+                  <div key={i} className="text-xs p-1.5 bg-white dark:bg-gray-900 border rounded flex items-start gap-2">
+                    <span className="font-bold text-purple-600">{String.fromCharCode(65 + i)}.</span>
+                    <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {question.matches && (
+              <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Correct Matches:</span>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {Object.entries(question.matches as Record<string, string>).map(([left, right]) => (
+                    <Badge key={left} variant="outline" className="text-[10px] font-medium border-green-200 text-green-700 bg-green-50">
+                      {String(left)} → {String(right)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {question.type === 'INT' && (
+          <div className="mt-2 flex items-center gap-2">
+            <span className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Correct Answer:</span>
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300">{question.correctAnswer}</Badge>
+          </div>
         )}
       </div>
       <TooltipProvider>
@@ -379,7 +460,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'MCQ'), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -425,8 +506,8 @@ export default function ExamBuilderPage() {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return false;
     }
 
-    // For MCQ questions, check if adding would exceed total marks
-    if (question.type === 'MCQ') {
+    // For MCQ/Objective questions, check if adding would exceed total marks
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -445,9 +526,9 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (question.type === 'MCQ') {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
-      return 'Add MCQ Question';
+      return `Add ${question.type} Question`;
     }
 
     return 'Add Question';
@@ -558,28 +639,41 @@ export default function ExamBuilderPage() {
         const shuffledQuestions = shuffleArray(selectedQuestions).map(q => {
           let processedQuestion = { ...q };
 
-          // Shuffle MCQ options if it's an MCQ question
-          if (q.type === 'MCQ' && Array.isArray(q.options)) {
-            const shuffledOptions = shuffleArray(q.options); // Shuffle first
+          // Shuffle MCQ/MC options
+          if ((q.type === 'MCQ' || q.type === 'MC') && Array.isArray(q.options)) {
+            const shuffledOptions = shuffleArray(q.options);
             processedQuestion = { ...processedQuestion, options: shuffledOptions };
 
-            // Recalculate correctAnswer based on the new position of the correct option
-            const correctOptionIndex = shuffledOptions.findIndex((opt: any) => opt.isCorrect === true || String(opt.isCorrect) === 'true');
-            if (correctOptionIndex !== -1) {
-              // Convert index 0->A, 1->B, 2->C, 3->D, 4->E, 5->F ...
+            // Recalculate correctAnswer based on the new position of correct options
+            const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+              if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                acc.push(idx);
+              }
+              return acc;
+            }, []);
+
+            if (correctIndices.length > 0) {
+              // Convert index 0->A, 1->B, 2->C...
+              const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
               processedQuestion = {
                 ...processedQuestion,
-                correctAnswer: String.fromCharCode(65 + correctOptionIndex)
+                correctAnswer: answerString
               };
             }
           }
 
-          // Add negative marks for MCQ questions if exam has negative marking
-          if (q.type === 'MCQ' && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+          // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF)
+          // MTF doesn't have negative marking per user request, so we exclude it here or set to 0
+          if (['MCQ', 'MC', 'AR', 'INT'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
             const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
             processedQuestion = {
               ...processedQuestion,
               negativeMarks: parseFloat(negativeMarks.toFixed(2))
+            };
+          } else if (q.type === 'MTF') {
+            processedQuestion = {
+              ...processedQuestion,
+              negativeMarks: 0 // No negative marking for MTF per user request
             };
           }
 
@@ -680,6 +774,10 @@ export default function ExamBuilderPage() {
                       <SelectContent>
                         <SelectItem value="all">All Types</SelectItem>
                         <SelectItem value="MCQ">MCQ</SelectItem>
+                        <SelectItem value="MC">MC (Multiple Correct)</SelectItem>
+                        <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                        <SelectItem value="INT">INT (Integer)</SelectItem>
+                        <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                         <SelectItem value="CQ">CQ</SelectItem>
                         <SelectItem value="SQ">SQ</SelectItem>
                       </SelectContent>

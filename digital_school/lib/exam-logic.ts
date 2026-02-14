@@ -149,12 +149,20 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 totalScore += score;
             } else if (type === 'INT') {
                 const result = evaluateINTQuestion(question, studentAnswer || { answer: 0 });
-                mcqMarks += result.score;
-                totalScore += result.score;
+                let finalScore = result.score;
+                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    finalScore = -((question.marks * exam.mcqNegativeMarking) / 100);
+                }
+                mcqMarks += finalScore;
+                totalScore += finalScore;
             } else if (type === 'AR') {
                 const result = evaluateARQuestion(question, studentAnswer || { selectedOption: 0 });
-                mcqMarks += result.score;
-                totalScore += result.score;
+                let finalScore = result.score;
+                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    finalScore = -((question.marks * exam.mcqNegativeMarking) / 100);
+                }
+                mcqMarks += finalScore;
+                totalScore += finalScore;
             } else if (type === 'MTF') {
                 const result = evaluateMTFQuestion(question, studentAnswer || {});
                 mcqMarks += result.score;

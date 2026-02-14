@@ -234,6 +234,7 @@ model Question {
   leftColumn             Json?    // MTF: Left items
   rightColumn            Json?    // MTF: Right items
   matches                Json?    // MTF: Correct matches
+  explanation            String?  // General explanation for non-MCQ types
   isForPractice          Boolean                  @default(false)
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]

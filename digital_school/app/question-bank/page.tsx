@@ -58,6 +58,7 @@ type Question = {
   questionBanks: QuestionBank[]; createdAt: string; isAiGenerated?: boolean;
   images?: string[];
   isForPractice?: boolean;
+  explanation?: string | null;
 };
 
 // Enhanced types for AI generated questions
@@ -658,6 +659,9 @@ export default function QuestionBankPage() {
                               <SelectItem value="all">All Types</SelectItem>
                               <SelectItem value="MCQ">MCQ</SelectItem>
                               <SelectItem value="MC">MC (Multiple Correct)</SelectItem>
+                              <SelectItem value="INT">INT (Integer)</SelectItem>
+                              <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                              <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
                             </SelectContent>
@@ -1116,9 +1120,33 @@ const QuestionCard: React.FC<{
                   <UniversalMathJax>{question.reason}</UniversalMathJax>
                 </div>
               </div>
-              <div className="p-3 rounded-xl bg-green-50/50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 flex items-center justify-between">
-                <span className="text-xs font-bold text-green-700 dark:text-green-400">Correct Option</span>
-                <Badge className="bg-green-600 hover:bg-green-700">{question.correctOption}</Badge>
+              <div className="p-3 rounded-xl bg-green-50/50 dark:bg-green-900/20 border border-green-100 dark:border-green-800 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-green-700 dark:text-green-400">Correct Option</span>
+                  <Badge className="bg-green-600 hover:bg-green-700">{question.correctOption}</Badge>
+                </div>
+                <div className="text-[11px] font-medium text-green-800 dark:text-green-300 italic leading-snug">
+                  {question.correctOption === 1 ? "Both A and R are true, and R is the correct explanation of A." :
+                    question.correctOption === 2 ? "Both A and R are true, but R is NOT the correct explanation of A." :
+                      question.correctOption === 3 ? "A is true, but R is false." :
+                        question.correctOption === 4 ? "A is false, but R is true." :
+                          question.correctOption === 5 ? "Both A and R are false." : ""}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* General Explanation for non-MCQ types */}
+          {(question.type === 'AR' || question.type === 'MTF' || question.type === 'INT') && question.explanation && (
+            <div className="mt-3">
+              <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-300 transition-colors">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-1 h-3 bg-indigo-500 rounded-full"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Explanation</p>
+                </div>
+                <div className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
+                  <UniversalMathJax>{question.explanation}</UniversalMathJax>
+                </div>
               </div>
             </div>
           )}

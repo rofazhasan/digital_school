@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
   // Fetch exams with caching and pagination (SWR)
   // url is already defined at line 8
   const page = parseInt(url.searchParams.get('page') || '1');
-  const limit = parseInt(url.searchParams.get('limit') || '20');
+  const limit = parseInt(url.searchParams.get('limit') || '1000');
   const skip = (page - 1) * limit;
 
   const cacheKey = `exams:all:${page}:${limit}`;
