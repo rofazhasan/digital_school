@@ -121,6 +121,143 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
     </div>
   );
 
+  // Render MC (Multiple Correct) questions - each question has checkboxes for all options
+  const renderMCColumn = (startIdx: number, endIdx: number, mcQuestions: { q: string; options: string[] }[]) => (
+    <table className="w-full text-center border-collapse table-fixed">
+      <thead>
+        <tr className="bg-gray-800 text-white font-black text-[10px]">
+          <th className="py-0.5 w-8">প্রশ্ন</th>
+          {mcqOptionLabels.slice(0, 5).map((l, i) => (
+            <th key={i} className="py-0.5">{l}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-black/10">
+        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+          if (idx >= mcQuestions.length) return null;
+          return (
+            <tr key={idx} className="hover:bg-gray-100">
+              <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+              {mcqOptionLabels.slice(0, 5).map((l, oidx) => (
+                <td key={oidx} className="py-[0px]">
+                  <div
+                    className="w-[15px] h-[15px] border-[1.5px] border-black rounded-sm flex items-center justify-center mx-auto bg-white"
+                    aria-label={`MC ${idx + 1} option ${l}`}
+                  ></div>
+                </td>
+              ))}
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
+  // Render AR (Assertion-Reason) - usually 5 options
+  const renderARColumn = (startIdx: number, endIdx: number, arQuestions: any[]) => {
+    const labels = ['1', '2', '3', '4', '5']; // Kept as Arabic numerals for AR usually, but can change if requested
+    const bengaliLabels = ['১', '২', '৩', '৪', '৫'];
+    return (
+      <table className="w-full text-center border-collapse table-fixed">
+        <thead>
+          <tr className="bg-gray-800 text-white font-black text-[10px]">
+            <th className="py-0.5 w-8">প্রশ্ন</th>
+            {bengaliLabels.map((l, i) => (
+              <th key={i} className="py-0.5">{l}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-black/10">
+          {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+            if (idx >= arQuestions.length) return null;
+            return (
+              <tr key={idx} className="hover:bg-gray-100">
+                <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+                {bengaliLabels.map((l, oidx) => (
+                  <td key={oidx} className="py-[0px]">
+                    <div
+                      className="w-[15px] h-[15px] border-[1.5px] border-black rounded-full flex items-center justify-center mx-auto bg-white text-[8px] font-black pb-[1px]"
+                    >{l}</div>
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    );
+  };
+
+  // Render MTF (Match the Following) Grid
+  const renderMTFSection = (mtfQuestions: any[]) => (
+    <div className="mt-2 space-y-2">
+      {mtfQuestions.map((q, qIndex) => (
+        <div key={qIndex} className="border border-black p-1 rounded relative bg-white overflow-hidden">
+          <div className="text-[9px] font-black uppercase mb-1 border-b border-black pb-0.5 flex justify-between items-center bg-gray-100 -mx-1 px-1">
+            <span>MTF প্রশ্ন {toBengaliNumerals(qIndex + 1)}</span>
+            <span className="opacity-50 text-[6px]">MATRIX</span>
+          </div>
+          <table className="w-full border-collapse">
+            <thead>
+              <tr>
+                <th className="border-b border-black/30 text-[8px] w-6">#</th>
+                {q.rightColumn.map((rc: any) => (
+                  <th key={rc.id} className="border-b border-black/30 text-[10px] font-black">{rc.id}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {q.leftColumn.map((lc: any) => (
+                <tr key={lc.id}>
+                  <td className="border-b border-black/10 text-[10px] font-black py-[1px]">{lc.id}</td>
+                  {q.rightColumn.map((rc: any) => (
+                    <td key={rc.id} className="border-b border-black/10 py-[1px] text-center">
+                      <div className="w-3 h-3 rounded-full border border-black mx-auto hover:bg-black transition-colors duration-200"></div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Render INT (Integer) Column
+  const renderINTColumn = (startIdx: number, endIdx: number, intQuestions: any[]) => (
+    <table className="w-full text-center border-collapse table-fixed">
+      <thead>
+        <tr className="bg-gray-800 text-white font-black text-[10px]">
+          <th className="py-0.5 w-8">প্রশ্ন</th>
+          <th className="py-0.5">উত্তর (পূর্ণসংখ্যা)</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-black/10">
+        {Array.from({ length: endIdx - startIdx }, (_, i) => startIdx + i).map(idx => {
+          if (idx >= intQuestions.length) return null;
+          return (
+            <tr key={idx} className="hover:bg-gray-100">
+              <td className="text-[11px] font-black py-[1px] border-r border-black/20 leading-none">{toBengaliNumerals(idx + 1)}</td>
+              <td className="py-[1px] flex justify-center gap-1">
+                {[1, 2, 3].map(pos => (
+                  <div key={pos} className="flex flex-col gap-[1px] bg-gray-100 p-[1px] border border-black rounded-[2px]">
+                    <div className="w-full h-2.5 bg-white border border-black flex items-center justify-center text-[7px] font-black mb-[1px]">▢</div>
+                    <div className="grid grid-cols-2 gap-[1px]">
+                      {DIGITS.map(d => (
+                        <div key={d} className="w-2.5 h-2.5 border-[0.5px] border-black rounded-full text-[6px] font-black flex items-center justify-center bg-white pb-[1px]">{toBengaliNumerals(d)}</div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+
   return (
     <div className="w-full h-full flex flex-col p-8 bg-white relative print:m-0 print:p-0"
       style={{
@@ -173,76 +310,128 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
           </div>
         </header>
 
-        {/* BODY */}
-        <div className="flex-1 flex flex-row">
+        {/* Main Container - Adjusted Spacing */}
+        <div className="flex-1 flex flex-row items-stretch mx-10 my-4 gap-4 overflow-visible">
 
-          {/* LEFT: 100 Questions Grid */}
-          <div className="flex-[3] flex flex-row p-3 gap-3 border-r-[3px] border-black">
-            <div className="flex-1">{renderMCQColumn(0, 25)}</div>
-            <div className="w-[2px] bg-black/20 my-2"></div>
-            <div className="flex-1">{renderMCQColumn(25, 50)}</div>
-            <div className="w-[2px] bg-black/20 my-2"></div>
-            <div className="flex-1">{renderMCQColumn(50, 75)}</div>
-            <div className="w-[2px] bg-black/20 my-2"></div>
-            <div className="flex-1">{renderMCQColumn(75, 100)}</div>
+          {/* Left Section: Answer Grid - OPTIMIZED SPACING - Tight grid */}
+          <div className="flex-[3] flex flex-col gap-2">
+            {/* Main 100 Q Grid - Tighter gaps */}
+            <div className="grid grid-cols-4 gap-x-1 gap-y-0 border-4 border-double border-black p-1 bg-white rounded-lg shadow-sm h-full">
+              <div className="border-r-2 border-black pr-1 h-full">
+                {renderMCQColumn(0, 25)}
+              </div>
+              <div className="border-r-2 border-black pr-1 h-full">
+                {renderMCQColumn(25, 50)}
+              </div>
+              <div className="border-r-2 border-black pr-1 h-full">
+                {renderMCQColumn(50, 75)}
+              </div>
+              <div className="pl-0 h-full">
+                {renderMCQColumn(75, 100)}
+              </div>
+            </div>
+
+            {/* Special Type Questions */}
+            <div className="grid grid-cols-3 gap-2">
+              {questions.mc && questions.mc.length > 0 && (
+                <div className="border-2 border-black p-1 rounded bg-gray-50">
+                  <div className="text-[9px] font-black uppercase mb-1 border-b border-black px-1">Multiple Correct (MC)</div>
+                  {renderMCColumn(0, 10, questions.mc)}
+                </div>
+              )}
+              {questions.ar && questions.ar.length > 0 && (
+                <div className="border-2 border-black p-1 rounded bg-gray-50">
+                  <div className="text-[9px] font-black uppercase mb-1 border-b border-black px-1">Assertion-Reason (AR)</div>
+                  {renderARColumn(0, 10, questions.ar)}
+                </div>
+              )}
+              {questions.int && questions.int.length > 0 && (
+                <div className="border-2 border-black p-1 rounded bg-gray-50">
+                  <div className="text-[9px] font-black uppercase mb-1 border-b border-black px-1">Integer Type (INT)</div>
+                  {renderINTColumn(0, 10, questions.int)}
+                </div>
+              )}
+            </div>
+
+            {questions.mtf && questions.mtf.length > 0 && (
+              <div className="border-2 border-black p-2 rounded bg-white">
+                <div className="text-[9px] font-black uppercase mb-1 border-b border-black">Match The Following (MTF)</div>
+                {renderMTFSection(questions.mtf)}
+              </div>
+            )}
           </div>
 
-          {/* RIGHT: Student Info Sidebar */}
-          <div className="flex-[1.2] flex flex-col bg-gray-100/50 p-4 gap-6 items-center border-l border-white">
+          {/* Right Section: Student Data - FIXED VISIBILITY */}
+          <div className="flex-[1.2] min-w-[220px] flex flex-col gap-4 border-4 border-double border-black bg-gray-50 p-3 rounded-lg relative overflow-visible shadow-sm">
+            {/* Subtle Watermark */}
+            <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none select-none -rotate-45 overflow-hidden">
+              <span className="text-3xl font-black">CONFIDENTIAL</span>
+            </div>
 
-            {/* Set & ID Block */}
-            <div className="w-full flex flex-col gap-4 bg-white p-3 rounded-lg border-2 border-black shadow-sm">
+            <div className="flex flex-col items-center pt-2 w-full">
+              {verticalField('রোল নম্বর', rollDigits, 22)} {/* Reverted to original verticalField call, assuming the new one was a typo or not fully provided */}
+            </div>
+
+            <div className="w-full border-t-2 border-black border-dashed opacity-50"></div>
+
+            <div className="flex flex-row justify-center gap-4 items-start w-full">
               <div className="flex flex-col items-center">
-                <span className="text-xs font-black uppercase mb-1">Set Code</span>
-                <div className="flex gap-2 items-center">
-                  <div className="w-8 h-8 border-2 border-black flex items-center justify-center text-lg font-black bg-gray-50 shadow-inner rounded">{setName || 'A'}</div>
-                  <div className="flex gap-1">
-                    {mcqOptionLabels.slice(0, 4).map(l => (
-                      <div key={l} className={`w-6 h-6 rounded-full border border-black flex items-center justify-center text-xs font-bold ${l === setName ? 'bg-black text-white' : 'bg-white'}`}>{l}</div>
-                    ))}
-                  </div>
+                <div className="text-[10px] font-black mb-1 uppercase tracking-wider">SET CODE</div>
+                <div className="p-1 border-2 border-black bg-white rounded flex flex-col items-center gap-1 shadow-sm">
+                  <div className="w-8 h-8 border-2 border-black mb-1 bg-black text-white flex items-center justify-center text-[14px] font-black rounded">{setName || 'A'}</div>
+                  {mcqOptionLabels.slice(0, 4).map((l) => (
+                    <div key={l} className={`w-5 h-5 border border-black rounded-full flex items-center justify-center text-[10px] font-black transition-colors duration-200 pb-[1px] ${setName === l ? 'bg-black text-white' : 'bg-white hover:bg-black hover:text-white'}`}>
+                      {l}
+                    </div>
+                  ))}
                 </div>
               </div>
-
-              <div className="w-full h-[1px] bg-black/20"></div>
-
-              <div className="flex flex-col items-center">
-                <span className="text-xs font-black uppercase mb-1">Student ID</span>
-                <div className="bg-white p-1 border border-black rounded shadow-sm">
-                  <QRCode value={JSON.stringify(qrData)} size={90} /> /* Bigger QR */
+              <div className="flex flex-col items-center justify-center pt-2">
+                <div className="bg-white p-1 border-2 border-black rounded shadow-sm">
+                  <QRCode value={JSON.stringify(qrData)} size={80} />
                 </div>
-                {uniqueCode && <span className="text-[9px] font-mono mt-1 text-gray-500">{uniqueCode.slice(0, 8)}</span>}
+                <span className="text-[8px] font-mono mt-1 opacity-50 uppercase tracking-widest">Secured QR</span>
               </div>
             </div>
 
-            {/* Roll Number Block */}
-            <div className="bg-white p-3 rounded-lg border-2 border-black shadow-sm w-full flex justify-center">
-              {verticalField('ROLL NUMBER', rollDigits, 22)}
+            <div className="w-full border-t-2 border-black border-dashed opacity-50"></div>
+
+            <div className="flex flex-col items-center w-full">
+              {verticalField('বিষয় কোড', 3, 22)} {/* Reverted to original verticalField call */}
             </div>
 
-            {/* Additional Fields / Signatures */}
-            <div className="mt-auto w-full flex flex-col gap-4">
+            <div className="mt-auto space-y-4 w-full">
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-bold uppercase text-gray-500">Student Signature</span>
-                <div className="h-10 border-b-2 border-black bg-white"></div>
+                <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Student's Signature / শিক্ষার্থীর স্বাক্ষর</span>
+                <div className="h-10 border-b-2 border-black border-dashed bg-white"></div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-bold uppercase text-gray-500">Invigilator Signature</span>
-                <div className="h-10 border-b-2 border-black bg-white"></div>
+                <span className="text-[9px] font-black uppercase text-gray-500 tracking-wider">Invigilator's Signature / পরিদর্শকের স্বাক্ষর</span>
+                <div className="h-10 border-b-2 border-black border-dashed bg-white"></div>
               </div>
             </div>
 
-            {/* Instructions Footer */}
-            <div className="text-[9px] text-center text-gray-500 leading-tight">
-              <p>• Use Black Ballpoint Pen only.</p>
-              <p>• Completely darken the bubble: ⬤</p>
-              <p>• Do not fold this sheet.</p>
+            {/* Instructions Block */}
+            <div className="mt-4 p-2 border-2 border-black bg-white text-[8px] leading-tight rounded shadow-sm">
+              <div className="font-black text-center mb-1 border-b border-black pb-0.5 tracking-wider">INSTRUCTIONS</div>
+              <ul className="space-y-1 font-bold">
+                <li className="flex items-start gap-1">
+                  <span className="text-black">•</span>
+                  <span>Use Black Ballpoint Pen only.</span>
+                </li>
+                <li className="flex items-start gap-1">
+                  <span className="text-black">•</span>
+                  <span>Fill the bubble completely: ⬤</span>
+                </li>
+                <li className="flex items-start gap-1">
+                  <span className="text-black">•</span>
+                  <span>Do not fold or crush this sheet.</span>
+                </li>
+              </ul>
             </div>
-
           </div>
 
         </div>
-
       </div>
 
       {/* --- TIMING TRACKS (Bottom) --- */}
