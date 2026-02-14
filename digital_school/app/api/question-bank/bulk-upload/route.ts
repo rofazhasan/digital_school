@@ -297,12 +297,14 @@ export async function POST(req: NextRequest) {
                         rightColumn: q.rightColumn || undefined,
                         matches: q.matches || undefined,
                         createdById: creator.id,
-                        hasMath: /\\/.test(q.questionText || '') ||
+                        hasMath: Boolean(
+                            /\\/.test(q.questionText || '') ||
                             /\\/.test(q.modelAnswer || '') ||
                             /\\/.test(q.assertion || '') ||
                             /\\/.test(q.reason || '') ||
-                            (q.options && q.options.some((o: any) => /\\/.test(o.text))) ||
-                            (q.subQuestions && q.subQuestions.some((sq: any) => /\\/.test(sq.question)))
+                            (q.options ? q.options.some((o: any) => /\\/.test(o.text)) : false) ||
+                            (q.subQuestions ? q.subQuestions.some((sq: any) => /\\/.test(sq.question)) : false)
+                        )
                     });
                 } catch (err: any) {
                     // Capture pre-validation errors
