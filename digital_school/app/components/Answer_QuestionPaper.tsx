@@ -13,6 +13,7 @@ interface MCQ {
   correctAnswer?: string; // The correct option (A, B, C, D or ক, খ, গ, ঘ)
   explanation?: string;
   questionText?: string;
+  type?: string;
 }
 interface MC {
   q: string;
@@ -20,12 +21,14 @@ interface MC {
   marks?: number;
   explanation?: string;
   questionText?: string;
+  type?: string;
 }
 interface INT {
   q: string;
   marks?: number;
   modelAnswer?: string;
   explanation?: string;
+  type?: string;
 }
 interface AR {
   assertion: string;
@@ -34,6 +37,7 @@ interface AR {
   marks?: number;
   explanation?: string;
   questionText?: string;
+  type?: string;
 }
 interface CQ {
   questionText: string;
@@ -41,11 +45,13 @@ interface CQ {
   modelAnswer?: string;
   subQuestions?: any[];
   subAnswers?: string[]; // Array of answers for sub-questions
+  type?: string;
 }
 interface SQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
+  type?: string;
 }
 interface MTF {
   leftColumn: { id: string; text: string }[];
@@ -53,6 +59,7 @@ interface MTF {
   matches: Record<string, string>;
   marks?: number;
   explanation?: string;
+  type?: string;
 }
 interface AnswerQuestionPaperProps {
   examInfo: {
@@ -303,14 +310,20 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <span className="font-bold">[{toBengaliNumerals(q.marks || 1)}]</span>
                         </div>
                         <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {Object.entries(q.matches || {}).map(([leftId, rightId]: [string, any], matchIdx) => {
-                            const leftItem = (q.leftColumn || []).find((l: any) => l.id === leftId);
-                            const rightItem = (q.rightColumn || []).find((r: any) => r.id === rightId);
+                          {((q.leftColumn || []) as any[]).map((leftItem: any, lIdx: number) => {
+                            const rightId = (q.matches || {})[leftItem.id];
+                            const rightIdx = (q.rightColumn || []).findIndex((r: any) => r.id === rightId);
+                            const rightItem = (q.rightColumn || [])[rightIdx];
+
+                            // Visual labels
+                            const vLeftLabel = toBengaliNumerals(lIdx + 1);
+                            const vRightLabel = rightIdx !== -1 ? String.fromCharCode(65 + rightIdx) : '?';
+
                             return (
-                              <div key={matchIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
-                                <span className="font-bold text-green-700">{leftId}.</span>
+                              <div key={lIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                                <span className="font-bold text-green-700">{vLeftLabel}.</span>
                                 <span className="text-sm">→</span>
-                                <span className="font-bold text-green-700">{rightId}</span>
+                                <span className="font-bold text-green-700">{vRightLabel}</span>
                                 <span className="text-xs text-gray-600 truncate">
                                   (<UniversalMathJax inline>{leftItem?.text || ''}</UniversalMathJax> - <UniversalMathJax inline>{rightItem?.text || ''}</UniversalMathJax>)
                                 </span>
