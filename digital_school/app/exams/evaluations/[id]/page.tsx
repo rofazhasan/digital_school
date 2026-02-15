@@ -47,6 +47,7 @@ import { MathJaxContext } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
+import { toBengaliNumerals } from "@/utils/numeralConverter";
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
@@ -2669,52 +2670,72 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
-                                          {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: i, text: p.left })))?.map((leftItem: any, i: number) => {
+                                          {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: i, text: p.left })))?.map((leftItem: any, lIdx: number) => {
                                             // Determine Student's Match
                                             let studentRightText = "Unmatched";
                                             let isCorrect = false;
+                                            let studentRightIdx = -1;
 
                                             // Determine Correct Match for display if wrong
                                             let correctRightText = "";
+                                            let correctRightIdx = -1;
 
                                             if ((currentQuestion as any).leftColumn) {
                                               // New Schema
                                               const studentRightId = currentAnswer?.[leftItem.id];
                                               const rightItem = (currentQuestion as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                              studentRightIdx = (currentQuestion as any).rightColumn?.findIndex((r: any) => r.id === studentRightId);
                                               studentRightText = rightItem?.text || (studentRightId ? "Invalid ID" : "Unmatched");
 
                                               const correctRightId = (currentQuestion as any).correctMatches?.[leftItem.id];
                                               isCorrect = studentRightId === correctRightId;
 
                                               const correctItem = (currentQuestion as any).rightColumn?.find((r: any) => r.id === correctRightId);
+                                              correctRightIdx = (currentQuestion as any).rightColumn?.findIndex((r: any) => r.id === correctRightId);
                                               correctRightText = correctItem?.text || "";
 
                                             } else {
                                               // Legacy Schema (Pairs)
                                               // Try to find match in array
-                                              const pair = (currentQuestion as any).pairs[i];
-                                              const matchIndex = currentAnswer?.matches?.find((m: any) => m.leftIndex === i)?.rightIndex;
+                                              const pair = (currentQuestion as any).pairs[lIdx];
+                                              studentRightIdx = currentAnswer?.matches?.find((m: any) => m.leftIndex === lIdx)?.rightIndex;
 
-                                              const rightPair = (currentQuestion as any).pairs[matchIndex];
+                                              const rightPair = (currentQuestion as any).pairs[studentRightIdx];
                                               studentRightText = rightPair?.right || "Unmatched";
 
                                               isCorrect = pair.right === rightPair?.right;
                                               correctRightText = pair.right;
+                                              // For legacy pairs, correctRightIdx would be lIdx if they were perfectly aligned initially
+                                              correctRightIdx = lIdx;
                                             }
 
+                                            // Visual labels
+                                            const vlLeft = toBengaliNumerals(lIdx + 1);
+                                            const vStudentRight = studentRightIdx !== -1 && studentRightIdx !== undefined ? String.fromCharCode(65 + studentRightIdx) : null;
+                                            const vCorrectRight = correctRightIdx !== -1 && correctRightIdx !== undefined ? String.fromCharCode(65 + correctRightIdx) : null;
+
                                             return (
-                                              <tr key={i} className={isCorrect ? "bg-green-50/30" : "bg-red-50/30"}>
+                                              <tr key={lIdx} className={isCorrect ? "bg-green-50/30" : "bg-red-50/30"}>
                                                 <td className="px-3 py-2 font-medium">
-                                                  <UniversalMathJax inline>{cleanupMath(leftItem.text || String(leftItem))}</UniversalMathJax>
+                                                  <div className="flex items-center gap-1">
+                                                    <span className="font-bold text-gray-400 shrink-0">{vlLeft}.</span>
+                                                    <UniversalMathJax inline>{cleanupMath(leftItem.text || String(leftItem))}</UniversalMathJax>
+                                                  </div>
                                                 </td>
                                                 <td className="px-3 py-2">
                                                   <div className="flex flex-col">
                                                     <span className={isCorrect ? "text-green-700 font-semibold" : "text-red-700 font-semibold"}>
-                                                      <UniversalMathJax inline>{cleanupMath(studentRightText)}</UniversalMathJax>
+                                                      <div className="flex items-center gap-1">
+                                                        {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
+                                                        <UniversalMathJax inline>{cleanupMath(studentRightText)}</UniversalMathJax>
+                                                      </div>
                                                     </span>
                                                     {!isCorrect && (
                                                       <span className="text-xs text-gray-500 mt-0.5">
-                                                        Correct: <span className="text-green-600 font-medium"><UniversalMathJax inline>{cleanupMath(correctRightText)}</UniversalMathJax></span>
+                                                        Correct: <span className="text-green-600 font-medium flex items-center gap-1">
+                                                          {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
+                                                          <UniversalMathJax inline>{cleanupMath(correctRightText)}</UniversalMathJax>
+                                                        </span>
                                                       </span>
                                                     )}
                                                   </div>

@@ -47,6 +47,7 @@ import { cleanupMath } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
+import { toBengaliNumerals } from '@/utils/numeralConverter';
 // import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
@@ -1725,14 +1726,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               </tr>
                                             </thead>
                                             <tbody className="divide-y divide-indigo-100 bg-white">
-                                              {(question as any).leftColumn?.map((item: any, i: number) => {
+                                              {(question as any).leftColumn?.map((item: any, lIdx: number) => {
                                                 const correctMatches = (question as any).matches || {};
                                                 const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
 
                                                 // Normalize student answer
                                                 let studentRightId = null;
                                                 if (Array.isArray(studentMatches)) {
-                                                  const match = studentMatches.find((m: any) => m.leftIndex === i || m.leftId === item.id);
+                                                  const match = studentMatches.find((m: any) => m.leftIndex === lIdx || m.leftId === item.id);
                                                   if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
                                                 } else {
                                                   studentRightId = studentMatches[item.id];
@@ -1740,10 +1741,17 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                                 const correctRightId = correctMatches[item.id];
                                                 const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
-                                                const isUnanswered = !studentRightId;
 
                                                 const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                                const studentRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === studentRightId);
+
                                                 const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
+                                                const correctRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === correctRightId);
+
+                                                // Visual labels
+                                                const vlLeft = toBengaliNumerals(lIdx + 1);
+                                                const vStudentRight = studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
+                                                const vCorrectRight = correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
 
                                                 // Row styling
                                                 const rowClass = isMatchCorrect
