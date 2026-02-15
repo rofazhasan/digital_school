@@ -34,6 +34,7 @@ interface Question {
   hasMath: boolean;
   options?: any;
   questionLatex?: string | null;
+  negativeMarks?: number;
 }
 
 interface ExamSet {
@@ -47,6 +48,11 @@ interface Exam {
   id: string;
   name: string;
   totalMarks: number;
+  cqTotalQuestions: number;
+  cqRequiredQuestions: number;
+  sqTotalQuestions: number;
+  sqRequiredQuestions: number;
+  mcqNegativeMarking?: number;
   examSets: ExamSet[];
 }
 
@@ -76,7 +82,14 @@ const MathRenderer = ({ content, inline = true }: { content: string; inline?: bo
     }
 };
 
-const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable }: { question: Question; onAdd?: (q: Question) => void; onRemove?: (id: string) => void; isAdded: boolean; isSelectable: boolean; }) => (
+const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, selectionReason }: { 
+    question: Question; 
+    onAdd?: (q: Question) => void; 
+    onRemove?: (id: string) => void; 
+    isAdded: boolean; 
+    isSelectable: boolean;
+    selectionReason?: string;
+}) => (
     <div className={`p-4 border rounded-lg mb-3 transition-all ${isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
         <div className="flex justify-between items-start gap-4">
             <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
@@ -103,7 +116,9 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable }: { qu
                                 <PlusCircle className={`h-5 w-5 ${isAdded || !isSelectable ? 'text-gray-400' : 'text-green-500 hover:text-green-600'}`} />
                             </Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>{isAdded ? 'Already Added' : 'Add Question'}</p></TooltipContent>
+                        <TooltipContent>
+                            <p>{isAdded ? 'Already Added' : selectionReason || 'Add Question'}</p>
+                        </TooltipContent>
                     </Tooltip>
                 )}
                 {onRemove && (
@@ -131,7 +146,13 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable }: { qu
                     {question.difficulty}
                 </Badge>
                 <Badge variant="outline">{question.marks} Marks</Badge>
+                {question.type === 'MCQ' && question.negativeMarks && (
+                    <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
+                )}
                 <Badge variant="outline">Sub: {question.subject}</Badge>
+                {selectionReason && (
+                    <Badge variant="outline" className="text-xs">{selectionReason}</Badge>
+                )}
             </div>
         </div>
     </div>
@@ -267,15 +288,86 @@ export default function ExamBuilderPage() {
       fetchSets();
     }, [examId]);
 
+    // Derived State for Question Selection Logic
+    const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
+    const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
+    const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'MCQ'), [selectedQuestions]);
 
-    // Derived State
-    const currentMarks = useMemo(() => selectedQuestions.reduce((total, q) => total + q.marks, 0), [selectedQuestions]);
+    // Calculate marks only up to required number of questions
+    const cqMarks = useMemo(() => {
+        const requiredCQ = exam?.cqRequiredQuestions || 0;
+        return selectedCQQuestions.slice(0, requiredCQ).reduce((total, q) => total + q.marks, 0);
+    }, [selectedCQQuestions, exam]);
+    
+    const sqMarks = useMemo(() => {
+        const requiredSQ = exam?.sqRequiredQuestions || 0;
+        return selectedSQQuestions.slice(0, requiredSQ).reduce((total, q) => total + q.marks, 0);
+    }, [selectedSQQuestions, exam]);
+    
+    const mcqMarks = useMemo(() => selectedMCQQuestions.reduce((total, q) => total + q.marks, 0), [selectedMCQQuestions]);
+    
+    // Total marks is sum of required CQ + required SQ + all MCQ
+    const currentMarks = useMemo(() => cqMarks + sqMarks + mcqMarks, [cqMarks, sqMarks, mcqMarks]);
+
+    // Validation logic
     const isMarksMatched = useMemo(() => exam ? currentMarks === exam.totalMarks : false, [currentMarks, exam]);
+    const isCQValid = useMemo(() => {
+        if (!exam) return false;
+        return selectedCQQuestions.length >= exam.cqRequiredQuestions && selectedCQQuestions.length <= exam.cqTotalQuestions;
+    }, [selectedCQQuestions.length, exam]);
+    const isSQValid = useMemo(() => {
+        if (!exam) return false;
+        return selectedSQQuestions.length >= exam.sqRequiredQuestions && selectedSQQuestions.length <= exam.sqTotalQuestions;
+    }, [selectedSQQuestions.length, exam]);
+    const isSelectionValid = useMemo(() => isCQValid && isSQValid && isMarksMatched, [isCQValid, isSQValid, isMarksMatched]);
+
     const selectedQuestionIds = useMemo(() => new Set(selectedQuestions.map(q => q.id)), [selectedQuestions]);
+
+    // Helper function to determine if a question can be added
+    const canAddQuestion = useCallback((question: Question) => {
+        if (!exam) return false;
+        
+        // Check if question is already selected
+        if (selectedQuestionIds.has(question.id)) return false;
+        
+        // Check type-specific constraints first
+        if (question.type === 'CQ') {
+            if (selectedCQQuestions.length >= exam.cqTotalQuestions) return false;
+        } else if (question.type === 'SQ') {
+            if (selectedSQQuestions.length >= exam.sqTotalQuestions) return false;
+        }
+        
+        // For MCQ questions, check if adding would exceed total marks
+        if (question.type === 'MCQ') {
+            if (currentMarks + question.marks > exam.totalMarks) return false;
+        }
+        
+        return true;
+    }, [exam, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
+
+    // Helper function to get selection reason for tooltip
+    const getSelectionReason = useCallback((question: Question) => {
+        if (!exam) return '';
+        
+        if (selectedQuestionIds.has(question.id)) return 'Already Added';
+        
+        if (question.type === 'CQ') {
+            if (selectedCQQuestions.length >= exam.cqTotalQuestions) return 'CQ Limit Reached';
+            return 'Add CQ Question';
+        } else if (question.type === 'SQ') {
+            if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
+            return 'Add SQ Question';
+        } else if (question.type === 'MCQ') {
+            if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
+            return 'Add MCQ Question';
+        }
+        
+        return 'Add Question';
+    }, [exam, selectedQuestionIds, currentMarks, selectedCQQuestions.length, selectedSQQuestions.length]);
 
     // Event Handlers
     const handleAddQuestion = (question: Question) => {
-        if (!selectedQuestionIds.has(question.id)) {
+        if (!selectedQuestionIds.has(question.id) && canAddQuestion(question)) {
             setSelectedQuestions(prev => [...prev, question]);
         }
     };
@@ -297,10 +389,14 @@ export default function ExamBuilderPage() {
             setFilters(prev => ({ ...prev, page: newPage }));
         }
     };
+
     const handleSubmitSet = async () => {
-        // ... (manual submission logic remains the same)
-        if (!isMarksMatched) {
-            toast.error("Total marks of selected questions must match the exam's total marks.");
+        if (!isSelectionValid) {
+            let errorMessage = "Validation failed: ";
+            if (!isCQValid) errorMessage += `CQ questions must be ${exam?.cqRequiredQuestions}-${exam?.cqTotalQuestions}. `;
+            if (!isSQValid) errorMessage += `SQ questions must be ${exam?.sqRequiredQuestions}-${exam?.sqTotalQuestions}. `;
+            if (!isMarksMatched) errorMessage += `Total marks must be ${exam?.totalMarks}.`;
+            toast.error(errorMessage);
             return;
         }
         if (!newSetName.trim()) {
@@ -358,45 +454,62 @@ export default function ExamBuilderPage() {
 
     // On generate, create N sets with shuffled questions and MCQ options
     const handleGenerateSets = async () => {
-      if (!isMarksMatched) {
-        toast.error("Total marks of selected questions must match the exam's total marks.");
-        return;
-      }
-      if (!newSetName.trim()) {
-        toast.error("Please provide a name for this question set.");
-        return;
-      }
-      setIsSubmitting(true);
-      try {
-        const setsToSave = Array.from({ length: numSets }).map((_, i) => {
-          const shuffledQuestions = shuffleArray(selectedQuestions).map(q => {
-            if (q.type === 'MCQ' && Array.isArray(q.options)) {
-              return { ...q, options: shuffleArray(q.options) };
-            }
-            return q;
-          });
-          return {
-            name: `${newSetName.trim()} ${String.fromCharCode(65 + i)}`,
-            questions: shuffledQuestions,
-          };
-        });
-        const response = await fetch(`/api/exams/${examId}/set`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sets: setsToSave }),
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Failed to create exam sets.');
-        toast.success(`Generated and saved ${numSets} sets!`);
-        // Fetch the new sets and update state
-        const setsRes = await fetch(`/api/exams/${examId}/set`);
-        const setsData = await setsRes.json();
-        setSets(setsData.sets || []);
-      } catch (error: any) {
-        toast.error(error.message);
-      } finally {
-        setIsSubmitting(false);
-      }
+        if (!isSelectionValid) {
+            let errorMessage = "Validation failed: ";
+            if (!isCQValid) errorMessage += `CQ questions must be ${exam?.cqRequiredQuestions}-${exam?.cqTotalQuestions}. `;
+            if (!isSQValid) errorMessage += `SQ questions must be ${exam?.sqRequiredQuestions}-${exam?.sqTotalQuestions}. `;
+            if (!isMarksMatched) errorMessage += `Total marks must be ${exam?.totalMarks}.`;
+            toast.error(errorMessage);
+            return;
+        }
+        if (!newSetName.trim()) {
+            toast.error("Please provide a name for this question set.");
+            return;
+        }
+        setIsSubmitting(true);
+        try {
+            const setsToSave = Array.from({ length: numSets }).map((_, i) => {
+                const shuffledQuestions = shuffleArray(selectedQuestions).map(q => {
+                    let processedQuestion = { ...q };
+                    
+                    // Shuffle MCQ options if it's an MCQ question
+                    if (q.type === 'MCQ' && Array.isArray(q.options)) {
+                        processedQuestion = { ...processedQuestion, options: shuffleArray(q.options) };
+                    }
+                    
+                    // Add negative marks for MCQ questions if exam has negative marking
+                    if (q.type === 'MCQ' && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                        const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
+                        processedQuestion = {
+                            ...processedQuestion,
+                            negativeMarks: parseFloat(negativeMarks.toFixed(2))
+                        };
+                    }
+                    
+                    return processedQuestion;
+                });
+                return {
+                    name: `${newSetName.trim()} ${String.fromCharCode(65 + i)}`,
+                    questions: shuffledQuestions,
+                };
+            });
+            const response = await fetch(`/api/exams/${examId}/set`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sets: setsToSave }),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'Failed to create exam sets.');
+            toast.success(`Generated and saved ${numSets} sets!`);
+            // Fetch the new sets and update state
+            const setsRes = await fetch(`/api/exams/${examId}/set`);
+            const setsData = await setsRes.json();
+            setSets(setsData.sets || []);
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (isLoading && !exam) {
@@ -419,6 +532,12 @@ export default function ExamBuilderPage() {
                                 <div>
                                     <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">{exam.name}</h1>
                                     <p className="text-sm text-muted-foreground">Exam Builder | Total Marks: {exam.totalMarks}</p>
+                                    <div className="flex gap-4 mt-2 text-xs">
+                                        <span>CQ: {exam.cqRequiredQuestions}-{exam.cqTotalQuestions} questions (marks count from first {exam.cqRequiredQuestions})</span>
+                                        <span>SQ: {exam.sqRequiredQuestions}-{exam.sqTotalQuestions} questions (marks count from first {exam.sqRequiredQuestions})</span>
+                                        <span>MCQ: Remaining questions{exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 ? ` (${exam.mcqNegativeMarking}% negative marking)` : ''}</span>
+                                    </div>
+
                                 </div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <Button variant="outline" onClick={() => router.push(`/exams/${examId}/print`)}><Printer className="mr-2 h-4 w-4" />Print Sets ({exam.examSets.length})</Button>
@@ -472,7 +591,14 @@ export default function ExamBuilderPage() {
                                     <ScrollArea className="h-[60vh] pr-4">
                                         {isLoading && <div className="flex justify-center py-10"><Loader2 className="h-8 w-8 animate-spin" /></div>}
                                         {!isLoading && questionsData?.data.map(q => (
-                                            <QuestionCard key={q.id} question={q} onAdd={handleAddQuestion} isAdded={selectedQuestionIds.has(q.id)} isSelectable={currentMarks + q.marks <= exam.totalMarks} />
+                                            <QuestionCard 
+                                                key={q.id} 
+                                                question={q} 
+                                                onAdd={handleAddQuestion} 
+                                                isAdded={selectedQuestionIds.has(q.id)} 
+                                                isSelectable={canAddQuestion(q)}
+                                                selectionReason={getSelectionReason(q)}
+                                            />
                                         ))}
                                         {!isLoading && questionsData?.data.length === 0 && <p className="text-center text-muted-foreground py-10">No questions match the current filters.</p>}
                                     </ScrollArea>
@@ -493,11 +619,29 @@ export default function ExamBuilderPage() {
                              <Card className="sticky top-6">
                                 <CardHeader>
                                     <CardTitle className="flex items-center gap-2"><ClipboardList className="h-5 w-5"/>Manual Set Builder</CardTitle>
-                                    <div className={`flex justify-between items-center text-sm pt-2 p-2 rounded-md ${isMarksMatched ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                                    <div className={`flex justify-between items-center text-sm pt-2 p-2 rounded-md ${isSelectionValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
                                         <span className="font-medium">Selected Marks:</span>
-                                        <span className={`font-bold text-lg ${isMarksMatched ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
+                                        <span className={`font-bold text-lg ${isSelectionValid ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'}`}>
                                             {currentMarks} / {exam.totalMarks}
                                         </span>
+                                    </div>
+                                    {/* Question Type Breakdown */}
+                                    <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+                                        <div className={`p-2 rounded ${isCQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                                            <div className="font-medium">CQ</div>
+                                            <div>{selectedCQQuestions.length} / {exam.cqRequiredQuestions}-{exam.cqTotalQuestions}</div>
+                                            <div>{cqMarks} marks (first {exam.cqRequiredQuestions})</div>
+                                        </div>
+                                        <div className={`p-2 rounded ${isSQValid ? 'bg-green-100 dark:bg-green-900/30' : 'bg-yellow-100 dark:bg-yellow-900/30'}`}>
+                                            <div className="font-medium">SQ</div>
+                                            <div>{selectedSQQuestions.length} / {exam.sqRequiredQuestions}-{exam.sqTotalQuestions}</div>
+                                            <div>{sqMarks} marks (first {exam.sqRequiredQuestions})</div>
+                                        </div>
+                                        <div className="p-2 rounded bg-blue-100 dark:bg-blue-900/30">
+                                            <div className="font-medium">MCQ</div>
+                                            <div>{selectedMCQQuestions.length} questions</div>
+                                            <div>{mcqMarks} marks</div>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -523,8 +667,8 @@ export default function ExamBuilderPage() {
                                     </ScrollArea>
                                     <TooltipProvider>
                                         <Tooltip>
-                                            <TooltipTrigger asChild><div className="mt-4"><Button className="w-full" onClick={handleGenerateSets} disabled={!isMarksMatched || isSubmitting || !newSetName.trim()}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}Generate & Save Sets</Button></div></TooltipTrigger>
-                                            {!isMarksMatched && <TooltipContent><p>Marks must match. Required: {exam.totalMarks}, Current: {currentMarks}.</p></TooltipContent>}
+                                            <TooltipTrigger asChild><div className="mt-4"><Button className="w-full" onClick={handleGenerateSets} disabled={!isSelectionValid || isSubmitting || !newSetName.trim()}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}Generate & Save Sets</Button></div></TooltipTrigger>
+                                            {!isSelectionValid && <TooltipContent><p>All validation criteria must be met: CQ ({exam.cqRequiredQuestions}-{exam.cqTotalQuestions}), SQ ({exam.sqRequiredQuestions}-{exam.sqTotalQuestions}), and total marks ({exam.totalMarks}).</p></TooltipContent>}
                                         </Tooltip>
                                     </TooltipProvider>
                                 </CardContent>
@@ -600,6 +744,11 @@ export default function ExamBuilderPage() {
                                                 ))}
                                               </ul>
                                             )}
+                                            {setQ.type === 'MCQ' && setQ.negativeMarks && (
+                                              <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                                -{setQ.negativeMarks} marks
+                                              </div>
+                                            )}
                                           </div>
                                         ) : <span className="text-muted-foreground">-</span>}
                                       </td>
@@ -632,6 +781,11 @@ export default function ExamBuilderPage() {
                                           </li>
                                         ))}
                                       </ul>
+                                    )}
+                                    {q.type === 'MCQ' && q.negativeMarks && (
+                                      <div className="mt-1 text-xs text-red-600 dark:text-red-400">
+                                        Negative marking: -{q.negativeMarks} marks for wrong answer
+                                      </div>
                                     )}
                                     {q.type === 'CQ' && Array.isArray(q.subQuestions) && (
                                       <ol className="list-decimal pl-6 mt-1">

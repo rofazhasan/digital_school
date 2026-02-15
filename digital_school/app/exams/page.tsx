@@ -41,6 +41,11 @@ type Exam = {
   createdAt?: string;
   type?: 'ONLINE' | 'OFFLINE' | 'MIXED';
   allowRetake?: boolean;
+  mcqNegativeMarking?: number;
+  cqTotalQuestions?: number;
+  cqRequiredQuestions?: number;
+  sqTotalQuestions?: number;
+  sqRequiredQuestions?: number;
 };
 
 type FilterState = {
@@ -48,6 +53,7 @@ type FilterState = {
   status: string;
   type: string;
   subject: string;
+  negativeMarking?: string;
   sortBy: string;
   sortOrder: 'asc' | 'desc';
 };
@@ -194,6 +200,7 @@ export default function ExamsPage() {
       status: 'all',
       type: 'all',
       subject: 'all',
+      negativeMarking: 'all',
       sortBy: 'date',
       sortOrder: 'desc'
     });
@@ -219,8 +226,23 @@ export default function ExamsPage() {
       
       const matchesType = filters.type === 'all' || exam.type === filters.type;
       const matchesSubject = filters.subject === 'all' || exam.subject === filters.subject;
+      const matchesNegativeMarking = !filters.negativeMarking || filters.negativeMarking === 'all' ||
+        (filters.negativeMarking === 'with' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) ||
+        (filters.negativeMarking === 'without' && (!exam.mcqNegativeMarking || exam.mcqNegativeMarking === 0));
       
-      return matchesSearch && matchesStatus && matchesType && matchesSubject;
+      // Handle tab-based filtering
+      let matchesTab = true;
+      if (activeTab === 'active') {
+        matchesTab = exam.isActive;
+      } else if (activeTab === 'pending') {
+        matchesTab = !exam.isActive;
+      } else if (activeTab === 'online') {
+        matchesTab = exam.type === 'ONLINE';
+      } else if (activeTab === 'negative-marking') {
+        matchesTab = !!(exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0);
+      }
+      
+      return matchesSearch && matchesStatus && matchesType && matchesSubject && matchesNegativeMarking && matchesTab;
     });
 
     // Sort exams
@@ -267,8 +289,11 @@ export default function ExamsPage() {
     const online = exams.filter(e => e.type === 'ONLINE').length;
     const offline = exams.filter(e => e.type === 'OFFLINE').length;
     const mixed = exams.filter(e => e.type === 'MIXED').length;
+    const withNegativeMarking = exams.filter(e => e.mcqNegativeMarking && e.mcqNegativeMarking > 0).length;
+    const withCQ = exams.filter(e => e.cqTotalQuestions && e.cqTotalQuestions > 0).length;
+    const withSQ = exams.filter(e => e.sqTotalQuestions && e.sqTotalQuestions > 0).length;
     
-    return { total, active, pending, online, offline, mixed };
+    return { total, active, pending, online, offline, mixed, withNegativeMarking, withCQ, withSQ };
   }, [exams]);
 
   const getStatusColor = (isActive: boolean) => {
@@ -341,7 +366,7 @@ export default function ExamsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
           >
             <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
               <CardContent className="p-6">
@@ -398,6 +423,22 @@ export default function ExamsPage() {
                 </div>
               </CardContent>
             </Card>
+
+            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Negative Marking</p>
+                    <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                      {stats.withNegativeMarking}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full">
+                    <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Filters and Tabs */}
@@ -410,15 +451,16 @@ export default function ExamsPage() {
             <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
               <CardContent className="p-6">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-4 bg-gray-100 dark:bg-gray-700">
+                  <TabsList className="grid w-full grid-cols-5 bg-gray-100 dark:bg-gray-700">
                     <TabsTrigger value="all">All Exams</TabsTrigger>
                     <TabsTrigger value="active">Active</TabsTrigger>
                     <TabsTrigger value="pending">Pending</TabsTrigger>
                     <TabsTrigger value="online">Online</TabsTrigger>
+                    <TabsTrigger value="negative-marking">Negative Marking</TabsTrigger>
                   </TabsList>
 
                   <div className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
                       <div className="lg:col-span-2">
                         <Label htmlFor="search">Search</Label>
                         <div className="relative">
@@ -482,6 +524,23 @@ export default function ExamsPage() {
                             {uniqueSubjects.map(subject => (
                               <SelectItem key={subject} value={subject}>{subject}</SelectItem>
                             ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="negative-marking-filter">Negative Marking</Label>
+                        <Select 
+                          value={filters.negativeMarking || 'all'} 
+                          onValueChange={(value) => setFilters(prev => ({ ...prev, negativeMarking: value }))}
+                        >
+                          <SelectTrigger id="negative-marking-filter">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Exams</SelectItem>
+                            <SelectItem value="with">With Negative Marking</SelectItem>
+                            <SelectItem value="without">Without Negative Marking</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -675,6 +734,19 @@ export default function ExamsPage() {
                                 Retake Allowed
                               </Badge>
                             )}
+
+                            {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Badge variant="outline" className="text-red-600 border-red-600 cursor-help">
+                                    -{exam.mcqNegativeMarking}% MCQ
+                                  </Badge>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Negative marking of {exam.mcqNegativeMarking}% for incorrect MCQ answers</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                           </div>
                         </CardHeader>
 
@@ -716,6 +788,51 @@ export default function ExamsPage() {
                               </p>
                             </div>
                           </div>
+
+                          {/* CQ/SQ Information */}
+                          {(exam.cqTotalQuestions || exam.sqTotalQuestions) && (
+                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                              <div className="grid grid-cols-2 gap-4 text-sm">
+                                {exam.cqTotalQuestions && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-help">
+                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
+                                          <FileText className="w-3 h-3" />
+                                          CQ Questions
+                                        </div>
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                          {exam.cqRequiredQuestions || 0}/{exam.cqTotalQuestions}
+                                        </p>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Creative Questions: {exam.cqRequiredQuestions || 0} required out of {exam.cqTotalQuestions} total</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                                
+                                {exam.sqTotalQuestions && (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <div className="cursor-help">
+                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
+                                          <FileText className="w-3 h-3" />
+                                          SQ Questions
+                                        </div>
+                                        <p className="font-medium text-gray-900 dark:text-white">
+                                          {exam.sqRequiredQuestions || 0}/{exam.sqTotalQuestions}
+                                        </p>
+                                      </div>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Short Questions: {exam.sqRequiredQuestions || 0} required out of {exam.sqTotalQuestions} total</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </div>
+                          )}
 
                           <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                             <div className="flex items-center justify-between">

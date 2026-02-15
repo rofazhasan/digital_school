@@ -152,13 +152,17 @@ export async function POST(
           if (question.type?.toUpperCase() === 'MCQ') {
             const studentAnswer = answers[question.id];
             if (studentAnswer) {
+              const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
+              const userAns = normalize(studentAnswer);
               let isCorrect = false;
               
-              // Check if student answer matches any option marked as correct
+              // Enhanced MCQ answer comparison logic
               if (question.options && Array.isArray(question.options)) {
+                // Check if student answer matches any option marked as correct
                 const correctOption = question.options.find((opt: Record<string, unknown>) => opt.isCorrect);
                 if (correctOption) {
-                  isCorrect = studentAnswer === correctOption.text;
+                  const correctOptionText = normalize(correctOption.text || String(correctOption));
+                  isCorrect = userAns === correctOptionText;
                 }
               }
               
@@ -166,24 +170,29 @@ export async function POST(
               if (!isCorrect && question.correctAnswer) {
                 const correctAnswer = question.correctAnswer;
                 
-                // Handle different correct answer formats
                 if (typeof correctAnswer === 'number') {
-                  isCorrect = studentAnswer === correctAnswer;
+                  isCorrect = userAns === normalize(String(correctAnswer));
                 } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
                   // Handle object format (e.g., {text: "answer"})
-                  isCorrect = studentAnswer === (correctAnswer as Record<string, unknown>).text;
+                  isCorrect = userAns === normalize((correctAnswer as Record<string, unknown>).text || String(correctAnswer));
                 } else if (Array.isArray(correctAnswer)) {
                   // Handle array format (e.g., ["answer1", "answer2"])
-                  isCorrect = correctAnswer.includes(studentAnswer);
+                  isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
                 } else {
                   // Handle string format
-                  isCorrect = studentAnswer === String(correctAnswer);
+                  isCorrect = userAns === normalize(String(correctAnswer));
                 }
+              }
+              
+              // Final fallback: use question.correct
+              if (!isCorrect && question.correct) {
+                const correctAns = normalize(String(question.correct));
+                isCorrect = userAns === correctAns;
               }
             
               console.log(`MCQ Question ${question.id}:`, {
-                studentAnswer,
-                correctOptionText: question.options?.find((opt: Record<string, unknown>) => opt.isCorrect)?.text || 'No correct option found',
+                userAnswer: userAns,
+                correctAnswer: question.correct,
                 isCorrect,
                 questionMarks: question.marks,
                 previousMcqMarks: mcqMarks
@@ -194,7 +203,15 @@ export async function POST(
                 totalScore += question.marks;
                 console.log(`✅ MCQ marks awarded: +${question.marks}, Total MCQ: ${mcqMarks}, Total Score: ${totalScore}`);
               } else {
-                console.log(`❌ MCQ marks not awarded: 0, Total MCQ: ${mcqMarks}, Total Score: ${totalScore}`);
+                // Apply negative marking for wrong answers
+                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                  const negativeMarks = (question.marks * exam.mcqNegativeMarking) / 100;
+                  mcqMarks -= negativeMarks;
+                  totalScore -= negativeMarks;
+                  console.log(`❌ MCQ negative marking applied: -${negativeMarks.toFixed(2)} for question ${question.id}, Total MCQ: ${mcqMarks}, Total Score: ${totalScore}`);
+                } else {
+                  console.log(`❌ MCQ marks not awarded: 0, Total MCQ: ${mcqMarks}, Total Score: ${totalScore}`);
+                }
               }
             }
           }

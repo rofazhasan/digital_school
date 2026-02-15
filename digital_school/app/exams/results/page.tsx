@@ -10,7 +10,35 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Download, Search, Filter, Trophy, Award, TrendingUp, Users, Calendar, FileText } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Separator } from '@/components/ui/separator';
+import { 
+  Download, 
+  Search, 
+  Filter, 
+  Trophy, 
+  Award, 
+  TrendingUp, 
+  Users, 
+  Calendar, 
+  FileText,
+  Target,
+  BarChart3,
+  Star,
+  Medal,
+  Crown,
+  CheckCircle,
+  XCircle,
+  Minus,
+  Eye,
+  Clock,
+  BookOpen,
+  GraduationCap,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  MessageSquare
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 interface User {
@@ -83,6 +111,44 @@ interface ExamResults {
   passRate: number;
 }
 
+interface DetailedResult {
+  id: string;
+  mcqMarks: number;
+  cqMarks: number;
+  sqMarks: number;
+  total: number;
+  rank?: number;
+  grade?: string;
+  percentage?: number;
+  isPublished: boolean;
+  publishedAt?: string;
+  student: {
+    id: string;
+    roll: string;
+    registrationNo: string;
+    user: {
+      name: string;
+    };
+    class: {
+      name: string;
+      section: string;
+    };
+  };
+  exam: Exam;
+  // Additional detailed fields
+  mcqTotal?: number;
+  cqTotal?: number;
+  sqTotal?: number;
+  mcqPercentage?: number;
+  cqPercentage?: number;
+  sqPercentage?: number;
+  performanceAnalysis?: {
+    strength: string;
+    weakness: string;
+    recommendation: string;
+  };
+}
+
 export default function ExamResultsPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
@@ -94,6 +160,8 @@ export default function ExamResultsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'class'>('date');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
+  const [downloading, setDownloading] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchUserAndResults();
@@ -108,7 +176,9 @@ export default function ExamResultsPage() {
       setLoading(true);
       
       // Fetch current user
-      const userResponse = await fetch('/api/user');
+      const userResponse = await fetch('/api/user', {
+        credentials: 'include'
+      });
       if (!userResponse.ok) {
         if (userResponse.status === 401) {
         router.push('/login');
@@ -120,7 +190,9 @@ export default function ExamResultsPage() {
       setUser(userData);
 
       // Fetch results based on user role
-      const resultsResponse = await fetch('/api/exams/results/all');
+      const resultsResponse = await fetch('/api/exams/results/all', {
+        credentials: 'include'
+      });
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
         // Handle different possible data structures
@@ -184,18 +256,34 @@ export default function ExamResultsPage() {
   };
 
   const downloadResultsSheet = async (examId: string, format: 'pdf' | 'csv' = 'pdf') => {
+    const downloadKey = `${examId}-${format}`;
+    
+    if (downloading.has(downloadKey)) {
+      return; // Prevent multiple downloads
+    }
+
     try {
+      setDownloading(prev => new Set(prev).add(downloadKey));
       const loadingToast = toast.loading(`Generating ${format.toUpperCase()} results sheet...`);
       
       const endpoint = format === 'pdf' 
         ? `/api/exams/results/${examId}/download`
         : `/api/exams/results/${examId}/download-simple`;
       
+      console.log('🔍 Download request:', { endpoint, format, examId });
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
+      });
+      
+      console.log('🔍 Download response:', { 
+        status: response.status, 
+        statusText: response.statusText,
+        ok: response.ok 
       });
 
       if (response.ok) {
@@ -222,6 +310,12 @@ export default function ExamResultsPage() {
     } catch (error) {
       console.error(`Error downloading ${format} results sheet:`, error);
       toast.error(`Failed to download ${format.toUpperCase()} results sheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setDownloading(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(downloadKey);
+        return newSet;
+      });
     }
   };
 
@@ -253,6 +347,49 @@ export default function ExamResultsPage() {
     if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
     if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
     return <Badge variant="outline">{rank}</Badge>;
+  };
+
+  const getPerformanceAnalysis = (result: Result) => {
+    const totalPossible = result.exam.totalMarks;
+    const percentage = result.percentage || 0;
+    
+    let strength = '';
+    let weakness = '';
+    let recommendation = '';
+
+    // Analyze performance by section
+    const mcqPercentage = result.mcqMarks / (result.exam.totalMarks * 0.4) * 100; // Assuming 40% MCQ
+    const cqPercentage = result.cqMarks / (result.exam.totalMarks * 0.4) * 100; // Assuming 40% CQ
+    const sqPercentage = result.sqMarks / (result.exam.totalMarks * 0.2) * 100; // Assuming 20% SQ
+
+    if (mcqPercentage > 80) strength = 'Excellent MCQ performance';
+    else if (mcqPercentage < 50) weakness = 'MCQ section needs improvement';
+
+    if (cqPercentage > 80) strength = strength ? strength + ', Strong CQ answers' : 'Strong CQ answers';
+    else if (cqPercentage < 50) weakness = weakness ? weakness + ', CQ section needs work' : 'CQ section needs work';
+
+    if (sqPercentage > 80) strength = strength ? strength + ', Good SQ performance' : 'Good SQ performance';
+    else if (sqPercentage < 50) weakness = weakness ? weakness + ', SQ section needs attention' : 'SQ section needs attention';
+
+    if (percentage >= 90) recommendation = 'Outstanding performance! Keep up the excellent work.';
+    else if (percentage >= 80) recommendation = 'Very good performance. Focus on weak areas for even better results.';
+    else if (percentage >= 70) recommendation = 'Good performance. Review and practice more in challenging areas.';
+    else if (percentage >= 60) recommendation = 'Satisfactory performance. Consider additional study and practice.';
+    else recommendation = 'Performance needs improvement. Consider seeking additional help and practice.';
+
+    return { strength, weakness, recommendation };
+  };
+
+  const toggleExpandedResult = (examId: string) => {
+    setExpandedResults(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(examId)) {
+        newSet.delete(examId);
+      } else {
+        newSet.add(examId);
+      }
+      return newSet;
+    });
   };
 
   if (loading) {
@@ -309,7 +446,7 @@ export default function ExamResultsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Exam Results</h1>
           <p className="text-muted-foreground">
             {isStudent 
-              ? 'View your exam results and performance'
+              ? 'View your exam results and performance analysis'
               : 'Manage and view all exam results'
             }
           </p>
@@ -388,7 +525,7 @@ export default function ExamResultsPage() {
 
       {/* Results Display */}
       {isStudent ? (
-        // Student View - Individual Results
+        // Student View - Individual Results with Detailed Analysis
         <div className="space-y-6">
           {filteredResults.length === 0 ? (
             <Card>
@@ -401,85 +538,199 @@ export default function ExamResultsPage() {
               </CardContent>
             </Card>
           ) : (
-            filteredResults.map((examResult) => (
-              <Card key={examResult.exam?.id || 'unknown'}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="flex items-center gap-2">
-                        <FileText className="w-5 h-5" />
-                        {examResult.exam?.name || 'Unknown Exam'}
-                      </CardTitle>
-                      <CardDescription>
-                        {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
-                        {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} • 
-                        Total Marks: {examResult.exam?.totalMarks || 0}
-                      </CardDescription>
-                    </div>
-                    <Badge variant={examResult.results?.[0]?.isPublished ? "default" : "secondary"}>
-                      {examResult.results?.[0]?.isPublished ? "Published" : "Draft"}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                    <div className="text-center p-4 bg-blue-50 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">
-                        {examResult.results?.[0]?.total || 0}
-                      </div>
-                      <div className="text-sm text-blue-600">Total Marks</div>
-                    </div>
-                    <div className="text-center p-4 bg-green-50 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">
-                        {examResult.results?.[0]?.percentage?.toFixed(1) || 0}%
-                      </div>
-                      <div className="text-sm text-green-600">Percentage</div>
-                    </div>
-                    <div className="text-center p-4 bg-purple-50 rounded-lg">
-                      <div className="text-2xl font-bold text-purple-600">
-                        {examResult.results?.[0]?.grade || 'N/A'}
-                      </div>
-                      <div className="text-sm text-purple-600">Grade</div>
-                    </div>
-                    <div className="text-center p-4 bg-orange-50 rounded-lg">
-                      <div className="text-2xl font-bold text-orange-600">
-                        {examResult.results?.[0]?.rank || 'N/A'}
-                      </div>
-                      <div className="text-sm text-orange-600">Rank</div>
-                    </div>
-                  </div>
+            filteredResults.map((examResult) => {
+              const studentResult = examResult.results?.[0];
+              if (!studentResult) return null;
 
-                  <div className="space-y-4">
-                    <h4 className="font-semibold">Detailed Breakdown</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">MCQ Marks</div>
-                        <div className="text-xl font-semibold">
-                          {(() => {
-                            const mcqMarks = examResult.results?.[0]?.mcqMarks || 0;
-                            console.log('🔍 MCQ Marks Debug:', {
-                              examResult: examResult.exam?.name,
-                              results: examResult.results,
-                              firstResult: examResult.results?.[0],
-                              mcqMarks: mcqMarks
-                            });
-                            return mcqMarks;
-                          })()}
+              const performanceAnalysis = getPerformanceAnalysis(studentResult);
+              const isExpanded = expandedResults.has(examResult.exam.id);
+
+              return (
+                <Card key={examResult.exam?.id || 'unknown'} className="overflow-hidden">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <FileText className="w-5 h-5" />
+                          {examResult.exam?.name || 'Unknown Exam'}
+                        </CardTitle>
+                        <CardDescription>
+                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
+                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}
+                        </CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={studentResult.isPublished ? "default" : "secondary"}>
+                          {studentResult.isPublished ? "Published" : "Draft"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => toggleExpandedResult(examResult.exam.id)}
+                        >
+                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  {/* Summary Cards */}
+                  <CardContent>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="text-center p-4 bg-blue-50 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {studentResult.total || 0}
+                        </div>
+                        <div className="text-sm text-blue-600">Your Score</div>
+                        <div className="text-xs text-muted-foreground">
+                          out of {examResult.exam?.totalMarks || 0}
                         </div>
                       </div>
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">CQ Marks</div>
-                        <div className="text-xl font-semibold">{examResult.results?.[0]?.cqMarks || 0}</div>
+                      <div className="text-center p-4 bg-green-50 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">
+                          {studentResult.percentage?.toFixed(1) || 0}%
+                        </div>
+                        <div className="text-sm text-green-600">Percentage</div>
                       </div>
-                      <div className="p-4 border rounded-lg">
-                        <div className="text-sm text-muted-foreground">SQ Marks</div>
-                        <div className="text-xl font-semibold">{examResult.results?.[0]?.sqMarks || 0}</div>
+                      <div className="text-center p-4 bg-purple-50 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {studentResult.grade || 'N/A'}
+                        </div>
+                        <div className="text-sm text-purple-600">Grade</div>
+                      </div>
+                      <div className="text-center p-4 bg-orange-50 rounded-lg">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {studentResult.rank || 'N/A'}
+                        </div>
+                        <div className="text-sm text-orange-600">Rank</div>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+
+                    {/* Detailed Breakdown */}
+                    <div className="space-y-4">
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4" />
+                        Detailed Breakdown
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="p-4 border rounded-lg">
+                          <div className="text-sm text-muted-foreground">MCQ Marks</div>
+                          <div className="text-xl font-semibold">
+                            {studentResult.mcqMarks || 0}
+                          </div>
+                          <Progress 
+                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                            className="mt-2"
+                          />
+                        </div>
+                        <div className="p-4 border rounded-lg">
+                          <div className="text-sm text-muted-foreground">CQ Marks</div>
+                          <div className="text-xl font-semibold">{studentResult.cqMarks || 0}</div>
+                          <Progress 
+                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                            className="mt-2"
+                          />
+                        </div>
+                        <div className="p-4 border rounded-lg">
+                          <div className="text-sm text-muted-foreground">SQ Marks</div>
+                          <div className="text-xl font-semibold">{studentResult.sqMarks || 0}</div>
+                          <Progress 
+                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                            className="mt-2"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Expanded Detailed Analysis */}
+                    {isExpanded && (
+                      <div className="mt-6 space-y-6">
+                        <Separator />
+                        
+                        {/* Performance Analysis */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold flex items-center gap-2">
+                            <Target className="w-4 h-4" />
+                            Performance Analysis
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {performanceAnalysis.strength && (
+                              <div className="p-4 bg-green-50 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <CheckCircle className="w-4 h-4 text-green-600" />
+                                  <span className="font-medium text-green-800">Strengths</span>
+                                </div>
+                                <p className="text-sm text-green-700">{performanceAnalysis.strength}</p>
+                              </div>
+                            )}
+                            {performanceAnalysis.weakness && (
+                              <div className="p-4 bg-red-50 rounded-lg">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <XCircle className="w-4 h-4 text-red-600" />
+                                  <span className="font-medium text-red-800">Areas for Improvement</span>
+                                </div>
+                                <p className="text-sm text-red-700">{performanceAnalysis.weakness}</p>
+                              </div>
+                            )}
+                            <div className="p-4 bg-blue-50 rounded-lg">
+                              <div className="flex items-center gap-2 mb-2">
+                                <Star className="w-4 h-4 text-blue-600" />
+                                <span className="font-medium text-blue-800">Recommendation</span>
+                              </div>
+                              <p className="text-sm text-blue-700">{performanceAnalysis.recommendation}</p>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Class Performance Comparison */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold flex items-center gap-2">
+                            <Users className="w-4 h-4" />
+                            Class Performance
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="text-center p-4 bg-gray-50 rounded-lg">
+                              <div className="text-lg font-semibold">{examResult.averageScore?.toFixed(1) || 0}</div>
+                              <div className="text-sm text-muted-foreground">Class Average</div>
+                            </div>
+                            <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                              <div className="text-lg font-semibold">{examResult.highestScore || 0}</div>
+                              <div className="text-sm text-muted-foreground">Highest Score</div>
+                            </div>
+                            <div className="text-center p-4 bg-green-50 rounded-lg">
+                              <div className="text-lg font-semibold">{examResult.passRate?.toFixed(1) || 0}%</div>
+                              <div className="text-sm text-muted-foreground">Pass Rate</div>
+                            </div>
+                            <div className="text-center p-4 bg-purple-50 rounded-lg">
+                              <div className="text-lg font-semibold">{examResult.totalStudents || 0}</div>
+                              <div className="text-sm text-muted-foreground">Total Students</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Action Items */}
+                        <div className="space-y-4">
+                          <h4 className="font-semibold flex items-center gap-2">
+                            <BookOpen className="w-4 h-4" />
+                            Next Steps
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <Button variant="outline" className="w-full">
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Detailed Answers
+                            </Button>
+                            <Button variant="outline" className="w-full">
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              Request Review
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
       ) : (
@@ -557,38 +808,48 @@ export default function ExamResultsPage() {
             {/* Exam Results Summary */}
             <div className="space-y-4">
               {filteredResults.map((examResult) => (
-              <Card key={examResult.exam?.id || 'unknown'}>
+                <Card key={examResult.exam?.id || 'unknown'}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
                         <CardTitle className="flex items-center gap-2">
                           <FileText className="w-5 h-5" />
-                        {examResult.exam?.name || 'Unknown Exam'}
+                          {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
                         <CardDescription>
-                        {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
-                        {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} • 
-                        {examResult.totalStudents || 0} students
+                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
+                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} • 
+                          {examResult.totalStudents || 0} students
                         </CardDescription>
                       </div>
-                                             <div className="flex items-center gap-2">
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
-                         >
-                           <Download className="w-4 h-4 mr-2" />
-                           Download PDF
-                         </Button>
-                         <Button
-                           variant="outline"
-                           size="sm"
-                           onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
-                         >
-                           <Download className="w-4 h-4 mr-2" />
-                           Download CSV
-                         </Button>
-                       </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
+                          disabled={downloading.has(`${examResult.exam.id}-pdf`)}
+                        >
+                          {downloading.has(`${examResult.exam.id}-pdf`) ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                          ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                          )}
+                          PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
+                          disabled={downloading.has(`${examResult.exam.id}-csv`)}
+                        >
+                          {downloading.has(`${examResult.exam.id}-csv`) ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                          ) : (
+                            <Download className="w-4 h-4 mr-2" />
+                          )}
+                          CSV
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -628,22 +889,32 @@ export default function ExamResultsPage() {
                         {new Date(examResult.exam.date).toLocaleDateString()}
                       </CardDescription>
                     </div>
-                                         <div className="flex items-center gap-2">
-                       <Button
-                         variant="outline"
-                         onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
-                       >
-                         <Download className="w-4 h-4 mr-2" />
-                         Download PDF
-                       </Button>
-                       <Button
-                         variant="outline"
-                         onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
-                       >
-                         <Download className="w-4 h-4 mr-2" />
-                         Download CSV
-                       </Button>
-                     </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
+                        disabled={downloading.has(`${examResult.exam.id}-pdf`)}
+                      >
+                        {downloading.has(`${examResult.exam.id}-pdf`) ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        PDF
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
+                        disabled={downloading.has(`${examResult.exam.id}-csv`)}
+                      >
+                        {downloading.has(`${examResult.exam.id}-csv`) ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                        ) : (
+                          <Download className="w-4 h-4 mr-2" />
+                        )}
+                        CSV
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>

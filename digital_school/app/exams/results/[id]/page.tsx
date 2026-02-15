@@ -1279,7 +1279,7 @@ Generated on: ${new Date().toLocaleString()}
                                     <div className="flex items-center gap-2">
                                       <Minus className="h-4 w-4 text-red-600" />
                                       <span className="text-sm text-red-700 font-medium">
-                                        Negative marks applied for incorrect answer
+                                        Negative marks applied for incorrect answer: {question.awardedMarks} marks
                                       </span>
                                     </div>
                                   </div>

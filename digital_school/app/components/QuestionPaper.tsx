@@ -31,6 +31,10 @@ interface QuestionPaperProps {
     set?: string;
     duration?: string;
     totalMarks?: string;
+    mcqNegativeMarking?: number;
+    cqRequiredQuestions?: number;
+    sqRequiredQuestions?: number;
+    cqSubsections?: any[];
   };
   questions: {
     mcq: MCQ[];
@@ -64,9 +68,21 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const cqs = questions.cq || [];
     const sqs = questions.sq || [];
     
+    // Calculate total marks for all questions
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
     const cqTotal = cqs.reduce((sum, q) => sum + (q.marks || 0), 0);
     const sqTotal = sqs.reduce((sum, q) => sum + (q.marks || 0), 0);
+    
+    // Calculate highest possible marks for required questions
+    const cqRequired = examInfo.cqRequiredQuestions || 0;
+    const sqRequired = examInfo.sqRequiredQuestions || 0;
+    
+    // Sort questions by marks (highest first) and calculate required marks
+    const cqSorted = [...cqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
+    const sqSorted = [...sqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
+    
+    const cqRequiredMarks = cqSorted.slice(0, cqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
+    const sqRequiredMarks = sqSorted.slice(0, sqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
 
     // Calculate MCQ pagination based on rules
     const getMCQPages = () => {
@@ -105,7 +121,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
     const mcqPages = getMCQPages();
 
     return (
-      <div ref={ref} className="question-paper-container bg-white p-8 rounded-lg shadow-lg font-serif">
+      <div ref={ref} className="question-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
         {/* Header */}
         <header className="text-center mb-4 relative border-b-2 border-black pb-2">
           <div className="absolute top-0 right-0">
@@ -130,13 +146,18 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {mcqs.length > 0 && (
             <>
               {/* MCQ Header - only once */}
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid">
+              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header">
                 <h3>বহুনির্বাচনি প্রশ্ন (MCQ)</h3>
-                <span>মোট নম্বর: {mcqTotal}</span>
+                <div className="text-right">
+                  <div>মোট নম্বর: {mcqTotal}</div>
+                  {examInfo.mcqNegativeMarking && examInfo.mcqNegativeMarking > 0 && (
+                    <div className="text-red-600 text-sm">(প্রতিটি ভুল উত্তরের জন্য {examInfo.mcqNegativeMarking}% নম্বর কর্তন করা হবে)</div>
+                  )}
+                </div>
               </div>
               
               {mcqPages.map((page, pageIdx) => (
-                <div key={pageIdx}>
+                <div key={pageIdx} className="mcq-page">
                   {page.isTwoColumn ? (
                     // Two column layout
                     <div className="grid grid-cols-2 gap-x-8">
@@ -145,14 +166,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? idx : (pageIdx * 18) + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
                                   <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
+                                  <div className="mt-1 question-options">
                                     {(q.options || []).map((opt: any, oidx: number) => (
-                                      <span key={oidx} className="inline-block mr-4 text-xs">
+                                      <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                         <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
                                       </span>
                                     ))}
@@ -169,14 +190,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                         {(page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).right.map((q: MCQ, idx: number) => {
                           const globalIdx = pageIdx === 0 ? ((page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx) : (pageIdx * 18) + (page as { left: MCQ[]; right: MCQ[]; isTwoColumn: true }).left.length + idx;
                           return (
-                            <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                            <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                               <div className="flex items-start">
                                 <span className="font-bold mr-2 text-sm">{globalIdx + 1}.</span>
                                 <div className="flex-1 text-sm">
                                   <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                                  <div className="mt-1">
+                                  <div className="mt-1 question-options">
                                     {(q.options || []).map((opt: any, oidx: number) => (
-                                      <span key={oidx} className="inline-block mr-4 text-xs">
+                                      <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                         <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
                                       </span>
                                     ))}
@@ -192,14 +213,14 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     // Single column layout
                     <div>
                       {(page as { questions: MCQ[]; isTwoColumn: false }).questions.map((q: MCQ, idx: number) => (
-                        <div key={idx} className="mb-2 text-left" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                        <div key={idx} className="mb-2 text-left question-block" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-sm">{idx + 1}.</span>
                             <div className="flex-1 text-sm">
                               <Text>{`${q.q} [${q.marks || 1}]`}</Text>
-                              <div className="mt-1">
+                              <div className="mt-1 question-options">
                                 {(q.options || []).map((opt: any, oidx: number) => (
-                                  <span key={oidx} className="inline-block mr-4 text-xs">
+                                  <span key={oidx} className="inline-block mr-4 text-xs font-bold">
                                     <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
                                   </span>
                                 ))}
@@ -215,52 +236,131 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             </>
           )}
 
-          {/* CQ Section - starts immediately after MCQ */}
+          {/* CQ Section - starts on new page after MCQ */}
           {cqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
-                <h3>রচনামূলক প্রশ্ন (CQ)</h3>
-                <span>মোট নম্বর: {cqTotal}</span>
+              <div 
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 cq-section section-break"
+                style={{ 
+                  pageBreakBefore: 'always', 
+                  breakBefore: 'page',
+                  marginTop: '0',
+                  paddingTop: '0'
+                }}
+              >
+                <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
+                <div className="text-right">
+                  <div>সর্বোচ্চ নম্বর: {cqRequiredMarks}</div>
+                  {cqRequired > 0 && (
+                    <div className="text-sm">(মোট {cqRequired} টি উত্তর করতে হবে)</div>
+                  )}
+                </div>
               </div>
-              <div>
-                {cqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
-                    <div className="flex items-start">
-                      <span className="font-bold mr-2">{idx + 1}.</span>
-                      <div className="flex-1">
-                        <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
-                        {q.subQuestions && Array.isArray(q.subQuestions) && (
-                          <ul className="list-inside mt-1 ml-4">
-                            {q.subQuestions.map((sub, sidx) => (
-                              <li key={sidx} className="ml-4 flex items-start">
-                                <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
-                                <span className="flex-1">
-                                  <Text>
-                                    {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
-                                  </Text>
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
+              
+              {/* Render CQ questions with subsections if they exist */}
+              {examInfo.cqSubsections && examInfo.cqSubsections.length > 1 ? (
+                // Multiple subsections - render with headers
+                examInfo.cqSubsections.map((subsection: any, subIdx: number) => {
+                  const subsectionQuestions = cqs.slice(subsection.startIndex - 1, subsection.endIndex);
+                  const subsectionRequired = subsection.requiredQuestions || 0;
+                  
+                  return (
+                    <div key={subIdx} className="mb-4">
+                      {/* Subsection header */}
+                      <div className="font-semibold text-base text-blue-800 dark:text-blue-400 mb-2 border-l-4 border-blue-500 pl-3 bg-blue-50 dark:bg-blue-900/20 py-2">
+                        {subsection.name || `Subsection ${subIdx + 1}`}
+                        {subsectionRequired > 0 && (
+                          <span className="text-sm font-normal text-gray-600 dark:text-gray-400 ml-2">
+                            (কমপক্ষে {subsectionRequired} টি উত্তর করতে হবে)
+                          </span>
                         )}
                       </div>
+                      
+                      {/* Questions in this subsection */}
+                      <div className="ml-4">
+                        {subsectionQuestions.map((q, idx) => (
+                          <div key={idx} className="mb-3 text-left cq-question">
+                            <div className="flex items-start">
+                              <span className="font-bold mr-2">{subsection.startIndex + idx}.</span>
+                              <div className="flex-1">
+                                <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
+                                {q.subQuestions && Array.isArray(q.subQuestions) && (
+                                  <ul className="list-inside mt-1 ml-4">
+                                    {q.subQuestions.map((sub, sidx) => (
+                                      <li key={sidx} className="ml-4 flex items-start">
+                                        <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                        <span className="flex-1">
+                                          <Text>
+                                            {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
+                                          </Text>
+                                        </span>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  );
+                })
+              ) : (
+                // Single subsection or no subsections - render normally
+                <div>
+                  {cqs.map((q, idx) => (
+                    <div key={idx} className="mb-3 text-left cq-question">
+                      <div className="flex items-start">
+                        <span className="font-bold mr-2">{idx + 1}.</span>
+                        <div className="flex-1">
+                          <Text>{`${q.questionText} [${q.marks || 1}]`}</Text>
+                          {q.subQuestions && Array.isArray(q.subQuestions) && (
+                            <ul className="list-inside mt-1 ml-4">
+                              {q.subQuestions.map((sub, sidx) => (
+                                <li key={sidx} className="ml-4 flex items-start">
+                                  <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                  <span className="flex-1">
+                                    <Text>
+                                      {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${sub.marks}]` : ''}`}
+                                    </Text>
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </>
           )}
 
-          {/* SQ Section - starts immediately after CQ */}
+          {/* SQ Section - starts on new page after CQ */}
           {sqs.length > 0 && (
             <>
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4">
+              <div 
+                className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 mt-4 sq-section section-break"
+                style={{ 
+                  pageBreakBefore: 'always', 
+                  breakBefore: 'page',
+                  marginTop: '0',
+                  paddingTop: '0'
+                }}
+              >
                 <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
-                <span>মোট নম্বর: {sqTotal}</span>
+                <div className="text-right">
+                  <div>সর্বোচ্চ নম্বর: {sqRequiredMarks}</div>
+                  {sqRequired > 0 && (
+                    <div className="text-sm">(মোট {sqRequired} টি উত্তর করতে হবে)</div>
+                  )}
+                </div>
               </div>
               <div>
                 {sqs.map((q, idx) => (
-                  <div key={idx} className="mb-3 text-left">
+                  <div key={idx} className="mb-3 text-left sq-question">
                     <div className="flex items-start">
                       <span className="font-bold mr-2">{idx + 1}.</span>
                       <div className="flex-1">

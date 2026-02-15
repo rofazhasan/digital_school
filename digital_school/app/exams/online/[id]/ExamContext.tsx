@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
 
 const ExamContext = createContext<any>(null);
 
@@ -14,14 +14,20 @@ function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   }, [...deps, delay]);
 }
 
-export function ExamContextProvider({ exam, children }: { exam: any; children: React.ReactNode }) {
+export function ExamContextProvider({ 
+  exam, 
+  children 
+}: { 
+  exam: any; 
+  children: React.ReactNode;
+}) {
   const [answers, setAnswers] = useState<any>({});
   const [navigation, setNavigation] = useState<any>({ current: 0, marked: {} });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [isOnline, setIsOnline] = useState(typeof window !== "undefined" ? navigator.onLine : true);
-  const [isSyncPending, setIsSyncPending] = useState(false);
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
   const [highContrast, setHighContrast] = useState(false);
+  const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
+  
   const localKey = `exam-answers-${exam.id}`;
   const navigationKey = `exam-navigation-${exam.id}`;
 
@@ -59,76 +65,120 @@ export function ExamContextProvider({ exam, children }: { exam: any; children: R
     localStorage.setItem(navigationKey, JSON.stringify(navigation));
   }, [navigation, navigationKey]);
 
-  // Track online/offline state
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const goOnline = () => setIsOnline(true);
-    const goOffline = () => setIsOnline(false);
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    setIsOnline(navigator.onLine);
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
+  // Simple autosave with Appwrite image handling
+  const saveAnswers = useCallback(async (answersToSave: any) => {
+    try {
+      setSaveStatus("saving");
+      
+      // Process answers to include Appwrite image information
+      const processedAnswers = { ...answersToSave };
+      
+      // Extract Appwrite image data for questions with images
+      Object.keys(processedAnswers).forEach(key => {
+        if (key.endsWith('_images') && Array.isArray(processedAnswers[key])) {
+          processedAnswers[key] = processedAnswers[key].map((img: any) => ({
+            appwriteFileId: img.appwriteFileId,
+            appwriteUrl: img.appwriteUrl,
+            appwriteFilename: img.appwriteFilename,
+            timestamp: img.timestamp,
+            questionId: img.questionId,
+            questionText: img.questionText,
+            uploadedAt: img.uploadedAt,
+            // Keep preview for fallback if needed
+            preview: img.preview
+          }));
+        }
+      });
+      
+      const response = await fetch(`/api/exams/${exam.id}/responses`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ answers: processedAnswers }),
+      });
+
+      if (!response.ok) throw new Error("Failed to save");
+      
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 1500);
+    } catch (error) {
+      console.error("Save failed:", error);
+      setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 3000);
+    }
+  }, [exam.id]);
 
   // Autosave answers (debounced)
   useDebouncedEffect(() => {
     if (Object.keys(answers).length > 0) {
-      if (!isOnline) {
-        setIsSyncPending(true);
-        setSaveStatus("idle");
-        return;
-      }
-      setSaveStatus("saving");
-      fetch(`/api/exams/${exam.id}/responses`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to save");
-          setSaveStatus("saved");
-          setIsSyncPending(false);
-          setTimeout(() => setSaveStatus("idle"), 1500);
-        })
-        .catch(() => {
-          setSaveStatus("error");
-          setIsSyncPending(true);
-        });
+      saveAnswers(answers);
     }
-  }, [answers, isOnline], 2000);
+  }, [answers, saveAnswers], 2000); // 2 second debounce
 
-  // When back online, sync pending answers
-  useEffect(() => {
-    if (isOnline && isSyncPending && Object.keys(answers).length > 0) {
-      setSaveStatus("saving");
-      fetch(`/api/exams/${exam.id}/responses`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers }),
-      })
-        .then((res) => {
-          if (!res.ok) throw new Error("Failed to save");
-          setSaveStatus("saved");
-          setIsSyncPending(false);
-          setTimeout(() => setSaveStatus("idle"), 1500);
-        })
-        .catch(() => {
-          setSaveStatus("error");
-          setIsSyncPending(true);
-        });
+  // Enhanced navigation with performance optimizations
+  const navigateToQuestion = useCallback((index: number) => {
+    if (index >= 0 && index < (exam.questions?.length || 0)) {
+      setNavigation(prev => ({ ...prev, current: index }));
     }
-  }, [isOnline]);
+  }, [exam.questions?.length]);
+
+  const markQuestion = useCallback((questionId: string, marked: boolean) => {
+    setNavigation(prev => ({
+      ...prev,
+      marked: {
+        ...prev.marked,
+        [questionId]: marked
+      }
+    }));
+  }, []);
+
+  // Performance-optimized question filtering
+  const getQuestionsByType = useCallback((type: string) => {
+    if (!exam.questions) return [];
+    return exam.questions.filter((q: any) => 
+      (q.type || q.questionType || "").toLowerCase() === type.toLowerCase()
+    );
+  }, [exam.questions]);
+
+  // Memoized question counts
+  useEffect(() => {
+    if (exam.questions) {
+      const counts = {
+        cq: getQuestionsByType('cq').length,
+        sq: getQuestionsByType('sq').length
+      };
+      setQuestionCounts(counts);
+    }
+  }, [exam.questions, getQuestionsByType]);
+
+  const contextValue = {
+    exam,
+    answers,
+    setAnswers,
+    navigation,
+    setNavigation,
+    saveStatus,
+    fontSize,
+    setFontSize,
+    highContrast,
+    setHighContrast,
+    questionCounts,
+    navigateToQuestion,
+    markQuestion,
+    getQuestionsByType,
+    saveAnswers
+  };
 
   return (
-    <ExamContext.Provider value={{ exam, answers, setAnswers, navigation, setNavigation, saveStatus, isOnline, isSyncPending, fontSize, setFontSize, highContrast, setHighContrast }}>
+    <ExamContext.Provider value={contextValue}>
       {children}
     </ExamContext.Provider>
   );
 }
 
-export function useExamContext() {
-  return useContext(ExamContext);
-} 
+export const useExamContext = () => {
+  const context = useContext(ExamContext);
+  if (!context) {
+    throw new Error("useExamContext must be used within an ExamContextProvider");
+  }
+  return context;
+}; 

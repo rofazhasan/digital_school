@@ -16,19 +16,26 @@ async function getDeveloperUserId() {
 // --- Updated Schema ---
 const questionSchema = z.object({
     type: z.nativeEnum(QuestionType),
-    subject: z.string().min(1),
-    topic: z.string().optional(),
-    marks: z.coerce.number().int().min(1),
+    subject: z.string().min(1, "Subject is required"),
+    topic: z.string().optional().nullable(),
+    marks: z.coerce.number().int().min(1, "Marks must be at least 1"),
     difficulty: z.nativeEnum(Difficulty),
-    // UNIFIED: questionText is now the single source for content
     questionText: z.string().min(1, "Question content is required"),
     hasMath: z.boolean().default(false),
-    classId: z.string().cuid(),
+    classId: z.string().cuid("Valid class ID is required"),
     isAiGenerated: z.boolean().default(false),
-    options: z.unknown().optional(),
-    subQuestions: z.unknown().optional(),
-    modelAnswer: z.string().optional(),
-    questionBankIds: z.array(z.string().cuid()).optional(),
+    options: z.array(z.object({
+        text: z.string().min(1, "Option text is required"),
+        isCorrect: z.boolean(),
+        explanation: z.string().optional().nullable()
+    })).nullable().default(null),
+    subQuestions: z.array(z.object({
+        question: z.string().min(1, "Sub-question text is required"),
+        marks: z.number().int().min(1, "Sub-question marks must be at least 1"),
+        modelAnswer: z.string().optional().nullable()
+    })).nullable().default(null),
+    modelAnswer: z.string().optional().nullable(),
+    questionBankIds: z.array(z.string().cuid()).optional().nullable(),
 });
 
 const aiGenerationSchema = z.object({
@@ -55,7 +62,12 @@ export async function POST(request: Request) {
 
         const validation = questionSchema.safeParse(body);
         if (!validation.success) {
-            return NextResponse.json({ error: "Invalid input", details: validation.error.flatten() }, { status: 400 });
+            console.error('Validation failed:', validation.error.flatten());
+            return NextResponse.json({ 
+                error: "Invalid input", 
+                details: validation.error.flatten(),
+                receivedData: body 
+            }, { status: 400 });
         }
 
         const { questionBankIds, ...questionData } = validation.data;
@@ -231,14 +243,67 @@ async function handleAIGeneration(body: any) {
     };
 
    
- const prompt = `You are an expert test creator. Generate ${count} unique, high-quality questions based on these rules:
-    - Class: ${className}, Subject: ${subject}, Topic: ${topic || 'General'}, Difficulty: ${difficulty}, Type: ${questionType}
-    - For 'MCQ', YOU MUST provide an 'options' array with exactly 4 items, only one having 'isCorrect: true'.${includeAnswers ? ' Include an \'explanation\' field for the correct option explaining why it\'s the right answer.' : ''}
-    - For 'CQ', YOU MUST provide a 'subQuestions' array with 2 to 4 sub-questions.${includeAnswers ? ' Include a \'modelAnswer\' field for each sub-question with a detailed solution.' : ''}
-    - For 'SQ', YOU MUST provide a non-empty 'modelAnswer' string with a comprehensive solution.
-    - For any math either in question or or explanation model answer, provide a LaTeX string in 'questionLatex' using $math$. If no math, this MUST be an empty string.
-    - For any code, provide a string in 'questionLatex' in \` code \`. If no code, this MUST be an empty string.
-    - Respond ONLY with a valid JSON array matching the provided schema. Do not include any other text or explanations.`;
+ const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
+
+REQUIREMENTS:
+- Class: ${className}, Subject: ${subject}, Topic: ${topic || 'General'}, Difficulty: ${difficulty}, Type: ${questionType}
+- Each question must be engaging, clear, and appropriate for the specified difficulty level
+- Include mathematical expressions, formulas, and equations where relevant using LaTeX notation
+
+QUESTION TYPE SPECIFICATIONS:
+
+${questionType === 'MCQ' ? `
+MCQ QUESTIONS:
+- Provide exactly 4 options (A, B, C, D format)
+- Only ONE option should have 'isCorrect: true'
+- All other options should have 'isCorrect: false'
+- Make incorrect options plausible but clearly wrong
+${includeAnswers ? '- Include detailed \'explanation\' for the correct option explaining the reasoning and solution steps' : ''}
+- Use LaTeX for mathematical expressions: $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, etc.` : ''}
+
+${questionType === 'CQ' ? `
+CQ (COMPREHENSIVE) QUESTIONS:
+- Provide 2-4 sub-questions that build upon each other
+- Each sub-question should have appropriate marks (total should equal question marks)
+- Sub-questions should progress from basic to advanced
+${includeAnswers ? '- Include detailed \'modelAnswer\' for each sub-question with step-by-step solutions' : ''}
+- Use LaTeX for mathematical expressions and solutions` : ''}
+
+${questionType === 'SQ' ? `
+SQ (SHORT) QUESTIONS:
+- Focus on a single concept or calculation
+- Question should be clear and direct
+${includeAnswers ? '- Provide comprehensive \'modelAnswer\' with detailed solution steps and reasoning' : ''}
+- Use LaTeX for mathematical expressions and solutions` : ''}
+
+MATHEMATICAL CONTENT AND FORMATTING:
+- For any mathematical content, use proper LaTeX notation
+- Common examples: $x^2 + y^2 = z^2$, $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, $\\int_{a}^{b} f(x) dx$
+- If no mathematical content, set 'questionLatex' to empty string
+
+TABLES AND DATA:
+- When presenting data in tables, use LaTeX table syntax:
+  - Simple table: $\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$
+  - Matrix: $\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$
+  - Determinant: $\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$
+- For frequency tables, use: $\\begin{array}{|c|c|} \\hline \\text{Value} & \\text{Frequency} \\\\ \\hline x_1 & f_1 \\\\ \\hline x_2 & f_2 \\\\ \\hline \\end{array}$
+
+GEOMETRY AND DIAGRAMS:
+- For geometric shapes, use LaTeX geometry commands:
+  - Triangle: $\\triangle ABC$ with sides $a$, $b$, $c$
+  - Circle: $\\odot O$ with radius $r$ and center $O$
+  - Rectangle: $\\square ABCD$ with length $l$ and width $w$
+  - Angles: $\\angle ABC = \\theta$
+  - Parallel lines: $AB \\parallel CD$
+  - Perpendicular: $AB \\perp CD$
+- For coordinate geometry: Point $A(x_1, y_1)$, Line $y = mx + c$, Circle $(x-h)^2 + (y-k)^2 = r^2$
+
+RESPONSE FORMAT:
+- Respond ONLY with a valid JSON array matching the provided schema
+- Do not include any explanatory text outside the JSON
+- Ensure all required fields are present and properly formatted
+
+Generate questions that will challenge students appropriately for ${difficulty} level while maintaining clarity and educational value.`;
     const payload = {
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", responseSchema }

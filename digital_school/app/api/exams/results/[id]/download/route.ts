@@ -24,7 +24,19 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    console.log('🔍 Download API called:', { 
+      url: request.url,
+      method: request.method,
+      headers: Object.fromEntries(request.headers.entries())
+    });
+    
     const token = await getTokenFromRequest(request);
+    
+    console.log('🔍 Token result:', { 
+      hasToken: !!token,
+      userRole: token?.user?.role,
+      userId: token?.user?.id
+    });
     
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -158,19 +170,40 @@ async function generateResultsPDF(data: PDFData, PDFClass: any): Promise<Buffer>
     white: [255, 255, 255]
   };
   
-  // Helper function to draw header section with English text
+  // Helper function to sanitize text for PDF (remove Unicode characters)
+  function sanitizeText(text: string): string {
+    if (!text) return '';
+    // Remove or replace Unicode characters that cause issues
+    return text.replace(/[^\x00-\x7F]/g, (char) => {
+      // Replace Bengali/Unicode characters with ASCII equivalents or remove them
+      const replacements: { [key: string]: string } = {
+        'আ': 'A', 'ব': 'B', 'গ': 'G', 'ঘ': 'Gh', 'ঙ': 'Ng',
+        'চ': 'Ch', 'ছ': 'Chh', 'জ': 'J', 'ঝ': 'Jh', 'ঞ': 'Ny',
+        'ট': 'T', 'ঠ': 'Th', 'ড': 'D', 'ঢ': 'Dh', 'ণ': 'N',
+        'ত': 'T', 'থ': 'Th', 'দ': 'D', 'ধ': 'Dh', 'ন': 'N',
+        'প': 'P', 'ফ': 'Ph', 'ব': 'B', 'ভ': 'Bh', 'ম': 'M',
+        'য': 'Y', 'র': 'R', 'ল': 'L', 'শ': 'Sh', 'ষ': 'Sh',
+        'স': 'S', 'হ': 'H', 'ড়': 'R', 'ঢ়': 'Rh', 'য়': 'Y',
+        'ৎ': 'K', 'ং': 'Ng', 'ঃ': 'H', 'ঁ': 'N',
+        // Add more replacements as needed
+      };
+      return replacements[char] || '?';
+    });
+  }
+  
+  // Helper function to draw header section with sanitized text
   async function drawHeader() {
     // School name at top
     doc.setFontSize(16);
     doc.setFont('times', 'bold');
     doc.setTextColor(...colors.black);
-    doc.text(institute?.name || 'Educational Institute', pageWidth/2, 25, { align: 'center' });
+    doc.text(sanitizeText(institute?.name || 'Educational Institute'), pageWidth/2, 25, { align: 'center' });
     
     // Class and exam name
     doc.setFontSize(12);
     doc.setFont('times', 'normal');
-    doc.text(`Class: ${exam.class.name} ${exam.class.section}`, margin, 40);
-    doc.text(`Exam: ${exam.name}`, margin, 50);
+    doc.text(`Class: ${sanitizeText(exam.class.name)} ${sanitizeText(exam.class.section)}`, margin, 40);
+    doc.text(`Exam: ${sanitizeText(exam.name)}`, margin, 50);
     
     // QR Code in front right corner with better positioning
     const qrX = pageWidth - margin - 30;
@@ -227,12 +260,12 @@ async function generateResultsPDF(data: PDFData, PDFClass: any): Promise<Buffer>
       
       // Roll Number
       doc.rect(currentX, currentY, 40, 8, 'S');
-      doc.text(result.student.roll, currentX + 2, currentY + 5);
+      doc.text(sanitizeText(result.student.roll), currentX + 2, currentY + 5);
       currentX += 40;
       
       // Student Name
       doc.rect(currentX, currentY, 60, 8, 'S');
-      doc.text(result.student.user.name, currentX + 2, currentY + 5);
+      doc.text(sanitizeText(result.student.user.name), currentX + 2, currentY + 5);
       currentX += 60;
       
       // Total Marks
@@ -316,7 +349,7 @@ async function generateResultsPDF(data: PDFData, PDFClass: any): Promise<Buffer>
     doc.setFontSize(8);
     doc.setFont('times', 'normal');
     doc.setTextColor(...colors.black);
-    doc.text(institute?.name || 'Educational Institute', signatureX + signatureWidth/2, signatureY + 35, { align: 'center' });
+    doc.text(sanitizeText(institute?.name || 'Educational Institute'), signatureX + signatureWidth/2, signatureY + 35, { align: 'center' });
     
     // Generation date in English
     doc.setFontSize(8);

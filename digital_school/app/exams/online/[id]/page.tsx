@@ -5,41 +5,6 @@ import { useRouter } from "next/navigation";
 import ExamLayout from "./ExamLayout";
 import { ExamContextProvider } from "./ExamContext";
 
-const fetchExamData = async (id: string) => {
-  // Add cache-busting parameter
-  const timestamp = Date.now();
-  const res = await fetch(`/api/exams/online/${id}?t=${timestamp}`, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      'Pragma': 'no-cache',
-      'Expires': '0'
-    },
-    credentials: 'include'
-  });
-  
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error("Failed to fetch exam data");
-  }
-  
-  const data = await res.json();
-  
-  if (data.questions && Array.isArray(data.questions)) {
-    // Filter out questions without valid IDs
-    const validQuestions = data.questions.filter((q: any) => q && q.id && q.id.trim() !== '');
-    
-    // Return data with only valid questions
-    return {
-      ...data,
-      questions: validQuestions
-    };
-  }
-  
-  return data;
-};
-
 export default function OnlineExamPage({ params }: { params: Promise<{ id: string }> }) {
   const [exam, setExam] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
@@ -49,42 +14,70 @@ export default function OnlineExamPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     const loadExam = async () => {
       try {
-        const { id } = await params;
         setLoading(true);
         setError(null);
         
-        // Clear any cached data
-        if (typeof window !== 'undefined') {
-          // Clear localStorage for this exam
-          const examKey = `exam-answers-${id}`;
-          const navigationKey = `exam-navigation-${id}`;
-          localStorage.removeItem(examKey);
-          localStorage.removeItem(navigationKey);
+        const { id } = await params;
+        const res = await fetch(`/api/exams/online/${id}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include'
+        });
+        
+        if (!res.ok) {
+          throw new Error(`Failed to load exam: ${res.status}`);
         }
         
-        const examData = await fetchExamData(id);
+        const examData = await res.json();
         
-        // Check if student has already submitted and exam doesn't allow retake
+        // Check if student has already submitted
         if (examData.hasSubmitted && !examData.allowRetake) {
-          // Redirect to results page
           router.push(`/exams/results/${id}`);
           return;
         }
         
         setExam(examData);
       } catch (err: any) {
-        setError(err.message || "Unknown error");
+        setError(err.message || "Failed to load exam");
       } finally {
         setLoading(false);
       }
     };
     
     loadExam();
-  }, [params]);
+  }, [params, router]);
 
-  if (loading) return <div className="flex items-center justify-center h-screen">Loading exam...</div>;
-  if (error) return <div className="flex items-center justify-center h-screen text-red-600">{error}</div>;
-  if (!exam) return <div className="flex items-center justify-center h-screen">No exam found.</div>;
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+        <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mb-4"></div>
+        <div className="text-lg text-gray-700">Loading exam...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-red-50 to-pink-50">
+        <div className="text-2xl text-red-600 mb-4">⚠️ Error Loading Exam</div>
+        <div className="text-gray-700 mb-4 text-center max-w-md">{error}</div>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!exam) {
+    return (
+      <div className="flex items-center justify-center h-screen text-gray-600">
+        No exam found.
+      </div>
+    );
+  }
 
   return (
     <ExamContextProvider exam={exam}>

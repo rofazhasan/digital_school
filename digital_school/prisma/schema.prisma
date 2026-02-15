@@ -153,6 +153,15 @@ model Exam {
   isActive              Boolean                    @default(false)
   allowRetake           Boolean                    @default(false)
   instructions          String?
+  // Negative marking for MCQs (percentage)
+  mcqNegativeMarking    Float?                    @default(0)
+  // Question selection settings
+  cqTotalQuestions      Int?                      @default(8)
+  cqRequiredQuestions   Int?                      @default(5)
+  sqTotalQuestions      Int?                      @default(15)
+  sqRequiredQuestions   Int?                      @default(5)
+  // CQ Subsection settings for math exams
+  cqSubsections         Json?                     // Array of subsection objects with name, startIndex, endIndex
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
   createdById           String
@@ -581,6 +590,8 @@ model ExamSubmission {
   score          Float?
   evaluatorNotes String?
   evaluatedAt    DateTime?
+  // Track if student answered more questions than required (results in suspension and zero marks)
+  exceededQuestionLimit Boolean          @default(false)
   exam           Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSet        ExamSet?                @relation(fields: [examSetId], references: [id])
   student        StudentProfile          @relation(fields: [studentId], references: [id])

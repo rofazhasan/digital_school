@@ -9,6 +9,7 @@ import Head from 'next/head';
 
 // --- Component Imports (Assumed to be in these paths) ---
 import QuestionPaper from '../../../components/QuestionPaper'; // The layout-only part of the question paper
+import AnswerQuestionPaper from '../../../components/Answer_QuestionPaper'; // The answer sheet component
 import OMRSheet from '../../../components/OMRSheet'; // Your OMR component
 // import { Loader, PrintControls, SecurityFeatures } from './PrintPageComponents'; // Remove this line
 
@@ -35,6 +36,7 @@ export default function PrintExamPage() {
   // Print-specific State
   const [isPrinting, setIsPrinting] = useState(false);
   const [isMathJaxReady, setIsMathJaxReady] = useState(false);
+  const [showAnswers, setShowAnswers] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   // --- Data Fetching ---
@@ -66,6 +68,16 @@ export default function PrintExamPage() {
     fetchExamData();
   }, [examId]); // Dependency array is correct
 
+  // Apply page breaks when exam data changes
+  useEffect(() => {
+    if (examData && printRef.current) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        forcePageBreaks();
+      }, 100);
+    }
+  }, [examData]);
+
   // --- THE CORE PRINTING LOGIC ---
   // @ts-ignore: react-to-print typing issue, content is valid
   const handlePrint = useReactToPrint({
@@ -74,6 +86,10 @@ export default function PrintExamPage() {
     onBeforeGetContent: async () => {
       // This is the key! We wait until MathJax is ready.
       setIsPrinting(true);
+      
+      // Force page breaks for SQ sections if CSS fails
+      forcePageBreaks();
+      
       if (isMathJaxReady) {
         return; // Already ready, proceed to print
       }
@@ -93,6 +109,33 @@ export default function PrintExamPage() {
       (window as any).__IS_MATHJAX_READY = false; // Reset global flag
     },
   } as any);
+
+  // Function to force page breaks for SQ sections
+  const forcePageBreaks = () => {
+    if (!printRef.current) return;
+    
+    // Find all SQ section headers
+    const sqSections = printRef.current.querySelectorAll('.sq-section');
+    sqSections.forEach((section) => {
+      // Add inline styles to force page breaks
+      (section as HTMLElement).style.pageBreakBefore = 'always';
+      (section as HTMLElement).style.breakBefore = 'page';
+      (section as HTMLElement).style.marginTop = '0';
+      (section as HTMLElement).style.paddingTop = '0';
+      
+      // Create a page break element before the section
+      const pageBreak = document.createElement('div');
+      pageBreak.style.pageBreakBefore = 'always';
+      pageBreak.style.breakBefore = 'page';
+      pageBreak.style.height = '0';
+      pageBreak.style.margin = '0';
+      pageBreak.style.padding = '0';
+      pageBreak.style.clear = 'both';
+      
+      // Insert the page break before the section
+      section.parentNode?.insertBefore(pageBreak, section);
+    });
+  };
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
@@ -129,9 +172,9 @@ export default function PrintExamPage() {
 
   return (
     <MathJaxContext config={mathJaxConfig}>
-      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black font-bangla" style={{ fontFamily: 'Noto Serif Bengali, serif' }}>
+      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
         <Head>
-          <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+Bengali:wght@400;700&display=swap" rel="stylesheet" />
+          <link href="https://fonts.googleapis.com/css2?family=SolaimanLipi:wght@400;700&display=swap" rel="stylesheet" />
           <title>প্রিন্ট প্রশ্নপত্র ও OMR</title>
         </Head>
 
@@ -141,33 +184,66 @@ export default function PrintExamPage() {
           onPrint={handlePrint}
           isPrinting={isPrinting}
           isMathJaxReady={isMathJaxReady}
+          showAnswers={showAnswers}
+          setShowAnswers={setShowAnswers}
           t={t}
         />
 
         {/* MathJax Ready Indicator */}
-        <div className="flex justify-center mt-2">
+        <div className="flex justify-center mt-2 gap-4">
           {isMathJaxReady ? (
             <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">MathJax Ready</span>
           ) : (
             <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">Waiting for MathJax...</span>
           )}
+          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+            showAnswers 
+              ? 'bg-orange-100 text-orange-800' 
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
+          </span>
+          <button
+            onClick={forcePageBreaks}
+            className="bg-purple-600 text-white px-3 py-1 rounded-full text-sm font-semibold hover:bg-purple-700 transition"
+            title="Force page breaks for SQ sections"
+          >
+            Force Page Breaks
+          </button>
         </div>
 
         <div ref={printRef} className="relative z-10">
-          {/* Render each set as a single page, no internal pagination */}
-          {nonEmptySets.map((set: any) => (
-            <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
-              <QuestionPaper
-                examInfo={{ ...examInfo, set: set.setName }}
-                questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
-                qrData={set.qrData}
-              />
-            </div>
-          ))}
-          {/* Render OMR Sheets */}
-          {nonEmptySets.map((set: any) => (
-            <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
-          ))}
+          {/* Render Question Papers or Answer Sheets based on toggle */}
+          {!showAnswers ? (
+            // Question Papers
+            <>
+              {nonEmptySets.map((set: any) => (
+                <div key={set.setId} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
+                  <QuestionPaper
+                    examInfo={{ ...examInfo, set: set.setName }}
+                    questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
+                    qrData={set.qrData}
+                  />
+                </div>
+              ))}
+              
+              {/* Render OMR Sheets only for question papers */}
+              {nonEmptySets.map((set: any) => (
+                <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
+              ))}
+            </>
+          ) : (
+            // Answer Sheets (no OMR sheets)
+            nonEmptySets.map((set: any) => (
+              <div key={`answer-${set.setId}`} className="print-page-container legal-paper" style={{ pageBreakAfter: 'always' }}>
+                <AnswerQuestionPaper
+                  examInfo={{ ...examInfo, set: set.setName }}
+                  questions={{ mcq: set.mcq, cq: set.cq, sq: set.sq }}
+                  qrData={set.qrData}
+                />
+              </div>
+            ))
+          )}
         </div>
       </div>
     </MathJaxContext>
@@ -222,7 +298,7 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
         questions={set}
         qrData={set.qrData}
         rollDigits={6}
-        fontFamily={language === 'bn' ? 'Noto Serif Bengali, serif' : 'serif'}
+        fontFamily={language === 'bn' ? 'SolaimanLipi, serif' : 'Times New Roman, serif'}
         mcqOptionLabels={language === 'bn' ? ['ক','খ','গ','ঘ'] : ['A','B','C','D']}
         setName={set.setName}
         bubbleSize={16}
@@ -239,7 +315,7 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
 // You would move these into a separate file e.g. `app/print/exam/[id]/PrintPageComponents.tsx`
 // For demonstration, they are included here.
 
-const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxReady, t }: any) => (
+const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers, t }: any) => (
   <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2 print:hidden">
     <div className="flex gap-2">
       <button
@@ -247,6 +323,16 @@ const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxRe
         className="bg-gray-200 text-gray-800 px-3 py-2 rounded shadow hover:bg-gray-300 transition border border-gray-300"
       >
         {language === 'bn' ? 'English' : 'বাংলা'}
+      </button>
+      <button
+        onClick={() => setShowAnswers(!showAnswers)}
+        className={`px-4 py-2 rounded shadow-lg transition ${
+          showAnswers 
+            ? 'bg-green-600 text-white hover:bg-green-700' 
+            : 'bg-orange-600 text-white hover:bg-orange-700'
+        }`}
+      >
+        {showAnswers ? 'প্রশ্নপত্র দেখুন' : 'উত্তরপত্র দেখুন'}
       </button>
       <button
         onClick={onPrint}

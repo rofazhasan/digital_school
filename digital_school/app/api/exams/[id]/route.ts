@@ -73,6 +73,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       prisma.question.count({ where: whereClause }),
     ]);
 
+
+
     return NextResponse.json({
       exam,
       questions: {
@@ -101,7 +103,7 @@ export async function PUT(
     const { params } = context;
     const { id: examId } = await params;
     const body = await request.json();
-    const { name, questionIds } = body;
+    const { name, questionIds, questionsWithNegativeMarks } = body;
 
     if (!examId || !name || !questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
       return NextResponse.json({ error: 'Missing required fields: examId, name, and a non-empty array of questionIds' }, { status: 400 });
@@ -119,12 +121,15 @@ export async function PUT(
       return NextResponse.json({ error: `Marks mismatch. Exam requires ${exam.totalMarks}, but selected questions total ${totalMarksOfSelectedQuestions}.` }, { status: 400 });
     }
 
+    // Use questionsWithNegativeMarks if provided, otherwise use selectedQuestions
+    const questionsToSave = questionsWithNegativeMarks || selectedQuestions;
+
     const newExamSet = await prisma.examSet.create({
       data: {
         name,
         exam: { connect: { id: examId } },
         createdBy: { connect: { id: exam.createdById } },
-        questionsJson: selectedQuestions,
+        questionsJson: questionsToSave,
         questions: { connect: questionIds.map((id: string) => ({ id })) },
       } as any, // Cast to any to avoid Prisma type error if needed
     });
@@ -188,12 +193,24 @@ export async function POST(
       return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 }); // 409 Conflict
     }
 
+    // Calculate negative marks for MCQ questions
+    const generatedSetWithNegativeMarks = generatedSet.map(q => {
+      if (q.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+        const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
+        return {
+          ...q,
+          negativeMarks: parseFloat(negativeMarks.toFixed(2))
+        };
+      }
+      return q;
+    });
+
     const newExamSet = await prisma.examSet.create({
       data: {
         name,
         exam: { connect: { id: examId } },
         createdBy: { connect: { id: exam.createdById } },
-        questionsJson: generatedSet,
+        questionsJson: generatedSetWithNegativeMarks,
         questions: { connect: generatedSet.map(q => ({ id: q.id })) },
       } as any, // Cast to any to avoid Prisma type error if needed
     });
