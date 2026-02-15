@@ -86,25 +86,37 @@ export const useProctoring = ({
         return () => window.removeEventListener('blur', handleBlur);
     }, [isExamActive, triggerViolation, isUploading]);
 
+    // Helper to get fullscreen element with prefixes
+    const getFullscreenElement = () => {
+        const d = document as any;
+        return d.fullscreenElement || d.webkitFullscreenElement || d.mozFullScreenElement || d.msFullscreenElement;
+    }
+
     // Handle Fullscreen Change
     useEffect(() => {
         const handleFullscreenChange = () => {
-            const isFull = !!document.fullscreenElement;
+            const isFull = !!getFullscreenElement();
             setIsFullscreen(isFull);
 
             if (!isFull && isExamActive) {
                 // We don't necessarily trigger a warning here immediately to avoid double counting with blur,
                 // but the UI will block them until they re-enter.
-                // Optionally we can trigger a warning if they stay out too long, but blocking is usually enough.
             }
         };
 
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        const events = [
+            'fullscreenchange',
+            'webkitfullscreenchange',
+            'mozfullscreenchange',
+            'MSFullscreenChange'
+        ];
+
+        events.forEach(event => document.addEventListener(event, handleFullscreenChange));
 
         // Check initial state
-        setIsFullscreen(!!document.fullscreenElement);
+        setIsFullscreen(!!getFullscreenElement());
 
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+        return () => events.forEach(event => document.removeEventListener(event, handleFullscreenChange));
     }, [isExamActive]);
 
     // Enter Fullscreen Helper
