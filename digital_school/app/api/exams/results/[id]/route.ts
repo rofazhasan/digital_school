@@ -7,6 +7,8 @@ import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
 import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
 import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
 
+// export const dynamic = 'force-dynamic'; // Ensure no caching
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -162,29 +164,13 @@ export async function GET(
       }
     });
 
-    // Optimized: Parallelize independent queries
-    const studentTotal = result?.total || 0;
-
-    const [stats, rankCount] = await Promise.all([
-      db.result.aggregate({
-        where: { examId },
-        _count: { _all: true },
-        _avg: { total: true },
-        _max: { total: true },
-        _min: { total: true }
-      }),
-      result ? db.result.count({
-        where: {
-          examId,
-          total: { gt: studentTotal }
-        }
-      }) : Promise.resolve(-1)
-    ]);
-    const totalStudents = stats._count._all;
-    const averageScore = stats._avg.total || 0;
-    const highestScore = stats._max.total || 0;
-    const lowestScore = stats._min.total || 0;
-    const rank = result ? rankCount + 1 : 0;
+    // Statistics calculation moved to after result processing to ensure accuracy
+    // kept placeholder variables if needed or just initialize later
+    let totalStudents = 0;
+    let averageScore = 0;
+    let highestScore = 0;
+    let lowestScore = 0;
+    let rank = 0;
 
     // Parse questions from exam set
     let questions = [];
@@ -544,6 +530,40 @@ export async function GET(
       // Removed the old strict if (!result || result.total === 0) block as it's subsumed by the logic above
     }
 
+    // -------------------------------------------------------------------------
+    // CALCULATE STATISTICS (Moved here to include potential updates)
+    // -------------------------------------------------------------------------
+    // Use totalMarks (which is either from DB or recalculated)
+    const finalStudentTotal = totalMarks;
+
+    // We can't rely on 'result' object being up-to-date if we just updated the DB without refetching
+    // But since we updated the DB, the aggregate query WILL see the new values.
+
+    // Check if result actually exists (it might have been created/updated above)
+    // If we have totalMarks > 0, we assume valid result needs to be counted
+
+    const [stats, rankCount] = await Promise.all([
+      db.result.aggregate({
+        where: { examId },
+        _count: { _all: true },
+        _avg: { total: true },
+        _max: { total: true },
+        _min: { total: true }
+      }),
+      db.result.count({
+        where: {
+          examId,
+          total: { gt: finalStudentTotal }
+        }
+      })
+    ]);
+
+    totalStudents = stats._count._all;
+    averageScore = stats._avg.total || 0;
+    highestScore = stats._max.total || 0;
+    lowestScore = stats._min.total || 0;
+    rank = rankCount + 1;
+
     console.log(`📊 Results API - MCQ: ${mcqMarks}, CQ: ${cqMarks}, SQ: ${sqMarks}, Total: ${totalMarks}, Suspended: ${isSuspended}`);
 
     return NextResponse.json({
@@ -589,7 +609,7 @@ export async function GET(
         cqMarks: cqMarks,
         sqMarks: sqMarks,
         total: totalMarks,
-        rank: result.rank || null,
+        rank: rank,
         grade: grade,
         percentage: percentage,
         comment: result.comment,
