@@ -51,6 +51,10 @@ interface Question {
   leftColumn?: any;
   rightColumn?: any;
   matches?: any;
+  subQuestions?: any[];
+  sub_questions?: any[];
+  images?: string[];
+  modelAnswer?: string;
 }
 
 interface ExamSet {
@@ -110,12 +114,24 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
     <div className="flex justify-between items-start gap-4">
       <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
         <h4 className="font-semibold text-sm mb-1 leading-snug"><UniversalMathJax inline>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
+        {question.images && question.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-2">
+            {question.images.map((img, i) => (
+              <img key={i} src={img} alt="Question" className="max-h-32 rounded border shadow-sm" />
+            ))}
+          </div>
+        )}
 
         {(question.type === 'MCQ' || question.type === 'MC') && Array.isArray(question.options) && (
           <ul className="list-disc pl-5 mt-2 space-y-1">
             {question.options.map((opt: any, i: number) => (
               <li key={i} className={opt.isCorrect || String(opt.isCorrect) === 'true' ? 'font-bold text-green-600 dark:text-green-400' : ''}>
                 <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax>
+                {opt.image && (
+                  <div className="mt-1">
+                    <img src={opt.image} alt="Option" className="max-h-24 rounded border" />
+                  </div>
+                )}
                 {(opt.isCorrect || String(opt.isCorrect) === 'true') && opt.explanation && (
                   <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium italic mt-0.5">
                     {opt.explanation}
@@ -191,7 +207,41 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
         {question.type === 'INT' && (
           <div className="mt-2 flex items-center gap-2">
             <span className="text-[10px] font-black uppercase text-amber-600 tracking-wider">Correct Answer:</span>
-            <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300">{question.correctAnswer}</Badge>
+            <Badge className="bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300">{question.correctAnswer || question.modelAnswer}</Badge>
+          </div>
+        )}
+
+        {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') && (question.subQuestions || question.sub_questions) && (
+          <div className="mt-3 space-y-3">
+            <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Sub Questions:</span>
+            {(question.subQuestions || question.sub_questions || []).map((sq: any, i: number) => (
+              <div key={i} className="pl-4 border-l-2 border-indigo-100 dark:border-indigo-900 py-1">
+                <div className="text-xs font-medium">
+                  {String.fromCharCode(97 + i)}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax>
+                  <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                </div>
+                {sq.image && (
+                  <div className="mt-1">
+                    <img src={sq.image} alt="Sub-question" className="max-h-24 rounded border" />
+                  </div>
+                )}
+                {sq.modelAnswer && (
+                  <div className="mt-1 text-[10px] text-indigo-600 dark:text-indigo-400 italic">
+                    <span className="font-bold uppercase tracking-tighter">Model Answer: </span>
+                    <UniversalMathJax inline>{cleanupMath(sq.modelAnswer)}</UniversalMathJax>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {question.type === 'SQ' && (
+          <div className="mt-2 p-2 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg border border-indigo-100 dark:border-indigo-900">
+            <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider block mb-1">Model Answer:</span>
+            <div className="text-xs text-gray-700 dark:text-gray-300 italic">
+              <UniversalMathJax inline>{cleanupMath(question.modelAnswer || '')}</UniversalMathJax>
+            </div>
           </div>
         )}
       </div>
@@ -1003,11 +1053,16 @@ export default function ExamBuilderPage() {
                             </div>
                           )}
                           {q.type === 'CQ' && Array.isArray(q.subQuestions) && (
-                            <ol className="list-decimal pl-6 mt-1">
+                            <div className="space-y-2 mt-2 ml-6 border-l-2 border-indigo-100 dark:border-indigo-900 pl-4">
+                              <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Sub Questions:</span>
                               {q.subQuestions.map((sq: any, i: number) => (
-                                <li key={i}>{sq.question}</li>
+                                <div key={i} className="text-sm">
+                                  <span className="font-bold mr-1">{String.fromCharCode(97 + i)}.</span>
+                                  <UniversalMathJax inline>{cleanupMath(sq.question || sq.text || sq || '')}</UniversalMathJax>
+                                  {sq.marks && <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>}
+                                </div>
                               ))}
-                            </ol>
+                            </div>
                           )}
                           {q.type === 'SQ' && q.modelAnswer && (
                             <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> {q.modelAnswer}</div>

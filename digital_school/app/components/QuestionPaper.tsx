@@ -12,39 +12,46 @@ interface MCQ {
   q: string;
   options: { text: string }[];
   marks?: number;
+  type?: string;
 }
 interface MC {
   q: string;
   options: { text: string; isCorrect?: boolean }[];
   marks?: number;
+  type?: string;
 }
 interface INT {
   q: string;
   marks?: number;
   modelAnswer?: string;
+  type?: string;
 }
 interface CQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
   subQuestions?: any[];
+  type?: string;
 }
 interface AR {
   assertion: string;
   reason: string;
   correctOption?: number;
   marks?: number;
+  type?: string;
 }
 interface SQ {
   questionText: string;
   marks?: number;
   modelAnswer?: string;
+  type?: string;
 }
 interface MTF {
   leftColumn: { id: string; text: string }[];
   rightColumn: { id: string; text: string }[];
   matches: Record<string, string>;
   marks?: number;
+  type?: string;
 }
 interface QuestionPaperProps {
   examInfo: {
@@ -184,7 +191,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                 {allObjective.map((q: any, idx) => {
                   const qNum = toBengaliNumerals(idx + 1);
 
-                  if (q.type === 'MCQ' || q.type === 'MC') {
+                  if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
                     const totalOptionsLength = (q.options || []).reduce((acc: number, opt: any) => acc + (opt.text || '').length, 0);
                     let gridClass = "options-grid-4";
                     if (totalOptionsLength > 60) gridClass = "options-grid-1";
@@ -194,15 +201,15 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
                         <div className="flex items-start">
                           <span className="font-bold mr-2 text-base">
-                            {qNum}.{q.type === 'MC' ? '*' : ''}
+                            {qNum}.{q.type?.toUpperCase() === 'MC' ? '*' : ''}
                           </span>
                           <div className="flex-1 text-base">
                             <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
-                            {q.type === 'MC' && <div className="text-[10px] text-blue-700 font-bold mb-1">[সকল সঠিক উত্তর নির্বাচন করো]</div>}
+                            {q.type?.toUpperCase() === 'MC' && <div className="text-[10px] text-blue-700 font-bold mb-1">[সকল সঠিক উত্তর নির্বাচন করো]</div>}
                             <div className={`mt-1 question-options ${gridClass}`}>
                               {(q.options || []).map((opt: any, oidx: number) => (
                                 <div key={oidx} className="option-item flex items-start gap-1">
-                                  {q.type === 'MC' && <span className="text-xs">☐</span>}
+                                  {q.type?.toUpperCase() === 'MC' && <span className="text-xs">☐</span>}
                                   <Text>{`${MCQ_LABELS[oidx]}. ${opt.text}`}</Text>
                                 </div>
                               ))}
@@ -213,7 +220,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     );
                   }
 
-                  if (q.type === 'INT' || q.type === 'NUMERIC') {
+                  if (q.type?.toUpperCase() === 'INT' || q.type?.toUpperCase() === 'NUMERIC') {
                     return (
                       <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start">
@@ -231,7 +238,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     );
                   }
 
-                  if (q.type === 'AR') {
+                  if (q.type?.toUpperCase() === 'AR') {
                     return (
                       <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start mb-2">
@@ -254,7 +261,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     );
                   }
 
-                  if (q.type === 'MTF') {
+                  if (q.type?.toUpperCase() === 'MTF') {
                     return (
                       <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start mb-2">

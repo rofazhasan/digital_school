@@ -459,82 +459,84 @@ export default function SuperUserDashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 w-full border-b border-gray-200/50 dark:border-gray-800/50 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
         <div className="container mx-auto px-4">
-          <div className="flex h-16 items-center justify-between">
+          <div className="flex h-20 items-center justify-between">
             {/* Logo and Title */}
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
                 size="icon"
-                className="md:hidden h-10 w-10 border border-border hover:bg-muted"
+                className="md:hidden h-10 w-10 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-xl"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
               >
                 <Menu className="h-5 w-5" />
               </Button>
 
-              <div className="flex items-center space-x-2">
-                <img src={institute?.logoUrl || "/logo.png"} alt={institute?.name || "Digital School"} className="h-8 w-auto object-contain" />
-                <span className="font-semibold text-lg hidden sm:block">
-                  {institute?.name || "Digital School"}
-                </span>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/30 hidden md:flex">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
+                    {institute?.name || "Digital School"}
+                  </span>
+                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase tracking-wider">Super User Panel</span>
+                </div>
               </div>
-              <Badge className="bg-purple-500 text-white hidden sm:flex">
-                <Shield className="h-4 w-4 mr-1" />
-                SUPER USER
-              </Badge>
             </div>
 
             {/* Header Actions */}
-            <div className="flex items-center space-x-3 sm:space-x-6">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10"
-                onClick={toggleDarkMode}
-              >
-                {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-              </Button>
+            <div className="flex items-center gap-3 sm:gap-6">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50"
+                  onClick={toggleDarkMode}
+                >
+                  {darkMode ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-gray-500" />}
+                </Button>
 
-              <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10">
-                <Bell className="h-4 w-4" />
-              </Button>
+                <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50 relative">
+                  <Bell className="h-5 w-5 text-gray-500" />
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+                </Button>
+              </div>
 
-              <div className="w-px h-6 bg-border mx-2 sm:mx-4"></div>
+              <div className="w-px h-8 bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-10 px-3 rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                        <User className="h-4 w-4 text-primary" />
+                  <Button variant="ghost" className="relative h-11 px-2 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50 border border-transparent hover:border-gray-200 dark:hover:border-gray-800 transition-all">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-md ring-2 ring-white dark:ring-gray-950">
+                        <User className="h-4 w-4" />
                       </div>
                       <div className="hidden sm:block text-left">
-                        <p className="text-sm font-medium leading-none">{user.name}</p>
-                        <p className="text-xs text-muted-foreground">Super User</p>
+                        <p className="text-sm font-semibold leading-none">{user.name}</p>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">Super User</p>
                       </div>
-                      <ChevronDown className="h-4 w-4 hidden sm:block" />
+                      <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block ml-1" />
                     </div>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-56" align="end" forceMount>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{user.name}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{user.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90" align="end" forceMount>
+                  <div className="px-3 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-xl mb-2">
+                    <p className="text-sm font-semibold leading-none">{user.name}</p>
+                    <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
+                  </div>
+                  <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                  <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('profile')}>
+                  <DropdownMenuItem onClick={() => setActiveTab('profile')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
+                  <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/10 rounded-lg cursor-pointer py-2.5">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Log out</span>
                   </DropdownMenuItem>
@@ -545,70 +547,88 @@ export default function SuperUserDashboardPage() {
         </div>
       </header>
 
+      {/* Mobile Sidebar Overlay */}
       <div className="flex">
-        {/* Mobile Sidebar Overlay */}
-        <div
-          className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm md:hidden transition-opacity duration-300 ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden={!sidebarOpen}
-        />
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300"
+            onClick={() => setSidebarOpen(false)}
+            aria-hidden={!sidebarOpen}
+          />
+        )}
 
         {/* Sidebar */}
         <aside className={`
-          fixed md:relative z-50 w-64 border-r min-h-screen transition-all duration-300 ease-in-out transform
-          ${sidebarOpen ? 'translate-x-0 scale-100 opacity-100' : '-translate-x-full scale-95 opacity-0'}
-          md:translate-x-0 md:scale-100 md:opacity-100 md:block
-          shadow-2xl md:shadow-none border-r border-border bg-gradient-to-b from-muted/80 via-background/90 to-muted/60
+          fixed md:relative z-50 w-72 h-screen border-r border-gray-200/50 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl shadow-2xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
+          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+          md:translate-x-0
         `}>
-          <div className="flex items-center justify-between p-4 border-b md:hidden">
-            <span className="font-semibold">Menu</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(false)}
-              className="transition-colors hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900 dark:hover:text-red-300"
-              aria-label="Close sidebar"
-            >
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-          <nav className="p-4 space-y-2">
-            {[
-              { id: 'overview', label: 'Dashboard Overview', icon: Home },
-              { id: 'users', label: 'Manage Users', icon: Users, href: '/admin/users' },
-              { id: 'exams', label: 'Exam Management', icon: FileText, href: '/exams' },
-              { id: 'question-bank', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
-              { id: 'approvals', label: 'Pending Approvals', icon: CheckSquare },
-              { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap },
-              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-              { id: 'logs', label: 'System Logs', icon: History },
-              { id: 'settings', label: 'Institute Settings', icon: Settings },
-              { id: 'billing', label: 'Billing', icon: CreditCard }
-            ].map((item, idx) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.href) {
-                    router.push(item.href);
-                  } else {
-                    setActiveTab(item.id);
-                    setSidebarOpen(false);
-                  }
-                }}
-                className={`w-full flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
-                  ${activeTab === item.id
-                    ? 'bg-primary text-primary-foreground shadow-md scale-105'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'}
-                  ${sidebarOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-4'}
-                  md:opacity-100 md:translate-x-0
-                  delay-[${idx * 40}ms]`}
-                style={{ transitionProperty: 'opacity, transform, box-shadow, background, color' }}
+          <div className="flex flex-col h-full">
+            {/* Sidebar Header */}
+            <div className="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-3 overflow-hidden">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/30 flex-shrink-0">
+                  SU
+                </div>
+                <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 whitespace-nowrap">
+                  Super User
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+                className="md:hidden text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
               >
-                <item.icon className="h-4 w-4" />
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <nav className="flex-1 overflow-y-auto py-6 space-y-1.5 px-3 custom-scrollbar">
+              {[
+                { id: 'overview', label: 'Dashboard Overview', icon: Home },
+                { id: 'users', label: 'Manage Users', icon: Users, href: '/admin/users' },
+                { id: 'exams', label: 'Exam Management', icon: FileText, href: '/exams' },
+                { id: 'question-bank', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
+                { id: 'approvals', label: 'Pending Approvals', icon: CheckSquare },
+                { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap },
+                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+                { id: 'logs', label: 'System Logs', icon: History },
+                { id: 'settings', label: 'Institute Settings', icon: Settings },
+                { id: 'billing', label: 'Billing', icon: CreditCard }
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    if (item.href) {
+                      router.push(item.href);
+                    } else {
+                      setActiveTab(item.id);
+                      setSidebarOpen(false);
+                    }
+                  }}
+                  className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden text-left ${activeTab === item.id
+                    ? 'bg-purple-50/80 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 shadow-sm'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                >
+                  {activeTab === item.id && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-purple-600 rounded-r-full" />
+                  )}
+                  <div className={`
+                    p-2 rounded-lg transition-all duration-300 flex-shrink-0
+                    ${activeTab === item.id ? 'bg-white dark:bg-gray-800 shadow-sm text-purple-600 dark:text-purple-400' : 'bg-gray-100/50 dark:bg-gray-800/50 text-gray-500 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-gray-700'}
+                `}>
+                    <item.icon className="w-5 h-5" />
+                  </div>
+
+                  <span className="ml-3 font-medium text-sm flex-1 truncate">
+                    {item.label}
+                  </span>
+                </button>
+              ))}
+            </nav>
+          </div>
         </aside>
 
         {/* Main Content */}
@@ -1023,7 +1043,7 @@ export default function SuperUserDashboardPage() {
             </AnimatePresence>
           </div>
         </main>
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }

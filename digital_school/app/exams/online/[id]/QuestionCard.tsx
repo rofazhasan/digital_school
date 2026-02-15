@@ -29,7 +29,7 @@ const mathJaxConfig = {
   },
 };
 
-// Clean MCQ Option Component
+// Premium MCQ Option Component
 const MCQOption = memo(({
   option,
   index,
@@ -53,20 +53,21 @@ const MCQOption = memo(({
 }) => {
   const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
 
-  // State styles
+  // Premium State styles
   const getStyles = () => {
-    const base = "w-full text-left p-4 rounded-xl border-2 flex items-start gap-4 transition-all duration-200 group relative overflow-hidden";
+    const base = "w-full text-left p-4 md:p-5 rounded-2xl border flex items-start gap-4 md:gap-5 transition-all duration-300 group relative overflow-hidden backdrop-blur-sm";
 
     // Result mode
     if (showResult) {
-      if (isCorrect) return `${base} bg-green-50/80 border-green-500 text-green-900 shadow-sm`;
-      if (isSelected && !isCorrect) return `${base} bg-red-50/80 border-red-500 text-red-900 shadow-sm`;
-      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-70 grayscale`;
+      if (isCorrect) return `${base} bg-emerald-50/90 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10`;
+      if (isSelected && !isCorrect) return `${base} bg-rose-50/90 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10`;
+      return `${base} bg-gray-50/50 border-gray-100/50 text-gray-400 opacity-60 grayscale`;
     }
 
     // Interaction mode
-    if (isSelected) return `${base} bg-indigo-50/90 border-indigo-600 shadow-md ring-1 ring-indigo-600 scale-[1.01] z-10`;
-    return `${base} bg-white border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/30 hover:shadow-md hover:-translate-y-0.5`;
+    if (isSelected) return `${base} bg-blue-50/90 border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500 transform scale-[1.01] z-10`;
+
+    return `${base} bg-white/60 dark:bg-gray-900/60 border-gray-200/50 dark:border-gray-800/50 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5`;
   };
 
   return (
@@ -77,17 +78,17 @@ const MCQOption = memo(({
     >
       {/* Option Key Circle */}
       <div className={`
-        flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 shadow-sm
-        ${showResult && isCorrect ? 'bg-green-600 text-white shadow-green-200' :
-          showResult && isSelected && !isCorrect ? 'bg-red-600 text-white shadow-red-200' :
-            isSelected ? 'bg-indigo-600 text-white shadow-indigo-200 scale-110' :
-              'bg-gray-100 text-gray-500 group-hover:bg-white group-hover:text-indigo-600 group-hover:shadow-md group-hover:scale-110'}
+        flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-sm md:text-base font-bold transition-all duration-300 shadow-sm
+        ${showResult && isCorrect ? 'bg-emerald-500 text-white shadow-emerald-200' :
+          showResult && isSelected && !isCorrect ? 'bg-rose-500 text-white shadow-rose-200' :
+            isSelected ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-200 scale-110' :
+              'bg-gray-100/80 text-gray-500 group-hover:bg-white group-hover:text-blue-600 group-hover:shadow-md group-hover:scale-110'}
       `}>
         {String.fromCharCode(65 + index)}
       </div>
 
       {/* Option Text */}
-      <div className="flex-1 pt-1 text-sm md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
+      <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
         <div className="min-w-0">
           <MathJax inline dynamic>
             <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
@@ -95,18 +96,18 @@ const MCQOption = memo(({
         </div>
         {/* @ts-ignore */}
         {option?.image && (
-          <div className="mt-3">
+          <div className="mt-4">
             {/* @ts-ignore */}
-            <img src={option.image} alt="Option" className="max-h-40 rounded-lg border bg-white object-contain shadow-sm" />
+            <img src={option.image} alt="Option" className="max-h-48 rounded-lg border border-gray-100 bg-white p-1 object-contain shadow-sm group-hover:shadow-md transition-shadow" />
           </div>
         )}
       </div>
 
       {/* Result Icons */}
       {showResult && (
-        <div className="absolute right-3 top-4">
-          {isCorrect && <Check className="w-5 h-5 text-green-600" />}
-          {isSelected && !isCorrect && <X className="w-5 h-5 text-red-500" />}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-white rounded-full p-1 shadow-sm" />}
+          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-white rounded-full p-1 shadow-sm" />}
         </div>
       )}
     </button>
@@ -115,7 +116,7 @@ const MCQOption = memo(({
 
 MCQOption.displayName = 'MCQOption';
 
-// Multiple Correct Option Component
+// Premium Multiple Correct Option Component
 const MCOption = memo(({
   option,
   index,
@@ -138,14 +139,17 @@ const MCOption = memo(({
   const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
 
   const getStyles = () => {
-    const base = "w-full text-left p-4 rounded-xl border-2 flex items-start gap-4 transition-all duration-200 group relative overflow-hidden";
+    const base = "w-full text-left p-4 md:p-5 rounded-2xl border flex items-start gap-4 md:gap-5 transition-all duration-300 group relative overflow-hidden backdrop-blur-sm";
+
     if (showResult) {
-      if (isCorrect) return `${base} bg-green-50/80 border-green-500 text-green-900 shadow-sm`;
-      if (isSelected && !isCorrect) return `${base} bg-red-50/80 border-red-500 text-red-900 shadow-sm`;
-      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-70 grayscale`;
+      if (isCorrect) return `${base} bg-emerald-50/90 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10`;
+      if (isSelected && !isCorrect) return `${base} bg-rose-50/90 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10`;
+      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-60 grayscale`;
     }
-    if (isSelected) return `${base} bg-indigo-50/90 border-indigo-600 shadow-md ring-1 ring-indigo-600 scale-[1.01] z-10`;
-    return `${base} bg-white border-gray-100 hover:border-indigo-300 hover:bg-indigo-50/30 hover:shadow-md hover:-translate-y-0.5`;
+
+    if (isSelected) return `${base} bg-blue-50/90 border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500 transform scale-[1.01] z-10`;
+
+    return `${base} bg-white/60 dark:bg-gray-900/60 border-gray-200/50 dark:border-gray-800/50 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5`;
   };
 
   return (
@@ -155,23 +159,24 @@ const MCOption = memo(({
       className={getStyles()}
     >
       <div className={`
-        flex-shrink-0 w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200
-        ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-white border-gray-300'}
-        ${showResult && isCorrect ? 'bg-green-600 border-green-600 shadow-green-100' : ''}
-        ${showResult && isSelected && !isCorrect ? 'bg-red-600 border-red-600 shadow-red-100' : ''}
+        flex-shrink-0 w-6 h-6 md:w-7 md:h-7 rounded-lg border-2 flex items-center justify-center transition-all duration-300
+        ${isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-sm scale-110' : 'bg-white border-gray-300 text-transparent group-hover:border-blue-400'}
+        ${showResult && isCorrect ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-100' : ''}
+        ${showResult && isSelected && !isCorrect ? 'bg-rose-600 border-rose-600 text-white shadow-rose-100' : ''}
       `}>
-        {isSelected && <Check className="w-4 h-4" />}
+        <Check className={`w-4 h-4 md:w-5 md:h-5 ${isSelected || (showResult && isCorrect) ? 'scale-100' : 'scale-0'} transition-transform duration-200`} />
       </div>
-      <div className="flex-1 pt-0.5 text-base md:text-lg leading-relaxed font-medium text-gray-800 dark:text-gray-100">
+      <div className="flex-1 pt-0.5 text-base md:text-lg leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
         <MathJax inline dynamic>
           <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
         </MathJax>
       </div>
+
       {/* Result Icons */}
       {showResult && (
-        <div className="absolute right-3 top-4">
-          {isCorrect && <Check className="w-5 h-5 text-green-600" />}
-          {isSelected && !isCorrect && <X className="w-5 h-5 text-red-500" />}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2">
+          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-white rounded-full p-1 shadow-sm" />}
+          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-white rounded-full p-1 shadow-sm" />}
         </div>
       )}
     </button>

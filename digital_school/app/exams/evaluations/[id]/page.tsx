@@ -108,6 +108,7 @@ interface Question {
   options?: any[];
   explanation?: string;
   subQuestions?: any[];
+  sub_questions?: any[];
   modelAnswer?: string;
   assertion?: string;
   reason?: string;
@@ -2206,8 +2207,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               <div>
                                 <div className="flex items-center justify-between mb-2">
                                   <Badge className={
-                                    currentQuestion.type === 'mcq' ? 'bg-blue-100 text-blue-800' :
-                                      currentQuestion.type === 'cq' ? 'bg-green-100 text-green-800' :
+                                    currentQuestion.type?.toLowerCase() === 'mcq' ? 'bg-blue-100 text-blue-800' :
+                                      currentQuestion.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
                                         'bg-yellow-100 text-yellow-800'
                                   }>
                                     {currentQuestion.type.toUpperCase()}
@@ -2271,13 +2272,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           </div>
 
                                           {/* Type Specific Rendering */}
-                                          {currentQuestion.type === 'mcq' && (
+                                          {currentQuestion.type?.toLowerCase() === 'mcq' && (
                                             <div className="text-base md:text-lg p-2 bg-white rounded border border-gray-100 italic">
                                               <UniversalMathJax inline dynamic>{cleanupMath(String(currentAnswer))}</UniversalMathJax>
                                             </div>
                                           )}
 
-                                          {currentQuestion.type === 'mc' && (
+                                          {currentQuestion.type?.toLowerCase() === 'mc' && (
                                             <div className="grid grid-cols-1 gap-2">
                                               {(currentQuestion.options || []).map((opt: any, idx: number) => {
                                                 const isSelected = currentAnswer?.selectedOptions?.includes(idx);
@@ -2297,7 +2298,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             </div>
                                           )}
 
-                                          {currentQuestion.type === 'ar' && (
+                                          {currentQuestion.type?.toLowerCase() === 'ar' && (
                                             <div className="p-3 bg-white rounded border border-gray-100">
                                               <div className="text-sm font-semibold text-indigo-600 mb-1">Selected Option {currentAnswer.selectedOption}:</div>
                                               <div className="text-sm text-gray-700 italic">
@@ -2315,7 +2316,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             </div>
                                           )}
 
-                                          {currentQuestion.type === 'mtf' && (
+                                          {currentQuestion.type?.toLowerCase() === 'mtf' && (
                                             <div className="space-y-2">
                                               <div className="text-sm font-semibold text-gray-600 mb-2">Student Matches:</div>
                                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -2346,7 +2347,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             </div>
                                           )}
 
-                                          {(currentQuestion.type === 'int' || currentQuestion.type === 'numeric') && (
+                                          {(currentQuestion.type?.toLowerCase() === 'int' || currentQuestion.type?.toLowerCase() === 'numeric') && (
                                             <div className="text-lg font-bold p-3 bg-white rounded border border-gray-100 flex items-center gap-2">
                                               <span>Answer:</span>
                                               <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded">{currentAnswer.answer}</span>
@@ -2414,10 +2415,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       })()}
 
                                       {/* CQ Sub-question Answers */}
-                                      {currentQuestion.type === 'cq' && currentQuestion.subQuestions && (
+                                      {(currentQuestion.type?.toLowerCase() === 'cq' || currentQuestion.type?.toLowerCase() === 'sq') && (currentQuestion.subQuestions || currentQuestion.sub_questions) && (
                                         <div className="space-y-4 border-t pt-4 mt-2">
                                           <h5 className="font-medium text-gray-700">Sub-question Answers:</h5>
-                                          {currentQuestion.subQuestions.map((subQ: any, idx: number) => {
+                                          {(currentQuestion.subQuestions || currentQuestion.sub_questions || []).map((subQ: any, idx: number) => {
                                             const subKey = `${currentQuestion.id}_sub_${idx}`;
                                             const subText = currentStudent?.answers?.[subKey];
                                             const subImg = currentStudent?.answers?.[`${subKey}_image`];
@@ -2431,6 +2432,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             return (
                                               <div key={idx} className="pl-4 border-l-2 border-indigo-100">
                                                 <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
+                                                {subQ.text || subQ.question || subQ.questionText ? (
+                                                  <div className="text-gray-800 font-medium leading-relaxed">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ.questionText)}</UniversalMathJax>
+                                                  </div>
+                                                ) : null}
                                                 <div className="mb-2 text-gray-800 text-sm md:text-base"><UniversalMathJax dynamic>{cleanupMath(subText)}</UniversalMathJax></div>
                                                 {(() => {
                                                   const singleImg = currentStudent?.answers?.[`${subKey}_image`];
@@ -2486,7 +2492,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               {/* Explanation & Correct Answer */}
                               <div className="mt-4 pt-4 border-t border-gray-200">
                                 {/* MCQ Options Display */}
-                                {currentQuestion.type === 'mcq' && currentQuestion.options && (
+                                {currentQuestion.type?.toLowerCase() === 'mcq' && currentQuestion.options && (
                                   <div className="mb-4">
                                     <h5 className="font-semibold text-gray-700 mb-2">Options:</h5>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">

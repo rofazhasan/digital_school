@@ -1,31 +1,39 @@
-import type { Metadata } from "next";
-import { Inter, JetBrains_Mono, Tiro_Bangla, Outfit, Hind_Siliguri, Baloo_Da_2 } from "next/font/google"; // Added Baloo_Da_2
+import type { Metadata, Viewport } from "next";
+import { Inter, Outfit, Hind_Siliguri, Baloo_Da_2, Tiro_Bangla, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { NavigationWrapper } from "@/components/ui/navigation-wrapper";
-import Script from "next/script";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
 import SessionGuard from "@/components/SessionGuard";
+import { AppFooter } from "@/components/AppFooter";
+import db from "@/lib/db";
 
+// --- Fonts ---
 const inter = Inter({
   subsets: ["latin"],
   variable: '--font-inter',
   display: 'swap',
+  adjustFontFallback: false,
 });
-// Removed EB Garamond as per user request for better readability. Using Inter (standard sans-serif) instead.
+
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: '--font-outfit',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
 
 const tiroBangla = Tiro_Bangla({
   weight: '400',
   subsets: ['bengali'],
   variable: '--font-tiro-bangla',
-  display: 'swap',
-});
-
-const outfit = Outfit({
-  subsets: ['latin'],
-  variable: '--font-outfit',
   display: 'swap',
 });
 
@@ -42,10 +50,7 @@ const balooDa2 = Baloo_Da_2({
   display: 'swap',
 });
 
-
-import { AppFooter } from "@/components/AppFooter";
-import db from "@/lib/db";
-
+// --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
   let title = "Digital School";
   try {
@@ -54,20 +59,31 @@ export async function generateMetadata(): Promise<Metadata> {
     });
     title = settings?.instituteName || settings?.institute?.name || "Digital School";
   } catch (error) {
-    console.warn("Failed to fetch settings for metadata (likely build time):", error);
+    console.warn("Failed to fetch settings for metadata:", error);
   }
 
   return {
-    title: title,
-    description: "A comprehensive digital school management system",
+    title: {
+      template: `%s | ${title}`,
+      default: title,
+    },
+    description: "A world-class digital learning platform.",
+    icons: {
+      icon: "/favicon.ico",
+      apple: "/apple-touch-icon.png",
+    },
   };
 }
 
-export const viewport = {
+export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5, // Allow zooming for accessibility
+  userScalable: true,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({
@@ -76,19 +92,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="overflow-x-hidden">
-      <head>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" />
-      </head>
-      <body className={`${inter.className} ${inter.variable} ${tiroBangla.variable} ${outfit.variable} ${hindSiliguri.variable} ${balooDa2.variable} overflow-x-hidden flex flex-col min-h-screen`}>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} ${tiroBangla.variable} ${hindSiliguri.variable} ${balooDa2.variable} font-sans antialiased overflow-x-hidden min-h-screen flex flex-col bg-background text-foreground`}>
         <ErrorBoundary>
           <SessionProviderWrapper>
             <NavigationWrapper>
               <MaintenanceGuard>
                 <SessionGuard />
-                <main className="flex-grow">
+                <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">
                   {children}
-                </main>
+                </div>
                 <AppFooter />
                 <Toaster />
               </MaintenanceGuard>

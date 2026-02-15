@@ -126,6 +126,7 @@ interface Question {
   modelAnswer?: string;
   explanation?: string;
   subQuestions?: any[];
+  sub_questions?: any[];
   feedback?: string;
   images?: string[];
 }
@@ -227,7 +228,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     if (!result) return null;
 
     const questions = {
-      mcq: result.questions.filter(q => q.type === 'MCQ').map(q => ({
+      mcq: result.questions.filter(q => q.type?.toUpperCase() === 'MCQ').map(q => ({
         id: q.id,
         q: q.questionText,
         options: q.options || [],
@@ -259,13 +260,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         marks: q.marks,
         answer: (q as any).answer || (q as any).correct || 0
       })),
-      cq: result.questions.filter(q => q.type === 'CQ').map(q => ({
+      cq: result.questions.filter(q => q.type?.toUpperCase() === 'CQ').map(q => ({
         id: q.id,
         questionText: q.questionText,
         marks: q.marks,
         subQuestions: q.subQuestions || []
       })),
-      sq: result.questions.filter(q => q.type === 'SQ').map(q => ({
+      sq: result.questions.filter(q => q.type?.toUpperCase() === 'SQ').map(q => ({
         id: q.id,
         questionText: q.questionText,
         marks: q.marks,
@@ -278,7 +279,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       if (q.studentAnswer) {
         answers[q.id] = q.studentAnswer;
       }
-      if (q.type === 'CQ' || q.type === 'SQ') {
+      if (q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'SQ') {
         answers[`${q.id}_marks`] = q.awardedMarks;
       }
     });
@@ -485,7 +486,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     if (!result?.questions) return false;
 
     return result.questions.some((question: Question) => {
-      if (question.type === 'CQ' || question.type === 'SQ') {
+      if (question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') {
         // Check if the question has been evaluated (has awarded marks)
         // Only consider unevaluated if student provided an answer but got 0 marks
         const hasStudentAnswer = question.studentAnswer &&
@@ -502,7 +503,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     if (!result?.questions) return false;
 
     return result.questions.some((question: Question) => {
-      if (question.type === 'CQ' || question.type === 'SQ') {
+      if (question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') {
         // Check if student didn't answer the question
         const hasStudentAnswer = question.studentAnswer &&
           (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) &&
@@ -646,13 +647,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   });
 
   // Calculate marks breakdown
-  const mcqQuestions = result?.questions?.filter((q: Question) => q.type === 'MCQ') || [];
+  const mcqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MCQ') || [];
   const mcQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mc') || [];
   const arQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'ar') || [];
   const mtfQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
   const intQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
-  const cqQuestions = result?.questions?.filter((q: Question) => q.type === 'CQ') || [];
-  const sqQuestions = result?.questions?.filter((q: Question) => q.type === 'SQ') || [];
+  const cqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ') || [];
+  const sqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
 
   const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions];
   const totalObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
@@ -1486,7 +1487,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: 0.1 * index }}
-                                  className={`border rounded-lg p-6 ${isCorrect ? 'bg-green-50/30 border-green-200' : hasAnswer ? 'bg-red-50/30 border-red-200' : 'bg-gray-50 border-gray-200'}`}
+                                  className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 ${isCorrect ? 'bg-green-50/20 border-green-100' : hasAnswer ? 'bg-red-50/20 border-red-100' : 'bg-gray-50 border-gray-200'}`}
                                 >
                                   {/* Question Header */}
                                   <div className="flex items-center justify-between mb-4">
@@ -1497,8 +1498,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <span className="text-sm text-gray-600 font-bold">Question {index + 1}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                      <Badge variant={isCorrect ? 'default' : 'destructive'}>
-                                        {Number(question.awardedMarks).toFixed(1).replace(/\.0$/, '')}/{question.marks}
+                                      <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
+                                        {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
                                       </Badge>
                                     </div>
                                   </div>
@@ -1581,29 +1582,38 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           let containerStyle = "";
                                           let icon = null;
+                                          let labelStyle = "";
 
                                           if (isSelected && isCorrectOpt) {
-                                            containerStyle = "border-green-500 bg-green-50 text-green-700 font-bold shadow-sm ring-1 ring-green-200";
-                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />;
+                                            // 1. Correct and Selected -> GREEN
+                                            containerStyle = "border-green-500 bg-green-50 text-green-900 shadow-md ring-1 ring-green-200 transform scale-[1.01]";
+                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-100" />;
+                                            labelStyle = "bg-green-200 text-green-800";
                                           } else if (isSelected && !isCorrectOpt) {
-                                            containerStyle = "border-red-500 bg-red-50 text-red-700 font-bold shadow-sm ring-1 ring-red-200";
-                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0" />;
+                                            // 2. Wrong and Selected -> RED
+                                            containerStyle = "border-red-500 bg-red-50 text-red-900 shadow-md ring-1 ring-red-200";
+                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-100" />;
+                                            labelStyle = "bg-red-200 text-red-800";
                                           } else if (!isSelected && isCorrectOpt) {
-                                            containerStyle = "border-green-300 bg-green-50/50 text-green-800 border-dashed opacity-90";
-                                            icon = <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0 opacity-60" />;
+                                            // 3. Correct but NOT Selected -> BLUE/TEAL (Distinct)
+                                            containerStyle = "border-teal-400 bg-teal-50 text-teal-900 border-dashed ring-1 ring-teal-100";
+                                            icon = <CheckCircle className="h-5 w-5 text-teal-600 flex-shrink-0" />;
+                                            labelStyle = "bg-teal-200 text-teal-800";
                                           } else {
-                                            containerStyle = "border-gray-100 bg-white text-gray-500 opacity-60";
+                                            // 4. Wrong and NOT Selected -> GRAY (Faded)
+                                            containerStyle = "border-gray-100 bg-white text-gray-400 opacity-60 hover:opacity-100 transition-opacity";
+                                            labelStyle = "bg-gray-100 text-gray-500";
                                           }
 
                                           return (
                                             <div
                                               key={optIndex}
-                                              className={`p-3 rounded-lg border-2 transition-all flex items-center gap-3 ${containerStyle}`}
+                                              className={`p-3 rounded-2xl border-2 transition-all flex items-center gap-3 ${containerStyle}`}
                                             >
-                                              <span className={`font-bold ${isSelected || isCorrectOpt ? 'text-gray-800' : 'text-gray-400'}`}>
-                                                {String.fromCharCode(0x0995 + optIndex)}.
+                                              <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${labelStyle}`}>
+                                                {String.fromCharCode(0x0995 + optIndex)}
                                               </span>
-                                              <span className="flex-1 font-medium">
+                                              <span className="flex-1 font-medium text-base leading-relaxed break-words">
                                                 <UniversalMathJax inline dynamic>
                                                   {type === 'AR' ? [
                                                     "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
@@ -1767,7 +1777,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                     {/* CQ Section */}
                     {result.questions.filter(q => {
-                      if (q.type !== 'CQ') return false;
+                      if (q.type?.toUpperCase() !== 'CQ') return false;
                       // Filter Logic
                       const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
                       const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
@@ -1786,13 +1796,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <h3 className="text-2xl font-bold text-gray-800">Creative Questions (CQ)</h3>
                             <Badge className="bg-green-100 text-green-800">
-                              {result.questions.filter(q => q.type === 'CQ').length} Questions
+                              {result.questions.filter(q => q.type?.toUpperCase() === 'CQ').length} Questions
                             </Badge>
                           </div>
                           <div className="space-y-6">
                             {result.questions
                               .filter(q => {
-                                if (q.type !== 'CQ') return false;
+                                if (q.type?.toUpperCase() !== 'CQ') return false;
                                 // Filter Logic
                                 const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
                                 const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
@@ -2019,7 +2029,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                     {/* SQ Section */}
                     {result.questions.filter(q => {
-                      if (q.type !== 'SQ') return false;
+                      if (q.type?.toUpperCase() !== 'SQ') return false;
                       // Filter Logic
                       const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
                       const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
@@ -2038,13 +2048,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <h3 className="text-2xl font-bold text-gray-800">Short Questions (SQ)</h3>
                             <Badge className="bg-yellow-100 text-yellow-800">
-                              {result.questions.filter(q => q.type === 'SQ').length} Questions
+                              {result.questions.filter(q => q.type?.toUpperCase() === 'SQ').length} Questions
                             </Badge>
                           </div>
                           <div className="space-y-6">
                             {result.questions
                               .filter(q => {
-                                if (q.type !== 'SQ') return false;
+                                if (q.type?.toUpperCase() !== 'SQ') return false;
                                 // Filter Logic
                                 const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
                                 const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
@@ -2088,10 +2098,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   </div>
 
-                                  {question.type === 'CQ' && question.subQuestions ? (
+                                  {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') && (question.subQuestions || question.sub_questions) ? (
                                     <div className="space-y-8 mt-6">
                                       <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
-                                      {question.subQuestions.map((subQ: any, idx: number) => (
+                                      {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
                                         <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
                                           {/* Sub-question Header */}
                                           <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">

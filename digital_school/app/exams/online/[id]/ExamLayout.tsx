@@ -7,13 +7,12 @@ import Timer from "./Timer";
 import Navigator from "./Navigator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, Save, CheckCircle, AlertCircle, Menu, X, Clock, HelpCircle, ShieldAlert, Maximize2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
 import { toast } from "sonner";
-
-// ... (imports remain)
+import { cn } from "@/lib/utils";
 
 // Mobile-optimized navigation component
 const MobileNavigator = memo(({
@@ -30,23 +29,23 @@ const MobileNavigator = memo(({
   marked: any;
 }) => {
   return (
-    <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar pb-2">
+    <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar pb-2 bg-white/50 dark:bg-gray-950/50 backdrop-blur-md rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
       {questions.map((q, idx) => {
         const isCurrent = idx === currentIndex;
         const isAnswered = !!answers[q.id];
         const isMarked = !!marked[q.id];
 
-        let bgClass = "bg-card border-border text-muted-foreground hover:bg-muted";
-        if (isCurrent) bgClass = "bg-primary text-primary-foreground border-primary ring-2 ring-offset-1 ring-primary";
-        else if (isMarked) bgClass = "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900 dark:text-amber-100";
-        else if (isAnswered) bgClass = "bg-primary/10 text-primary border-primary/20";
+        let bgClass = "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500 hover:bg-gray-50";
+        if (isCurrent) bgClass = "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900 shadow-lg shadow-blue-500/30 scale-110";
+        else if (isMarked) bgClass = "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/50 dark:text-amber-400";
+        else if (isAnswered) bgClass = "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-400";
 
         return (
           <button
             key={q.id}
             onClick={() => onNavigate(idx)}
             className={`
-                flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-semibold border transition-all duration-200
+                flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border transition-all duration-300
                 ${bgClass}
              `}
           >
@@ -78,6 +77,9 @@ export default function ExamLayout() {
   // Initialize instructions visibility based on whether exam has started
   const [showInstructions, setShowInstructions] = useState(!exam.startedAt);
   const [isStarting, setIsStarting] = useState(false);
+
+  // Illusion Mode State
+  const [illusionMode, setIllusionMode] = useState(false);
 
   const questions = sortedQuestions || [];
   const currentQuestion = questions[navigation.current];
@@ -192,6 +194,16 @@ export default function ExamLayout() {
     return totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0;
   }, [answeredCount, totalQuestions]);
 
+  const toggleIllusionMode = () => {
+    setIllusionMode(prev => !prev);
+    if (!illusionMode) {
+      toast.info("Illusion Mode Active: Distractions hidden.", {
+        position: "top-center",
+        duration: 2000
+      });
+    }
+  };
+
   // --------------- BLOCKING MODAL FOR PROCTORING (Overlay) ---------------
   const isBlocked = isExamActive && (!isFullscreen || !isTabActive);
 
@@ -209,100 +221,75 @@ export default function ExamLayout() {
     const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + cqMarks + sqMarks)) * 0.33);
 
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans">
-        <Card className="max-w-3xl w-full p-6 md:p-10 shadow-2xl rounded-3xl bg-card border-border">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans animate-in fade-in duration-500">
+        <Card className="max-w-3xl w-full p-6 md:p-10 shadow-2xl rounded-3xl bg-card border-border relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
           <div className="text-center mb-8">
             <div className="flex justify-center mb-4">
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
-            <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'অনলাইন পরীক্ষা'}</h1>
-            <p className="text-sm md:text-lg text-muted-foreground">আপনি কি পরীক্ষা শুরু করতে প্রস্তুত?</p>
+            <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
+            <p className="text-sm md:text-lg text-muted-foreground">Ready to begin?</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-muted/50 p-4 rounded-xl text-center">
-              <Clock className="w-6 h-6 mx-auto text-primary mb-2" />
-              <h3 className="font-semibold text-foreground text-sm">সময়</h3>
-              <p className="text-base md:text-lg font-bold text-primary">{exam.duration} মিনিট</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Time</div>
+              <p className="text-xl font-bold text-primary">{exam.duration}m</p>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center">
-              <HelpCircle className="w-6 h-6 mx-auto text-primary mb-2" />
-              <h3 className="font-semibold text-foreground text-sm">মোট প্রশ্ন</h3>
-              <p className="text-lg font-bold text-primary">{totalQuestions} টি</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Questions</div>
+              <p className="text-xl font-bold text-primary">{totalQuestions}</p>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center">
-              <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
-              <h3 className="font-semibold text-foreground text-sm">পূর্ণমান</h3>
-              <p className="text-base md:text-lg font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Marks</div>
+              <p className="text-xl font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center">
-              <CheckCircle className="w-6 h-6 mx-auto text-primary mb-2" />
-              <h3 className="font-semibold text-foreground text-sm">পাস মার্ক</h3>
-              <p className="text-base md:text-lg font-bold text-primary">{passMark}</p>
+            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Pass Mark</div>
+              <p className="text-xl font-bold text-primary">{passMark}</p>
             </div>
           </div>
 
-          {/* Question Breakdown */}
-          <div className="mb-8 border rounded-xl p-4 bg-gray-50 dark:bg-gray-800/50">
-            <h3 className="font-semibold mb-3 text-center border-b pb-2">প্রশ্ন বিভাজন (Question Breakdown)</h3>
-            <div className="grid grid-cols-3 divide-x text-center text-sm">
-              <div className="px-2">
-                <div className="font-bold text-primary">MCQ</div>
-                <div>{mcqQuestions.length} টি</div>
-                <div className="text-xs text-muted-foreground">({mcqMarks} নম্বর)</div>
-              </div>
-              <div className="px-2">
-                <div className="font-bold text-primary">Creative (CQ)</div>
-                <div>{cqQuestions.length} টি</div>
-                <div className="text-xs text-muted-foreground">({cqMarks} নম্বর)</div>
-              </div>
-              <div className="px-2">
-                <div className="font-bold text-primary">Short (SQ)</div>
-                <div>{sqQuestions.length} টি</div>
-                <div className="text-xs text-muted-foreground">({sqMarks} নম্বর)</div>
-              </div>
+          <div className="alert alert-warning mb-6 bg-amber-50/50 border-amber-100 text-amber-900 rounded-xl p-4 text-sm">
+            <div className="flex items-center gap-2 font-bold mb-2">
+              <AlertCircle className="w-4 h-4" /> Important Instructions
             </div>
-          </div>
-
-          <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-xl mb-8 text-sm text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800">
-            <h3 className="font-bold mb-2 flex items-center gap-2"><AlertCircle className="w-4 h-4" /> নির্দেশাবলি (Instructions):</h3>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>পরীক্ষা শুরু করার পর টাইমার থামানো যাবে না।</li>
-              <li>নির্দিষ্ট সময়ের মধ্যে উত্তর জমা না দিলে স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</li>
-              <li>প্রতিটি প্রশ্নের জন্য সঠিক উত্তর নির্বাচন করুন বা লিখুন।</li>
-              <li>ইন্টারনেট সংযোগ বিচ্ছিন্ন হলে পুনরায় সংযোগের চেষ্টা করুন, আপনার উত্তর সংরক্ষিত থাকবে।</li>
-              {exam.mcqNegativeMarking > 0 && (
-                <li className="font-bold text-red-600 dark:text-red-400 mt-2">
-                  সতর্কতা: প্রতিটি ভুল উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কর্তন করা হবে।
-                </li>
-              )}
-              <li className="font-bold text-red-600 dark:text-red-400 mt-2">সতর্কতা: ফুলস্ক্রিন মোড চালু থাকবে।</li>
+            <ul className="list-disc pl-5 space-y-1 opacity-90">
+              <li>Do not switch tabs or exit fullscreen (Violations are recorded).</li>
+              <li>Ensure stable internet connection.</li>
+              {exam.mcqNegativeMarking > 0 && <li>Negative Marking: {exam.mcqNegativeMarking}% per wrong MCQ.</li>}
             </ul>
           </div>
 
           <Button
             onClick={handleStartExam}
             disabled={isStarting}
-            className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-6 text-lg rounded-2xl shadow-lg transition-transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed"
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-6 text-lg rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]"
           >
-            {isStarting ? "লোডিং..." : "পরীক্ষা শুরু করুন (Enter Fullscreen)"}
+            {isStarting ? "Initializing Assessment..." : "Start Assessment"}
           </Button>
         </Card>
       </div>
     );
   }
 
-  if (!currentQuestion) return <div className="flex justify-center items-center h-screen text-muted-foreground">Loading exam...</div>;
+  if (!currentQuestion) return <div className="flex justify-center items-center h-screen text-muted-foreground">Loading exam content...</div>;
 
   return (
-    <div className={`
-      min-h-screen bg-gray-50 flex flex-col font-exam-online
-      ${isExamActive && (!isFullscreen || !isTabActive) ? 'select-none' : ''}
-    `}>  {/* Sticky Header */}
-      <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
+    <div className={cn(
+      "min-h-screen flex flex-col font-exam-online transition-colors duration-500 ease-in-out",
+      illusionMode ? "illusion-mode" : "bg-gray-50 dark:bg-background",
+      isExamActive && (!isFullscreen || !isTabActive) ? 'select-none blur-sm' : ''
+    )}>
+
+      {/* --- HEADER (Hidden in Illusion Mode) --- */}
+      <header className={cn(
+        "sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md shadow-sm transition-all duration-500",
+        illusionMode ? "-translate-y-full opacity-0 pointer-events-none absolute" : "translate-y-0 opacity-100"
+      )}>
         <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {/* Mobile Drawer */}
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon" className="lg:hidden">
@@ -310,54 +297,37 @@ export default function ExamLayout() {
                 </Button>
               </SheetTrigger>
               <SheetContent side="left" className="w-[300px] p-0">
-                <div className="p-4 border-b">
-                  <h2 className="font-bold text-lg text-foreground">Question Navigator</h2>
+                <div className="p-4 border-b bg-muted/30">
+                  <h2 className="font-bold text-lg">Navigator</h2>
                 </div>
                 <div className="p-4">
                   <Navigator questions={questions} />
                 </div>
               </SheetContent>
             </Sheet>
-            <div className="flex items-center space-x-3">
-              <img src={instituteLogo} alt={instituteName} className="h-8 w-auto hidden sm:block object-contain" />
-              <div className="hidden sm:block">
-                <h1 className="font-bold text-foreground truncate max-w-[200px] text-sm md:text-base">{exam.title || exam.name}</h1>
-              </div>
+
+            <div className="flex items-center gap-3">
+              <img src={instituteLogo} alt="Logo" className="h-8 w-auto hidden sm:block rounded" />
+              <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
             </div>
           </div>
 
-          {/* Timer: Stacked on mobile, Absolute centered on desktop */}
-          <div className="relative mt-2 sm:mt-0 sm:absolute sm:left-1/2 sm:transform sm:-translate-x-1/2 flex justify-center order-last sm:order-none w-full sm:w-auto">
-            <Timer onTimeUp={() => handleSubmit(true)} />
+          {/* Centered Timer */}
+          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+            <div className="pointer-events-auto">
+              <Timer onTimeUp={() => handleSubmit(true)} />
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Warnings Indicator */}
-            {warnings > 0 && (
-              <div className="flex gap-2">
-                {warnings > 0 && (
-                  <Badge variant="destructive" className="animate-pulse hidden sm:flex gap-1">
-                    <ShieldAlert className="w-3 h-3" />
-                    Sys: {warnings}/4
-                  </Badge>
-                )}
-              </div>
-            )}
-
-            <div className="hidden sm:flex flex-col items-end mr-4">
-              <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Progress</span>
-              <div className="flex items-center gap-2">
-                <div className="w-24 h-2 bg-muted rounded-full overflow-hidden">
-                  <div className="h-full bg-primary transition-all duration-500" style={{ width: `${progress}%` }} />
-                </div>
-                <span className="text-xs font-bold text-primary">{Math.round(progress)}%</span>
-              </div>
-            </div>
+            {/* Illusion Mode Toggle (Desktop Header) */}
+            <Button variant="ghost" size="icon" onClick={toggleIllusionMode} title="Enter Focus Mode" className="hidden sm:flex text-muted-foreground hover:text-primary">
+              <Eye className="w-5 h-5" />
+            </Button>
 
             <Button
               onClick={() => handleSubmit(false)}
-              variant={showSubmitConfirm ? "destructive" : "default"}
-              className={`${showSubmitConfirm ? "bg-red-500 hover:bg-red-600" : "bg-primary hover:bg-primary/90"} text-primary-foreground rounded-full px-6 transition-all`}
+              className={cn("rounded-full px-6 transition-all shadow-md", showSubmitConfirm ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")}
             >
               {showSubmitConfirm ? "Confirm" : "Submit"}
             </Button>
@@ -365,102 +335,149 @@ export default function ExamLayout() {
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      {/* --- PROGRESS BAR (Hidden in Illusion) --- */}
+      {!illusionMode && (
+        <div className="w-full h-1 bg-muted fixed top-16 z-40">
+          <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+        </div>
+      )}
 
-        {/* Left Col: Navigator (Desktop) */}
-        <aside className="hidden lg:block lg:col-span-3">
-          <div className="sticky top-24">
-            <Navigator questions={questions} />
-          </div>
-        </aside>
+      {/* --- MAIN CONTENT --- */}
+      <main className={cn(
+        "flex-grow mx-auto w-full transition-all duration-500",
+        illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
+      )}>
 
-        {/* Center: Question */}
-        <div className="lg:col-span-9 flex flex-col gap-6">
-          <div className="lg:hidden">
-            <MobileNavigator
-              questions={questions}
-              currentIndex={navigation.current}
-              onNavigate={navigateToQuestion}
-              answers={answers || {}}
-              marked={navigation.marked || {}}
+        {/* --- LEFT SIDEBAR (Desktop Navigator) --- */}
+        {!illusionMode && (
+          <aside className="hidden lg:block lg:col-span-3">
+            <div className="sticky top-24 space-y-4">
+              <Card className="p-4 border shadow-sm bg-card/50 backdrop-blur-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-sm font-medium text-muted-foreground">Question Navigator</span>
+                  <Badge variant="secondary" className="bg-primary/10 text-primary">{answeredCount}/{totalQuestions}</Badge>
+                </div>
+                <Navigator questions={questions} onSubmit={() => handleSubmit(false)} />
+              </Card>
+
+              {/* Warnings Widget */}
+              {warnings > 0 && (
+                <div className="bg-destructive/5 text-destructive border border-destructive/20 p-4 rounded-xl flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5" />
+                  <div className="text-sm font-semibold">
+                    <p>Security Warnings</p>
+                    <p className="text-xs opacity-80">{warnings}/4 Recorded</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        )}
+
+        {/* --- CENTER CONTENT --- */}
+        <div className={cn("flex flex-col gap-6", illusionMode ? "w-full" : "lg:col-span-9")}>
+
+          {/* Mobile Navigator (Normal Mode Only) */}
+          {!illusionMode && (
+            <div className="lg:hidden mb-2">
+              <MobileNavigator
+                questions={questions}
+                currentIndex={navigation.current}
+                onNavigate={navigateToQuestion}
+                answers={answers || {}}
+                marked={navigation.marked || {}}
+              />
+            </div>
+          )}
+
+          {/* Question Card Container */}
+          <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "")}>
+            <QuestionCard
+              questionIdx={navigation.current}
+              questionOverride={currentQuestion}
+              disabled={isSubmitting}
             />
           </div>
 
-          <QuestionCard
-            questionIdx={navigation.current}
-            questionOverride={currentQuestion}
-            disabled={isSubmitting}
-          />
-
-          {/* Navigation Bottom Bar */}
-          <div className="flex items-center justify-between gap-4 py-4 mt-auto">
-            <Button
-              variant="outline"
-              size="lg"
-              onClick={handlePrevious}
-              disabled={navigation.current === 0 || isSubmitting}
-              className="rounded-full px-8 border-border hover:bg-muted hover:text-foreground text-muted-foreground"
-            >
-              <ChevronLeft className="w-4 h-4 mr-2" /> Previous
-            </Button>
-
-            <div className="text-sm font-medium text-muted-foreground hidden sm:block">
-              Question {navigation.current + 1} of {totalQuestions}
+          {/* --- FLOATING CONTROLS (Illusion Mode) --- */}
+          {illusionMode && (
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/80 backdrop-blur-md rounded-full px-6 py-3 shadow-2xl z-50 text-white border border-white/10">
+              <Button variant="ghost" size="icon" onClick={handlePrevious} disabled={navigation.current === 0} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
+                <ChevronLeft className="w-6 h-6" />
+              </Button>
+              <span className="text-sm font-mono opacity-80 mx-2">{navigation.current + 1} / {totalQuestions}</span>
+              <Button variant="ghost" size="icon" onClick={handleNext} disabled={navigation.current === totalQuestions - 1} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
+                <ChevronRight className="w-6 h-6" />
+              </Button>
+              <div className="w-px h-6 bg-white/20 mx-2" />
+              <Button variant="ghost" size="icon" onClick={toggleIllusionMode} className="text-white hover:bg-white/20 rounded-full h-10 w-10 text-amber-300">
+                <EyeOff className="w-5 h-5" />
+              </Button>
             </div>
+          )}
 
-            <Button
-              size="lg"
-              onClick={handleNext}
-              disabled={navigation.current === totalQuestions - 1 || isSubmitting}
-              className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
-            >
-              Next <ChevronRight className="w-4 h-4 ml-2" />
-            </Button>
-          </div>
+          {/* --- STANDARD BOTTOM BAR (Normal Mode) --- */}
+          {!illusionMode && (
+            <div className="flex items-center justify-between gap-4 py-4 mt-auto">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={handlePrevious}
+                disabled={navigation.current === 0 || isSubmitting}
+                className="rounded-full px-6 border-border hover:bg-muted text-muted-foreground"
+              >
+                <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+              </Button>
+
+              <div className="block sm:hidden">
+                <Button variant="secondary" size="icon" onClick={toggleIllusionMode} className="rounded-full w-12 h-12 shadow-md">
+                  <Eye className="w-5 h-5" />
+                </Button>
+              </div>
+
+              <Button
+                size="lg"
+                onClick={handleNext}
+                disabled={navigation.current === totalQuestions - 1 || isSubmitting}
+                className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+              >
+                Next <ChevronRight className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+          )}
         </div>
       </main>
 
-      {/* Submit Modal Overlay */}
+      {/* --- OVERLAYS --- */}
       {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <Card className="max-w-sm w-full p-6 text-center shadow-2xl animate-in fade-in zoom-in duration-200 border-border">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-6 h-6 text-red-600" />
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <Card className="max-w-sm w-full p-6 text-center shadow-2xl border-border bg-card">
+            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
             </div>
             <h3 className="text-lg font-bold text-foreground mb-2">Submit Assessment?</h3>
             <p className="text-muted-foreground text-sm mb-6">You are about to submit your answers. This action cannot be undone.</p>
             <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">
-                Cancel
-              </Button>
-              <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">
-                Submit Now
-              </Button>
+              <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">Cancel</Button>
+              <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">Submit Now</Button>
             </div>
           </Card>
         </div>
       )}
 
-      {/* Security Violation Overlay (Refactored from early return) */}
       {isBlocked && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
           <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
             <ShieldAlert className="w-12 h-12 text-red-600" />
           </div>
-          <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Exam Paused: Security Violation</h1>
+          <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Security Violation Detected</h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
-            You have left fullscreen mode or switched tabs. This is recorded as a violation.
-            <br /><br />
-            <span className="font-bold text-red-500">Warning {warnings}/4</span>
+            Please return to fullscreen mode immediately.
+            <br />
+            <span className="font-bold text-red-500 mt-2 block">Warning Level: {warnings}/4</span>
           </p>
-          <Button
-            size="lg"
-            onClick={enterFullscreen}
-            className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl"
-          >
-            <Maximize2 className="w-6 h-6 mr-2" />
-            Return to Fullscreen to Continue
+          <Button size="lg" onClick={enterFullscreen} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl">
+            <Maximize2 className="w-6 h-6 mr-2" /> Return to Fullscreen
           </Button>
         </div>
       )}

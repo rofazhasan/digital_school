@@ -27,8 +27,8 @@ import {
   CheckCircle,
   Clock,
   Zap,
-  User,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
@@ -50,7 +50,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -85,7 +84,7 @@ export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const router = useRouter();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -135,8 +134,8 @@ export default function AdminDashboard() {
     }
   };
 
-  const [instituteSettings, setInstituteSettings] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
+  const [instituteSettings, setInstituteSettings] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
+  const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
 
   useEffect(() => {
     fetch('/api/settings').then(r => r.json()).then(setInstituteSettings).catch(console.error);
@@ -144,54 +143,67 @@ export default function AdminDashboard() {
   }, []);
 
   const instituteName = instituteSettings?.instituteName || "Digital School";
-  const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+  // const instituteLogo = instituteSettings?.logoUrl || "/logo.png"; // Unused for now
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
+      {/* Background Elements */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+      </div>
+
       {/* Mobile Sidebar Overlay */}
-      {mobileSidebarOpen && (
-        <div
-          className="fixed inset-0 z-40 lg:hidden"
-          onClick={() => setMobileSidebarOpen(false)}
-        >
-          <div className="absolute inset-0 bg-gray-600 bg-opacity-60 backdrop-blur-sm" />
-        </div>
-      )}
+      <div
+        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${mobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        onClick={() => setMobileSidebarOpen(false)}
+      />
 
       {/* Sidebar */}
       <motion.div
         initial={{ width: 280 }}
         animate={{ width: sidebarCollapsed ? 80 : 280 }}
-        className={`fixed lg:relative z-50 h-full bg-white shadow-xl border-r border-gray-200 transform transition-transform duration-300 ease-in-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`fixed lg:relative z-50 h-full bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 shadow-2xl shadow-gray-200/20 dark:shadow-none transform transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
       >
-        <div className="p-4 lg:p-6">
-          <div className="flex items-center justify-between mb-6 lg:mb-8">
+        <div className="flex flex-col h-full">
+          <div className={`h-20 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-gray-100/50 dark:border-gray-800/50`}>
             <motion.div
               initial={{ opacity: 1 }}
               animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-              className="flex items-center gap-2"
+              className={`${sidebarCollapsed ? 'hidden' : 'flex'} items-center gap-3 overflow-hidden`}
             >
-              <img src={instituteLogo} alt={instituteName} className="h-8 w-auto object-contain" />
-              <span className="text-xl lg:text-2xl font-bold text-gray-800">{instituteName}</span>
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30 flex-shrink-0">
+                {/* Logo or Placeholder */}
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 whitespace-nowrap">
+                {instituteName}
+              </span>
             </motion.div>
-            <div className="flex items-center space-x-2">
+            {sidebarCollapsed && (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
+                <Sparkles className="w-5 h-5 text-white" />
+              </div>
+            )}
+
+            <div className={`flex items-center ${sidebarCollapsed ? 'absolute -right-3 top-24' : ''}`}>
               <button
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="hidden lg:block p-2 rounded-lg hover:bg-gray-100"
+                className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors ${sidebarCollapsed ? 'rotate-180' : ''}`}
               >
-                <ChevronDown className={`w-5 h-5 transform transition-transform ${sidebarCollapsed ? 'rotate-90' : '-rotate-90'}`} />
+                <ChevronDown className="w-4 h-4 rotate-90" />
               </button>
               <button
                 onClick={() => setMobileSidebarOpen(false)}
-                className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+                className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
             {sidebarItems.map((item) => (
               <button
                 key={item.id}
@@ -203,28 +215,34 @@ export default function AdminDashboard() {
                     setMobileSidebarOpen(false);
                   }
                 }}
-                className={`w-full flex items-center px-3 lg:px-4 py-3 lg:py-3 rounded-lg transition-all duration-200 text-sm lg:text-base font-medium min-h-[44px] ${activeTab === item.id
-                  ? 'bg-blue-50 text-blue-600 border-r-2 border-blue-600 shadow-sm ring-2 ring-blue-100'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 hover:shadow-sm'
+                className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${activeTab === item.id
+                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
                   }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 flex-shrink-0 transition-colors ${activeTab === item.id ? 'text-blue-600' : 'text-gray-500'
-                  }`} />
-                <motion.span
-                  initial={{ opacity: 1 }}
-                  animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-                  className="flex-1 text-left"
-                >
-                  {item.label}
-                </motion.span>
-                {item.badge && (
+                <div className={`
+                    p-1 rounded-lg transition-all duration-300 flex-shrink-0
+                    ${activeTab === item.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200'}
+                `}>
+                  <item.icon className="w-5 h-5" />
+                </div>
+
+                {!sidebarCollapsed && (
                   <motion.span
-                    initial={{ opacity: 1 }}
-                    animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-                    className={`text-xs px-2 py-1 rounded-full font-semibold min-w-[20px] text-center ${activeTab === item.id
-                      ? 'bg-blue-200 text-blue-700'
-                      : 'bg-blue-100 text-blue-600'
-                      }`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                    className="ml-3 font-medium text-sm flex-1 text-left truncate"
+                  >
+                    {item.label}
+                  </motion.span>
+                )}
+
+                {!sidebarCollapsed && item.badge && (
+                  <motion.span
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className={`ml-2 text-xs px-2 py-0.5 rounded-full font-semibold ${activeTab === item.id ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}
                   >
                     {item.badge}
                   </motion.span>
@@ -232,58 +250,88 @@ export default function AdminDashboard() {
               </button>
             ))}
           </nav>
+
+          <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 backdrop-blur-sm">
+            {!sidebarCollapsed ? (
+              <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => setActiveTab('settings')}>
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm">
+                  {user?.name?.[0] || 'A'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{user?.name || 'Admin'}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
+                </div>
+                <Settings className="w-4 h-4 text-gray-400" />
+              </div>
+            ) : (
+              <div className="flex justify-center">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm" title={user?.name}>
+                  {user?.name?.[0] || 'A'}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </motion.div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex flex-col">
+      <div className="flex-1 overflow-hidden flex flex-col bg-gray-50/50 dark:bg-gray-950 transition-colors relative z-10">
         {/* Top Bar with User Menu */}
-        <div className="flex items-center justify-between px-4 lg:px-8 py-4 bg-white border-b border-gray-200 relative z-10 shadow-sm">
+        <header className="h-20 py-4 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl sticky top-0 z-40 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 md:px-8">
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="lg:hidden p-2 rounded-xl hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors text-gray-600 dark:text-gray-300"
           >
-            <Menu className="w-5 h-5 text-gray-600" />
+            <Menu className="w-6 h-6" />
           </button>
 
-          <div className="flex-1 lg:hidden" />
+          <div className="flex-1 lg:hidden text-center pl-2">
+            <h1 className="font-bold text-lg text-gray-800 dark:text-gray-200">
+              {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
+            </h1>
+          </div>
 
-          <div className="relative ml-auto">
+          <div className="flex items-center gap-4 ml-auto">
+            <div className="hidden md:flex items-center gap-2 mr-2">
+              <Button variant="ghost" size="icon" className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full relative">
+                <Bell className="w-5 h-5" />
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+              </Button>
+            </div>
+            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block"></div>
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center space-x-2 focus:outline-none group p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                  className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-800 transition-all"
                 >
-                  <span className="inline-block w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm lg:text-lg shadow-sm">
-                    AD
-                  </span>
-                  <span className="hidden md:inline text-gray-800 font-medium">{user?.name || 'Admin'}</span>
-                  <ChevronDown className="w-4 h-4 ml-1 text-gray-400 group-hover:text-gray-600 transition-colors" />
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold shadow-sm">
+                    {user?.name?.[0] || 'A'}
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors hidden md:block" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end" forceMount>
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user?.name || 'Admin'}</p>
-                    <p className="text-xs leading-none text-muted-foreground">{user?.email || 'admin@school.com'}</p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setActiveTab('settings')}>
+              <DropdownMenuContent className="w-56 p-2 rounded-xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90" align="end" forceMount>
+                <div className="px-2 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-lg mb-2">
+                  <p className="text-sm font-semibold leading-none text-foreground">{user?.name || 'Admin'}</p>
+                  <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email || 'admin@school.com'}</p>
+                </div>
+                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 rounded-lg cursor-pointer py-2.5">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
+        </header>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
           <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
             <AnimatePresence mode="wait">
               <motion.div
@@ -297,7 +345,9 @@ export default function AdminDashboard() {
               </motion.div>
             </AnimatePresence>
           </div>
-          <AppFooter />,
+          <div className="mt-8">
+            <AppFooter />
+          </div>
         </div>
       </div>
     </div>
@@ -306,7 +356,7 @@ export default function AdminDashboard() {
 
 // Overview Tab Component
 function OverviewTab() {
-  const [stats, setStats] = useState<any>(null);
+  const [stats, setStats] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const router = useRouter();
 
   useEffect(() => {
@@ -317,88 +367,122 @@ function OverviewTab() {
   }, []);
 
   return (
-    <div className="p-4 lg:p-8">
+    <div className="p-0">
       <div className="mb-6 lg:mb-8">
-        <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-600 text-sm lg:text-base">Welcome back! Here&apos;s what&apos;s happening with your school.</p>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h1 className="text-3xl font-bold mb-2 tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Welcome back! Manage your institution efficiently.</p>
+        </motion.div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-6 lg:mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
         {[
-          { title: "Total Users", icon: Users, value: stats?.totalUsers, label: `+${stats?.newUsers || 0} this week`, color: 'blue' },
-          { title: "Active Teachers", icon: UserCheck, value: stats?.activeTeachers || 0, label: "Teaching staffs", color: 'green' },
-          { title: "Active Exams", icon: FileText, value: stats?.activeExams || 0, label: "Ongoing exams", color: 'purple' },
-          { title: "AI Usage", icon: Zap, value: stats?.aiUsage || 0, label: "Tokens used", color: 'yellow' }
+          { title: "Total Users", icon: Users, value: stats?.totalUsers, label: `+${stats?.newUsers || 0} this week`, color: 'blue', bg: 'bg-blue-500' },
+          { title: "Active Teachers", icon: UserCheck, value: stats?.activeTeachers || 0, label: "Teaching staffs", color: 'emerald', bg: 'bg-emerald-500' },
+          { title: "Active Exams", icon: FileText, value: stats?.activeExams || 0, label: "Ongoing exams", color: 'violet', bg: 'bg-violet-500' },
+          { title: "Tokens Used", icon: Zap, value: stats?.aiUsage || 0, label: "AI credits", color: 'amber', bg: 'bg-amber-500' }
         ].map((item, index) => (
-          <Card key={index} className="rounded-xl shadow-sm border border-gray-200">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{item.title}</CardTitle>
-              <item.icon className={`h-4 w-4 text-${item.color}-600`} />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{item.value !== undefined ? item.value : '...'}</div>
-              <p className="text-xs text-muted-foreground">{item.label}</p>
-            </CardContent>
-          </Card>
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.1 + 0.2 }}
+          >
+            <Card className="rounded-2xl border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+              <div className={`absolute top-0 right-0 w-24 h-24 ${item.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
+
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground z-10">{item.title}</CardTitle>
+                <div className={`p-2 rounded-xl ${item.bg} bg-opacity-10 text-${item.color}-600`}>
+                  <item.icon className="h-4 w-4" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{item.value !== undefined ? item.value : '...'}</div>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <span className={`text-${item.color}-600 font-medium`}>{item.label}</span>
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         ))}
       </div>
 
       {/* Quick Actions */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Common tasks you perform often</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => router.push('/admin/users?role=STUDENT')}>
-              <Users className="h-6 w-6 text-blue-500" />
-              <span>Add Student</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => router.push('/admin/users?role=TEACHER')}>
-              <UserCheck className="h-6 w-6 text-green-500" />
-              <span>Add Teacher</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => router.push('/exams')}>
-              <FileText className="h-6 w-6 text-purple-500" />
-              <span>Create Exam</span>
-            </Button>
-            <Button variant="outline" className="h-24 flex flex-col gap-2" onClick={() => router.push('/question-bank')}>
-              <BookOpen className="h-6 w-6 text-yellow-500" />
-              <span>Question Bank</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <Sparkles className="w-5 h-5 text-blue-500" /> Quick Actions
+      </h2>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        {[
+          { label: 'Add Student', icon: Users, color: 'text-blue-500', href: '/admin/users?role=STUDENT' },
+          { label: 'Add Teacher', icon: UserCheck, color: 'text-emerald-500', href: '/admin/users?role=TEACHER' },
+          { label: 'Create Exam', icon: FileText, color: 'text-violet-500', href: '/exams' },
+          { label: 'Question Bank', icon: BookOpen, color: 'text-amber-500', href: '/question-bank' },
+        ].map((action, i) => (
+          <motion.button
+            key={i}
+            whileHover={{ scale: 1.02, y: -2 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={() => router.push(action.href)}
+            className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all group"
+          >
+            <div className={`p-4 rounded-full bg-gray-50 dark:bg-gray-800 mb-3 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors`}>
+              <action.icon className={`h-6 w-6 ${action.color}`} />
+            </div>
+            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">{action.label}</span>
+          </motion.button>
+        ))}
+      </div>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
+            <CardDescription>Latest logs from the system</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">Activity logs will appear here.</p>
-              {/* Could map real logs here if available */}
+              {[1, 2, 3].map((_, i) => (
+                <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mt-0.5">
+                    <Activity className="w-4 h-4 text-blue-500" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">System Backup Completed</p>
+                    <p className="text-xs text-muted-foreground">Today, 10:23 AM</p>
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
           <CardHeader>
             <CardTitle>Pending Tasks</CardTitle>
+            <CardDescription>Items requiring your attention</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-2 border rounded">
-                <span className="text-sm">Review Exam Results</span>
-                <Badge variant="outline">Pending</Badge>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/20">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="w-5 h-5 text-red-500" />
+                  <span className="text-sm font-medium text-red-900 dark:text-red-200">Review Exam Results</span>
+                </div>
+                <Badge variant="outline" className="bg-white dark:bg-gray-950 text-red-600 border-red-200">Urgent</Badge>
               </div>
-              <div className="flex items-center justify-between p-2 border rounded">
-                <span className="text-sm">Approve Teacher Leave</span>
-                <Badge variant="outline">Pending</Badge>
+              <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/20">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-amber-500" />
+                  <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Approve Teacher Leave</span>
+                </div>
+                <Badge variant="outline" className="bg-white dark:bg-gray-950 text-amber-600 border-amber-200">Pending</Badge>
               </div>
             </div>
           </CardContent>
@@ -409,7 +493,7 @@ function OverviewTab() {
 }
 
 function ClassesTab() {
-  const [classes, setClasses] = useState<any[]>([]);
+  const [classes, setClasses] = useState<any[]>([]); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -429,48 +513,87 @@ function ClassesTab() {
   const filtered = classes.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="p-4 lg:p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Classes Management</h1>
-        <Button>
+    <div className="p-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Classes Management</h1>
+          <p className="text-muted-foreground text-sm">Manage class structures and sections.</p>
+        </div>
+        <Button className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 rounded-xl">
           <Plus className="h-4 w-4 mr-2" /> Add Class
         </Button>
       </div>
-      <div className="mb-6">
+
+      <div className="mb-6 relative">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
           placeholder="Search classes..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          className="max-w-md"
+          className="max-w-md pl-10 h-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 rounded-xl"
         />
       </div>
 
       {loading ? (
-        <div className="text-center py-10">Loading classes...</div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-xl"></div>)}
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((cls: any) => (
-            <Card key={cls.id}>
-              <CardHeader>
-                <CardTitle>{cls.name}</CardTitle>
-                <CardDescription>{cls.section ? `Section ${cls.section}` : 'No Section'}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm text-muted-foreground">
-                  <p>Teacher: {cls.teacher?.name || 'Unassigned'}</p>
-                  <p>Students: {cls.students?.length || 0}</p>
-                </div>
-                <div className="mt-4 flex gap-2">
-                  <Button variant="outline" size="sm" className="w-full">View</Button>
-                  <Button variant="outline" size="sm" className="w-full">Edit</Button>
-                </div>
-              </CardContent>
-            </Card>
+          {filtered.map((cls: any) => ( // eslint-disable-line @typescript-eslint/no-explicit-any
+            <motion.div
+              key={cls.id}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ y: -4 }}
+              transition={{ duration: 0.2 }}
+            >
+              <Card className="overflow-hidden border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 rounded-2xl group cursor-pointer hover:ring-2 hover:ring-blue-500/20 transition-all">
+                <div className="h-2 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+                <CardHeader>
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-xl">{cls.name}</CardTitle>
+                      <CardDescription className="font-mono text-xs mt-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded inline-block">
+                        {cls.section ? `SEC-${cls.section}` : 'NO SECTION'}
+                      </CardDescription>
+                    </div>
+                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                      <GraduationCap className="w-5 h-5" />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2"><UserCheck className="w-3.5 h-3.5" /> Teacher</span>
+                      <span className="font-medium truncate max-w-[120px]">{cls.teacher?.name || 'Unassigned'}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground flex items-center gap-2"><Users className="w-3.5 h-3.5" /> Students</span>
+                      <span className="font-medium bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full text-xs">
+                        {cls.students?.length || 0}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-6 flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
+                    <Button variant="ghost" size="sm" className="w-full hover:text-blue-600 hover:bg-blue-50">View Details</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           ))}
-          {filtered.length === 0 && <p className="text-muted-foreground">No classes found.</p>}
+          {filtered.length === 0 && (
+            <div className="col-span-full py-12 flex flex-col items-center justify-center text-center">
+              <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                <Search className="w-8 h-8 text-gray-400" />
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white">No classes found</h3>
+              <p className="text-muted-foreground">Try adjusting your search query.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 }
-

@@ -19,8 +19,10 @@ import {
     Menu,
     X,
     Scan,
-    User,
-    ChevronDown
+    ChevronDown,
+    Users,
+    Clock,
+    CheckCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
@@ -31,7 +33,6 @@ import {
     ChatTab,
     SecurityTab,
     AdminSettingsTab,
-    AdminAdmitCardsTab
 } from "@/components/dashboard/admin-tabs";
 import TeacherAdmitCardsTab from "@/components/dashboard/TeacherAdmitCardsTab";
 import { Button } from '@/components/ui/button';
@@ -41,7 +42,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -79,7 +79,7 @@ export default function TeacherDashboard() {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const router = useRouter();
     const userMenuRef = useRef<HTMLDivElement>(null);
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [loading, setLoading] = useState(true);
 
     // Handle click outside user menu
@@ -100,18 +100,10 @@ export default function TeacherDashboard() {
         fetch('/api/user')
             .then(res => res.json())
             .then(data => {
-                if (data.user && data.user.role === 'TEACHER') {
+                if (data.user && (data.user.role === 'TEACHER' || data.user.role === 'ADMIN' || data.user.role === 'SUPER_USER')) {
                     setUser(data.user);
                 } else if (data.user) {
-                    // Redirect if not teacher
-                    // Allow Admin/Super to view as well for testing, or redirect?
-                    // Strict redirect:
-                    if (data.user.role === 'ADMIN' || data.user.role === 'SUPER_USER') {
-                        // Admin can view teacher dashboard usually? Let's allow.
-                        setUser(data.user);
-                    } else {
-                        router.push('/dashboard');
-                    }
+                    router.push('/dashboard');
                 } else {
                     router.push('/login');
                 }
@@ -131,101 +123,108 @@ export default function TeacherDashboard() {
     };
 
     const Sidebar = () => (
-        <div className={`fixed inset-y-0 left-0 z-50 bg-white border-r transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'} hidden lg:flex flex-col shadow-sm`}>
-            <div className="h-16 flex items-center justify-between px-4 border-b">
+        <motion.div
+            initial={false}
+            animate={{ width: sidebarCollapsed ? 80 : 280 }}
+            className={`fixed inset-y-0 left-0 z-50 hidden lg:flex flex-col bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 shadow-2xl shadow-gray-200/20 dark:shadow-none transition-all duration-300`}
+        >
+            <div className={`h-20 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-gray-100/50 dark:border-gray-800/50`}>
                 {!sidebarCollapsed && (
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-lg">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
                             DS
                         </div>
-                        <span className="font-bold text-xl text-gray-800">Digital<span className="text-blue-600">School</span></span>
+                        <span className="font-bold text-2xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">Digital<span className="text-blue-600 dark:text-blue-400">School</span></span>
                     </div>
                 )}
                 {sidebarCollapsed && (
-                    <div className="w-full flex justify-center">
-                        <div className="w-10 h-10 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-xl">
-                            DS
-                        </div>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
+                        DS
                     </div>
                 )}
-                <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="hidden lg:flex text-gray-400 hover:text-gray-600">
-                    {sidebarCollapsed ? <ChevronDown className="h-5 w-5 rotate-[-90deg]" /> : <Menu className="h-5 w-5" />}
+                <Button variant="ghost" size="icon" onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className={`hidden lg:flex text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-full ${sidebarCollapsed ? 'mt-4 rotate-180' : ''}`}>
+                    {sidebarCollapsed ? <ChevronDown className="h-5 w-5 rotate-90" /> : <Menu className="h-5 w-5" />}
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-6 space-y-1 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
                 {sidebarItems.map((item) => (
-                    <div key={item.id} className="px-3">
-                        <div
-                            onClick={() => {
-                                if (item.href.startsWith('/')) {
-                                    router.push(item.href);
-                                } else {
-                                    setActiveTab(item.id);
-                                }
-                            }}
-                            className={`
-                  w-full flex items-center gap-3 px-3 py-2.5 rounded-lg cursor-pointer transition-all duration-200 group
-                  ${activeTab === item.id && !item.href.startsWith('/')
-                                    ? 'bg-blue-50 text-blue-700'
-                                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}
-                `}
-                        >
-                            <div className={`
-                    p-1.5 rounded-md transition-colors
-                    ${activeTab === item.id && !item.href.startsWith('/') ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500 group-hover:bg-white group-hover:shadow-sm'}
-                `}>
-                                <item.icon className="w-5 h-5" />
-                            </div>
-                            {!sidebarCollapsed && (
-                                <>
-                                    <span className="font-medium text-sm flex-1">{item.label}</span>
-                                    {item.badge && (
-                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200">
-                                            {item.badge}
-                                        </Badge>
-                                    )}
-                                </>
-                            )}
+                    <button
+                        key={item.id}
+                        onClick={() => {
+                            if (item.href.startsWith('/')) {
+                                router.push(item.href);
+                            } else {
+                                setActiveTab(item.id);
+                            }
+                        }}
+                        className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${activeTab === item.id
+                            ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                            : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
+                            }`}
+                    >
+                        <div className={`p-1 rounded-lg transition-all duration-300 flex-shrink-0 ${activeTab === item.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200'}`}>
+                            <item.icon className="w-5 h-5" />
                         </div>
-                    </div>
+                        {!sidebarCollapsed && (
+                            <motion.span
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ duration: 0.2 }}
+                                className="ml-3 font-medium text-sm flex-1 text-left truncate"
+                            >
+                                {item.label}
+                            </motion.span>
+                        )}
+                        {!sidebarCollapsed && item.badge && (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-0">
+                                {item.badge}
+                            </Badge>
+                        )}
+                    </button>
                 ))}
             </div>
 
-            <div className="p-4 border-t bg-gray-50/50">
+            <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 backdrop-blur-sm">
                 {!sidebarCollapsed ? (
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold border-2 border-white shadow-sm">
+                    <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => setActiveTab('settings')}>
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm">
                             {user?.name?.[0] || 'T'}
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{user?.name || 'Teacher'}</p>
-                            <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{user?.name || 'Teacher'}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
                         </div>
+                        <Settings className="w-4 h-4 text-gray-400" />
                     </div>
                 ) : (
                     <div className="flex justify-center">
-                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold text-xs" title={user?.name}>
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm" title={user?.name}>
                             {user?.name?.[0]}
                         </div>
                     </div>
                 )}
             </div>
-        </div>
+        </motion.div>
     );
 
     const MobileSidebar = () => (
-        <div className={`fixed inset-0 z-50 bg-black/50 transition-opacity lg:hidden ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileSidebarOpen(false)}>
-            <div className={`absolute inset-y-0 left-0 w-64 bg-white shadow-xl transition-transform transform ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={(e) => e.stopPropagation()}>
-                <div className="h-16 flex items-center justify-between px-4 border-b bg-gray-50/50">
-                    <span className="font-bold text-xl text-gray-800">Menu</span>
-                    <Button variant="ghost" size="icon" onClick={() => setMobileSidebarOpen(false)}>
+        <div className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden ${mobileSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setMobileSidebarOpen(false)}>
+            <div className={`absolute inset-y-0 left-0 w-72 bg-white/95 dark:bg-gray-950/95 backdrop-blur-xl shadow-2xl transition-transform transform duration-300 ease-out ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={(e) => e.stopPropagation()}>
+                <div className="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800 bg-gradient-to-r from-gray-50/50 to-white/50 dark:from-gray-900/50 dark:to-gray-950/50">
+                    <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
+                            DS
+                        </div>
+                        <span className="font-bold text-xl text-gray-800 dark:text-gray-200">Menu</span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setMobileSidebarOpen(false)} className="rounded-full hover:bg-red-50 hover:text-red-600">
                         <X className="h-5 w-5" />
                     </Button>
                 </div>
-                <div className="overflow-y-auto py-4 space-y-1 h-[calc(100vh-64px)]">
+                <div className="overflow-y-auto py-6 space-y-1 h-[calc(100vh-80px)] px-3 custom-scrollbar">
                     {sidebarItems.map((item) => (
-                        <div key={item.id} className="px-3">
+                        <div key={item.id}>
                             <div
                                 onClick={() => {
                                     if (item.href.startsWith('/')) {
@@ -236,10 +235,10 @@ export default function TeacherDashboard() {
                                     }
                                 }}
                                 className={`
-                      w-full flex items-center gap-3 px-3 py-3 rounded-lg cursor-pointer transition-colors
+                      w-full flex items-center gap-3 px-4 py-3.5 rounded-xl cursor-pointer transition-all duration-200
                       ${activeTab === item.id && !item.href.startsWith('/')
-                                        ? 'bg-blue-50 text-blue-700 font-medium'
-                                        : 'text-gray-600 hover:bg-gray-50'}
+                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 font-medium'
+                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50'}
                     `}
                             >
                                 <item.icon className="w-5 h-5" />
@@ -247,8 +246,8 @@ export default function TeacherDashboard() {
                             </div>
                         </div>
                     ))}
-                    <div className="px-3 mt-4 pt-4 border-t">
-                        <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50" onClick={handleLogout}>
+                    <div className="px-3 mt-8 pt-8 border-t border-gray-100 dark:border-gray-800">
+                        <Button variant="ghost" className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 py-6 text-base rounded-xl" onClick={handleLogout}>
                             <LogOut className="w-5 h-5 mr-3" />
                             Logout
                         </Button>
@@ -258,51 +257,67 @@ export default function TeacherDashboard() {
         </div>
     );
 
-    if (loading) return <div className="flex h-screen items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
+    if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
 
     return (
-        <div className="min-h-screen bg-gray-50/30 font-sans text-gray-900">
+        <div className="flex h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
+            {/* Background Elements */}
+            <div className="absolute inset-0 z-0">
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+            </div>
+
             <Sidebar />
             <MobileSidebar />
 
-            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'} flex flex-col min-h-screen w-full`}>
+            <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'} flex-1 flex flex-col min-h-screen w-full relative z-10`}>
                 {/* Top Header */}
-                <header className="h-auto min-h-[4rem] py-2 bg-white/80 backdrop-blur-md sticky top-0 z-40 border-b flex items-center justify-between px-4 md:px-8">
+                <header className="h-20 py-4 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl sticky top-0 z-40 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 md:px-8 transition-all duration-300">
                     <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
                         <Button variant="ghost" size="icon" className="lg:hidden flex-shrink-0" onClick={() => setMobileSidebarOpen(true)}>
-                            <Menu className="h-5 w-5" />
+                            <Menu className="h-6 w-6" />
                         </Button>
-                        <div className="truncate">
-                            <h1 className="text-lg md:text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 px-1 truncate">
+                        <div className="truncate flex flex-col justify-center pl-2">
+                            <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 px-1 truncate leading-tight">
                                 {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
                             </h1>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4">
+                        <div className="hidden md:flex items-center gap-2 mr-2">
+                            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full relative">
+                                <Bell className="w-5 h-5" />
+                                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+                            </Button>
+                        </div>
+                        <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block"></div>
                         <div className="relative" ref={userMenuRef}>
                             <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="sm" className="rounded-full h-9 w-9 p-0 border shadow-sm">
-                                        <div className="w-full h-full rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold">
+                                    <button className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-800 transition-all">
+                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold shadow-sm">
                                             {user?.name?.[0] || 'T'}
                                         </div>
-                                    </Button>
+                                        <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors hidden md:block" />
+                                    </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuLabel>
-                                        <div className="flex flex-col space-y-1">
-                                            <p className="text-sm font-medium leading-none">{user?.name}</p>
-                                            <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
-                                        </div>
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem onClick={() => setActiveTab('settings')}>
+                                <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90">
+                                    <div className="px-2 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-lg mb-2">
+                                        <p className="text-sm font-semibold leading-none text-foreground">{user?.name}</p>
+                                        <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email}</p>
+                                    </div>
+                                    <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                                    <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5">
                                         <Settings className="mr-2 h-4 w-4" />
                                         <span>Settings</span>
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem className="text-red-600 focus:text-red-600" onClick={handleLogout}>
+                                    <DropdownMenuItem onClick={() => router.push('/')} className="rounded-lg cursor-pointer py-2.5">
+                                        <Home className="mr-2 h-4 w-4" />
+                                        <span>Home</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                                    <DropdownMenuItem className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 rounded-lg cursor-pointer py-2.5" onClick={handleLogout}>
                                         <LogOut className="mr-2 h-4 w-4" />
                                         <span>Log out</span>
                                     </DropdownMenuItem>
@@ -313,61 +328,141 @@ export default function TeacherDashboard() {
                 </header>
 
                 {/* Dashboard Content */}
-                <main className="flex-1 p-4 md:p-8 max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={activeTab}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            transition={{ duration: 0.2 }}
-                            className="w-full"
-                        >
-                            {activeTab === 'overview' && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                        <Card>
-                                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                                <CardTitle className="text-sm font-medium">Coming Soon</CardTitle>
-                                                <Activity className="h-4 w-4 text-muted-foreground" />
-                                            </CardHeader>
-                                            <CardContent>
-                                                <div className="text-2xl font-bold">Overview</div>
-                                                <p className="text-xs text-muted-foreground">Detailed stats coming soon</p>
-                                            </CardContent>
-                                        </Card>
+                <main className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
+                    <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={activeTab}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="w-full"
+                            >
+                                {activeTab === 'overview' && (
+                                    <div className="space-y-6">
+                                        <div className="mb-6">
+                                            <h1 className="text-3xl font-bold mb-2">Teacher Dashboard</h1>
+                                            <p className="text-muted-foreground">Manage your classes, exams, and students.</p>
+                                        </div>
+
+                                        {/* Mock Stats */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                            {[
+                                                { label: 'Total Students', value: '1,234', icon: Users, color: 'blue', bg: 'bg-blue-500' },
+                                                { label: 'Upcoming Exams', value: '3', icon: FileText, color: 'purple', bg: 'bg-purple-500' },
+                                                { label: 'Pending Grading', value: '12', icon: ClipboardList, color: 'amber', bg: 'bg-amber-500' },
+                                                { label: 'Avg. Attendance', value: '92%', icon: Calendar, color: 'emerald', bg: 'bg-emerald-500' },
+                                            ].map((stat, i) => (
+                                                <motion.div
+                                                    key={i}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: i * 0.1 }}
+                                                >
+                                                    <Card className="border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 overflow-hidden relative group">
+                                                        <div className={`absolute top-0 right-0 w-20 h-20 ${stat.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
+                                                        <CardContent className="p-6">
+                                                            <div className="flex items-center justify-between mb-4">
+                                                                <div className={`p-2 rounded-lg ${stat.bg} bg-opacity-10 text-${stat.color}-600`}>
+                                                                    <stat.icon className="h-5 w-5" />
+                                                                </div>
+                                                            </div>
+                                                            <div className="text-2xl font-bold mb-1">{stat.value}</div>
+                                                            <div className="text-xs text-muted-foreground">{stat.label}</div>
+                                                        </CardContent>
+                                                    </Card>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* Recent Activity */}
+                                            <Card className="border-0 shadow-sm">
+                                                <CardHeader>
+                                                    <CardTitle>Recent Activity</CardTitle>
+                                                    <CardDescription>Latest updates from your classes</CardDescription>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-4">
+                                                        {[
+                                                            { title: "Exam 'Math Midterm' Published", time: "2 hours ago", icon: FileText, color: "text-blue-500" },
+                                                            { title: "Class 10-A Attendance Marked", time: "4 hours ago", icon: CheckCircle, color: "text-green-500" },
+                                                            { title: "New Question Added to Bank", time: "Yesterday", icon: BookOpen, color: "text-amber-500" },
+                                                        ].map((item, i) => (
+                                                            <div key={i} className="flex items-start gap-3 pb-3 border-b last:border-0">
+                                                                <div className="mt-1">
+                                                                    <item.icon className={`h-4 w-4 ${item.color}`} />
+                                                                </div>
+                                                                <div>
+                                                                    <div className="text-sm font-medium">{item.title}</div>
+                                                                    <div className="text-xs text-muted-foreground">{item.time}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Schedule */}
+                                            <Card className="border-0 shadow-sm">
+                                                <CardHeader>
+                                                    <CardTitle>Today&apos;s Schedule</CardTitle>
+                                                    <CardDescription>Your upcoming classes</CardDescription>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <div className="space-y-3">
+                                                        {[
+                                                            { time: "09:00 AM", class: "Class 10 - Section A", subject: "Mathematics" },
+                                                            { time: "11:00 AM", class: "Class 9 - Section B", subject: "Physics" },
+                                                            { time: "02:00 PM", class: "Class 11 - Section A", subject: "Further Math" },
+                                                        ].map((item, i) => (
+                                                            <div key={i} className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
+                                                                <div className="flex flex-col items-center justify-center min-w-[60px] p-2 bg-white dark:bg-gray-800 rounded-md shadow-sm">
+                                                                    <Clock className="h-4 w-4 text-primary mb-1" />
+                                                                    <span className="text-[10px] font-bold whitespace-nowrap">{item.time}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <div className="font-semibold text-sm">{item.subject}</div>
+                                                                    <div className="text-xs text-muted-foreground">{item.class}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {activeTab === 'analytics' && <AdminAnalyticsTab />}
-                            {activeTab === 'attendance' && <AttendanceTab />}
-                            {activeTab === 'notices' && <NoticesTab />}
-                            {activeTab === 'chat' && <ChatTab />}
-                            {activeTab === 'security' && <SecurityTab />}
-                            {activeTab === 'settings' && <AdminSettingsTab />}
-                            {activeTab === 'admit-cards' && <TeacherAdmitCardsTab />}
+                                {activeTab === 'analytics' && <AdminAnalyticsTab />}
+                                {activeTab === 'attendance' && <AttendanceTab />}
+                                {activeTab === 'notices' && <NoticesTab />}
+                                {activeTab === 'chat' && <ChatTab />}
+                                {activeTab === 'security' && <SecurityTab />}
+                                {activeTab === 'settings' && <AdminSettingsTab />}
+                                {activeTab === 'admit-cards' && <TeacherAdmitCardsTab />}
 
-                            {/* Placeholders for sections that are primarily link-based but might have inline content */}
-                            {['classes', 'omr-scanner'].includes(activeTab) && (
-                                <div className="flex flex-col items-center justify-center h-64 text-center">
-                                    <div className="p-4 rounded-full bg-blue-50 text-blue-500 mb-4">
-                                        <Settings className="w-8 h-8" />
+                                {/* Placeholders for sections that are primarily link-based but might have inline content */}
+                                {['classes', 'omr-scanner'].includes(activeTab) && (
+                                    <div className="flex flex-col items-center justify-center h-64 text-center">
+                                        <div className="p-4 rounded-full bg-blue-50 text-blue-500 mb-4">
+                                            <Settings className="w-8 h-8" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold text-gray-900">Module Loaded</h3>
+                                        <p className="text-gray-500 max-w-sm mt-2">
+                                            This module is either integrated via navigation links or currently under development for the Teacher view.
+                                        </p>
+                                        <Button className="mt-4" onClick={() => router.push('/dashboard')}>
+                                            Return to Dashboard
+                                        </Button>
                                     </div>
-                                    <h3 className="text-lg font-semibold text-gray-900">Module Loaded</h3>
-                                    <p className="text-gray-500 max-w-sm mt-2">
-                                        This module is either integrated via navigation links or currently under development for the Teacher view.
-                                    </p>
-                                    <Button className="mt-4" onClick={() => router.push('/dashboard')}>
-                                        Return to Dashboard
-                                    </Button>
-                                </div>
-                            )}
+                                )}
 
-                        </motion.div>
-                    </AnimatePresence>
+                            </motion.div>
+                        </AnimatePresence>
+                    </div>
                 </main>
-
                 <AppFooter />
             </div>
         </div>

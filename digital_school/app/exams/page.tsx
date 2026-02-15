@@ -922,6 +922,12 @@ export default function ExamsPage() {
                                   {getTypeIcon(exam.type)}
                                   {exam.type}
                                 </Badge>
+                                {exam.allowRetake && (
+                                  <Badge className="rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                                    <RefreshCw className="w-3 h-3" />
+                                    Retake
+                                  </Badge>
+                                )}
                               </div>
                               {userRole !== 'TEACHER' && (
                                 <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
@@ -1016,8 +1022,8 @@ export default function ExamsPage() {
 
                               <div className="flex items-center gap-3">
                                 <div className="flex flex-col items-end">
-                                  <div className="flex items-center gap-1 text-gray-500 dark:text-gray-400">
-                                    <Clock className="w-3.5 h-3.5" />
+                                  <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg px-2 py-1">
+                                    <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                                     <span className="text-xs font-bold">{exam.duration}m</span>
                                   </div>
                                   <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 mt-0.5">
