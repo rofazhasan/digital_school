@@ -302,14 +302,15 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
 
-  if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
+  // if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
+  // Hook violation fix: Moved check to render time
 
-  const text = question.text || question.questionText || "(No text)";
-  const type = (question.type || "").toLowerCase();
-  const subQuestions = question.subQuestions || question.sub_questions || [];
+  const text = question?.text || question?.questionText || "(No text)";
+  const type = (question?.type || "").toLowerCase();
+  const subQuestions = question?.subQuestions || question?.sub_questions || [];
 
   const handleAnswerChange = useCallback(async (value: any) => {
-    if (disabled) return;
+    if (disabled || !question) return;
     const updated = { ...answers, [question.id]: value };
     setAnswers(updated);
 
@@ -320,9 +321,10 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
         body: JSON.stringify({ answers: updated }),
       });
     } catch (e) { console.error("Autosave failed", e); }
-  }, [disabled, answers, question.id, setAnswers, exam.id]);
+  }, [disabled, answers, question?.id, setAnswers, exam.id]);
 
   const handleMarkQuestion = useCallback(() => {
+    if (!question) return;
     if (markQuestion) {
       markQuestion(question.id, !navigation.marked[question.id]);
     } else {
@@ -331,7 +333,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
       else newMarked[question.id] = true;
       setNavigation({ ...navigation, marked: newMarked });
     }
-  }, [question.id, navigation.marked, markQuestion, setNavigation, navigation]);
+  }, [question?.id, navigation.marked, markQuestion, setNavigation, navigation]);
+
+  if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
 
   const userAnswer = answers[question.id];
   const showResult = submitted && result;
@@ -552,76 +556,74 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       })()}
 
                       {/* Upload Button - Show if less than 5 images */}
-                      {!disabled && !submitted && (() => {
-                        const singleImage = answers[`${question.id}_image`];
-                        const multipleImages = answers[`${question.id}_images`] || [];
-                        const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
-                        return allImages.length < 5;
-                      })() && (
-                          <div className="relative">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              multiple
-                              onClick={() => setIsUploading && setIsUploading(true)}
-                              onChange={async (e) => {
-                                const files = Array.from(e.target.files || []);
-                                if (files.length === 0) {
-                                  setIsUploading && setIsUploading(false);
-                                  return;
-                                }
+                      {/* Upload Button - Show if less than 5 images */}
+                      {!disabled && !submitted && (
+                        ((answers[`${question.id}_image`] ? 1 : 0) + (answers[`${question.id}_images`]?.length || 0)) < 5
+                      ) ? (
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onClick={() => setIsUploading && setIsUploading(true)}
+                            onChange={async (e) => {
+                              const files = Array.from(e.target.files || []);
+                              if (files.length === 0) {
+                                setIsUploading?.(false);
+                                return;
+                              }
 
-                                const singleImage = answers[`${question.id}_image`];
-                                const multipleImages = answers[`${question.id}_images`] || [];
-                                const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+                              const singleImage = answers[`${question.id}_image`];
+                              const multipleImages = answers[`${question.id}_images`] || [];
+                              const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
 
-                                const remainingSlots = 5 - currentImages.length;
-                                const filesToUpload = files.slice(0, remainingSlots);
+                              const remainingSlots = 5 - currentImages.length;
+                              const filesToUpload = files.slice(0, remainingSlots);
 
-                                if (files.length > remainingSlots) {
-                                  toast.warning(`Only uploading ${remainingSlots} image(s). Maximum 5 images per question.`);
-                                }
+                              if (files.length > remainingSlots) {
+                                toast.warning(`Only uploading ${remainingSlots} image(s). Maximum 5 images per question.`);
+                              }
 
-                                const uploadedUrls: string[] = [];
+                              const uploadedUrls: string[] = [];
 
-                                for (const file of filesToUpload) {
-                                  const formData = new FormData();
-                                  formData.append('file', file);
-                                  try {
-                                    const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                    const data = await res.json();
+                              for (const file of filesToUpload) {
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                try {
+                                  const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                  const data = await res.json();
 
-                                    if (res.ok) {
-                                      uploadedUrls.push(data.url);
-                                      toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
-                                    } else {
-                                      console.error('Upload failed:', data);
-                                      toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
-                                    }
-                                  } catch (err) {
-                                    console.error('Upload error:', err);
-                                    toast.error('Failed to upload image. Please try again.');
+                                  if (res.ok) {
+                                    uploadedUrls.push(data.url);
+                                    toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
+                                  } else {
+                                    console.error('Upload failed:', data);
+                                    toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
                                   }
+                                } catch (err) {
+                                  console.error('Upload error:', err);
+                                  toast.error('Failed to upload image. Please try again.');
                                 }
+                              }
 
-                                if (uploadedUrls.length > 0) {
-                                  const newAnswers = { ...answers };
-                                  delete newAnswers[`${question.id}_image`]; // Remove old single image format
-                                  newAnswers[`${question.id}_images`] = [...currentImages, ...uploadedUrls];
-                                  setAnswers(newAnswers);
-                                }
+                              if (uploadedUrls.length > 0) {
+                                const newAnswers = { ...answers };
+                                delete newAnswers[`${question.id}_image`]; // Remove old single image format
+                                newAnswers[`${question.id}_images`] = [...currentImages, ...uploadedUrls];
+                                setAnswers(newAnswers);
+                              }
 
-                                setIsUploading && setIsUploading(false);
-                                e.target.value = ''; // Reset input
-                              }}
-                              className="hidden"
-                              id={`q-img-${question.id}`}
-                            />
-                            <label htmlFor={`q-img-${question.id}`} className="flex items-center gap-2 cursor-pointer text-sm text-indigo-600 hover:text-indigo-800">
-                              <Upload className="w-4 h-4" /> Upload Image Answer (Max 5)
-                            </label>
-                          </div>
-                        )}
+                              setIsUploading?.(false);
+                              e.target.value = ''; // Reset input
+                            }}
+                            className="hidden"
+                            id={`q-img-${question.id}`}
+                          />
+                          <label htmlFor={`q-img-${question.id}`} className="flex items-center gap-2 cursor-pointer text-sm text-indigo-600 hover:text-indigo-800">
+                            <Upload className="w-4 h-4" /> Upload Image Answer (Max 5)
+                          </label>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 )}
@@ -630,14 +632,22 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                   <div className="space-y-6">
                     {subQuestions.map((subQ: any, idx: number) => (
                       <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
-                        <div className="text-sm md:text-base font-medium text-gray-700 mb-2">
-                          {idx + 1}. <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
-                          {subQ.image && (
-                            <div className="mt-2">
-                              <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
-                            </div>
+                        <div className="text-sm md:text-base font-medium text-gray-700 mb-2 flex justify-between items-start gap-4">
+                          <span>
+                            {idx + 1}. <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
+                          </span>
+                          {subQ.marks && (
+                            <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs">
+                              {subQ.marks} Mark{Number(subQ.marks) !== 1 && 's'}
+                            </Badge>
                           )}
                         </div>
+                        {subQ.image && (
+                          <div className="mt-2">
+                            <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
+                          </div>
+                        )}
+
                         <div className="space-y-2">
                           <Input
                             value={answers[`${question.id}_sub_${idx}`] || ""}
@@ -690,76 +700,73 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                             })()}
 
                             {/* Upload Button */}
-                            {!disabled && !submitted && (() => {
-                              const singleImage = answers[`${question.id}_sub_${idx}_image`];
-                              const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
-                              const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
-                              return allImages.length < 5;
-                            })() && (
-                                <div className="relative">
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    onClick={() => setIsUploading && setIsUploading(true)}
-                                    onChange={async (e) => {
-                                      const files = Array.from(e.target.files || []);
-                                      if (files.length === 0) {
-                                        setIsUploading && setIsUploading(false);
-                                        return;
-                                      }
+                            {!disabled && !submitted && (
+                              ((answers[`${question.id}_sub_${idx}_image`] ? 1 : 0) + (answers[`${question.id}_sub_${idx}_images`]?.length || 0)) < 5
+                            ) ? (
+                              <div className="relative">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onClick={() => setIsUploading?.(true)}
+                                  onChange={async (e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length === 0) {
+                                      setIsUploading?.(false);
+                                      return;
+                                    }
 
-                                      const singleImage = answers[`${question.id}_sub_${idx}_image`];
-                                      const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
-                                      const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+                                    const singleImage = answers[`${question.id}_sub_${idx}_image`];
+                                    const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
+                                    const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
 
-                                      const remainingSlots = 5 - currentImages.length;
-                                      const filesToUpload = files.slice(0, remainingSlots);
+                                    const remainingSlots = 5 - currentImages.length;
+                                    const filesToUpload = files.slice(0, remainingSlots);
 
-                                      if (files.length > remainingSlots) {
-                                        toast.warning(`Only uploading ${remainingSlots} image(s). Maximum 5 images per sub-question.`);
-                                      }
+                                    if (files.length > remainingSlots) {
+                                      toast.warning(`Only uploading ${remainingSlots} image(s). Maximum 5 images per sub-question.`);
+                                    }
 
-                                      const uploadedUrls: string[] = [];
+                                    const uploadedUrls: string[] = [];
 
-                                      for (const file of filesToUpload) {
-                                        const formData = new FormData();
-                                        formData.append('file', file);
-                                        try {
-                                          const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                          const data = await res.json();
+                                    for (const file of filesToUpload) {
+                                      const formData = new FormData();
+                                      formData.append('file', file);
+                                      try {
+                                        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                        const data = await res.json();
 
-                                          if (res.ok) {
-                                            uploadedUrls.push(data.url);
-                                            toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
-                                          } else {
-                                            console.error('Upload failed:', data);
-                                            toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
-                                          }
-                                        } catch (err) {
-                                          console.error('Upload error:', err);
-                                          toast.error('Failed to upload image. Please try again.');
+                                        if (res.ok) {
+                                          uploadedUrls.push(data.url);
+                                          toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
+                                        } else {
+                                          console.error('Upload failed:', data);
+                                          toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
                                         }
+                                      } catch (err) {
+                                        console.error('Upload error:', err);
+                                        toast.error('Failed to upload image. Please try again.');
                                       }
+                                    }
 
-                                      if (uploadedUrls.length > 0) {
-                                        const newAnswers = { ...answers };
-                                        delete newAnswers[`${question.id}_sub_${idx}_image`];
-                                        newAnswers[`${question.id}_sub_${idx}_images`] = [...currentImages, ...uploadedUrls];
-                                        setAnswers(newAnswers);
-                                      }
+                                    if (uploadedUrls.length > 0) {
+                                      const newAnswers = { ...answers };
+                                      delete newAnswers[`${question.id}_sub_${idx}_image`];
+                                      newAnswers[`${question.id}_sub_${idx}_images`] = [...currentImages, ...uploadedUrls];
+                                      setAnswers(newAnswers);
+                                    }
 
-                                      setIsUploading && setIsUploading(false);
-                                      e.target.value = '';
-                                    }}
-                                    className="hidden"
-                                    id={`q-img-${question.id}-${idx}`}
-                                  />
-                                  <label htmlFor={`q-img-${question.id}-${idx}`} className="flex items-center gap-2 cursor-pointer text-xs text-indigo-600 hover:text-indigo-800">
-                                    <Upload className="w-3 h-3" /> Upload Image (Max 5)
-                                  </label>
-                                </div>
-                              )}
+                                    setIsUploading?.(false);
+                                    e.target.value = '';
+                                  }}
+                                  className="hidden"
+                                  id={`q-img-${question.id}-${idx}`}
+                                />
+                                <label htmlFor={`q-img-${question.id}-${idx}`} className="flex items-center gap-2 cursor-pointer text-xs text-indigo-600 hover:text-indigo-800">
+                                  <Upload className="w-3 h-3" /> Upload Image (Max 5)
+                                </label>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                       </div>
@@ -793,6 +800,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
         </CardContent>
       </Card>
-    </MathJaxContext>
+    </MathJaxContext >
   );
 } 

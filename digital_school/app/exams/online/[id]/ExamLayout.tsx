@@ -7,7 +7,7 @@ import Timer from "./Timer";
 import Navigator from "./Navigator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
@@ -154,6 +154,9 @@ export default function ExamLayout() {
     setExternalWarnings: setContextWarnings
   });
 
+  // Grace period state to prevent immediate blocking on start
+  const [gracePeriod, setGracePeriod] = useState(false);
+
   // Check initial start state
   useEffect(() => {
     if (exam.startedAt) {
@@ -163,22 +166,34 @@ export default function ExamLayout() {
 
   const handleStartExam = async () => {
     try {
+      setIsStarting(true);
+      setGracePeriod(true); // Enable grace period
+
       // 1. Enter Fullscreen FIRST
       await enterFullscreen();
 
-      setIsStarting(true);
+      // 2. Call API to start exam on server
+      const res = await fetch(`/api/exams/${exam.id}/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
 
-      // 2. Add ?action=start to the URL
-      const currentUrl = new URL(window.location.href);
-      currentUrl.searchParams.set('action', 'start');
+      if (!res.ok) throw new Error("Failed to start exam session");
 
-      // 3. Force reload to trigger the server-side start logic
-      window.location.href = currentUrl.toString();
+      // 3. Update local state to show exam
+      setIsExamActive(true);
+      setShowInstructions(false);
+
+      toast.success("Exam Started Successfully", { position: "top-center" });
+
+      // Disable grace period after 3 seconds (enough time for fullscreen to settle)
+      setTimeout(() => setGracePeriod(false), 3000);
 
     } catch (error) {
       console.error("Error starting exam:", error);
       toast.error("Failed to start exam. Please try again.");
       setIsStarting(false);
+      setGracePeriod(false);
     }
   };
 
@@ -205,7 +220,29 @@ export default function ExamLayout() {
   };
 
   // --------------- BLOCKING MODAL FOR PROCTORING (Overlay) ---------------
-  const isBlocked = isExamActive && (!isFullscreen || !isTabActive);
+  // Moved up to be available for keyboard navigation useEffect
+  // Added gracePeriod check to prevent instant block on start
+  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive);
+
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (isBlocked || !isExamActive) return;
+
+      // Ignore if user is typing in an input/textarea
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      if (e.key === 'ArrowRight') {
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrevious();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isBlocked, isExamActive, handleNext, handlePrevious]);
+
 
   if (showInstructions) {
     const mcqQuestions = questions.filter((q: any) => q.type === 'MCQ');
@@ -229,36 +266,64 @@ export default function ExamLayout() {
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
             <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
-            <p className="text-sm md:text-lg text-muted-foreground">Ready to begin?</p>
+            <p className="text-sm md:text-lg text-muted-foreground">পরীক্ষা শুরু করতে প্রস্তুত?</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Time</div>
-              <p className="text-xl font-bold text-primary">{exam.duration}m</p>
+            <div className="bg-blue-50/50 p-4 rounded-xl text-center border border-blue-100/50">
+              <div className="text-xs text-blue-600/80 font-bold uppercase tracking-wider mb-1">সময় (Time)</div>
+              <p className="text-xl font-bold text-blue-700">
+                {Math.floor(exam.duration / 60) > 0 ? `${Math.floor(exam.duration / 60)}h ` : ''}{exam.duration % 60}m
+              </p>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Questions</div>
-              <p className="text-xl font-bold text-primary">{totalQuestions}</p>
+            <div className="bg-purple-50/50 p-4 rounded-xl text-center border border-purple-100/50">
+              <div className="text-xs text-purple-600/80 font-bold uppercase tracking-wider mb-1">মোট প্রশ্ন</div>
+              <p className="text-xl font-bold text-purple-700">{totalQuestions}</p>
+              <div className="text-[10px] text-purple-500/80 mt-1 font-medium">
+                {mcqQuestions.length > 0 && `MCQ: ${mcqQuestions.length} `}
+                {cqQuestions.length > 0 && `CQ: ${cqQuestions.length} `}
+                {sqQuestions.length > 0 && `SQ: ${sqQuestions.length}`}
+              </div>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Total Marks</div>
-              <p className="text-xl font-bold text-primary">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
+            <div className="bg-emerald-50/50 p-4 rounded-xl text-center border border-emerald-100/50">
+              <div className="text-xs text-emerald-600/80 font-bold uppercase tracking-wider mb-1">পূর্ণমান (Marks)</div>
+              <p className="text-xl font-bold text-emerald-700">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
             </div>
-            <div className="bg-muted/50 p-4 rounded-xl text-center border hover:border-primary/20 transition-colors">
-              <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1">Pass Mark</div>
-              <p className="text-xl font-bold text-primary">{passMark}</p>
+            <div className="bg-rose-50/50 p-4 rounded-xl text-center border border-rose-100/50">
+              <div className="text-xs text-rose-600/80 font-bold uppercase tracking-wider mb-1">পাস মার্ক</div>
+              <p className="text-xl font-bold text-rose-700">{passMark}</p>
             </div>
           </div>
 
-          <div className="alert alert-warning mb-6 bg-amber-50/50 border-amber-100 text-amber-900 rounded-xl p-4 text-sm">
-            <div className="flex items-center gap-2 font-bold mb-2">
-              <AlertCircle className="w-4 h-4" /> Important Instructions
+          <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-5 text-sm space-y-4">
+            <div className="flex items-center gap-2 font-bold text-amber-900 border-b border-amber-200/50 pb-2">
+              <AlertCircle className="w-5 h-5" /> গুরুত্বপূর্ণ নির্দেশনা (Instructions)
             </div>
-            <ul className="list-disc pl-5 space-y-1 opacity-90">
-              <li>Do not switch tabs or exit fullscreen (Violations are recorded).</li>
-              <li>Ensure stable internet connection.</li>
-              {exam.mcqNegativeMarking > 0 && <li>Negative Marking: {exam.mcqNegativeMarking}% per wrong MCQ.</li>}
+            <ul className="space-y-2 text-amber-900/90 font-medium">
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-1">•</span>
+                <span>ফুলস্ক্রিন মোড থেকে বের হবেন না বা ট্যাব পরিবর্তন করবেন না (সতর্কতা রেকর্ড করা হবে)।</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-1">•</span>
+                <span>স্থিতিশীল ইন্টারনেট সংযোগ নিশ্চিত করুন।</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-600 mt-1">•</span>
+                <span>৪টি সতর্কতার (Warning) পর পরীক্ষা স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</span>
+              </li>
+              {exam.mcqNegativeMarking > 0 && (
+                <li className="flex items-start gap-2">
+                  <span className="text-red-500 mt-1">•</span>
+                  <span className="text-red-700 font-bold">প্রতিটি ভুল MCQ উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কাটা যাবে।</span>
+                </li>
+              )}
+              {hasCQorSQ && (
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-600 mt-1">•</span>
+                  <span>সৃজনশীল/সংক্ষিপ্ত প্রশ্নের উত্তর খাতায় লিখে ছবি তুলে আপলোড করতে পারবেন।</span>
+                </li>
+              )}
             </ul>
           </div>
 
@@ -267,7 +332,7 @@ export default function ExamLayout() {
             disabled={isStarting}
             className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-6 text-lg rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]"
           >
-            {isStarting ? "Initializing Assessment..." : "Start Assessment"}
+            {isStarting ? "লোডিং হচ্ছে..." : "পরীক্ষা শুরু করুন (Start Exam)"}
           </Button>
         </Card>
       </div>
@@ -462,6 +527,24 @@ export default function ExamLayout() {
               <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">Submit Now</Button>
             </div>
           </Card>
+        </div>
+      )}
+
+      {/* Submission Loader */}
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[70] bg-white/90 dark:bg-gray-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Check className="w-6 h-6 text-indigo-600 animate-pulse" />
+              </div>
+            </div>
+            <div className="text-center space-y-2">
+              <h2 className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">উত্তরপত্র জমা দেওয়া হচ্ছে...</h2>
+              <p className="text-gray-500 font-medium">অনুগ্রহ করে অপেক্ষা করুন (Processing Result...)</p>
+            </div>
+          </div>
         </div>
       )}
 

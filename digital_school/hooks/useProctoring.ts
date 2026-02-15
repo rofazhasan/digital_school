@@ -58,6 +58,9 @@ export const useProctoring = ({
             if (!isExamActive) return;
 
             if (document.hidden) {
+                // Ignore if uploading (file picker dialog)
+                if (isUploading) return;
+
                 setIsTabActive(false);
                 triggerViolation('You left the exam tab. This has been recorded.');
             } else {

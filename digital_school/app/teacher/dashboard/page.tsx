@@ -126,7 +126,7 @@ export default function TeacherDashboard() {
         <motion.div
             initial={false}
             animate={{ width: sidebarCollapsed ? 80 : 280 }}
-            className={`fixed inset-y-0 left-0 z-50 hidden lg:flex flex-col bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 shadow-2xl shadow-gray-200/20 dark:shadow-none transition-all duration-300`}
+            className={`fixed inset-y-0 left-0 z-50 hidden lg:flex flex-col bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border shadow-2xl shadow-black/5 dark:shadow-none transition-all duration-300`}
         >
             <div className={`h-20 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-gray-100/50 dark:border-gray-800/50`}>
                 {!sidebarCollapsed && (
@@ -260,7 +260,7 @@ export default function TeacherDashboard() {
     if (loading) return <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-gray-950"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div></div>;
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
+        <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
             {/* Background Elements */}
             <div className="absolute inset-0 z-0">
                 <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
@@ -272,7 +272,7 @@ export default function TeacherDashboard() {
 
             <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'} flex-1 flex flex-col min-h-screen w-full relative z-10`}>
                 {/* Top Header */}
-                <header className="h-20 py-4 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl sticky top-0 z-40 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 md:px-8 transition-all duration-300">
+                <header className="h-20 py-4 bg-background/80 backdrop-blur-xl sticky top-0 z-40 border-b border-border flex items-center justify-between px-4 md:px-8 transition-all duration-300">
                     <div className="flex items-center gap-2 sm:gap-4 overflow-hidden">
                         <Button variant="ghost" size="icon" className="lg:hidden flex-shrink-0" onClick={() => setMobileSidebarOpen(true)}>
                             <Menu className="h-6 w-6" />

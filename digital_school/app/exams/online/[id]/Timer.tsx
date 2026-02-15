@@ -1,23 +1,27 @@
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useExamContext } from "./ExamContext";
 import { Clock, WifiOff } from 'lucide-react';
 
 function formatTime(seconds: number) {
-  const m = Math.floor(seconds / 60).toString().padStart(2, "0");
-  const s = (seconds % 60).toString().padStart(2, "0");
-  return `${m}:${s}`;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+
+  if (h > 0) {
+    return `${h}h ${m.toString().padStart(2, '0')}m`;
+  }
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
   const { exam, isOnline } = useExamContext();
   const [secondsLeft, setSecondsLeft] = useState(0);
-  const [warned, setWarned] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // Calculate initial time based on server start time
+    // Calculate initial time based on server start time or duration
     const calculateTimeLeft = () => {
       const durationSeconds = exam.duration * 60;
 
@@ -25,6 +29,8 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
         const startTime = new Date(exam.startedAt).getTime();
         const now = Date.now();
         const elapsedSeconds = Math.floor((now - startTime) / 1000);
+
+        // Strict check: if elapsed > duration, time is up
         return Math.max(0, durationSeconds - elapsedSeconds);
       }
 
@@ -32,41 +38,39 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
     };
 
     setSecondsLeft(calculateTimeLeft());
-    setWarned(false);
   }, [exam.duration, exam.startedAt]);
 
-  // Timer tick logic
+  // Reliable Timer Logic
   useEffect(() => {
-    if (secondsLeft <= 0 && exam.startedAt) {
-      // If time is really up
-      const durationSeconds = exam.duration * 60;
-      const startTime = new Date(exam.startedAt).getTime();
-      const now = Date.now();
-      const elapsedSeconds = Math.floor((now - startTime) / 1000);
-      const realTimeLeft = Math.max(0, durationSeconds - elapsedSeconds);
-
-      if (realTimeLeft <= 0) {
-        if (onTimeUp) onTimeUp();
-      }
-      return;
-    }
-
-    // Run timer regardless of online status - rely on system time
-    intervalRef.current = setInterval(() => {
+    const checkTime = () => {
       if (exam.startedAt) {
         const startTime = new Date(exam.startedAt).getTime();
         const now = Date.now();
         const durationSeconds = exam.duration * 60;
         const newTime = Math.max(0, durationSeconds - Math.floor((now - startTime) / 1000));
 
-        setSecondsLeft(newTime);
+        if (newTime !== secondsLeft) {
+          setSecondsLeft(newTime);
+        }
+
         if (newTime <= 0) {
           if (onTimeUp) onTimeUp();
         }
       } else {
-        setSecondsLeft(prev => Math.max(0, prev - 1));
+        // Local fallback if startedAt missing (shouldn't happen in live exam)
+        setSecondsLeft(prev => {
+          const next = Math.max(0, prev - 1);
+          if (next === 0 && onTimeUp) onTimeUp();
+          return next;
+        });
       }
-    }, 1000);
+    };
+
+    // Run immediately
+    checkTime();
+
+    // Then interval
+    intervalRef.current = setInterval(checkTime, 1000);
 
     return () => {
       if (intervalRef.current) {
@@ -74,29 +78,20 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
         intervalRef.current = null;
       }
     };
-  }, [onTimeUp, exam.startedAt, exam.duration, secondsLeft === 0]);
-
-  // Warning effect
-  useEffect(() => {
-    if (!warned && secondsLeft === 300) {
-      // Simple toast or alert can go here, restricting to console for now to avoid intrusive alerts during dev
-      console.log("5 minutes left");
-      setWarned(true);
-    }
-  }, [secondsLeft, warned]);
+  }, [onTimeUp, exam.startedAt, exam.duration]);
 
   const isLowTime = secondsLeft <= 300; // 5 minutes
 
   return (
     <div className={`
-      flex items-center gap-2 px-4 py-2 rounded-full text-2xl font-bold transition-all shadow-sm
-      ${isLowTime ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-white text-gray-900 border border-gray-200'}
+      flex items-center gap-2 px-3 py-1.5 rounded-full text-sm md:text-base font-bold transition-all shadow-sm border
+      ${isLowTime ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-white text-gray-900 border-gray-200'}
     `}>
-      <Clock className={`w-5 h-5 ${isLowTime ? 'animate-pulse' : ''}`} />
-      <span>{formatTime(secondsLeft)}</span>
+      <Clock className="w-4 h-4" />
+      <span className="tabular-nums tracking-wide">{formatTime(secondsLeft)}</span>
       {!isOnline && (
-        <span className="ml-2 flex items-center text-xs text-red-500 bg-red-50 px-2 py-1 rounded-full border border-red-100">
-          <WifiOff className="w-3 h-3 mr-1" /> Offline
+        <span className="flex items-center text-[10px] text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 ml-1">
+          <WifiOff className="w-3 h-3 mr-1" />
         </span>
       )}
     </div>

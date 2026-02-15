@@ -267,7 +267,7 @@ export default function StudentDashboardPage() {
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
   return (
-    <div className="min-h-screen bg-gray-50/50 dark:bg-black font-sans relative overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground font-sans relative overflow-x-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
@@ -275,7 +275,7 @@ export default function StudentDashboardPage() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-gray-200/50 dark:border-gray-800/50 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
+      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
         <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4">
           <div className="flex h-20 items-center justify-between">
             {/* Logo and Navigation */}
@@ -423,7 +423,7 @@ export default function StudentDashboardPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6 mb-8">
                   <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
                     <Card
-                      className="border-0 shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all cursor-pointer bg-white/60 dark:bg-gray-900/60 backdrop-blur-md group"
+                      className="border-0 shadow-lg shadow-indigo-500/10 hover:shadow-indigo-500/20 transition-all cursor-pointer bg-card/60 backdrop-blur-md group"
                       onClick={() => router.push('/student/prac-perfect')}
                     >
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-indigo-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
@@ -443,7 +443,7 @@ export default function StudentDashboardPage() {
                   </motion.div>
 
                   <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                    <Card className="border-0 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all bg-white/60 dark:bg-gray-900/60 backdrop-blur-md group overflow-hidden">
+                    <Card className="border-0 shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-blue-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground z-10">Next Exam</CardTitle>

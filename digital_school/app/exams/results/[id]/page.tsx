@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import { useState, useEffect } from 'react';
 import { use } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,7 +17,6 @@ import {
   Users,
   Target,
   BarChart3,
-  Star,
   Medal,
   Crown,
   CheckCircle,
@@ -25,7 +25,6 @@ import {
   Download,
   Share2,
   Eye,
-  Calendar,
   Clock,
   BookOpen,
   User,
@@ -35,8 +34,6 @@ import {
   CheckSquare,
   MessageSquare,
   Lock,
-  ChevronLeft,
-  ChevronRight,
   Camera
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -48,7 +45,7 @@ import { cleanupMath } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
-import QRCode from "react-qr-code";
+// import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
   id: string;
@@ -177,22 +174,24 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [studentComment, setStudentComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showNotification, setShowNotification] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [error, setError] = useState<string | null>(null);
-  const [notificationMessage, setNotificationMessage] = useState('');
+  // const [notificationMessage, setNotificationMessage] = useState(''); // Unused
   const [zoomedImage, setZoomedImage] = useState<string>('');
   const [zoomedImageTitle, setZoomedImageTitle] = useState<string>('');
   const [filterStatus, setFilterStatus] = useState<'ALL' | 'CORRECT' | 'WRONG' | 'UNANSWERED'>('ALL');
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [annotatedImageFailed, setAnnotatedImageFailed] = useState(false);
   const [originalImageFallback, setOriginalImageFallback] = useState<string>('');
-  const [downloading, setDownloading] = useState(false);
+  const [downloading, setDownloading] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   // Print Handler
-  // @ts-ignore
+  // No lint error here anymore
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: result ? `${result.student.name}_${result.exam.name}_Result` : 'Exam_Result',
@@ -349,6 +348,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     };
 
     checkRoleAndRedirect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   useEffect(() => {
@@ -368,6 +368,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   }, [showZoomModal]);
 
   // Function to combine original image with annotations
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const combineImageWithAnnotations = async (originalImageSrc: string, annotationImageSrc: string): Promise<string> => {
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
@@ -515,6 +516,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     });
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const downloadResult = async () => {
     if (!result) return;
     setDownloading(true);
@@ -1355,7 +1357,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <div>
                         <h4 className="font-medium text-gray-800 mb-2 flex items-center gap-2">
                           <GraduationCap className="h-4 w-4" />
-                          Teacher's Response:
+                          Teacher&apos;s Response:
                           {result.reviewRequest.reviewer && (
                             <span className="text-sm text-gray-600">
                               (by {result.reviewRequest.reviewer.name})
@@ -1562,8 +1564,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         }
 
                                         return (optionsToRender || []).map((option, optIndex) => {
-                                          const isSelected = question.studentAnswer?.selectedOptions?.includes(optIndex) ||
-                                            question.studentAnswer?.selectedOption === optIndex;
+                                          const isSelected =
+                                            // Check for object format (e.g. MC, AR)
+                                            question.studentAnswer?.selectedOptions?.includes(optIndex) ||
+                                            question.studentAnswer?.selectedOption === optIndex ||
+                                            // Check for primitive format (e.g. standard MCQ text or index)
+                                            question.studentAnswer === option.text ||
+                                            question.studentAnswer === optIndex;
 
                                           // Determine correctness
                                           let isCorrectOpt = false;
@@ -1922,12 +1929,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   {/* Evaluator's Drawing Feedback */}
                                   {question.allDrawings && question.allDrawings.length > 0 && (
                                     <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
+                                      <h4 className="font-medium text-gray-800 mb-2">Evaluator&apos;s Feedback:</h4>
                                       <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
                                         <div className="flex items-center gap-2 mb-2">
                                           <MessageSquare className="h-4 w-4 text-orange-600" />
                                           <span className="text-sm font-medium text-orange-800">
-                                            Teacher's annotations on your answer
+                                            Teacher&apos;s annotations on your answer
                                           </span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2273,12 +2280,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       {/* Evaluator's Drawing Feedback */}
                                       {question.allDrawings && question.allDrawings.length > 0 && (
                                         <div className="mb-4">
-                                          <h4 className="font-medium text-gray-800 mb-2">Evaluator's Feedback:</h4>
+                                          <h4 className="font-medium text-gray-800 mb-2">Evaluator&apos;s Feedback:</h4>
                                           <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
                                             <div className="flex items-center gap-2 mb-2">
                                               <MessageSquare className="h-4 w-4 text-orange-600" />
                                               <span className="text-sm font-medium text-orange-800">
-                                                Teacher's annotations on your answer
+                                                Teacher&apos;s annotations on your answer
                                               </span>
                                             </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2449,7 +2456,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   <ul className="list-disc list-inside space-y-1">
                     <li>Your request will be sent to the teacher/evaluator</li>
                     <li>They will review your submission and comment</li>
-                    <li>You'll be notified when the review is complete</li>
+                    <li>You&apos;ll be notified when the review is complete</li>
                     <li>Marks may be adjusted if errors are found</li>
                   </ul>
                 </div>
@@ -2529,7 +2536,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           }
                         }
                       }}
-                      onLoad={(e) => {
+                      onLoad={() => {
                         // Image loaded successfully
                       }}
                       style={{

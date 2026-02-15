@@ -221,7 +221,22 @@ export function ExamContextProvider({
     setIsUploading,
     warnings,
     setWarnings,
-    sortedQuestions
+    sortedQuestions,
+    groupedQuestions: useMemo(() => {
+      if (!exam.questions) return {};
+      const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], other: [] };
+      exam.questions.forEach((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        if (g[type]) g[type].push(q);
+        else g.other.push(q);
+      });
+      // Return structured groups for UI
+      return {
+        creative: [...g.cq],
+        short: [...g.sq],
+        objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
+      };
+    }, [exam.questions])
   };
 
   return (

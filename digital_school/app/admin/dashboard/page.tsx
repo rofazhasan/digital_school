@@ -146,7 +146,7 @@ export default function AdminDashboard() {
   // const instituteLogo = instituteSettings?.logoUrl || "/logo.png"; // Unused for now
 
   return (
-    <div className="flex h-screen bg-gray-50 dark:bg-black overflow-hidden relative">
+    <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
       {/* Background Elements */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
@@ -163,7 +163,7 @@ export default function AdminDashboard() {
       <motion.div
         initial={{ width: 280 }}
         animate={{ width: sidebarCollapsed ? 80 : 280 }}
-        className={`fixed lg:relative z-50 h-full bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl border-r border-gray-200/50 dark:border-gray-800/50 shadow-2xl shadow-gray-200/20 dark:shadow-none transform transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        className={`fixed lg:relative z-50 h-full bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border shadow-2xl shadow-black/5 dark:shadow-none transform transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
           }`}
       >
         <div className="flex flex-col h-full">
@@ -275,9 +275,9 @@ export default function AdminDashboard() {
       </motion.div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden flex flex-col bg-gray-50/50 dark:bg-gray-950 transition-colors relative z-10">
+      <div className="flex-1 overflow-hidden flex flex-col bg-background/50 backdrop-blur-sm transition-colors relative z-10">
         {/* Top Bar with User Menu */}
-        <header className="h-20 py-4 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl sticky top-0 z-40 border-b border-gray-200/50 dark:border-gray-800/50 flex items-center justify-between px-4 md:px-8">
+        <header className="h-20 py-4 bg-background/80 backdrop-blur-xl sticky top-0 z-40 border-b border-border flex items-center justify-between px-4 md:px-8">
           <button
             onClick={() => setMobileSidebarOpen(true)}
             className="lg:hidden p-2 rounded-xl hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors text-gray-600 dark:text-gray-300"
