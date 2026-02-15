@@ -712,6 +712,53 @@ export default function ExamBuilderPage() {
             }
           }
 
+          // Shuffle MTF Right Column
+          if (q.type === 'MTF' && Array.isArray(q.rightColumn)) {
+            const shuffledRightColumn = shuffleArray(q.rightColumn);
+            processedQuestion = { ...processedQuestion, rightColumn: shuffledRightColumn };
+          }
+
+          // Shuffle AR Options (Generate default if missing)
+          if (q.type === 'AR') {
+            const defaultAROptions = [
+              { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+              { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+              { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+              { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false },
+              { text: "Assertion (A) ও Reason (R) উভয়ই মিথ্যা", isCorrect: false }
+            ];
+
+            let optionsToShuffle = (Array.isArray(q.options) && q.options.length > 0) ? q.options : defaultAROptions;
+
+            // Identify correct option index (1-based from correctOption or finding isCorrect in options)
+            let correctIndex = -1;
+            if (q.correctOption) {
+              correctIndex = Number(q.correctOption) - 1; // Convert 1-based to 0-based
+            } else if (Array.isArray(q.options)) {
+              correctIndex = q.options.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+            }
+
+            // Mark correct option in the array if not already marked (for default options)
+            if (correctIndex >= 0 && correctIndex < optionsToShuffle.length) {
+              optionsToShuffle = optionsToShuffle.map((opt: any, idx: number) => ({
+                ...opt,
+                isCorrect: idx === correctIndex
+              }));
+            }
+
+            const shuffledAROptions = shuffleArray(optionsToShuffle);
+            processedQuestion = { ...processedQuestion, options: shuffledAROptions };
+
+            // Find new correct index
+            const newCorrectIndex = shuffledAROptions.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+            if (newCorrectIndex !== -1) {
+              processedQuestion = {
+                ...processedQuestion,
+                correctOption: newCorrectIndex + 1 // Store as 1-based index
+              };
+            }
+          }
+
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC)
           if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
             const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
@@ -1000,18 +1047,31 @@ export default function ExamBuilderPage() {
                               {setQ ? (
                                 <div>
                                   {setQ.hasMath ? <UniversalMathJax inline>{cleanupMath(setQ.questionText)}</UniversalMathJax> : setQ.questionText}
-                                  {setQ.type === 'MCQ' && Array.isArray(setQ.options) && (
+                                  {((setQ.type === 'MCQ' || setQ.type === 'AR') && Array.isArray(setQ.options)) && (
                                     <ul className="list-disc pl-4 mt-1">
-                                      {setQ.options.map((opt: any, i: number) => (
-                                        <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                                          {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
-                                        </li>
-                                      ))}
+                                      {setQ.options.map((opt: any, i: number) => {
+                                        let isCorrect = false;
+                                        if (opt.isCorrect !== undefined) isCorrect = opt.isCorrect;
+                                        // Fallback to correctOption index check if isCorrect not explicit on option
+                                        if (!isCorrect && setQ.correctOption !== undefined) {
+                                          isCorrect = (i === (Number(setQ.correctOption) - 1));
+                                        }
+                                        return (
+                                          <li key={i} className={isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
+                                            {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
+                                          </li>
+                                        );
+                                      })}
                                     </ul>
                                   )}
                                   {setQ.type === 'MCQ' && setQ.negativeMarks && (
                                     <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                                       -{setQ.negativeMarks} marks
+                                    </div>
+                                  )}
+                                  {(setQ.type === 'INT' || setQ.type === 'NUMERIC') && (
+                                    <div className="mt-1 text-sm font-semibold text-blue-700 dark:text-blue-400">
+                                      Answer: {setQ.correctAnswer || setQ.modelAnswer || setQ.correct}
                                     </div>
                                   )}
                                 </div>
@@ -1038,13 +1098,20 @@ export default function ExamBuilderPage() {
                           <div className="mb-2">
                             {q.hasMath ? <UniversalMathJax inline>{cleanupMath(q.questionText)}</UniversalMathJax> : q.questionText}
                           </div>
-                          {q.type === 'MCQ' && Array.isArray(q.options) && (
+                          {((q.type === 'MCQ' || q.type === 'AR') && Array.isArray(q.options)) && (
                             <ul className="list-disc pl-6 mt-1">
-                              {q.options.map((opt: any, i: number) => (
-                                <li key={i} className={opt.isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
-                                  {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <MathJax>{opt.text}</MathJax> : opt.text}
-                                </li>
-                              ))}
+                              {q.options.map((opt: any, i: number) => {
+                                let isCorrect = false;
+                                if (opt.isCorrect !== undefined) isCorrect = opt.isCorrect;
+                                if (!isCorrect && q.correctOption !== undefined) {
+                                  isCorrect = (i === (Number(q.correctOption) - 1));
+                                }
+                                return (
+                                  <li key={i} className={isCorrect ? 'font-bold text-green-600 dark:text-green-400' : ''}>
+                                    {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <MathJax>{opt.text}</MathJax> : opt.text}
+                                  </li>
+                                );
+                              })}
                             </ul>
                           )}
                           {q.type === 'MCQ' && q.negativeMarks && (

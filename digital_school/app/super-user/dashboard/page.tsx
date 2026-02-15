@@ -13,7 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useTheme } from "next-themes";
+
 import { DashboardSidebar, MobileDashboardSidebar, SidebarItem } from '@/components/dashboard/DashboardSidebar';
 import {
   Tabs,
@@ -289,7 +289,7 @@ export default function SuperUserDashboardPage() {
       setIsSaving(false);
     }
   };
-  const { setTheme, theme } = useTheme();
+
   // const [darkMode, setDarkMode] = useState(false); // Removed manual state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -505,14 +505,7 @@ export default function SuperUserDashboardPage() {
 
           <div className="flex items-center gap-4 ml-auto">
             <div className="flex items-center gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full hover:bg-muted/50"
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              >
-                {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
-              </Button>
+
 
               <div className="hidden md:flex items-center gap-2 mr-2">
                 <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full relative">

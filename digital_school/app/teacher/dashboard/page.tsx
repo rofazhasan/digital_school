@@ -23,13 +23,9 @@ import {
     Clock,
     CheckCircle,
     Sparkles,
-    CheckCircle,
-    Sparkles,
-    ArrowRight,
-    Sun,
-    Moon
+    ArrowRight
 } from 'lucide-react';
-import { useTheme } from "next-themes";
+
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
 import {
@@ -79,7 +75,7 @@ export default function TeacherDashboard() {
     const [user, setUser] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
     const [loading, setLoading] = useState(true);
     const [instituteSettings, setInstituteSettings] = useState<any>(null);
-    const { setTheme, theme } = useTheme();
+
 
     // Handle click outside user menu
     useEffect(() => {
@@ -170,14 +166,7 @@ export default function TeacherDashboard() {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-10 w-10 rounded-full hover:bg-muted/50"
-                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        >
-                            {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
-                        </Button>
+
                         <div className="hidden md:flex items-center gap-2 mr-2">
                             <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full relative">
                                 <Bell className="w-5 h-5" />

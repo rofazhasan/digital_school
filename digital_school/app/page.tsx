@@ -1,12 +1,11 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "next-themes";
+
 import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
 import {
     ArrowRight,
-    Sun,
-    Moon,
+
     ChevronDown,
     Bot,
     ScanLine,
@@ -77,22 +76,7 @@ export default function LandingPage() {
     );
 }
 
-// --- Theme Toggle ---
-const ThemeToggle = () => {
-    const { theme, setTheme } = useTheme();
-    return (
-        <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            aria-label="Toggle theme"
-        >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-        </Button>
-    );
-};
+
 
 // --- Hero Section ---
 const HeroSection = () => {
@@ -518,10 +502,7 @@ const Footer = () => (
                     <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
                 </ul>
             </div>
-            <div className="flex flex-col items-center md:items-start">
-                <h4 className="font-bold mb-4">Theme</h4>
-                <ThemeToggle />
-            </div>
+
         </div>
         <div className="text-center text-muted-foreground/50 mt-12 pt-8 border-t border-border/20">
             <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved.</p>

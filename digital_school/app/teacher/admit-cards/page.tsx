@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from 'sonner';
 
-import { chunkArray, Student, ExamDetails, RoomPlan, SeatAssignment } from '@/utils/exam-management';
+import { chunkArray, Student, ExamDetails, RoomPlan, SeatAssignment, generateRoomLayout } from '@/utils/exam-management';
 import AdmitCard from '@/components/exam-management/AdmitCardTemplate';
 import SeatPlanTemplate from '@/components/exam-management/SeatPlanTemplate';
 import AttendanceSheetTemplate from '@/components/exam-management/AttendanceSheetTemplate';
@@ -60,9 +60,29 @@ export default function AdmitCardManagementPage() {
 
     // Print Refs
     const printRef = useRef<HTMLDivElement>(null);
+
+    // Dynamic Page Style based on View Mode
+    const getPageStyle = () => {
+        if (viewMode === 'attendance') {
+            return `
+                @page { size: landscape; margin: 0; }
+                @media print { 
+                    body { -webkit-print-color-adjust: exact; }
+                }
+            `;
+        }
+        return `
+            @page { size: A4 portrait; margin: 0; }
+            @media print { 
+                body { -webkit-print-color-adjust: exact; }
+            }
+        `;
+    };
+
     const handlePrint = useReactToPrint({
         contentRef: printRef,
         documentTitle: `ExamLogistics-${viewMode}-${new Date().toISOString()}`,
+        pageStyle: getPageStyle(),
     });
 
     // 1. Initial Fetch (Exams & Classes & All Halls)
@@ -282,7 +302,7 @@ export default function AdmitCardManagementPage() {
         roomNumber: s.roomNo || "",
         hallName: s.hallName || ""
     }));
-    const labelPages = chunkArray(labelAssignments, 24);
+    const labelPages = chunkArray(labelAssignments, 8);
 
 
     return (
@@ -488,19 +508,73 @@ export default function AdmitCardManagementPage() {
                                                 </div>
                                             )}
 
-                                            {/* DESK LABELS: 3x8 Grid (24 Per Page) */}
+                                            {/* VIEW 4: DESK LABELS (2x4 Grid per Page) */}
                                             {viewMode === 'label' && (
-                                                <div className="flex flex-col">
-                                                    {labelPages.map((page, i) => (
-                                                        <div key={i} className="w-[210mm] h-[297mm] bg-white grid grid-cols-2 grid-rows-4 gap-0 break-after-page" style={{ pageBreakAfter: 'always' }}>
-                                                            {page.map((assign: any, idx) => (
-                                                                <div key={assign.student.id} className="border border-dashed border-gray-300 flex items-center justify-center p-2 relative overflow-hidden">
-                                                                    <SeatLabelTemplate assignment={assign} exam={examDetails} />
+                                                <>
+                                                    {/* Detailed Logic to ensure Sync with Seat Plan */}
+                                                    {(() => {
+                                                        // 1. Group Students by Room to apply Room Logic
+                                                        const roomGroups: Record<string, typeof allocations> = {};
+
+                                                        // Helper to safely get Room ID
+                                                        const getRoomKey = (s: any) => `${s.hallName}-${s.roomNo}`;
+
+                                                        allocations.forEach(alloc => {
+                                                            const key = getRoomKey(alloc);
+                                                            if (!roomGroups[key]) roomGroups[key] = [];
+                                                            roomGroups[key].push(alloc);
+                                                        });
+
+                                                        // 2. Process each room with Core Engine
+                                                        // We need to flatten back to a list of "LabelProps"
+                                                        const allLabelProps: any[] = [];
+
+                                                        Object.values(roomGroups).forEach(roomAllocations => {
+                                                            // Convert to SeatAssignment format expected by Engine
+                                                            const assignments = roomAllocations.map(a => ({
+                                                                student: mapToStudent(a),
+                                                                seatNumber: a.seatLabel,
+                                                                roomNumber: a.roomNo,
+                                                                hallName: a.hallName
+                                                            }));
+
+                                                            // RUN CORE ENGINE
+                                                            const layout = generateRoomLayout(assignments);
+
+                                                            // Flatten Benches back to Students, but with POSITION info
+                                                            // We traverse benches to keep the "Walk Path" order (optional but nice)
+                                                            // Or we can just map the original list if we match by ID. 
+                                                            // Let's use the layout's sorted students to ensure we print in order.
+
+                                                            layout.benches.forEach(bench => {
+                                                                bench.students.forEach(s => {
+                                                                    allLabelProps.push({
+                                                                        assignment: s.raw,
+                                                                        exam: examDetails, // specific exam details? For now using global
+                                                                        position: s.position,
+                                                                        benchLabel: s.benchLabel
+                                                                    });
+                                                                });
+                                                            });
+                                                        });
+
+                                                        // 3. Chunk for 2x4 Grid (8 per page)
+                                                        const labelPages = chunkArray(allLabelProps, 8);
+
+                                                        return labelPages.map((pageItems, pIdx) => (
+                                                            <div key={pIdx} className="w-[210mm] h-[297mm] bg-white break-after-page relative print-container-A4">
+                                                                {/* 2 Cols x 4 Rows Grid */}
+                                                                <div className="grid grid-cols-2 grid-rows-4 h-full w-full">
+                                                                    {pageItems.map((props, i) => (
+                                                                        <div key={i} className="border border-slate-100 p-2 break-inside-avoid">
+                                                                            <SeatLabelTemplate {...props} />
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
-                                                            ))}
-                                                        </div>
-                                                    ))}
-                                                </div>
+                                                            </div>
+                                                        ));
+                                                    })()}
+                                                </>
                                             )}
                                         </>
                                     )}

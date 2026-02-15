@@ -1,55 +1,103 @@
 import React from 'react';
 import { SeatAssignment, ExamDetails } from '@/utils/exam-management';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface SeatLabelProps {
     assignment: SeatAssignment;
     exam: ExamDetails;
+    position?: 'L' | 'R' | 'S'; // Left, Right, Single (Passed from Core Engine)
+    benchLabel?: string;        // "Row 1 • Bench 2" (Passed from Core Engine)
 }
 
-export const SeatLabelTemplate = ({ assignment, exam }: SeatLabelProps) => {
+export const SeatLabelTemplate = ({ assignment, exam, position, benchLabel }: SeatLabelProps) => {
+    // Fallback logic if props not passed (Core Engine Sync Safety)
+    const m = assignment.seatNumber.match(/C(\d+)-R(\d+)-S(\d+)/);
+    const row = m ? m[2] : '?';
+    const col = m ? m[1] : '?';
+
+    // Aesthetic "Swiss" Typography Class
+    const fontMain = "font-sans tracking-tight";
+
     return (
-        <div className="w-full h-full flex flex-col bg-white overflow-hidden relative text-black pt-1">
+        <div className="w-full h-full flex flex-row bg-black text-white overflow-hidden relative break-inside-avoid border border-slate-800">
 
-            {/* Header */}
-            <div className="flex justify-between items-center px-2 py-1 border-b-2 border-black bg-slate-50">
-                <span className="text-[8px] uppercase font-bold tracking-widest text-slate-600">{exam.schoolName}</span>
-                <span className="text-[8px] font-bold bg-black text-white px-1.5 py-0.5 rounded-sm">{exam.name}</span>
-            </div>
-
-            {/* Massive Seat Number - High Contrast (Black on White) */}
-            <div className="flex-[3] flex flex-col items-center justify-center relative my-1">
-                <span className="text-[12px] font-black uppercase tracking-[0.3em] text-slate-300 mb-[-10px]">SEAT</span>
-                <span className="text-[6rem] font-black tracking-tighter leading-none text-black drop-shadow-sm">
-                    {assignment.seatNumber.split(' ')[1]}
-                </span>
-            </div>
-
-            {/* Student Info - Clean Typography */}
-            <div className="flex-[2] px-3 pb-2 flex flex-col justify-center text-center space-y-1 bg-slate-100 border-t-4 border-black relative">
-                {/* ID Arrow */}
-                <div className="absolute top-[-10px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[10px] border-l-transparent border-r-[10px] border-r-transparent border-b-[10px] border-b-black"></div>
-
-                <div className="w-full">
-                    <div className="font-black text-xl leading-tight break-words line-clamp-2 uppercase">
-                        {assignment.student.name}
+            {/* LEFT: The "Info Block" (White on Black) */}
+            <div className="w-[40%] h-full flex flex-col justify-between p-3 border-r border-slate-800 relative">
+                {/* School & Exam */}
+                <div>
+                    <div className="text-[9px] font-bold uppercase tracking-widest text-slate-400 mb-1">
+                        {exam.schoolName}
                     </div>
-                    <div className="text-[10px] font-bold text-slate-500 uppercase mt-1">{exam.className} | {exam.name}</div>
-                </div>
-
-                <div className="w-full flex justify-center gap-6 text-sm mt-2 border-t border-slate-300 pt-2">
-                    <div className="flex flex-col items-center">
-                        <span className="text-[8px] uppercase font-bold text-slate-500 tracking-wider">Roll No</span>
-                        <span className="font-mono font-black text-2xl">{assignment.student.roll}</span>
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <span className="text-[8px] uppercase font-bold text-slate-500 tracking-wider">Reg No</span>
-                        <span className="font-mono font-bold text-xl text-slate-700">{assignment.student.registrationId}</span>
+                    <div className="text-[8px] font-medium uppercase text-slate-500 leading-tight">
+                        {exam.name}
                     </div>
                 </div>
+
+                {/* Coordinates (The "Navigator") */}
+                <div className="flex flex-col gap-2 my-1">
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-[8px] uppercase font-bold text-slate-500">ROW</span>
+                        <span className="text-xl font-bold leading-none">{row}</span>
+                    </div>
+                    <div className="flex items-baseline gap-1">
+                        <span className="text-[8px] uppercase font-bold text-slate-500">BENCH</span>
+                        <span className="text-xl font-bold leading-none">{col}</span>
+                    </div>
+                </div>
+
+                {/* QR Verification (Placeholder for "Scan to Verify") */}
+                <div className="mt-auto">
+                    <div className="bg-white p-1 w-fit rounded-sm">
+                        <QRCodeSVG
+                            value={JSON.stringify({ id: assignment.student.id, roll: assignment.student.roll })}
+                            size={32}
+                            level="L"
+                        />
+                    </div>
+                    <div className="text-[6px] uppercase font-bold text-slate-600 mt-1 tracking-wider">
+                        SCAN TO VERIFY
+                    </div>
+                </div>
             </div>
 
-            {/* Cut Lines */}
-            <div className="absolute inset-0 border border-dashed border-slate-300 pointer-events-none"></div>
+            {/* RIGHT: The "Candidate Block" (Inverted Area) */}
+            <div className="flex-1 h-full bg-white text-black relative flex flex-col p-3">
+
+                {/* Position Badge (Floating) */}
+                <div className="absolute top-0 right-0 bg-black text-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest rounded-bl-lg">
+                    {position === 'L' ? 'LEFT' : position === 'R' ? 'RIGHT' : 'SINGLE'}
+                </div>
+
+                {/* Seat Number (Massive) */}
+                <div className="flex-1 flex flex-col justify-center items-center mt-2">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-slate-400 mb-[-5px]">SEAT</span>
+                    <span className="text-[5rem] font-bold leading-none tracking-tighter">
+                        {assignment.seatNumber.match(/S(\d+)/)?.[1]}
+                    </span>
+                </div>
+
+                {/* Candidate Details */}
+                <div className="mt-auto border-t-2 border-black pt-2">
+                    <div className="flex justify-between items-end">
+                        <div className="flex-1 min-w-0 pr-2">
+                            <div className="text-[8px] font-bold uppercase text-slate-500 tracking-wider mb-0.5">Candidate</div>
+                            <div className="text-sm font-black uppercase truncate leading-none">
+                                {assignment.student.name}
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[8px] font-bold uppercase text-slate-500 tracking-wider mb-0.5">Roll No</div>
+                            <div className="text-xl font-mono font-bold leading-none">
+                                {assignment.student.roll}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            {/* CUT GUIDES */}
+            <div className="absolute inset-0 border border-dashed border-white/20 pointer-events-none"></div>
         </div>
     );
 };

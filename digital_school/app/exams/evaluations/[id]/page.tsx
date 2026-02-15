@@ -2303,6 +2303,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <div className="text-sm font-semibold text-indigo-600 mb-1">Selected Option {currentAnswer.selectedOption}:</div>
                                               <div className="text-sm text-gray-700 italic">
                                                 {(() => {
+                                                  // Use stored options if available (supports shuffling)
+                                                  if (currentQuestion.options && currentQuestion.options.length > 0) {
+                                                    const selectedIdx = Number(currentAnswer.selectedOption) - 1;
+                                                    if (selectedIdx >= 0 && selectedIdx < currentQuestion.options.length) {
+                                                      return <UniversalMathJax inline dynamic>{cleanupMath(currentQuestion.options[selectedIdx].text)}</UniversalMathJax>;
+                                                    }
+                                                  }
+
+                                                  // Fallback for legacy data
                                                   const labels = [
                                                     "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা",
                                                     "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়",
@@ -2310,7 +2319,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                     "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
                                                   ];
-                                                  return labels[currentAnswer.selectedOption - 1] || "Unknown Option";
+                                                  return <UniversalMathJax inline dynamic>{labels[Number(currentAnswer.selectedOption) - 1] || "Unknown Option"}</UniversalMathJax>;
                                                 })()}
                                               </div>
                                             </div>

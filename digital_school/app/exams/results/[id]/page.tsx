@@ -1669,7 +1669,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           </div>
                                           <div className="w-px h-4 bg-gray-200" />
                                           <div className="text-sm font-bold text-indigo-600">
-                                            Correct Answer: <span className="ml-2">{(question as any).correctAnswer || (question as any).answer || (question as any).correct}</span>
+                                            Correct Answer: <span className="ml-2">{(question as any).correctAnswer || (question as any).answer || (question as any).correct || (question as any).modelAnswer}</span>
                                           </div>
                                         </div>
                                         {isCorrect ? <CheckCircle className="h-5 w-5 text-green-600" /> : (question.studentAnswer ? <XCircle className="h-5 w-5 text-red-600" /> : null)}
