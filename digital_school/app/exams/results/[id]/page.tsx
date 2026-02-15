@@ -1741,6 +1741,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                                 const correctRightId = correctMatches[item.id];
                                                 const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
+                                                const isUnanswered = !studentRightId;
 
                                                 const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
                                                 const studentRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === studentRightId);
@@ -1761,23 +1762,29 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     : "bg-red-50";
 
                                                 return (
-                                                  <tr key={i} className={rowClass}>
+                                                  <tr key={lIdx} className={rowClass}>
                                                     <td className="p-2 border-r border-indigo-100 font-medium">
-                                                      <span className="font-bold mr-1">{i + 1}.</span>
-                                                      <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                      <div className="flex items-center gap-1">
+                                                        <span className="font-bold text-gray-500 shrink-0">{vlLeft}.</span>
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                      </div>
                                                     </td>
                                                     <td className={`p-2 border-r border-indigo-100 ${isMatchCorrect ? 'text-green-700 font-bold' : isUnanswered ? 'text-gray-400 italic' : 'text-red-600 font-bold'}`}>
                                                       {isUnanswered ? (
                                                         "No selection"
                                                       ) : (
-                                                        <>
+                                                        <div className="flex items-center gap-1">
+                                                          {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
                                                           {rightItem ? <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax> : "Unknown"}
                                                           {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1" /> : <XCircle className="inline h-4 w-4 ml-1" />}
-                                                        </>
+                                                        </div>
                                                       )}
                                                     </td>
                                                     <td className="p-2 text-green-700 font-medium">
-                                                      {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                      <div className="flex items-center gap-1">
+                                                        {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
+                                                        {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                      </div>
                                                     </td>
                                                   </tr>
                                                 );
