@@ -184,8 +184,19 @@ export default function ExamLayout() {
       setIsStarting(true);
       setGracePeriod(true); // Enable grace period
 
-      // 1. Enter Fullscreen FIRST
-      await enterFullscreen();
+      // 1. Enter Fullscreen FIRST (with timeout to prevent hanging)
+      try {
+        await Promise.race([
+          enterFullscreen(),
+          new Promise((resolve) => setTimeout(() => resolve("timeout"), 1000))
+        ]);
+      } catch (e) {
+        console.warn("Fullscreen attempt timed out or failed, proceeding anyway.");
+      }
+
+      // Just in case Promise.race doesn't behave as expected in all envs (e.g. resolve vs reject logic above)
+      // actually enterFullscreen inside useProctoring catches errors, so it resolves. 
+      // The timeout ensures we don't wait forever if the browser prompt hangs.
 
       // 2. Call API to start exam on server
       const res = await fetch(`/api/exams/${exam.id}/start`, {

@@ -110,10 +110,21 @@ export const useProctoring = ({
     // Enter Fullscreen Helper
     const enterFullscreen = async () => {
         try {
-            await document.documentElement.requestFullscreen();
+            const elem = document.documentElement as any;
+            if (elem.requestFullscreen) {
+                await elem.requestFullscreen();
+            } else if (elem.webkitRequestFullscreen) { /* Safari/Chrome */
+                await elem.webkitRequestFullscreen();
+            } else if (elem.msRequestFullscreen) { /* IE11 */
+                await elem.msRequestFullscreen();
+            } else if (elem.mozRequestFullScreen) { /* Firefox */
+                await elem.mozRequestFullScreen();
+            }
         } catch (err) {
             console.error('Error attempting to enable fullscreen:', err);
-            toast.error('Could not enter fullscreen mode. Please manually enable it.');
+            // Don't toast error here, just let it fail silently or log.
+            // Toasting might confuse user if they are on a device that simply doesn't support it (like iOS).
+            // toast.error('Could not enter fullscreen mode. Please manually enable it.');
         }
     };
 
