@@ -406,10 +406,19 @@ export default function ExamLayout() {
           </div>
 
           {/* Centered Timer */}
-          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-1">
             <div className="pointer-events-auto">
               <Timer onTimeUp={() => handleSubmit(true)} />
             </div>
+            {/* Conditional Proctor Warning in Header */}
+            {warnings > 0 && (
+              <div className="pointer-events-auto animate-in fade-in slide-in-from-top-1 duration-300">
+                <Badge variant="destructive" className="flex items-center gap-1 text-[10px] px-2 h-5 bg-red-600 hover:bg-red-700 animate-pulse">
+                  <ShieldAlert className="w-3 h-3" />
+                  <span>Warning: {warnings}/4</span>
+                </Badge>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 md:gap-3">

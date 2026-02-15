@@ -10,9 +10,9 @@ function formatTime(seconds: number) {
   const s = seconds % 60;
 
   if (h > 0) {
-    return `${h}h ${m.toString().padStart(2, '0')}m`;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
-  return `${m}:${s.toString().padStart(2, "0")}`;
+  return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
 }
 
 export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {

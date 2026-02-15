@@ -929,9 +929,25 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const submitTime = new Date(result.submission.submittedAt);
                         const timeDiff = submitTime.getTime() - startTime.getTime();
                         const minutesTaken = timeDiff / (1000 * 60);
-                        const efficiency = ((result.exam.duration - minutesTaken) / result.exam.duration * 100).toFixed(1);
-                        return `${efficiency}% remaining`;
-                      })() : 'Not available'}
+                        const durationMinutes = result.exam.duration;
+
+                        // Calculate efficiency (Time Saved / Total Duration)
+                        const savedMinutes = Math.max(0, durationMinutes - minutesTaken);
+                        const efficiency = (savedMinutes / durationMinutes * 100).toFixed(1);
+
+                        return (
+                          <div className="flex flex-col">
+                            <span className={Number(efficiency) > 0 ? "text-green-600 font-bold" : "text-gray-600"}>
+                              {efficiency}% Efficient
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              (Saved {Math.floor(savedMinutes)}m {Math.floor((savedMinutes % 1) * 60)}s)
+                            </span>
+                          </div>
+                        );
+                      })() : (
+                        <span className="text-gray-400 italic">Data unavailable</span>
+                      )}
                     </div>
                   </div>
                 </div>

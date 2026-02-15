@@ -18,7 +18,10 @@ import {
     Linkedin,
     Facebook,
     Mail,
+    Sun,
+    Moon
 } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -78,6 +81,24 @@ export default function LandingPage() {
 
 
 
+// --- Theme Toggle ---
+const ThemeToggle = () => {
+    const { theme, setTheme } = useTheme();
+    return (
+        <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="fixed top-4 right-4 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-md"
+            aria-label="Toggle theme"
+        >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="sr-only">Toggle theme</span>
+        </Button>
+    );
+};
+
 // --- Hero Section ---
 const HeroSection = () => {
     const mouseX = useMotionValue(0);
@@ -95,6 +116,7 @@ const HeroSection = () => {
 
     return (
         <header className="relative flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-hidden">
+            <ThemeToggle />
             <HeroCanvas />
             <motion.div
                 onMouseMove={handleMouseMove}

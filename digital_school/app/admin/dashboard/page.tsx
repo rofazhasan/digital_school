@@ -32,6 +32,7 @@ import {
   Sun,
   Moon
 } from 'lucide-react';
+import { useTheme } from "next-themes";
 
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
@@ -80,6 +81,7 @@ const sidebarItems: SidebarItem[] = [
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
+  const { theme, setTheme } = useTheme();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
@@ -192,7 +194,14 @@ export default function AdminDashboard() {
 
           <div className="flex items-center gap-4 ml-auto">
             <div className="hidden md:flex items-center gap-2 mr-2">
-
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-muted/50"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
+              </Button>
               <Button variant="ghost" size="icon" className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full relative">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
