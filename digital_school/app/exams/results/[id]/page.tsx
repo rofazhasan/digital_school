@@ -34,7 +34,9 @@ import {
   CheckSquare,
   MessageSquare,
   Lock,
-  Camera
+  Camera,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -189,6 +191,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   // Print Handler
   // No lint error here anymore
@@ -366,6 +372,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [showZoomModal]);
+
+  // Reset pagination when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filterStatus]);
 
   // Function to combine original image with annotations
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1466,8 +1477,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                       if (filteredQuestions.length === 0) return null;
 
+                      const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
+                      const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                      const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
                       return (
-                        <div>
+                        <div id="objective-questions-section">
                           <div className="flex items-center gap-3 mb-6">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                               <CheckSquare className="h-4 w-4 text-blue-600" />
@@ -1478,8 +1493,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </Badge>
                           </div>
                           <div className="space-y-6">
-                            {filteredQuestions.map((question, index) => {
+                            {paginatedQuestions.map((question, index) => {
                               const type = (question.type || "").toUpperCase();
+                              const globalIndex = startIndex + index;
                               const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
                               const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
 
@@ -1497,7 +1513,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <Badge className="bg-blue-100 text-blue-800">
                                         {type}
                                       </Badge>
-                                      <span className="text-sm text-gray-600 font-bold">Question {index + 1}</span>
+                                      <span className="text-sm text-gray-600 font-bold">Question {globalIndex + 1}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
@@ -1775,6 +1791,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               );
                             })}
                           </div>
+
+                          {/* Pagination Controls */}
+                          {totalPages > 1 && (
+                            <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (currentPage > 1) {
+                                    setCurrentPage(curr => curr - 1);
+                                    document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                  }
+                                }}
+                                disabled={currentPage === 1}
+                                className="w-24"
+                              >
+                                <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                              </Button>
+
+                              <div className="flex items-center gap-1 mx-4">
+                                <span className="text-sm font-medium text-gray-600">
+                                  Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
+                                </span>
+                              </div>
+
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (currentPage < totalPages) {
+                                    setCurrentPage(curr => curr + 1);
+                                    document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                  }
+                                }}
+                                disabled={currentPage === totalPages}
+                                className="w-24"
+                              >
+                                Next <ChevronRight className="h-4 w-4 ml-1" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}
