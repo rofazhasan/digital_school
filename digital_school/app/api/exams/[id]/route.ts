@@ -137,13 +137,29 @@ export async function PUT(
     // Use questionsWithNegativeMarks if provided, otherwise use selectedQuestions
     let questionsToSave = questionsWithNegativeMarks || selectedQuestions;
 
-    // Sanitize: Ensure MTF questions do not have negative marks
+    // Sanitize and Shuffle: Ensure MTF questions do not have negative marks AND shuffle options for all types
     questionsToSave = questionsToSave.map((q: any) => {
-      if (q.type === 'MTF') {
-        const { negativeMarks, ...rest } = q;
+      const processedQuestion = { ...q };
+
+      // 1. Shuffle options for MCQ and MC
+      if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
+        if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          processedQuestion.options = shuffleArray(processedQuestion.options);
+        }
+      }
+
+      // 2. Shuffle right column for MTF
+      if (processedQuestion.type === 'MTF') {
+        if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
+        }
+
+        // Remove negative marks for MTF (sanitization)
+        const { negativeMarks, ...rest } = processedQuestion;
         return rest;
       }
-      return q;
+
+      return processedQuestion;
     });
 
     const newExamSet = await prisma.examSet.create({
