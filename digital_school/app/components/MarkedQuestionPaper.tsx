@@ -5,6 +5,7 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
 import { cleanupMath } from '@/lib/utils';
+import { toBengaliNumerals } from "@/utils/numeralConverter";
 
 // --- TYPES ---
 interface MCQ {
@@ -581,29 +582,43 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                                                                 const correctRightId = correctMatches[lCol.id];
                                                                                 const rightItem = q.rightColumn?.find((r: any) => r.id === studentRightId);
+                                                                                const studentRightIdx = q.rightColumn?.findIndex((r: any) => r.id === studentRightId);
+
                                                                                 const correctRightItem = q.rightColumn?.find((r: any) => r.id === correctRightId);
+                                                                                const correctRightIdx = q.rightColumn?.findIndex((r: any) => r.id === correctRightId);
 
                                                                                 const isMatchCorrect = studentRightId === correctRightId && !!studentRightId;
                                                                                 const isUnanswered = !studentRightId;
 
+                                                                                // Visual labels
+                                                                                const vlLeft = toBengaliNumerals(cidx + 1);
+                                                                                const vStudentRight = studentRightIdx !== -1 && studentRightIdx !== undefined ? String.fromCharCode(65 + studentRightIdx) : null;
+                                                                                const vCorrectRight = correctRightIdx !== -1 && correctRightIdx !== undefined ? String.fromCharCode(65 + correctRightIdx) : null;
+
                                                                                 return (
                                                                                     <tr key={cidx} className={isMatchCorrect ? "bg-green-50/30" : (isUnanswered ? "bg-white" : "bg-red-50/30")}>
                                                                                         <td className="p-2 border-r border-gray-100 font-medium">
-                                                                                            <span className="font-bold mr-1 text-gray-500">{cidx + 1}.</span>
-                                                                                            <Text>{lCol.text}</Text>
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                <span className="font-bold text-gray-400 shrink-0">{vlLeft}.</span>
+                                                                                                <Text>{lCol.text}</Text>
+                                                                                            </div>
                                                                                         </td>
                                                                                         <td className="p-2 border-r border-gray-100">
                                                                                             {isUnanswered ? <span className="text-gray-400 italic text-[10px]">No match</span> : (
                                                                                                 <div className="flex items-center gap-1">
                                                                                                     {isMatchCorrect ? <CheckCircle className="w-3 h-3 text-green-600" /> : <XCircle className="w-3 h-3 text-red-600" />}
-                                                                                                    <span className={isMatchCorrect ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
+                                                                                                    <span className={isMatchCorrect ? "text-green-700 font-bold flex items-center gap-1" : "text-red-700 font-bold flex items-center gap-1"}>
+                                                                                                        {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
                                                                                                         {rightItem ? <Text>{rightItem.text}</Text> : "Unknown"}
                                                                                                     </span>
                                                                                                 </div>
                                                                                             )}
                                                                                         </td>
                                                                                         <td className="p-2 text-green-700 font-bold">
-                                                                                            {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
+                                                                                                {correctRightItem ? <Text>{correctRightItem.text}</Text> : "-"}
+                                                                                            </div>
                                                                                         </td>
                                                                                     </tr>
                                                                                 );
