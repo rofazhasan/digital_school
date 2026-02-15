@@ -47,7 +47,7 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         marks: n(getValue(row, ["Marks", "Mark"])),
         questionText: s(getValue(row, ["Question Text", "Question", "Title"])),
         modelAnswer: s(getValue(row, ["Model Answer", "Answer"])),
-        modelAnswer: s(getValue(row, ["Model Answer", "Answer"])),
+
         explanation: s(getValue(row, ["Explanation", "Rationale", "Exp", "Solution", "Explaination"])),
         classId: null,
         options: null,
@@ -115,13 +115,13 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             if (correctOpts.size === 0) throw new Error("Correct option(s) required (e.g. A, B or 1, 2)");
 
             const optionsList = [
-                { text: optA, isCorrect: correctOpts.has('A') },
-                { text: optB, isCorrect: correctOpts.has('B') },
+                { text: optA, isCorrect: correctOpts.has('A'), explanation: correctOpts.has('A') ? data.explanation : "" },
+                { text: optB, isCorrect: correctOpts.has('B'), explanation: correctOpts.has('B') ? data.explanation : "" },
             ];
 
-            if (optC) optionsList.push({ text: optC, isCorrect: correctOpts.has('C') });
-            if (optD) optionsList.push({ text: optD, isCorrect: correctOpts.has('D') });
-            if (optE) optionsList.push({ text: optE, isCorrect: correctOpts.has('E') });
+            if (optC) optionsList.push({ text: optC, isCorrect: correctOpts.has('C'), explanation: correctOpts.has('C') ? data.explanation : "" });
+            if (optD) optionsList.push({ text: optD, isCorrect: correctOpts.has('D'), explanation: correctOpts.has('D') ? data.explanation : "" });
+            if (optE) optionsList.push({ text: optE, isCorrect: correctOpts.has('E'), explanation: correctOpts.has('E') ? data.explanation : "" });
 
             data.options = optionsList;
         } else if (data.type === 'INT') {
