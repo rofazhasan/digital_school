@@ -2575,7 +2575,8 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         subject: "General",
         className: availableClasses[0]?.name || "Class 10",
         options: ["Option A", "Option B", "Option C", "Option D"],
-        correctAnswer: "Option A"
+        correctAnswer: "Option A",
+        explanation: ""
       },
       errors: []
     };
@@ -2828,6 +2829,7 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                     <TableHead className="w-[180px]">Class</TableHead>
                     <TableHead>Subject</TableHead>
                     <TableHead className="w-[300px]">Question Text</TableHead>
+                    <TableHead className="w-[200px]">Explanation</TableHead>
                     <TableHead className="w-[150px]">Rendered Preview</TableHead>
                     <TableHead className="w-[50px]">Marks</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -2874,6 +2876,22 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                           className="h-12 text-xs"
                         />
                       </TableCell>
+
+                      <TableCell>
+                        <Textarea
+                          value={row.data.questionText}
+                          onChange={(e) => handleEditRow(index, 'questionText', e.target.value)}
+                          className="min-h-[80px] text-xs font-mono"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Textarea
+                          value={row.data.explanation || ""}
+                          onChange={(e) => handleEditRow(index, 'explanation', e.target.value)}
+                          className="min-h-[80px] text-xs font-mono"
+                          placeholder="Add explanation..."
+                        />
+                      </TableCell>
                       <TableCell>
                         <div className="max-w-[150px] overflow-hidden">
                           <UniversalMathJax inline dynamic>{cleanupMath(row.data.questionText || '')}</UniversalMathJax>
@@ -2889,13 +2907,6 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                             </div>
                           )}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Textarea
-                          value={row.data.questionText}
-                          onChange={(e) => handleEditRow(index, 'questionText', e.target.value)}
-                          className="min-h-[80px] text-xs font-mono"
-                        />
                       </TableCell>
                       <TableCell>{row.data.marks}</TableCell>
                       <TableCell className="text-right">
