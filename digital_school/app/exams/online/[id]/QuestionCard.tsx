@@ -425,9 +425,13 @@ const MTFGrid = ({
                 <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
                   <span className="font-bold text-gray-500">{lc.id}</span>
                   <div className="flex items-center gap-2">
-                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>{uAns || '?'}</span>
+                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>
+                      <UniversalMathJax inline dynamic>{uAns ? getRightText(uAns) : '?'}</UniversalMathJax>
+                    </span>
                     <span className="text-gray-300">→</span>
-                    <span className="text-green-700 font-bold">{cAns}</span>
+                    <span className="text-green-700 font-bold">
+                      <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
+                    </span>
                   </div>
                 </div>
               );
@@ -448,9 +452,13 @@ const MTFGrid = ({
                 <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
                   <span className="font-bold text-gray-500">{lc.id}</span>
                   <div className="flex items-center gap-2">
-                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>{uAns || '?'}</span>
+                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>
+                      <UniversalMathJax inline dynamic>{uAns ? getRightText(uAns) : '?'}</UniversalMathJax>
+                    </span>
                     <span className="text-gray-300">→</span>
-                    <span className="text-green-700 font-bold">{cAns}</span>
+                    <span className="text-green-700 font-bold">
+                      <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
+                    </span>
                   </div>
                 </div>
               );
