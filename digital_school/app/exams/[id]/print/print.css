@@ -263,7 +263,9 @@
   .print-page-container {
     padding: 2rem;
     margin: 1rem auto;
-    background: white;
+    background: white !important;
+    color: black !important;
+    /* Force black text for visibility in dark mode */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     max-width: 8.5in;
     /* Standard width preview */
