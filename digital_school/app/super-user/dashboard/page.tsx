@@ -13,6 +13,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useTheme } from "next-themes";
+import { DashboardSidebar, MobileDashboardSidebar, SidebarItem } from '@/components/dashboard/DashboardSidebar';
 import {
   Tabs,
   TabsContent,
@@ -192,6 +194,20 @@ ChartJS.register(
   ArcElement
 );
 
+
+const sidebarItems: SidebarItem[] = [
+  { id: 'overview', label: 'Dashboard Overview', icon: Home, href: '#overview' },
+  { id: 'users', label: 'Manage Users', icon: Users, href: '/admin/users' },
+  { id: 'exams', label: 'Exam Management', icon: FileText, href: '/exams' },
+  { id: 'question-bank', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
+  { id: 'approvals', label: 'Pending Approvals', icon: CheckSquare, href: '#approvals' },
+  { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap, href: '#ai-usage' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '#analytics' },
+  { id: 'logs', label: 'System Logs', icon: History, href: '#logs' },
+  { id: 'settings', label: 'Institute Settings', icon: Settings, href: '#settings' },
+  { id: 'billing', label: 'Billing', icon: CreditCard, href: '#billing' }
+];
+
 export default function SuperUserDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [institute, setInstitute] = useState<Institute | null>(null);
@@ -273,8 +289,10 @@ export default function SuperUserDashboardPage() {
       setIsSaving(false);
     }
   };
-  const [darkMode, setDarkMode] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { setTheme, theme } = useTheme();
+  // const [darkMode, setDarkMode] = useState(false); // Removed manual state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [stats, setStats] = useState<any>(null);
@@ -285,12 +303,12 @@ export default function SuperUserDashboardPage() {
   const [systemStats, setSystemStats] = useState<any>(null);
 
   useEffect(() => {
-    // Check for saved dark mode preference
-    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-    setDarkMode(savedDarkMode);
-    if (savedDarkMode) {
-      document.documentElement.classList.add('dark');
-    }
+    // Check for saved dark mode preference - REMOVED for next-themes
+    // const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    // setDarkMode(savedDarkMode);
+    // if (savedDarkMode) {
+    //   document.documentElement.classList.add('dark');
+    // }
 
     fetch('/api/user')
       .then(res => res.json())
@@ -400,17 +418,7 @@ export default function SuperUserDashboardPage() {
     console.log(`${action} approval for id: ${id}`);
   };
 
-  const toggleDarkMode = () => {
-    const newDarkMode = !darkMode;
-    setDarkMode(newDarkMode);
-    localStorage.setItem('darkMode', newDarkMode.toString());
-
-    if (newDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  };
+  // const toggleDarkMode = () => { ... } // Removed manual toggle
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -457,184 +465,102 @@ export default function SuperUserDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 w-full border-b border-gray-200/50 dark:border-gray-800/50 bg-white/70 dark:bg-gray-950/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-        <div className="container mx-auto px-4">
-          <div className="flex h-20 items-center justify-between">
-            {/* Logo and Title */}
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden h-10 w-10 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 rounded-xl"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
+    <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
+      <DashboardSidebar
+        items={sidebarItems}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        user={user}
+        instituteName={institute?.name || "Digital School"}
+        onLogout={handleLogout}
+      />
 
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-purple-500/30 hidden md:flex">
-                  <Shield className="h-5 w-5" />
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
-                    {institute?.name || "Digital School"}
-                  </span>
-                  <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase tracking-wider">Super User Panel</span>
-                </div>
-              </div>
-            </div>
+      <MobileDashboardSidebar
+        items={sidebarItems}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isOpen={mobileSidebarOpen}
+        setIsOpen={setMobileSidebarOpen}
+        user={user}
+        onLogout={handleLogout}
+      />
 
-            {/* Header Actions */}
-            <div className="flex items-center gap-3 sm:gap-6">
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50"
-                  onClick={toggleDarkMode}
-                >
-                  {darkMode ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-gray-500" />}
-                </Button>
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'} flex-1 flex flex-col min-h-screen w-full relative z-10`}>
+        {/* Top Bar with User Menu */}
+        <header className="h-20 py-4 bg-background/80 backdrop-blur-xl sticky top-0 z-40 border-b border-border flex items-center justify-between px-4 md:px-8">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="lg:hidden p-2 rounded-xl hover:bg-muted/50 transition-colors text-muted-foreground"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
 
-                <Button variant="ghost" size="icon" className="hidden sm:flex h-10 w-10 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50 relative">
-                  <Bell className="h-5 w-5 text-gray-500" />
-                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
-                </Button>
-              </div>
-
-              <div className="w-px h-8 bg-gray-200 dark:bg-gray-800 hidden sm:block"></div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="relative h-11 px-2 rounded-full hover:bg-gray-100/50 dark:hover:bg-gray-800/50 border border-transparent hover:border-gray-200 dark:hover:border-gray-800 transition-all">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-md ring-2 ring-white dark:ring-gray-950">
-                        <User className="h-4 w-4" />
-                      </div>
-                      <div className="hidden sm:block text-left">
-                        <p className="text-sm font-semibold leading-none">{user.name}</p>
-                        <p className="text-[10px] text-muted-foreground mt-0.5 font-medium">Super User</p>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block ml-1" />
-                    </div>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90" align="end" forceMount>
-                  <div className="px-3 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-xl mb-2">
-                    <p className="text-sm font-semibold leading-none">{user.name}</p>
-                    <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
-                  </div>
-                  <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                  <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('profile')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
-                    <User className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/10 rounded-lg cursor-pointer py-2.5">
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+          <div className="flex-1 lg:hidden text-center pl-2">
+            <h1 className="font-bold text-lg text-foreground">
+              {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
+            </h1>
           </div>
-        </div>
-      </header>
 
-      {/* Mobile Sidebar Overlay */}
-      <div className="flex">
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden transition-opacity duration-300"
-            onClick={() => setSidebarOpen(false)}
-            aria-hidden={!sidebarOpen}
-          />
-        )}
-
-        {/* Sidebar */}
-        <aside className={`
-          fixed md:relative z-50 w-72 h-screen border-r border-gray-200/50 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl shadow-2xl md:shadow-none transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)]
-          ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-          md:translate-x-0
-        `}>
-          <div className="flex flex-col h-full">
-            {/* Sidebar Header */}
-            <div className="h-20 flex items-center justify-between px-6 border-b border-gray-100 dark:border-gray-800">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-purple-500/30 flex-shrink-0">
-                  SU
-                </div>
-                <span className="font-bold text-lg tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 whitespace-nowrap">
-                  Super User
-                </span>
-              </div>
+          <div className="flex items-center gap-4 ml-auto">
+            <div className="flex items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(false)}
-                className="md:hidden text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full"
+                className="h-10 w-10 rounded-full hover:bg-muted/50"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               >
-                <X className="h-5 w-5" />
+                {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
               </Button>
+
+              <div className="hidden md:flex items-center gap-2 mr-2">
+                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full relative">
+                  <Bell className="w-5 h-5" />
+                  <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-background"></span>
+                </Button>
+              </div>
             </div>
 
-            <nav className="flex-1 overflow-y-auto py-6 space-y-1.5 px-3 custom-scrollbar">
-              {[
-                { id: 'overview', label: 'Dashboard Overview', icon: Home },
-                { id: 'users', label: 'Manage Users', icon: Users, href: '/admin/users' },
-                { id: 'exams', label: 'Exam Management', icon: FileText, href: '/exams' },
-                { id: 'question-bank', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
-                { id: 'approvals', label: 'Pending Approvals', icon: CheckSquare },
-                { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap },
-                { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-                { id: 'logs', label: 'System Logs', icon: History },
-                { id: 'settings', label: 'Institute Settings', icon: Settings },
-                { id: 'billing', label: 'Billing', icon: CreditCard }
-              ].map((item) => (
+            <div className="h-8 w-[1px] bg-border hidden md:block"></div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
                 <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.href) {
-                      router.push(item.href);
-                    } else {
-                      setActiveTab(item.id);
-                      setSidebarOpen(false);
-                    }
-                  }}
-                  className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden text-left ${activeTab === item.id
-                    ? 'bg-purple-50/80 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 shadow-sm'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
-                    }`}
+                  className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-border transition-all"
                 >
-                  {activeTab === item.id && (
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-purple-600 rounded-r-full" />
-                  )}
-                  <div className={`
-                    p-2 rounded-lg transition-all duration-300 flex-shrink-0
-                    ${activeTab === item.id ? 'bg-white dark:bg-gray-800 shadow-sm text-purple-600 dark:text-purple-400' : 'bg-gray-100/50 dark:bg-gray-800/50 text-gray-500 group-hover:bg-white group-hover:shadow-sm dark:group-hover:bg-gray-700'}
-                `}>
-                    <item.icon className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold shadow-sm">
+                    {user?.name?.[0] || 'S'}
                   </div>
-
-                  <span className="ml-3 font-medium text-sm flex-1 truncate">
-                    {item.label}
-                  </span>
+                  <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors hidden md:block" />
                 </button>
-              ))}
-            </nav>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 p-2 rounded-xl shadow-xl border-border backdrop-blur-xl bg-background/90" align="end" forceMount>
+                <div className="px-2 py-3 bg-muted/50 rounded-lg mb-2">
+                  <p className="text-sm font-semibold leading-none text-foreground">{user?.name || 'Super User'}</p>
+                  <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email}</p>
+                </div>
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5">
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setActiveTab('profile')} className="rounded-lg cursor-pointer py-2.5">
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer py-2.5">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-        </aside>
+        </header>
 
-        {/* Main Content */}
-        <main className="flex-1 p-4 md:p-6 max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
-          <div>
-            {/* Page Header */}
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8">
+          <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto w-full">
             <div className="mb-6 md:mb-8">
               <h1 className="text-2xl md:text-3xl font-bold mb-2">Super User Dashboard</h1>
               <p className="text-muted-foreground text-sm md:text-base">
@@ -1042,7 +968,7 @@ export default function SuperUserDashboardPage() {
               )}
             </AnimatePresence>
           </div>
-        </main>
+        </div>
       </div>
     </div>
   );

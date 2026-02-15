@@ -172,7 +172,8 @@
   --secondary: oklch(0.20 0.05 260);
   --secondary-foreground: oklch(0.98 0.01 260);
 
-  --muted: oklch(0.20 0.04 260);
+  /* Muted - Used for hovers and secondary backgrounds. Increased lightness for visibility */
+  --muted: oklch(0.25 0.04 260);
   --muted-foreground: oklch(0.7 0.05 260);
 
   --accent: oklch(0.25 0.05 260);
@@ -184,11 +185,11 @@
 
   --border: oklch(0.25 0.04 260);
   /* Higher contrast border */
-  --input: oklch(0.25 0.04 260);
+  --input: oklch(0.30 0.04 260);
   --ring: oklch(0.5 0.15 260);
 
   /* Sidebar Dark - Distinct from main content */
-  --sidebar: oklch(0.12 0.04 260);
+  --sidebar: oklch(0.13 0.04 260);
   --sidebar-foreground: oklch(0.9 0.02 260);
   --sidebar-primary: oklch(0.65 0.2 260);
   --sidebar-primary-foreground: oklch(1 0 0);

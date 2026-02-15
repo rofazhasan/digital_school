@@ -86,6 +86,10 @@ export const viewport: Viewport = {
   ],
 };
 
+import { ThemeProvider } from "@/components/theme-provider";
+
+// ... existing imports
+
 export default function RootLayout({
   children,
 }: {
@@ -94,20 +98,27 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} ${tiroBangla.variable} ${hindSiliguri.variable} ${balooDa2.variable} font-sans antialiased overflow-x-hidden min-h-screen flex flex-col bg-background text-foreground`}>
-        <ErrorBoundary>
-          <SessionProviderWrapper>
-            <NavigationWrapper>
-              <MaintenanceGuard>
-                <SessionGuard />
-                <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">
-                  {children}
-                </div>
-                <AppFooter />
-                <Toaster />
-              </MaintenanceGuard>
-            </NavigationWrapper>
-          </SessionProviderWrapper>
-        </ErrorBoundary>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ErrorBoundary>
+            <SessionProviderWrapper>
+              <NavigationWrapper>
+                <MaintenanceGuard>
+                  <SessionGuard />
+                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">
+                    {children}
+                  </div>
+                  <AppFooter />
+                  <Toaster />
+                </MaintenanceGuard>
+              </NavigationWrapper>
+            </SessionProviderWrapper>
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -28,8 +28,11 @@ import {
   Clock,
   Zap,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Sun,
+  Moon
 } from 'lucide-react';
+import { useTheme } from "next-themes";
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
 import {
@@ -53,14 +56,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DashboardSidebar, MobileDashboardSidebar, SidebarItem } from '@/components/dashboard/DashboardSidebar';
 
-interface SidebarItem {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  href: string;
-  badge?: number;
-}
+
 
 const sidebarItems: SidebarItem[] = [
   { id: 'overview', label: 'Overview', icon: Home, href: '#overview' },
@@ -86,6 +84,7 @@ export default function AdminDashboard() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false); // eslint-disable-line @typescript-eslint/no-unused-vars
   const router = useRouter();
+  const { setTheme, theme } = useTheme();
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside user menu
@@ -153,126 +152,26 @@ export default function AdminDashboard() {
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
       </div>
 
-      {/* Mobile Sidebar Overlay */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden transition-opacity duration-300 ${mobileSidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        onClick={() => setMobileSidebarOpen(false)}
+      <DashboardSidebar
+        items={sidebarItems}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        sidebarCollapsed={sidebarCollapsed}
+        setSidebarCollapsed={setSidebarCollapsed}
+        user={user}
+        instituteName={instituteName}
+        onLogout={handleLogout}
       />
 
-      {/* Sidebar */}
-      <motion.div
-        initial={{ width: 280 }}
-        animate={{ width: sidebarCollapsed ? 80 : 280 }}
-        className={`fixed lg:relative z-50 h-full bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border shadow-2xl shadow-black/5 dark:shadow-none transform transition-all duration-300 ease-[cubic-bezier(0.25,0.1,0.25,1)] ${mobileSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-          }`}
-      >
-        <div className="flex flex-col h-full">
-          <div className={`h-20 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-gray-100/50 dark:border-gray-800/50`}>
-            <motion.div
-              initial={{ opacity: 1 }}
-              animate={{ opacity: sidebarCollapsed ? 0 : 1 }}
-              className={`${sidebarCollapsed ? 'hidden' : 'flex'} items-center gap-3 overflow-hidden`}
-            >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30 flex-shrink-0">
-                {/* Logo or Placeholder */}
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 whitespace-nowrap">
-                {instituteName}
-              </span>
-            </motion.div>
-            {sidebarCollapsed && (
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-            )}
-
-            <div className={`flex items-center ${sidebarCollapsed ? 'absolute -right-3 top-24' : ''}`}>
-              <button
-                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className={`hidden lg:flex items-center justify-center w-8 h-8 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-sm text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 transition-colors ${sidebarCollapsed ? 'rotate-180' : ''}`}
-              >
-                <ChevronDown className="w-4 h-4 rotate-90" />
-              </button>
-              <button
-                onClick={() => setMobileSidebarOpen(false)}
-                className="lg:hidden p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <nav className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
-            {sidebarItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  if (item.href && item.href.startsWith('/')) {
-                    router.push(item.href);
-                  } else {
-                    setActiveTab(item.id);
-                    setMobileSidebarOpen(false);
-                  }
-                }}
-                className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${activeTab === item.id
-                  ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 hover:text-gray-900 dark:hover:text-gray-200'
-                  }`}
-              >
-                <div className={`
-                    p-1 rounded-lg transition-all duration-300 flex-shrink-0
-                    ${activeTab === item.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-200'}
-                `}>
-                  <item.icon className="w-5 h-5" />
-                </div>
-
-                {!sidebarCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2 }}
-                    className="ml-3 font-medium text-sm flex-1 text-left truncate"
-                  >
-                    {item.label}
-                  </motion.span>
-                )}
-
-                {!sidebarCollapsed && item.badge && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className={`ml-2 text-xs px-2 py-0.5 rounded-full font-semibold ${activeTab === item.id ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'}`}
-                  >
-                    {item.badge}
-                  </motion.span>
-                )}
-              </button>
-            ))}
-          </nav>
-
-          <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30 backdrop-blur-sm">
-            {!sidebarCollapsed ? (
-              <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/50 dark:hover:bg-gray-800/50 transition-colors cursor-pointer" onClick={() => setActiveTab('settings')}>
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm">
-                  {user?.name?.[0] || 'A'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">{user?.name || 'Admin'}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{user?.email}</p>
-                </div>
-                <Settings className="w-4 h-4 text-gray-400" />
-              </div>
-            ) : (
-              <div className="flex justify-center">
-                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-white dark:border-gray-700 shadow-sm" title={user?.name}>
-                  {user?.name?.[0] || 'A'}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </motion.div>
+      <MobileDashboardSidebar
+        items={sidebarItems}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        isOpen={mobileSidebarOpen}
+        setIsOpen={setMobileSidebarOpen}
+        user={user}
+        onLogout={handleLogout}
+      />
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex flex-col bg-background/50 backdrop-blur-sm transition-colors relative z-10">
@@ -293,6 +192,14 @@ export default function AdminDashboard() {
 
           <div className="flex items-center gap-4 ml-auto">
             <div className="hidden md:flex items-center gap-2 mr-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10 rounded-full hover:bg-muted/50"
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              >
+                {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
+              </Button>
               <Button variant="ghost" size="icon" className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full relative">
                 <Bell className="w-5 h-5" />
                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>

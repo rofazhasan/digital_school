@@ -737,6 +737,7 @@ model SeatAllocation {
   hall        ExamHall       @relation(fields: [hallId], references: [id])
 
   @@unique([examId, studentId])
+  @@index([examId, hallId]) // Performance optimization for Hall filtering
   @@map("seat_allocations")
 }
 

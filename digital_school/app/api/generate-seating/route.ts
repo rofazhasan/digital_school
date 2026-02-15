@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
         // ... (lines 8-150 remain same)
 
         // ... (lines 8-150 remain same)
-        if (!user || (user.role !== "TEACHER" && user.role !== "ADMIN")) {
+        if (!user || (user.role !== "TEACHER" && user.role !== "ADMIN" && user.role !== "SUPER_USER")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -124,61 +124,60 @@ export async function POST(req: NextRequest) {
             const cols = hall.columns || 4;
             const seatsPerBench = hall.seatsPerBench || 2;
 
-            // Iterate strictly by Row first (to fill Front-to-Back mentally, but user wants Row-based patterns)
-            // User Pattern: R1C1S1(7), R1C1S2(8)...
-            // Loop: Row -> Col -> Seat
+            // Checkerboard Logic:
+            // Calculate total seats in a row (cols * seatsPerBench)
+            const seatsPerRow = cols * seatsPerBench;
+
             for (let r = 1; r <= rows; r++) {
-
-                // For Single Exam: Switch Parity based on Row?
-                // R1: Odds (Queue 0), R2: Evens (Queue 1)
-                // BUT user wants specific scrambling.
-                // Let's stick to strict Round Robin across columns to maximize distance.
-                // If Single Exam:
-                // Row 1: Take from Queue 0 (Odds)? 
-                // Row 2: Take from Queue 1 (Evens)?
-                // This matches the "R1 all odds, R2 all evens" observation.
-
-                let rowQueueIndex = 0;
-                if (isSingleExam) {
-                    // If Single Exam, we lock the queue for the entire ROW
-                    // Even Rows (2,4) -> Queue 1. Odd Rows (1,3) -> Queue 0.
-                    // Note: 'r' is 1-based.
-                    rowQueueIndex = (r % 2 === 1) ? 0 : 1;
-                }
-
                 for (let c = 1; c <= cols; c++) {
                     for (let s = 1; s <= seatsPerBench; s++) {
 
                         let student = null;
+                        let queueIndex;
 
                         if (isSingleExam) {
-                            // Single Exam: Pull from the specific Queue for this Row
-                            if (queues[rowQueueIndex].length > 0) {
-                                student = queues[rowQueueIndex].shift();
-                            } else {
-                                // Fallback: If one parity runs out, try the other
-                                const other = (rowQueueIndex + 1) % 2;
-                                if (queues[other].length > 0) student = queues[other].shift();
-                            }
+                            // Single Exam: Alternate queues by Row (Odd vs Even Rows)
+                            // Row 1: Q1, Row 2: Q2... 
+                            // Simple row-based interleaving strategy (as strict A-B-A-B seat-by-seat is hard with one population type unless split strictly)
+                            // Let's stick to strict Row alternating for single exam standard "Set A / Set B" separation if queues split
+                            queueIndex = (r % 2 === 1) ? 0 : 1;
                         } else {
-                            // Multi Exam: Round Robin per SEAT
-                            // Seat 1: Class 7, Seat 2: Class 8...
-                            // We try to find a queue with students
-                            let attempts = 0;
-                            while (attempts < queues.length) {
-                                const qIdx = (globalQueueIndex + attempts) % queues.length;
-                                if (queues[qIdx].length > 0) {
-                                    student = queues[qIdx].shift();
-                                    // Advance global index for next seat
-                                    globalQueueIndex = (qIdx + 1) % queues.length;
-                                    break;
-                                }
-                                attempts++;
-                            }
-                            // If we broke, we found a student. If loop finished, no students left in any queue?
+                            // Multi Exam: Standard Checkerboard (A-B-A-B)
+                            // Formula: (RowIndex + GlobalLinearSeatIndex) % NumExams
+                            // But GlobalLinearSeatIndex resets every row for visual checkerboard?
+                            // Visual Checkerboard on Grid: (Row + Col) % 2
+                            // Seat Index: (r + c*seatsPerBench + s) % numExams?
+
+                            // Let's use a robust linear offset per row to ensure diagonal separation
+                            // If exams=2:
+                            // R1: 0 1 0 1
+                            // R2: 1 0 1 0
+                            // Offset = Row Index % NumExams
+
+                            // Calculate "Seat Index in Row" (0-based)
+                            const seatIdxInRow = ((c - 1) * seatsPerBench) + (s - 1);
+
+                            // Calculate Queue Index
+                            // (RowOffset + SeatIndex) % NumExams
+                            // RowOffset = (r - 1)
+                            queueIndex = ((r - 1) + seatIdxInRow) % queues.length;
                         }
 
-                        if (!student) continue; // Skip empty seat if no students left
+                        // Try to get student from calculated queue
+                        if (queues[queueIndex] && queues[queueIndex].length > 0) {
+                            student = queues[queueIndex].shift();
+                        } else {
+                            // Fallback: If ideal queue empty, try next available (Round Robin search)
+                            for (let i = 1; i < queues.length; i++) {
+                                const fallbackIdx = (queueIndex + i) % queues.length;
+                                if (queues[fallbackIdx] && queues[fallbackIdx].length > 0) {
+                                    student = queues[fallbackIdx].shift();
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!student) continue;
 
                         const seatLabel = `C${c}-R${r}-S${s}`;
 
@@ -200,47 +199,27 @@ export async function POST(req: NextRequest) {
             });
         }
 
-        // 8. Fetch Full Data for Frontend Return
-        // We fetch allocations for all involved exams and students to be safe
-        const finalAllocations = await prisma.seatAllocation.findMany({
+        // 8. Return Summary ONLY (Optimization for Large Datasets)
+        const totalAllocated = await prisma.seatAllocation.count({
             where: {
-                examId: { in: examIds },
-                studentId: { in: allStudentIds }
-            },
-            include: {
-                student: {
-                    include: { user: true }
-                },
-                hall: true
-            },
-            orderBy: { seatLabel: 'asc' }
-        });
-
-        // Flatten for Frontend
-        const flatAllocations = finalAllocations.map(a => ({
-            ...a,
-            student: {
-                ...a.student,
-                name: a.student.user.name
+                examId: { in: examIds }
             }
-        }));
+        });
 
         // Return Stats & Data
         return NextResponse.json({
+            success: true,
             totalStudents: totalStudentCount,
-            allocated: flatAllocations.length,
-            unallocated: totalStudentCount - flatAllocations.length,
-            hallsUsed: halls.length, // Simplified
-            allocations: flatAllocations
+            allocated: totalAllocated,
+            hallsUsed: halls.length,
+            message: "Allocations generated successfully. Please view by Hall."
         });
 
     } catch (error: any) {
         console.error("❌ FATAL SERVER ERROR in generate-seating:", error);
-        console.error("Stack:", error.stack);
         return NextResponse.json({
             error: "Internal Server Error",
-            details: error.message,
-            stack: error.stack
+            details: error.message
         }, { status: 500 });
     }
 }

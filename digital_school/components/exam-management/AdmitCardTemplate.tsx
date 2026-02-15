@@ -23,27 +23,23 @@ const AdmitCard = ({ student, exam }: AdmitCardProps) => {
                 </div>
 
                 {/* Header */}
-                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-1 mb-2 relative z-10">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-bold text-[10px] ring-2 ring-slate-100 ring-offset-1">
+                <div className="flex justify-between items-start border-b-2 border-slate-900 pb-2 mb-2 relative z-10">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-900 text-white flex items-center justify-center font-bold text-xs ring-2 ring-slate-100 ring-offset-1 rounded-sm">
                             DS
                         </div>
                         <div>
-                            <h1 className="text-xs font-black uppercase tracking-wider text-slate-900 leading-none mb-0.5 truncate max-w-[120px]">{exam.schoolName}</h1>
-                            <div className="flex items-center gap-1">
-                                <span className="bg-slate-900 text-white text-[8px] px-1 py-0.5 rounded-sm font-bold uppercase tracking-widest">Admit Card</span>
-                                <span className="text-[8px] uppercase font-bold text-slate-600 truncate max-w-[80px]">{exam.name}</span>
+                            <h1 className="text-[10px] font-bold uppercase tracking-widest text-slate-500 leading-none mb-1">{exam.schoolName}</h1>
+                            <div className="text-xl font-black uppercase text-slate-900 leading-none tracking-tight break-all line-clamp-2 max-w-[140px]">
+                                {exam.name}
                             </div>
                         </div>
                     </div>
-                    <div className="flex flex-col items-end gap-0.5">
-                        <div className="text-right leading-none">
-                            <p className="text-[8px] font-bold text-slate-500">EIIN: {exam.eiin}</p>
-                            <p className="text-[8px] font-bold text-slate-500">{new Date(exam.date).toLocaleDateString()}</p>
+                    <div className="flex flex-col items-end gap-1">
+                        <div className="bg-white p-1 border-2 border-slate-900 shadow-sm">
+                            <QRCodeSVG value={qrPayload} size={42} />
                         </div>
-                        <div className="bg-white p-0.5 border border-slate-200">
-                            <QRCodeSVG value={qrPayload} size={36} />
-                        </div>
+                        <p className="text-[8px] font-bold text-slate-400">{new Date(exam.date).toLocaleDateString()}</p>
                     </div>
                 </div>
 
