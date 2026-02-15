@@ -14,8 +14,8 @@ export async function GET(req: NextRequest) {
 
     let exams;
 
-    if (tokenData.user.role === "SUPER_USER") {
-      // Super user sees all exams (active and inactive) with evaluation assignments
+    if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
+      // Super user and Admin sees all exams (active and inactive) with evaluation assignments
       exams = await prisma.exam.findMany({
         where: {
           ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } })
@@ -102,22 +102,22 @@ export async function GET(req: NextRequest) {
     const formattedExams = await Promise.all(exams.map(async exam => {
       // Calculate evaluation status based on submissions
       let evaluationStatus = "UNASSIGNED";
-      
+
       if (exam.evaluationAssignments.length > 0) {
         // Check if any submissions have been evaluated
-        const evaluatedSubmissions = exam.examSubmissions.filter(submission => 
+        const evaluatedSubmissions = exam.examSubmissions.filter(submission =>
           submission.evaluatedAt !== null
         );
-        
+
         const inProgressSubmissions = exam.examSubmissions.filter(submission => {
           // Check if any questions have manual marks or evaluator notes
           const answers = submission.answers as any;
-          const hasManualGrading = answers && Object.keys(answers).some(key => 
+          const hasManualGrading = answers && Object.keys(answers).some(key =>
             key.endsWith('_marks') && typeof answers[key] === 'number' && answers[key] > 0
           );
           return hasManualGrading || submission.evaluatorNotes;
         });
-        
+
         if (evaluatedSubmissions.length === exam.examSubmissions.length && exam.examSubmissions.length > 0) {
           evaluationStatus = "COMPLETED";
         } else if (inProgressSubmissions.length > 0) {
@@ -126,25 +126,25 @@ export async function GET(req: NextRequest) {
           evaluationStatus = "PENDING";
         }
       }
-      
-              const formattedExam = {
-          id: exam.id,
-          name: exam.name,
-          description: exam.description,
-          date: exam.date.toISOString(),
-          type: exam.type,
-          totalMarks: exam.totalMarks,
-          isActive: exam.isActive,
-          class: exam.class,
-          createdBy: exam.createdBy,
-          totalStudents: exam.examSubmissions.length,
-          submittedStudents: exam.examSubmissions.length,
-          publishedResults: exam.results.length,
-          evaluationAssignment: exam.evaluationAssignments[0] || null,
-          status: evaluationStatus
-        };
-        console.log(`Exam ${exam.name}: status=${evaluationStatus}, submissions=${exam.examSubmissions.length}, assignments=${exam.evaluationAssignments.length}`);
-        return formattedExam;
+
+      const formattedExam = {
+        id: exam.id,
+        name: exam.name,
+        description: exam.description,
+        date: exam.date.toISOString(),
+        type: exam.type,
+        totalMarks: exam.totalMarks,
+        isActive: exam.isActive,
+        class: exam.class,
+        createdBy: exam.createdBy,
+        totalStudents: exam.examSubmissions.length,
+        submittedStudents: exam.examSubmissions.length,
+        publishedResults: exam.results.length,
+        evaluationAssignments: exam.evaluationAssignments,
+        status: evaluationStatus
+      };
+      console.log(`Exam ${exam.name}: status=${evaluationStatus}, submissions=${exam.examSubmissions.length}, assignments=${exam.evaluationAssignments.length}`);
+      return formattedExam;
     }));
 
     return NextResponse.json(formattedExams);

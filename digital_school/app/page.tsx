@@ -1,12 +1,11 @@
 "use client";
 
 import React from "react";
-import { useTheme } from "next-themes";
+
 import { motion, useMotionTemplate, useMotionValue } from "framer-motion";
 import {
     ArrowRight,
-    Sun,
-    Moon,
+
     ChevronDown,
     Bot,
     ScanLine,
@@ -19,12 +18,20 @@ import {
     Linkedin,
     Facebook,
     Mail,
+    Sun,
+    Moon
 } from "lucide-react";
+import { useTheme } from "next-themes";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import HeroCanvas from "@/components/ui/hero-canvas";
+import dynamic from 'next/dynamic';
 import { cn } from "@/lib/utils";
+
+const HeroCanvas = dynamic(() => import('@/components/ui/hero-canvas'), {
+    ssr: false,
+    loading: () => <div className="absolute inset-0 bg-background/50 z-0" />
+});
 
 // --- Animation Variants ---
 const containerVariants = (stagger = 0.1) => ({
@@ -72,6 +79,8 @@ export default function LandingPage() {
     );
 }
 
+
+
 // --- Theme Toggle ---
 const ThemeToggle = () => {
     const { theme, setTheme } = useTheme();
@@ -80,6 +89,7 @@ const ThemeToggle = () => {
             variant="outline"
             size="icon"
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="fixed top-4 right-4 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-md"
             aria-label="Toggle theme"
         >
             <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
@@ -95,10 +105,10 @@ const HeroSection = () => {
     const mouseY = useMotionValue(0);
 
     const handleMouseMove = ({
-                                 clientX,
-                                 clientY,
-                                 currentTarget,
-                             }: React.MouseEvent) => {
+        clientX,
+        clientY,
+        currentTarget,
+    }: React.MouseEvent) => {
         const { left, top } = currentTarget.getBoundingClientRect();
         mouseX.set(clientX - left);
         mouseY.set(clientY - top);
@@ -106,6 +116,7 @@ const HeroSection = () => {
 
     return (
         <header className="relative flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-hidden">
+            <ThemeToggle />
             <HeroCanvas />
             <motion.div
                 onMouseMove={handleMouseMove}
@@ -120,6 +131,9 @@ const HeroSection = () => {
                         background: useMotionTemplate`radial-gradient(450px circle at ${mouseX}px ${mouseY}px, hsl(var(--primary) / 0.1), transparent 80%)`,
                     }}
                 />
+                <motion.div variants={itemVariants} className="mb-6">
+                    <img src="/logo.png" alt="Digital School Logo" className="h-20 w-auto mx-auto drop-shadow-lg" />
+                </motion.div>
                 <motion.h1
                     className="shimmer-text text-4xl sm:text-6xl md:text-7xl font-bold tracking-tighter"
                     variants={itemVariants}
@@ -244,11 +258,11 @@ const FeaturesSection = () => (
 );
 
 const FeatureCard = ({
-                         icon: Icon,
-                         title,
-                         description,
-                         className,
-                     }: {
+    icon: Icon,
+    title,
+    description,
+    className,
+}: {
     icon: React.ComponentType<{ size?: number }>;
     title: string;
     description: string;
@@ -469,14 +483,13 @@ const DeveloperTrademarkSection = () => (
             <Card className="glass-card p-6 md:p-8 text-center">
                 <h3 className="font-semibold text-lg">Developed with ❤️ by Md. Rofaz Hasan Rafiu</h3>
                 <div className="flex justify-center gap-6 mt-4">
-                    <a href="https://linkedin.com/in/rafiu-dev" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin /></a>
-                    <a href="https://facebook.com/rafiu.dev" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Facebook /></a>
-                    <a href="mailto:contact.rafiu.dev@gmail.com" className="text-muted-foreground hover:text-primary transition-colors"><Mail /></a>
+                    <a href="https://www.linkedin.com/in/md-rofaz-hasan-rafiu/" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Linkedin /></a>
+                    <a href="https://github.com/rofazhasan" target="_blank" className="text-muted-foreground hover:text-primary transition-colors"><Code /></a>
+                    <a href="mailto:mdrofazhasanrafiu@gmail.com" className="text-muted-foreground hover:text-primary transition-colors"><Mail /></a>
                 </div>
                 <div className="mt-6 border-t border-border/50 pt-6">
-                    <p className="text-sm text-muted-foreground">In official partnership with</p>
-                    <p className="font-bold text-xl">Elite School & College, Rangpur</p>
-                    <a href="mailto:contact.eliteschool@example.com" className="text-sm text-muted-foreground hover:text-primary transition-colors">contact.eliteschool@example.com</a>
+                    <p className="font-bold text-xl">Address</p>
+                    <p className="text-md text-muted-foreground">Kalihati, Tangail</p>
                 </div>
             </Card>
         </div>
@@ -488,7 +501,10 @@ const Footer = () => (
     <footer className="bg-card/30 text-foreground py-12 px-4 border-t border-border/20">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
             <div className="md:col-span-1 flex flex-col items-center md:items-start">
-                <h4 className="font-bold text-lg mb-2">Elite Exam System</h4>
+                <div className="flex items-center gap-2 mb-2">
+                    <img src="/logo.png" alt="Digital School Logo" className="h-8 w-auto" />
+                    <h4 className="font-bold text-lg">Elite Exam System</h4>
+                </div>
                 <p className="text-muted-foreground text-sm max-w-xs">The future of assessment technology for Bangladesh.</p>
             </div>
             <div>
@@ -503,18 +519,15 @@ const Footer = () => (
             <div>
                 <h4 className="font-bold mb-4">Contact</h4>
                 <ul className="space-y-2 text-muted-foreground">
-                    <li><a href="mailto:contact.eliteschool@example.com" className="hover:text-primary transition-colors">School Inquiries</a></li>
-                    <li><a href="mailto:support.elite@example.com" className="hover:text-primary transition-colors">Technical Support</a></li>
-                    <li><a href="mailto:contact.rafiu.dev@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">School Inquiries</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Technical Support</a></li>
+                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
                 </ul>
             </div>
-            <div className="flex flex-col items-center md:items-start">
-                <h4 className="font-bold mb-4">Theme</h4>
-                <ThemeToggle />
-            </div>
+
         </div>
         <div className="text-center text-muted-foreground/50 mt-12 pt-8 border-t border-border/20">
-            <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved. A concern of Elite School & College.</p>
+            <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved.</p>
         </div>
     </footer>
 );

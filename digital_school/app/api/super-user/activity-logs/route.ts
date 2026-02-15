@@ -5,7 +5,7 @@ import { getDatabaseClient } from '@/lib/db-init';
 export async function GET(request: NextRequest) {
   try {
     const authData = await getTokenFromRequest(request);
-    
+
     if (!authData || authData.user.role !== 'SUPER_USER') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -15,9 +15,9 @@ export async function GET(request: NextRequest) {
 
     const prismadb = await getDatabaseClient();
 
-    // Get recent activity logs (last 20)
+    // Get recent activity logs (last 100)
     const activityLogs = await prismadb.log.findMany({
-      take: 20,
+      take: 100,
       orderBy: { timestamp: 'desc' },
       select: {
         id: true,
@@ -35,14 +35,31 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform data to match frontend expectations
-    const transformedLogs = activityLogs.map(log => ({
-      id: log.id,
-      action: log.action,
-      user: log.user?.name || 'Unknown',
-      details: JSON.stringify(log.context || {}),
-      timestamp: log.timestamp,
-      type: 'SYSTEM' // Default type, could be determined from action
-    }));
+    const transformedLogs = activityLogs.map(log => {
+      let action = log.action.toString();
+      let type: 'EXAM' | 'USER' | 'SYSTEM' | 'AI' = 'SYSTEM';
+      const context = log.context as any;
+
+      if (context?.type === 'SYSTEM_AUDIT') {
+        action = 'SYSTEM_AUDIT';
+        type = 'SYSTEM';
+      } else if (action.includes('EXAM') || action.includes('SUBMISSION')) {
+        type = 'EXAM';
+      } else if (action.includes('USER') || action.includes('LOGIN') || action.includes('REGISTER')) {
+        type = 'USER';
+      } else if (action.includes('AI') || action.includes('GENERAT')) {
+        type = 'AI';
+      }
+
+      return {
+        id: log.id,
+        action: action,
+        user: log.user?.name || 'Unknown',
+        details: JSON.stringify(log.context || {}),
+        timestamp: log.timestamp,
+        type: type
+      };
+    });
 
     return NextResponse.json(transformedLogs);
   } catch (error) {
@@ -52,4 +69,44 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
-} 
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const authData = await getTokenFromRequest(request);
+
+    if (!authData || authData.user.role !== 'SUPER_USER') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    const prismadb = await getDatabaseClient();
+
+    // Delete all logs
+    await prismadb.log.deleteMany();
+
+    // Log the purge action itself
+    await prismadb.log.create({
+      data: {
+        action: 'DELETE',
+        userId: authData.user.id,
+        context: {
+          type: 'SYSTEM',
+          details: 'Audit log history purged by Super User'
+        },
+        ipAddress: request.headers.get('x-forwarded-for') || '127.0.0.1',
+        userAgent: request.headers.get('user-agent') || 'System'
+      }
+    });
+
+    return NextResponse.json({ message: 'Log history cleared successfully' });
+  } catch (error) {
+    console.error('Failed to clear logs:', error);
+    return NextResponse.json(
+      { error: 'Failed to clear log history' },
+      { status: 500 }
+    );
+  }
+}

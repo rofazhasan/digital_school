@@ -3,18 +3,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient, Question, QuestionType, Difficulty } from '@prisma/client';
 import { z } from 'zod';
+import { shuffleArray } from '@/lib/utils';
 
 const prisma = new PrismaClient();
 
 // Zod schema for query parameter validation
 const getQuestionsQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce.number().int().min(1).max(10000).default(20),
   type: z.nativeEnum(QuestionType).optional(),
   difficulty: z.nativeEnum(Difficulty).optional(),
   subject: z.string().optional(),
+  topic: z.string().optional(),
+  startDate: z.string().datetime().optional(),
+  endDate: z.string().datetime().optional(),
 });
-
 
 // GET handler to fetch exam details and a paginated/filtered list of available questions
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -42,7 +45,6 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!exam) {
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
-
     // 2. Validate and parse query parameters for filtering and pagination
     const queryParams = Object.fromEntries(request.nextUrl.searchParams.entries());
     const validation = getQuestionsQuerySchema.safeParse(queryParams);
@@ -50,7 +52,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!validation.success) {
       return NextResponse.json({ error: 'Invalid query parameters', details: validation.error.flatten() }, { status: 400 });
     }
-    const { page, limit, type, difficulty, subject } = validation.data;
+    const { page, limit, type, difficulty, subject, topic, startDate, endDate } = validation.data;
     const skip = (page - 1) * limit;
 
     // 3. Construct a dynamic where clause for professional-grade filtering
@@ -60,6 +62,17 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
       ...(type && { type }),
       ...(difficulty && { difficulty }),
       ...(subject && { subject: { contains: subject, mode: 'insensitive' } }),
+      ...(topic && { topic: { contains: topic, mode: 'insensitive' } }),
+      ...(startDate && endDate ? {
+        createdAt: {
+          gte: new Date(startDate),
+          lte: new Date(endDate),
+        }
+      } : (startDate ? {
+        createdAt: { gte: new Date(startDate) }
+      } : (endDate ? {
+        createdAt: { lte: new Date(endDate) }
+      } : {}))),
     };
 
     // 4. Fetch the filtered and paginated questions and the total count for pagination UI
@@ -96,8 +109,8 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
 // PUT handler for MANUAL exam set creation
 export async function PUT(
-    request: NextRequest,
-    context: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { params } = context;
@@ -122,7 +135,32 @@ export async function PUT(
     }
 
     // Use questionsWithNegativeMarks if provided, otherwise use selectedQuestions
-    const questionsToSave = questionsWithNegativeMarks || selectedQuestions;
+    let questionsToSave = questionsWithNegativeMarks || selectedQuestions;
+
+    // Sanitize and Shuffle: Ensure MTF questions do not have negative marks AND shuffle options for all types
+    questionsToSave = questionsToSave.map((q: any) => {
+      const processedQuestion = { ...q };
+
+      // 1. Shuffle options for MCQ and MC
+      if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
+        if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          processedQuestion.options = shuffleArray(processedQuestion.options);
+        }
+      }
+
+      // 2. Shuffle right column for MTF
+      if (processedQuestion.type === 'MTF') {
+        if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
+        }
+
+        // Remove negative marks for MTF (sanitization)
+        const { negativeMarks, ...rest } = processedQuestion;
+        return rest;
+      }
+
+      return processedQuestion;
+    });
 
     const newExamSet = await prisma.examSet.create({
       data: {
@@ -147,8 +185,8 @@ export async function PUT(
 
 // POST handler for AUTOMATIC exam set generation
 export async function POST(
-    request: NextRequest,
-    context: { params: Promise<{ id: string }> }
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
     const { params } = context;
@@ -193,16 +231,31 @@ export async function POST(
       return NextResponse.json({ error: `Could not automatically generate a set with total marks of ${exam.totalMarks}. Please try again or create a set manually.` }, { status: 409 }); // 409 Conflict
     }
 
-    // Calculate negative marks for MCQ questions
+    // Process questions: Shuffle options and calculate negative marks
     const generatedSetWithNegativeMarks = generatedSet.map(q => {
-      if (q.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-        const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
-        return {
-          ...q,
-          negativeMarks: parseFloat(negativeMarks.toFixed(2))
-        };
+      const processedQuestion = { ...q } as any;
+
+      // 1. Shuffle options for MCQ and MC
+      if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
+        if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          processedQuestion.options = shuffleArray(processedQuestion.options);
+        }
       }
-      return q;
+
+      // 2. Shuffle right column for MTF
+      if (processedQuestion.type === 'MTF') {
+        if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
+        }
+      }
+
+      // 3. Negative marking for MCQ (Single Correct)
+      if (processedQuestion.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+        const negativeMarks = (processedQuestion.marks * exam.mcqNegativeMarking) / 100;
+        processedQuestion.negativeMarks = parseFloat(negativeMarks.toFixed(2));
+      }
+
+      return processedQuestion;
     });
 
     const newExamSet = await prisma.examSet.create({

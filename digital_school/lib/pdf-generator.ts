@@ -12,10 +12,21 @@ export interface PDFOptions {
   margin?: number;
 }
 
+// Use Omit to avoid conflict with base Question type
+export interface ExtendedQuestion extends Omit<Question, 'tags' | 'options' | 'subQuestions'> {
+  stem?: string;
+  correctOption?: number;
+  chapter?: string;
+  tags?: string | string[]; // Allow string (JSON) or string[]
+  options?: any;
+  subQuestions?: any;
+  // Re-declare tags to match Omit (optional here)
+}
+
 export interface QuestionBankPDFData {
   title: string;
   description?: string;
-  questions: Question[];
+  questions: ExtendedQuestion[];
   filters?: {
     subject?: string;
     class?: string;
@@ -28,7 +39,7 @@ export interface QuestionBankPDFData {
 }
 
 class PDFGenerator {
-  private async generateHTML(questions: Question[], options: PDFOptions = {}): Promise<string> {
+  private async generateHTML(questions: ExtendedQuestion[], options: PDFOptions = {}): Promise<string> {
     const {
       title = 'Question Bank',
       includeAnswers = false,
@@ -38,7 +49,7 @@ class PDFGenerator {
       margin = 20
     } = options;
 
-    const formatQuestion = (question: Question, index: number): string => {
+    const formatQuestion = (question: ExtendedQuestion, index: number): string => {
       let html = `
         <div class="question" style="margin-bottom: 20px; page-break-inside: avoid;">
           <div class="question-header" style="margin-bottom: 10px;">
@@ -101,18 +112,18 @@ class PDFGenerator {
       if (includeAnswers) {
         html += '<div class="answers" style="margin-top: 15px; padding: 10px; background: #f0fdf4; border-left: 4px solid #059669;">';
         html += '<div style="font-weight: bold; color: #059669; margin-bottom: 5px;">Answer:</div>';
-        
-        if (question.type === 'MCQ' && question.correctOption !== null) {
+
+        if (question.type === 'MCQ' && question.correctOption !== null && question.correctOption !== undefined) {
           const options = Array.isArray(question.options) ? question.options : JSON.parse(question.options as string);
           const correctOption = options[question.correctOption];
           const optionLabel = String.fromCharCode(0x0995 + question.correctOption);
           html += `<div>Correct Answer: <strong>${optionLabel}. ${correctOption}</strong></div>`;
         }
-        
+
         if (question.modelAnswer) {
           html += `<div style="margin-top: 5px;"><strong>Model Answer:</strong> ${question.modelAnswer}</div>`;
         }
-        
+
         html += '</div>';
       }
 
@@ -244,7 +255,7 @@ class PDFGenerator {
 
     try {
       const page = await browser.newPage();
-      
+
       // Generate HTML content
       const html = await this.generateHTML(data.questions, {
         title: data.title,

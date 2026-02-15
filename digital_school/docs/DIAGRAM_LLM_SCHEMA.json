@@ -1,0 +1,177 @@
+{
+    "version": "9.0",
+    "total_presets": 358,
+    "intent": "Master System Prompt for AI-Driven Scientific Diagram Generation",
+    "ai_guidance": {
+        "core_principle": "Deliver professional, technical, and bilingual diagrams using high-level presets or hybrid FBD syntax.",
+        "parsing_rule": "Always wrap diagrams in ##PRESET:name(args)##. Multiple diagrams can be joined with pipes: ##PRESET:A | PRESET:B##.",
+        "parameter_philosophy": "Params are flexible. (radius=50) is equivalent to (50). Use named params for AI clarity.",
+        "typography": "Supports Inter (EN), Kalpurush (BN), and STIX Two Math (LaTeX symbols like \\theta, \\pi, \\Delta)."
+    },
+    "composition_framework": {
+        "modes": {
+            "SERIES": "##COMBINE:SERIES[p1, p2]## - Horizontal sequence with flow arrows.",
+            "PARALLEL": "##COMBINE:PARALLEL[p1, p2]## - Vertical stack with index labels.",
+            "GRID": "##COMBINE:GRID:cols[p1, p2, p3]## - Matrix layout (e.g., GRID:2).",
+            "COMPARE": "##COMBINE:COMPARE[Label1|p1, Label2|p2]## - Side-by-side comparison."
+        }
+    },
+    "library": {
+        "physics": {
+            "mechanics": [
+                "incline",
+                "hanging",
+                "pulley",
+                "beam",
+                "spring",
+                "pendulum",
+                "projectile",
+                "freefall",
+                "collision",
+                "lever",
+                "atwood"
+            ],
+            "environments": [
+                "pendulum-water",
+                "pendulum-fire",
+                "projectile-water",
+                "projectile-fire",
+                "freefall-water",
+                "freefall-fire"
+            ],
+            "electricity": [
+                "circuit-series",
+                "circuit-parallel",
+                "resistor",
+                "capacitor",
+                "inductor",
+                "battery",
+                "ac-source",
+                "dc-source",
+                "mosfet",
+                "op-amp"
+            ],
+            "waves_optics": [
+                "wave-transverse",
+                "wave-standing",
+                "ray-diagram",
+                "lens-convex",
+                "lens-concave",
+                "prism",
+                "laser",
+                "double-slit"
+            ],
+            "thermodynamics": [
+                "pv-diagram",
+                "carnot-cycle",
+                "phase-diagram",
+                "maxwell-distribution",
+                "isothermal",
+                "adiabatic"
+            ],
+            "modern": [
+                "bohr-model",
+                "energy-levels",
+                "photoelectric",
+                "nuclear-fission",
+                "nuclear-fusion",
+                "schrodinger-equation"
+            ]
+        },
+        "chemistry": {
+            "apparatus": [
+                "beaker",
+                "test-tube",
+                "flask-conical",
+                "burette",
+                "funnel",
+                "titration",
+                "distillation"
+            ],
+            "molecular_3d": [
+                "atom",
+                "molecule",
+                "molecule-water",
+                "molecule-co2",
+                "methane",
+                "benzene",
+                "glucose",
+                "caffeine",
+                "aspirin"
+            ],
+            "structure": [
+                "nacl-crystal",
+                "diamond-structure",
+                "graphite-structure",
+                "octahedral-complex"
+            ]
+        },
+        "biology": {
+            "molecules": [
+                "dna",
+                "protein-helix",
+                "cell-membrane",
+                "atp",
+                "enzyme-substrate"
+            ],
+            "anatomy": [
+                "eye",
+                "ear",
+                "heart",
+                "neuron",
+                "nephron",
+                "digestive-system",
+                "respiratory-system",
+                "skeletal-system"
+            ],
+            "botany": [
+                "leaf-structure",
+                "flower-structure",
+                "root-system",
+                "photosynthesis",
+                "stomata"
+            ]
+        },
+        "mathematics": {
+            "shapes": [
+                "triangle",
+                "circle",
+                "rectangle",
+                "pentagon",
+                "hexagon",
+                "cube",
+                "sphere",
+                "cylinder",
+                "cone"
+            ],
+            "graphs_advanced": [
+                "graph-sine",
+                "graph-exponential",
+                "vector",
+                "parabola",
+                "hyperbola",
+                "polar-coordinates",
+                "vector-3d",
+                "matrix-2x2"
+            ]
+        },
+        "logic_gates": [
+            "and-gate",
+            "or-gate",
+            "not-gate",
+            "nand-gate",
+            "nor-gate",
+            "xor-gate",
+            "jk-flipflop",
+            "555-timer"
+        ]
+    },
+    "customization_syntax": {
+        "hybrid": "##PRESET:name(args) | ELEMENT:type(params)##",
+        "elements": {
+            "force": "F<id>@P<ref>(mag, angle, label, type)",
+            "point": "P<id>(x, y, label, type)",
+            "moment": "M<id>@P<ref>(mag, label, direction)"
+        }
+    }
+}

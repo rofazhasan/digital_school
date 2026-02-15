@@ -37,6 +37,8 @@ interface ExamSubmission {
   studentId: string;
   submittedAt: string;
   score?: number;
+  answers?: any;
+  status?: 'IN_PROGRESS' | 'SUBMITTED';
 }
 
 const fetchUser = async () => {
@@ -47,8 +49,11 @@ const fetchUser = async () => {
 const fetchExams = async () => {
   const res = await fetch("/api/exams");
   const result = await res.json();
-  // Handle both array and object with data property
-  return Array.isArray(result) ? result : result.data || [];
+  // Handle array, wrapped array, or wrapped object with exams property
+  if (Array.isArray(result)) return result;
+  if (Array.isArray(result.data)) return result.data;
+  if (result.data?.exams && Array.isArray(result.data.exams)) return result.data.exams;
+  return [];
 };
 
 const fetchResults = async () => {
@@ -56,8 +61,14 @@ const fetchResults = async () => {
     const res = await fetch("/api/results");
     if (!res.ok) return { results: [] };
     const result = await res.json();
-    // Handle the API response structure
-    const data = result.results || result.data || [];
+
+    // Handle various API response structures
+    let data = [];
+    if (Array.isArray(result)) data = result;
+    else if (Array.isArray(result.results)) data = result.results;
+    else if (Array.isArray(result.data)) data = result.data;
+    else if (result.data?.results && Array.isArray(result.data.results)) data = result.data.results;
+
     return { results: data };
   } catch {
     return { results: [] };
@@ -69,8 +80,14 @@ const fetchExamSubmissions = async () => {
     const res = await fetch("/api/exam-submissions");
     if (!res.ok) return { submissions: [] };
     const result = await res.json();
-    // Handle the API response structure
-    const data = result.submissions || result.data || [];
+
+    // Handle various API response structures
+    let data = [];
+    if (Array.isArray(result)) data = result;
+    else if (Array.isArray(result.submissions)) data = result.submissions;
+    else if (Array.isArray(result.data)) data = result.data;
+    else if (result.data?.submissions && Array.isArray(result.data.submissions)) data = result.data.submissions;
+
     return { submissions: data };
   } catch {
     return { submissions: [] };
@@ -84,34 +101,64 @@ export default function OnlineExamsPage() {
   const [submissions, setSubmissions] = useState<ExamSubmission[]>([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("online");
-  const [showAllExams, setShowAllExams] = useState(false);
 
   useEffect(() => {
     (async () => {
       setLoading(true);
-      const userData = await fetchUser();
-      setUser(userData.user);
-      const examsData = await fetchExams();
-      console.log('📊 All exams fetched:', examsData);
-      setExams(examsData);
-      const resultsData = await fetchResults();
-      console.log('📊 Results data:', resultsData);
-      setResults(resultsData.results || []);
-      const submissionsData = await fetchExamSubmissions();
-      console.log('📊 Submissions data:', submissionsData);
-      setSubmissions(submissionsData.submissions || []);
-      setLoading(false);
+      try {
+        const userData = await fetchUser();
+        setUser(userData.user);
+        const examsData = await fetchExams();
+        setExams(examsData);
+        const resultsData = await fetchResults();
+        setResults(resultsData.results || []);
+        const submissionsData = await fetchExamSubmissions();
+        setSubmissions(submissionsData.submissions || []);
+      } catch (e) {
+        console.error("Failed to load data", e);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
-  // Helper to get result for an exam
-  const getResult = (examId: string) => results.find((r) => r.examId === examId);
+  const userClassId = user?.studentProfile?.class?.id;
 
-  // Helper to check if user has submitted an exam
-  const hasSubmitted = (examId: string) => {
-    if (!user?.studentProfile?.id) return false;
-    return submissions.some((s) => s.examId === examId && s.studentId === user.studentProfile.id);
+  // --- Filtering Logic ---
+  const filterExams = (examList: Exam[]) => {
+    if (!userClassId) return []; // strict: only see if you have a class
+
+    const now = new Date();
+    // Reset time for strictly date-based comparison logic if needed, 
+    // but users usually want "7 days from now" from current moment.
+    // The requirement: "today, tomorrow, tomorrow+1 ... all previous ... cant see 7 days after"
+    // "Tomorrow+1" = Today + 2 days.
+    const cutoffDate = new Date();
+    cutoffDate.setDate(now.getDate() + 3); // Allow T, T+1, T+2. T+3 is hidden.
+    cutoffDate.setHours(0, 0, 0, 0);
+
+    return examList.filter(exam => {
+      // 0. Active Status Filter (Critical)
+      if (!exam.isActive) return false;
+
+      // 1. Class Filter - STRICT
+      // If exam is assigned to a class, it must match user's class.
+      // If exam is NOT assigned to a class (undefined/null), assume it's NOT for this student 
+      // (or modify to assume global if that's the requirement, but user said "seeing all exams" is a bug).
+      if (!exam.classId || exam.classId !== userClassId) return false;
+
+      // 2. Date Filter - REMOVED
+      // User requested to see all approved exams even if they are in the future ("don't hide these only say that exam not started")
+      // const examDate = new Date(exam.date);
+      // if (examDate >= cutoffDate) return false; 
+
+      return true;
+    });
   };
+
+  const filteredExams = filterExams(exams);
+  const onlineExams = filteredExams.filter(e => !e.type || e.type === "ONLINE");
+  const mixedExams = filteredExams.filter(e => e.type === "MIXED");
 
   // Helper to determine exam status
   const getExamStatus = (exam: Exam) => {
@@ -122,7 +169,6 @@ export default function OnlineExamsPage() {
       start = new Date(exam.startTime);
       end = new Date(exam.endTime);
     } else {
-      // If only date is provided, make it active for the whole day
       const date = new Date(exam.date);
       start = new Date(date);
       start.setHours(0, 0, 0, 0);
@@ -135,236 +181,196 @@ export default function OnlineExamsPage() {
     return "active";
   };
 
-  // Helper to get user's classId
-  const userClassId = user?.studentProfile?.class?.id;
-  console.log('👤 User data:', {
-    userId: user?.id,
-    userRole: user?.role,
-    hasStudentProfile: !!user?.studentProfile,
-    userClassId: userClassId,
-    userClassName: user?.studentProfile?.class?.name
-  });
-
-  // Helper to get dashboard URL by role
-  const getDashboardUrl = () => {
-    if (!user) return "/dashboard";
-    switch (user.role) {
-      case "SUPER_USER": return "/super-user/dashboard";
-      case "ADMIN": return "/admin/dashboard";
-      case "TEACHER": return "/teacher/dashboard";
-      case "STUDENT": return "/student/dashboard";
-      default: return "/dashboard";
-    }
-  };
-
-  // Adaptive layout classes
-  const layoutClass = "w-full max-w-5xl mx-auto px-2 sm:px-4 md:px-8 py-8 flex flex-col gap-6";
+  const getResult = (examId: string) => results.find((r) => r.examId === examId);
+  const hasSubmitted = (examId: string) => submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'SUBMITTED');
+  const hasInProgress = (examId: string) => submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'IN_PROGRESS');
 
   return (
-    <main className="min-h-screen font-serif bg-gradient-to-br from-blue-50 via-blue-100 to-blue-200 dark:from-slate-900 dark:via-slate-800 dark:to-slate-700">
-      <div className="flex flex-col gap-4 mb-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-700 to-purple-600 drop-shadow-lg">অনলাইন পরীক্ষা</h1>
-          <div className="flex items-center gap-2">
+    <main className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans selection:bg-blue-100">
+      {/* Decorative header background */}
+      <div className="absolute top-0 left-0 w-full h-64 bg-gradient-to-br from-indigo-600 to-purple-700 rounded-b-[3rem] shadow-xl z-0" />
+
+      <div className="relative z-10 container mx-auto px-4 py-8 max-w-6xl">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <div className="text-white">
+            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">Online Exams</h1>
+            <p className="text-blue-100 opacity-90 font-medium">{user?.studentProfile?.class?.name ? `Class: ${user.studentProfile.class.name}` : "Student Portal"}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button asChild variant="secondary" className="shadow-lg hover:shadow-xl transition-all">
+              <Link href="/student/dashboard">Dashboard</Link>
+            </Button>
+            <Button asChild variant="outline" className="bg-white/10 text-white border-white/20 hover:bg-white/20 shadow-lg hover:shadow-xl transition-all backdrop-blur-md">
+              <Link href="/exams/results">Results</Link>
+            </Button>
             <DarkModeToggle />
           </div>
         </div>
-        
-        <div className="flex flex-wrap gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setShowAllExams(!showAllExams)}
-            className="flex-1 sm:flex-none"
-          >
-            {showAllExams ? "শুধু আমার ক্লাস" : "সকল পরীক্ষা দেখুন"}
-          </Button>
-          <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none">
-            <Link href="/exams/results">সকল ফলাফল দেখুন</Link>
-          </Button>
-          <Button asChild variant="secondary" size="sm" className="flex-1 sm:flex-none">
-            <Link href={getDashboardUrl()}>ড্যাশবোর্ডে যান</Link>
-          </Button>
-        </div>
-      </div>
-      <div className={layoutClass}>
-        <Tabs value={tab} onValueChange={setTab} className="mb-4">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="online" className="text-sm">অনলাইন পরীক্ষা</TabsTrigger>
-            <TabsTrigger value="mixed" className="text-sm">মিশ্র পরীক্ষা</TabsTrigger>
-          </TabsList>
-          <TabsContent value="online">
-            {(() => {
-              const onlineExams = showAllExams 
-                ? exams.filter((e) => !e.type || e.type === "ONLINE")
-                : exams.filter((e) => (!e.type || e.type === "ONLINE") && e.classId === userClassId);
-              console.log('🔍 Online exams after filtering:', {
-                totalExams: exams.length,
-                onlineExams: onlineExams.length,
-                userClassId: userClassId,
-                showAllExams: showAllExams,
-                filteredExams: onlineExams.map(e => ({ id: e.id, name: e.name, classId: e.classId, isActive: e.isActive }))
-              });
-              return (
-                <ExamTable
-                  exams={onlineExams}
-                  getResult={getResult}
-                  getExamStatus={getExamStatus}
-                  hasSubmitted={hasSubmitted}
-                  loading={loading}
-                />
-              );
-            })()}
-          </TabsContent>
-          <TabsContent value="mixed">
-            {(() => {
-              const mixedExams = showAllExams 
-                ? exams.filter((e) => e.type === "MIXED")
-                : exams.filter((e) => e.type === "MIXED" && e.classId === userClassId);
-              console.log('🔍 Mixed exams after filtering:', {
-                totalExams: exams.length,
-                mixedExams: mixedExams.length,
-                userClassId: userClassId,
-                showAllExams: showAllExams,
-                filteredExams: mixedExams.map(e => ({ id: e.id, name: e.name, classId: e.classId, isActive: e.isActive }))
-              });
-              return (
-                <ExamTable
-                  exams={mixedExams}
-                  getResult={getResult}
-                  getExamStatus={getExamStatus}
-                  hasSubmitted={hasSubmitted}
-                  loading={loading}
-                />
-              );
-            })()}
-          </TabsContent>
-        </Tabs>
+
+        <Card className="border-none shadow-2xl bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm rounded-3xl overflow-hidden">
+          <div className="p-2 sm:p-6">
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-8 p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl h-14">
+                <TabsTrigger value="online" className="rounded-xl h-12 text-base font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md transition-all">
+                  Online Exams ({onlineExams.length})
+                </TabsTrigger>
+                <TabsTrigger value="mixed" className="rounded-xl h-12 text-base font-semibold data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700 data-[state=active]:shadow-md transition-all">
+                  Mixed Mode ({mixedExams.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={tab}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <TabsContent value="online" className="mt-0">
+                    <ExamGrid
+                      exams={onlineExams}
+                      getExamStatus={getExamStatus}
+                      getResult={getResult}
+                      hasSubmitted={hasSubmitted}
+                      hasInProgress={hasInProgress}
+                      loading={loading}
+                    />
+                  </TabsContent>
+                  <TabsContent value="mixed" className="mt-0">
+                    <ExamGrid
+                      exams={mixedExams}
+                      getExamStatus={getExamStatus}
+                      getResult={getResult}
+                      hasSubmitted={hasSubmitted}
+                      hasInProgress={hasInProgress}
+                      loading={loading}
+                    />
+                  </TabsContent>
+                </motion.div>
+              </AnimatePresence>
+            </Tabs>
+          </div>
+        </Card>
       </div>
     </main>
   );
 }
 
-function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
-  exams: Exam[];
-  getResult: (examId: string) => Result | undefined;
-  getExamStatus: (exam: Exam) => string;
-  hasSubmitted: (examId: string) => boolean;
-  loading: boolean;
-}) {
-  if (loading) return <div className="text-center py-8">লোড হচ্ছে...</div>;
-  if (!exams.length) return <Alert className="glass"><AlertTitle>কোনো পরীক্ষা নেই</AlertTitle><AlertDescription>এই মুহূর্তে কোনো পরীক্ষা পাওয়া যায়নি।</AlertDescription></Alert>;
-  
+function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress, loading }: any) {
+  if (loading) return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+      {[1, 2, 3].map(i => <div key={i} className="h-64 bg-slate-200 dark:bg-slate-800 rounded-3xl" />)}
+    </div>
+  );
+
+  if (exams.length === 0) return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+        <span className="text-4xl">🎉</span>
+      </div>
+      <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">No exams found</h3>
+      <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto mt-2">You're all caught up! No exams scheduled for next few days.</p>
+    </div>
+  );
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <AnimatePresence>
-        {exams.map((exam) => {
+        {exams.map((exam: any) => {
           const status = getExamStatus(exam);
-          const result = getResult(exam.id);
           const submitted = hasSubmitted(exam.id);
-          const isInactive = exam.isActive === false;
-          
+          const inProgress = hasInProgress(exam.id);
+          const result = getResult(exam.id);
+
+          let statusColor = "bg-slate-100 text-slate-700";
+          if (status === "active") statusColor = "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300";
+          if (status === "upcoming") statusColor = "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300";
+          if (status === "finished") statusColor = "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300";
+
           return (
             <motion.div
+              layout
               key={exam.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              whileHover={{ y: -5 }}
+              className="group"
             >
-              <Card className={`glass shadow-lg h-full ${isInactive ? 'opacity-75' : ''}`}>
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg leading-tight">{exam.name}</CardTitle>
-                    <div className="flex flex-wrap gap-1">
-                      {hasSubmitted(exam.id) && (
-                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                          ✓ জমা দেওয়া হয়েছে
-                        </Badge>
-                      )}
-                      {exam.allowRetake && (
-                        <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
-                          🔄 পুনরায় পরীক্ষা
-                        </Badge>
-                      )}
-                      {isInactive && (
-                        <Badge variant="outline" className="text-xs bg-gray-50 text-gray-700 border-gray-200">
-                          ⏸️ নিষ্ক্রিয়
-                        </Badge>
-                      )}
-                    </div>
+              <div className="h-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 flex flex-col">
+                <div className={`h-2 w-full ${status === 'active' ? 'bg-indigo-500' : status === 'upcoming' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+
+                <div className="p-6 flex-1 flex flex-col">
+                  <div className="flex justify-between items-start mb-4">
+                    <Badge variant="secondary" className={`${statusColor} border-none px-3 py-1 font-semibold capitalize`}>
+                      {status === 'active' ? 'Live Now' : status}
+                    </Badge>
+                    {submitted && <Badge className="bg-green-500 text-white border-none">Completed</Badge>}
+                    {inProgress && !submitted && <Badge className="bg-amber-500 text-white border-none">Resuming...</Badge>}
                   </div>
-                  <CardDescription className="text-sm">{exam.subject}</CardDescription>
-                </CardHeader>
-                
-                <CardContent className="pb-3">
-                  <div className="space-y-2 text-sm">
+
+                  <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2 line-clamp-2 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    {exam.name}
+                  </h3>
+
+                  <div className="space-y-3 mt-4 text-sm text-slate-600 dark:text-slate-400 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">বর্ণনা:</span>
-                      <span className="line-clamp-2">{exam.description || "কোনো বর্ণনা নেই"}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">তারিখ:</span>
-                      <span>{new Date(exam.date).toLocaleDateString("bn-BD")}</span>
+                      <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xs">📚</span>
+                      {exam.subject || "General"}
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">স্ট্যাটাস:</span>
-                      <Badge variant={status === "active" ? "default" : status === "upcoming" ? "secondary" : "outline"}>
-                        {status === "active" && "চলমান"}
-                        {status === "upcoming" && "আসন্ন"}
-                        {status === "finished" && "শেষ"}
-                      </Badge>
+                      <span className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-xs">📅</span>
+                      {new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                     </div>
-                  </div>
-                </CardContent>
-                
-                <CardFooter className="pt-0">
-                  {!isInactive && (
-                    <div className="w-full">
-                      {status === "upcoming" ? (
-                        <div className="text-sm text-muted-foreground text-center">
-                          শুরু হবে {new Date(exam.startTime || exam.date).toLocaleString("bn-BD")}
-                        </div>
-                      ) : status === "finished" ? (
-                        submitted ? (
-                          <Button asChild variant="default" className="w-full">
-                            <a href={`/exams/results/${exam.id}`}>ফলাফল দেখুন</a>
-                          </Button>
-                        ) : (
-                          <div className="text-sm text-muted-foreground text-center">পরীক্ষা দেওয়া হয়নি</div>
-                        )
-                      ) : status === "active" ? (
-                        submitted ? (
-                          <div className="space-y-2">
-                            {exam.allowRetake && (
-                              <Button asChild variant="default" size="sm" className="w-full">
-                                <a href={`/exams/online/${exam.id}`}>পুনরায় পরীক্ষা দিন</a>
-                              </Button>
-                            )}
-                            <Button asChild variant="outline" size="sm" className="w-full">
-                              <a href={`/exams/results/${exam.id}`}>ফলাফল দেখুন</a>
-                            </Button>
-                          </div>
-                        ) : (
-                          <Button asChild variant="default" className="w-full">
-                            <a href={`/exams/online/${exam.id}`}>পরীক্ষা দিন</a>
-                          </Button>
-                        )
-                      ) : (
-                        <div className="text-sm text-muted-foreground text-center">অজানা স্ট্যাটাস</div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {isInactive && (
-                    <div className="w-full text-center">
-                      <div className="text-sm text-muted-foreground">
-                        এই পরীক্ষাটি বর্তমানে নিষ্ক্রিয় অবস্থায় রয়েছে
+                    {status === 'upcoming' && (
+                      <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="w-5 h-5 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center text-xs">⏰</span>
+                        Starts {new Date(exam.startTime || exam.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </div>
-                    </div>
-                  )}
-                </CardFooter>
-              </Card>
+                    )}
+                    {status === 'active' && (
+                      <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                        <span className="w-5 h-5 rounded-full bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center text-xs">⚡</span>
+                        Ending {new Date(exam.endTime || exam.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
+                    {submitted ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-xl">
+                            <div className="text-xs text-slate-500">Score</div>
+                            <div className="font-bold text-slate-900 dark:text-white">{result?.total ?? '-'}</div>
+                          </div>
+                          <Button asChild variant="outline" className="h-full rounded-xl border-slate-200">
+                            <a href={`/exams/results/${exam.id}`}>View Result</a>
+                          </Button>
+                        </div>
+                        {exam.allowRetake && status === 'active' && (
+                          <Button asChild className="w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-lg h-11 text-base font-semibold">
+                            <a href={`/exams/online/${exam.id}?action=start`}>🔄 Retake Exam</a>
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      // Allow starting/resuming if:
+                      // 1. Exam is currently active, OR
+                      // 2. Student has IN_PROGRESS submission and exam hasn't finished
+                      (status === 'active' || inProgress) && status !== 'finished' ? (
+                        <Button asChild className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none h-11 text-base font-semibold">
+                          <a href={`/exams/online/${exam.id}`}>{inProgress ? '▶️ Resume Exam' : 'Start Exam'}</a>
+                        </Button>
+                      ) : (
+                        <Button disabled className="w-full rounded-xl opacity-50 bg-slate-100 text-slate-400 dark:bg-slate-800 h-11">
+                          {status === 'upcoming' ? 'Not Started' : 'Expired'}
+                        </Button>
+                      )
+                    )}
+                  </div>
+                </div>
+              </div>
             </motion.div>
           );
         })}
@@ -372,6 +378,8 @@ function ExamTable({ exams, getResult, getExamStatus, hasSubmitted, loading }: {
     </div>
   );
 }
+
+
 
 function ResultCard({ result }: { result: Result }) {
   return (
@@ -388,7 +396,7 @@ function ResultCard({ result }: { result: Result }) {
       </CardContent>
       <CardFooter>
         <div className="flex flex-col gap-2 w-full">
-        <Badge variant="outline">{result.isPublished ? "প্রকাশিত" : "অপ্রকাশিত"}</Badge>
+          <Badge variant="outline">{result.isPublished ? "প্রকাশিত" : "অপ্রকাশিত"}</Badge>
           {result.isPublished && (
             <Button asChild variant="outline" size="sm">
               <a href={`/exams/results/${result.examId}`}>বিস্তারিত দেখুন</a>

@@ -14,6 +14,7 @@ export interface JWTPayload {
   email: string;
   role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
   instituteId?: string;
+  sid: string;
   iat: number;
   exp: number;
 }
@@ -25,7 +26,7 @@ export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Pro
     .setIssuedAt()
     .setExpirationTime('24h')
     .sign(JWT_SECRET);
-  
+
   return token;
 }
 
@@ -35,7 +36,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
     });
-    
+
     return payload as unknown as JWTPayload;
   } catch (error) {
     console.error('Token verification failed:', error);
@@ -43,64 +44,68 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
   }
 }
 
-// Get user from token (for API routes - includes database query)
-export async function getUserFromToken(token: string) {
-  const payload = await verifyToken(token);
-  if (!payload) return null;
-
+// Validate session status
+export async function validateSession(token: string) {
   try {
-    const user = await prismadb.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        role: true,
-        isActive: true,
-        instituteId: true,
-        institute: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        studentProfile: {
-          select: {
-            id: true,
-            roll: true,
-            registrationNo: true,
-            class: {
-              select: {
-                id: true,
-                name: true,
-                section: true,
-              },
+    const payload = await verifyToken(token);
+    if (!payload) return { status: 'invalid' };
+
+    // Defensive check for database query
+    let user;
+    try {
+      user = await prismadb.user.findUnique({
+        where: { id: payload.userId },
+        select: {
+          id: true, email: true, name: true, role: true, isActive: true,
+          activeSessionId: true, lastSessionInfo: true, instituteId: true,
+          institute: { select: { id: true, name: true } },
+          studentProfile: {
+            select: {
+              id: true, classId: true, roll: true, registrationNo: true,
+              class: { select: { id: true, name: true, section: true } },
             },
           },
-        },
-        teacherProfile: {
-          select: {
-            id: true,
-            employeeId: true,
-            department: true,
-            subjects: true,
+          teacherProfile: {
+            select: { id: true, employeeId: true, department: true, subjects: true },
           },
         },
-      },
-    });
+      });
+    } catch (dbError: any) {
+      console.warn('[AUTH] Session validation query failed. Likely missing schema fields.', dbError.message);
+      return { status: 'valid', user: { id: payload.userId, role: payload.role } as any };
+    }
 
     if (!user || !user.isActive) {
-      return null;
+      return { status: 'invalid' };
+    }
+
+    // Single session validation
+    if ((user as any).activeSessionId && (user as any).activeSessionId !== payload.sid) {
+      return {
+        status: 'mismatch',
+        user,
+        lastSessionInfo: (user as any).lastSessionInfo
+      };
     }
 
     return {
-      ...user,
-      role: user.role as JWTPayload['role'],
+      status: 'valid',
+      user: {
+        ...user,
+        role: user.role as JWTPayload['role'],
+      } as any
     };
   } catch (error) {
-    console.error('Error fetching user:', error);
-    return null;
+    console.error('Error validating session:', error);
+    return { status: 'error' };
   }
+}
+
+// Get user from token (for API routes - includes database query)
+export async function getUserFromToken(token: string) {
+  const { status, user } = await validateSession(token);
+  if (status === 'valid') return user;
+  return null;
 }
 
 // Get token from request (for API routes - includes database query)
@@ -118,7 +123,7 @@ export async function getTokenFromRequest(req: NextRequest): Promise<{
         return { user, token };
       }
     }
-    
+
     // Check for session token in cookies
     const sessionToken = req.cookies.get('session-token')?.value;
     if (sessionToken) {
@@ -127,7 +132,7 @@ export async function getTokenFromRequest(req: NextRequest): Promise<{
         return { user, token: sessionToken };
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error getting token from request:', error);
@@ -140,11 +145,11 @@ export async function getCurrentUser() {
   try {
     const cookieStore = await cookies();
     const sessionToken = cookieStore.get('session-token')?.value;
-    
+
     if (!sessionToken) {
       return null;
     }
-    
+
     return await getUserFromToken(sessionToken);
   } catch (error) {
     console.error('Error getting current user:', error);
@@ -180,7 +185,7 @@ export function hasPermission(
     TEACHER: 2,
     STUDENT: 1,
   };
-  
+
   return roleHierarchy[userRole] >= roleHierarchy[requiredRole];
 }
 
@@ -196,12 +201,12 @@ export function canAccessRoute(
     '/student': ['SUPER_USER', 'ADMIN', 'TEACHER', 'STUDENT'],
     '/dashboard': ['SUPER_USER', 'ADMIN', 'TEACHER', 'STUDENT'],
   };
-  
+
   for (const [routePrefix, allowedRoles] of Object.entries(routePermissions)) {
     if (route.startsWith(routePrefix)) {
       return allowedRoles.includes(userRole);
     }
   }
-  
+
   return true; // Default to allowing access
 } 

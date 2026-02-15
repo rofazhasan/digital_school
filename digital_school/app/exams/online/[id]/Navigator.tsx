@@ -1,168 +1,123 @@
 "use client";
 
-import React, { useMemo, useCallback, memo } from "react";
+import React, { useState } from "react";
 import { useExamContext } from "./ExamContext";
 import { Card } from "@/components/ui/card";
-
-// Memoized button color calculation for better performance
-const getButtonColor = (q: any, answers: any, navigation: any, idx: number) => {
-  if (navigation.current === idx) return "bg-black text-white border-black ring-2 ring-black";
-  if (navigation.marked[q.id]) return "bg-purple-400 text-white";
-  if (answers[q.id]) return "bg-green-400 text-white";
-  return "bg-gray-200 hover:bg-gray-300 transition-colors";
-};
-
-// Memoized question button component for better performance
-const QuestionButton = memo(({ 
-  question, 
-  index, 
-  globalIndex, 
-  answers, 
-  navigation, 
-  onNavigate 
-}: {
-  question: any;
-  index: number;
-  globalIndex: number;
-  answers: any;
-  navigation: any;
-  onNavigate: (index: number) => void;
-}) => {
-  const buttonColor = getButtonColor(question, answers, navigation, globalIndex);
-  const isAnswered = answers[question.id];
-  const isMarked = navigation.marked[question.id];
-  const isCurrent = navigation.current === globalIndex;
-  
-  const getTooltipText = () => {
-    const type = (question.type || question.questionType || "").toLowerCase();
-    const typeLabel = type === 'mcq' ? 'MCQ' : type === 'cq' ? 'CQ' : 'SQ';
-    const status = isCurrent ? 'Current' : isAnswered ? 'Answered' : isMarked ? 'Marked' : 'Not answered';
-    return `${typeLabel} ${index + 1} - ${status}`;
-  };
-
-  return (
-    <button
-      onClick={() => onNavigate(globalIndex)}
-      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border-2 cursor-pointer transition-all duration-200 hover:scale-110 active:scale-95 ${buttonColor}`}
-      title={getTooltipText()}
-      aria-label={getTooltipText()}
-    >
-      {index + 1}
-    </button>
-  );
-});
-
-QuestionButton.displayName = 'QuestionButton';
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface NavigatorProps {
   questions?: any[];
+  onSubmit?: () => void;
 }
 
-export default function Navigator({ questions }: NavigatorProps) {
-  const { exam, answers, navigation, navigateToQuestion } = useExamContext();
-  const questionList = questions || exam.questions || [];
+export default function Navigator({ questions, onSubmit }: NavigatorProps) {
+  const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions } = useExamContext();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // Memoized question categorization for better performance
-  const categorizedQuestions = useMemo(() => {
-    const mcqQuestions = questionList.filter((q: any) => 
-      (q.type || q.questionType || "").toLowerCase() === "mcq"
-    );
-    const cqQuestions = questionList.filter((q: any) => 
-      (q.type || q.questionType || "").toLowerCase() === "cq"
-    );
-    const sqQuestions = questionList.filter((q: any) => 
-      (q.type || q.questionType || "").toLowerCase() === "sq"
-    );
+  const questionList = sortedQuestions || questions || [];
+  if (questionList.length === 0) return null;
 
-    return { mcqQuestions, cqQuestions, sqQuestions };
-  }, [questionList]);
-
-  // Memoized navigation handler
-  const handleNavigate = useCallback((index: number) => {
-    navigateToQuestion(index);
-  }, [navigateToQuestion]);
-
-  // Memoized section renderer for better performance
-  const renderQuestionSection = useCallback((questions: any[], type: string, color: string, icon: string) => {
-    if (questions.length === 0) return null;
+  // Helper to render a group of questions
+  const renderGroup = (title: string, groupQuestions: any[], startIndex: number) => {
+    if (!groupQuestions || groupQuestions.length === 0) return null;
 
     return (
-      <div className="mb-4">
-        <div className={`text-sm font-semibold ${color} mb-2 flex items-center gap-2`}>
-          <span className={`w-4 h-4 ${color.replace('text-', 'bg-').replace('-600', '-100')} rounded-full flex items-center justify-center text-xs`}>
-            {icon}
-          </span>
-          {type.toUpperCase()} ({questions.length})
-        </div>
-        <div className="grid grid-cols-5 gap-2">
-          {questions.map((q: any, i: number) => {
-            const globalIndex = questionList.findIndex((q2: any) => q2.id === q.id);
+      <div className="mb-6">
+        {!isCollapsed && (
+          <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3 px-1 sticky top-0 bg-white/95 dark:bg-gray-950/95 py-1 z-20 backdrop-blur-sm">
+            {title}
+          </h4>
+        )}
+        <div className={`grid gap-2 md:gap-3 transition-all ${isCollapsed ? 'grid-cols-1' : 'grid-cols-5'}`}>
+          {groupQuestions.map((q: any, localIdx: number) => {
+            // Find the global index of this question in the sorted list
+            const globalIdx = sortedQuestions.findIndex((sq: any) => sq.id === q.id);
+            if (globalIdx === -1) return null;
+
+            const isCurrent = (navigation.current || 0) === globalIdx;
+            const isAnswered = answers[q.id];
+            const isMarked = navigation.marked[q.id];
+
             return (
-              <QuestionButton
-                key={`nav-${type}-${i}-${q.id || 'no-id'}`}
-                question={q}
-                index={i}
-                globalIndex={globalIndex}
-                answers={answers}
-                navigation={navigation}
-                onNavigate={handleNavigate}
-              />
+              <button
+                key={q.id}
+                onClick={() => navigateToQuestion(globalIdx)}
+                className={`
+                    relative flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-200
+                    ${isCollapsed ? 'w-8 h-8 mx-auto' : 'aspect-square w-full'}
+                    ${isCurrent
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 scale-105 ring-2 ring-blue-200 dark:ring-blue-900 z-10'
+                    : isMarked
+                      ? 'bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400'
+                      : isAnswered
+                        ? 'bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-gray-50 border border-gray-100 text-gray-400 hover:border-blue-200 hover:bg-blue-50 dark:bg-gray-900/50 dark:border-gray-800'
+                  }
+                  `}
+              >
+                {localIdx + 1}
+                {isMarked && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-white dark:border-gray-900" />
+                )}
+              </button>
             );
           })}
         </div>
       </div>
     );
-  }, [questionList, answers, navigation, handleNavigate]);
-
-  // Memoized question counts for better performance
-  const questionCounts = useMemo(() => ({
-    mcq: categorizedQuestions.mcqQuestions.length,
-    cq: categorizedQuestions.cqQuestions.length,
-    sq: categorizedQuestions.sqQuestions.length
-  }), [categorizedQuestions]);
-
-  // Only render if there are questions
-  if (questionList.length === 0) {
-    return null;
-  }
+  };
 
   return (
-    <Card className="p-4 mb-4 hidden md:block bg-white/80 backdrop-blur-sm border-0 shadow-lg">
-      <div className="mb-4 font-bold text-base text-gray-800">Question Navigator</div>
-      
-      {/* MCQ Section */}
-      {renderQuestionSection(
-        categorizedQuestions.mcqQuestions, 
-        'MCQ', 
-        'text-blue-600', 
-        '✓'
-      )}
+    <div className={`
+          flex flex-col bg-white/60 dark:bg-gray-950/60 backdrop-blur-xl transition-all duration-300
+          ${isCollapsed ? 'w-14 items-center' : 'w-full'}
+          h-full max-h-full overflow-hidden
+        `}>
 
-      {/* CQ Section */}
-      {renderQuestionSection(
-        categorizedQuestions.cqQuestions, 
-        'CQ', 
-        'text-green-600', 
-        '✏️'
-      )}
+      {/* Scrollable Content */}
+      <ScrollArea className="flex-1 w-full">
+        <div className="p-3 pb-20">
+          {/* Render CQ Group */}
+          {groupedQuestions?.creative?.length > 0 && renderGroup("Creative (CQ)", groupedQuestions.creative, 0)}
 
-      {/* SQ Section */}
-      {renderQuestionSection(
-        categorizedQuestions.sqQuestions, 
-        'SQ', 
-        'text-yellow-600', 
-        '💬'
-      )}
+          {/* Render SQ Group */}
+          {groupedQuestions?.short?.length > 0 && renderGroup("Short (SQ)", groupedQuestions.short, 0)}
 
-      {/* Summary */}
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="text-xs text-gray-600 space-y-1">
-          <div>Total Questions: {questionList.length}</div>
-          <div>Answered: {Object.keys(answers).filter(id => answers[id]).length}</div>
-          <div>Marked: {Object.keys(navigation.marked).filter(id => navigation.marked[id]).length}</div>
-          <div>Current: {navigation.current + 1}</div>
+          {/* Render Objective Group */}
+          {groupedQuestions?.objective?.length > 0 && renderGroup("Objective (MCQ)", groupedQuestions.objective, 0)}
+
+          {/* Fallback if no groups defined (legacy support) */}
+          {(!groupedQuestions || (groupedQuestions.creative.length === 0 && groupedQuestions.short.length === 0 && groupedQuestions.objective.length === 0)) &&
+            renderGroup("Questions", questionList, 0)
+          }
         </div>
-      </div>
-    </Card>
+      </ScrollArea>
+
+      {/* Footer Legend */}
+      {!isCollapsed && (
+        <div className="p-3 border-t border-gray-200/50 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md text-[10px] space-y-2">
+          <div className="flex justify-between">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-600"></span> Current</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Answered</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-500"></span> Marked</span>
+            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-gray-200"></span> Remaining</span>
+          </div>
+
+          {onSubmit && (
+            <Button
+              className="w-full mt-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-500/20"
+              size="sm"
+              onClick={onSubmit}
+            >
+              Finish Exam
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
   );
-} 
+}

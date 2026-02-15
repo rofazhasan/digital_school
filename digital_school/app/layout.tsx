@@ -1,18 +1,94 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, Outfit, Hind_Siliguri, Baloo_Da_2, Tiro_Bangla, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { NavigationWrapper } from "@/components/ui/navigation-wrapper";
-import Script from "next/script";
+import MaintenanceGuard from "@/components/MaintenanceGuard";
+import SessionGuard from "@/components/SessionGuard";
+import { AppFooter } from "@/components/AppFooter";
+import db from "@/lib/db";
 
-const inter = Inter({ subsets: ["latin"] });
+// --- Fonts ---
+const inter = Inter({
+  subsets: ["latin"],
+  variable: '--font-inter',
+  display: 'swap',
+  adjustFontFallback: false,
+});
 
-export const metadata: Metadata = {
-  title: "Digital School",
-  description: "A comprehensive digital school management system",
+const outfit = Outfit({
+  subsets: ["latin"],
+  variable: '--font-outfit',
+  display: 'swap',
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+});
+
+const tiroBangla = Tiro_Bangla({
+  weight: '400',
+  subsets: ['bengali'],
+  variable: '--font-tiro-bangla',
+  display: 'swap',
+});
+
+const hindSiliguri = Hind_Siliguri({
+  weight: ['300', '400', '500', '600', '700'],
+  subsets: ['bengali'],
+  variable: '--font-hind-siliguri',
+  display: 'swap',
+});
+
+const balooDa2 = Baloo_Da_2({
+  subsets: ['bengali'],
+  variable: '--font-baloo',
+  display: 'swap',
+});
+
+// --- Metadata ---
+export async function generateMetadata(): Promise<Metadata> {
+  let title = "Digital School";
+  try {
+    const settings = await db.settings.findFirst({
+      select: { instituteName: true, institute: { select: { name: true } } }
+    });
+    title = settings?.instituteName || settings?.institute?.name || "Digital School";
+  } catch (error) {
+    console.warn("Failed to fetch settings for metadata:", error);
+  }
+
+  return {
+    title: {
+      template: `%s | ${title}`,
+      default: title,
+    },
+    description: "A world-class digital learning platform.",
+    icons: {
+      icon: "/favicon.ico",
+      apple: "/apple-touch-icon.png",
+    },
+  };
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5, // Allow zooming for accessibility
+  userScalable: true,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
+
+import { ThemeProvider } from "@/components/theme-provider";
+
+// ... existing imports
 
 export default function RootLayout({
   children,
@@ -20,19 +96,29 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <head>
-        <Script src="https://js.puter.com/v2/" strategy="beforeInteractive" />
-      </head>
-      <body className={inter.className}>
-        <ErrorBoundary>
-        <SessionProviderWrapper>
-            <NavigationWrapper>
-          {children}
-          <Toaster />
-            </NavigationWrapper>
-        </SessionProviderWrapper>
-        </ErrorBoundary>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} ${tiroBangla.variable} ${hindSiliguri.variable} ${balooDa2.variable} font-sans antialiased overflow-x-hidden min-h-screen flex flex-col bg-background text-foreground`}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ErrorBoundary>
+            <SessionProviderWrapper>
+              <NavigationWrapper>
+                <MaintenanceGuard>
+                  <SessionGuard />
+                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">
+                    {children}
+                  </div>
+                  <AppFooter />
+                  <Toaster />
+                </MaintenanceGuard>
+              </NavigationWrapper>
+            </SessionProviderWrapper>
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );

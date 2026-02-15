@@ -40,3 +40,55 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
   if (totalMarks === 0) return 0;
   return Math.round((earnedMarks / totalMarks) * 100);
 }
+
+/**
+ * Ensures text uses inline math delimiters to prevent unwanted new lines and centering.
+ * Replaces $$...$$ with $...$ and \[...\] with \(...\)
+ * Also wraps Bangla/Unicode text in \text{} for proper rendering in LaTeX tables
+ * @param text - The text containing math to clean up
+ * @returns Cleaned text with inline math delimiters and Bangla support
+ */
+export function cleanupMath(text: string | null | undefined): string {
+  if (!text) return "";
+
+  let processed = text;
+
+  // Convert LaTeX display delimiters (\[...\]) and $$ to inline ($) for better print flow
+  processed = processed
+    .replace(/\$\$/g, '$')  // $$ -> $
+    .replace(/\\\[/g, '$').replace(/\\\]/g, '$') // \[ -> $, \] -> $
+    .replace(/\\\(/g, '$').replace(/\\\)/g, '$');   // \( -> $, \) -> $
+
+  // Process Bangla text in tables (array, tabular environments)
+  // This wraps Bangla Unicode characters in \text{} for proper rendering
+  const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
+
+  processed = processed.replace(tableRegex, (match) => {
+    // Wrap Bangla text (Unicode range U+0980 to U+09FF) in \text{}
+    // But only if it's not already wrapped
+    return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (banglaText) => {
+      // Check if already wrapped in \text{}
+      const beforeText = match.substring(0, match.indexOf(banglaText));
+      if (beforeText.endsWith('\\text{')) {
+        return banglaText; // Already wrapped
+      }
+      return `\\text{${banglaText}}`;
+    });
+  });
+
+  return processed;
+}
+
+/**
+ * Shuffles an array using Fisher-Yates algorithm
+ * @param array - The array to shuffle
+ * @returns A new shuffled array
+ */
+export function shuffleArray<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}

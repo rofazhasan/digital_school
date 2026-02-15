@@ -31,9 +31,10 @@ const ROUTE_PERMISSIONS = {
     '/api/setup/super-user',
     '/favicon.ico',
     '/_next',
-    '/api/webhooks'
+    '/api/webhooks',
+    '/maintenance'
   ],
-  
+
   // Super User routes
   superUser: [
     '/super-user',
@@ -53,7 +54,7 @@ const ROUTE_PERMISSIONS = {
     '/exams/results/*',
     '/omr_scanner'
   ],
-  
+
   // Admin routes
   admin: [
     '/admin',
@@ -71,7 +72,7 @@ const ROUTE_PERMISSIONS = {
     '/exams/results/*',
     '/omr_scanner'
   ],
-  
+
   // Teacher routes
   teacher: [
     '/teacher',
@@ -89,7 +90,7 @@ const ROUTE_PERMISSIONS = {
     '/exams/results/*',
     '/omr_scanner'
   ],
-  
+
   // Student routes
   student: [
     '/student',
@@ -99,6 +100,8 @@ const ROUTE_PERMISSIONS = {
     '/student/attendance',
     '/student/profile',
     '/student/chat',
+    '/student/prac-perfect',
+    '/student/prac-perfect/*',
     '/exams',
     '/exams/online',
     '/exams/online/',
@@ -106,7 +109,7 @@ const ROUTE_PERMISSIONS = {
     '/exams/results',
     '/exams/results/*',
   ],
-  
+
   // Shared routes (accessible by authenticated users)
   shared: [
     '/profile',
@@ -151,7 +154,7 @@ function hasPermission(userRole: string, path: string): boolean {
   if (ROUTE_PERMISSIONS.public.some(route => pathMatches(route, path))) {
     return true;
   }
-  
+
   // Map role to route permission key
   const roleKeyMap = {
     'SUPER_USER': 'superUser',
@@ -159,9 +162,9 @@ function hasPermission(userRole: string, path: string): boolean {
     'TEACHER': 'teacher',
     'STUDENT': 'student'
   };
-  
+
   const roleKey = roleKeyMap[userRole as keyof typeof roleKeyMap];
-  
+
   // Check role-specific routes
   if (roleKey && ROUTE_PERMISSIONS[roleKey as keyof typeof ROUTE_PERMISSIONS]) {
     const roleRoutes = ROUTE_PERMISSIONS[roleKey as keyof typeof ROUTE_PERMISSIONS];
@@ -169,12 +172,12 @@ function hasPermission(userRole: string, path: string): boolean {
       return true;
     }
   }
-  
+
   // Check shared routes
   if (ROUTE_PERMISSIONS.shared.some(route => pathMatches(route, path))) {
     return true;
   }
-  
+
   // Check if user has higher role permissions
   const roleHierarchy = {
     SUPER_USER: ['SUPER_USER', 'ADMIN', 'TEACHER', 'STUDENT'],
@@ -182,7 +185,7 @@ function hasPermission(userRole: string, path: string): boolean {
     TEACHER: ['TEACHER', 'STUDENT'],
     STUDENT: ['STUDENT']
   };
-  
+
   const userHierarchy = roleHierarchy[userRole as keyof typeof roleHierarchy];
   if (userHierarchy) {
     for (const role of userHierarchy) {
@@ -195,7 +198,7 @@ function hasPermission(userRole: string, path: string): boolean {
       }
     }
   }
-  
+
   return false;
 }
 
@@ -221,7 +224,7 @@ async function verifyToken(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       algorithms: [JWT_ALGORITHM],
     });
-    
+
     return payload as unknown as JWTPayload;
   } catch (error) {
     return null;
@@ -237,13 +240,13 @@ async function getTokenFromRequest(req: NextRequest): Promise<JWTPayload | null>
       const token = authHeader.substring(7);
       return await verifyToken(token);
     }
-    
+
     // Check for session token in cookies
     const sessionToken = req.cookies.get('session-token')?.value;
     if (sessionToken) {
       return await verifyToken(sessionToken);
     }
-    
+
     return null;
   } catch (error) {
     return null;
@@ -252,7 +255,7 @@ async function getTokenFromRequest(req: NextRequest): Promise<JWTPayload | null>
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
+
   // Skip middleware for static files, API routes, and other assets
   if (
     pathname.startsWith('/_next') ||
@@ -263,21 +266,33 @@ export async function middleware(request: NextRequest) {
   ) {
     return NextResponse.next();
   }
-  
+
   // Get user token and role using JWT verification only
   const userData = await getTokenFromRequest(request);
   console.log('[MIDDLEWARE] user role:', userData?.role, 'path:', pathname);
-  
+
   // Handle public routes
   if (ROUTE_PERMISSIONS.public.some(route => pathMatches(route, pathname))) {
+    const reason = request.nextUrl.searchParams.get('reason');
+
     // If user is authenticated and trying to access login/signup, redirect to dashboard
-    if (userData && (pathname === '/login' || pathname === '/signup')) {
+    // EXCEPTION: Allow access if there's a session-related reason (like mismatch/expiry)
+    if (userData && (pathname === '/login' || pathname === '/signup') && !reason) {
       const redirectUrl = getDefaultRedirectUrl(userData.role);
       return NextResponse.redirect(new URL(redirectUrl, request.url));
     }
+
+    // Proactive cookie clearing: If we are on login/signup and have a session reason, 
+    // clear the token server-side immediately.
+    if ((pathname === '/login' || pathname === '/signup') && reason) {
+      const response = NextResponse.next();
+      response.cookies.delete('session-token');
+      return response;
+    }
+
     return NextResponse.next();
   }
-  
+
   // Check if user is authenticated
   if (!userData) {
     // Redirect to login if not authenticated
@@ -285,25 +300,25 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
-  
+
   // Handle /dashboard route - redirect to role-specific dashboard
   if (pathname === '/dashboard') {
     const redirectUrl = getDefaultRedirectUrl(userData.role);
     return NextResponse.redirect(new URL(redirectUrl, request.url));
   }
-  
+
   // Check if user has permission for the requested route
   if (!hasPermission(userData.role, pathname)) {
     // Redirect to appropriate dashboard based on role
     const redirectUrl = getDefaultRedirectUrl(userData.role);
     return NextResponse.redirect(new URL(redirectUrl, request.url));
   }
-  
+
   // Add user role to headers for use in API routes
   const response = NextResponse.next();
   response.headers.set('x-user-role', userData.role);
   response.headers.set('x-user-id', userData.userId);
-  
+
   return response;
 }
 

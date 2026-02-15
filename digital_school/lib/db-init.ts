@@ -7,11 +7,19 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
+const prismaClientOptions = {
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL || 'postgresql://build:build@localhost:5432/builddb',
+    },
+  },
+};
+
 if (process.env.NODE_ENV !== 'production') {
-  globalThis.prisma = globalThis.prisma || new PrismaClient();
+  globalThis.prisma = globalThis.prisma || new PrismaClient(prismaClientOptions);
   prismadb = globalThis.prisma;
 } else {
-  prismadb = new PrismaClient();
+  prismadb = new PrismaClient(prismaClientOptions);
 }
 
 /**
@@ -28,7 +36,7 @@ export async function getDatabaseClient() {
     return prismadb;
   } catch (error) {
     console.error('❌ Database connection failed:', error);
-    
+
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('DATABASE_URL')) {
@@ -38,7 +46,7 @@ export async function getDatabaseClient() {
         throw new Error('Unable to connect to database. Please check your database URL and ensure the database is accessible.');
       }
     }
-    
+
     throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 }

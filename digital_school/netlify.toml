@@ -3,18 +3,13 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
   NEXTAUTH_URL = "https://digitalsch.netlify.app"
-  NEXTAUTH_SECRET = "your-nextauth-secret-here"
-  JWT_SECRET = "your-jwt-secret-here"
-  DATABASE_URL = "your-database-url-here"
-  GOOGLE_AI_API_KEY = "your-google-ai-api-key-here"
   NEXT_PUBLIC_APP_URL = "https://digitalsch.netlify.app"
   NEXT_PUBLIC_APPWRITE_PROJECT_ID = "68aa7b51002070dd9a73"
   NEXT_PUBLIC_APPWRITE_PROJECT_NAME = "digitalsch"
   NEXT_PUBLIC_APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1"
-  APPWRITE_API_KEY = "standard_a85d9a5fafc0c7bfa9260747ae5c8393bc2bb2579282773c912b3cde436c771c042c4dc2559131b23f05c6b749dd4c28a4f007c033935729be0e6cd7b1b51c879a6aee2392fa0cc4e08de00c67690c4412cce6fb09da8fe9045e06ba7546f7d25abf5385adac8f1788fda856f20a34d621097ab456d3db8dc72ca68fa1833786"
 
 # Next.js plugin for proper API route handling
 [[plugins]]

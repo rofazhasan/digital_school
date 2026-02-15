@@ -23,6 +23,8 @@
 # misc
 .DS_Store
 *.pem
+backup_prod_full.json
+DIAGRAM_CATALOG_WORLD_CLASS.html
 
 # debug
 npm-debug.log*
@@ -42,3 +44,6 @@ tailwindcss-*.log
 next-env.d.ts
 
 /generated/prisma
+
+# netlify
+netlify.toml

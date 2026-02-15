@@ -5,7 +5,7 @@ import { getDatabaseClient } from '@/lib/db-init';
 export async function GET(request: NextRequest) {
   try {
     const authData = await getTokenFromRequest(request);
-    
+
     if (!authData || authData.user.role !== 'SUPER_USER') {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -41,21 +41,38 @@ export async function GET(request: NextRequest) {
               }
             }
           }
-        }
+        },
+        cqTotalQuestions: true,
+        sqTotalQuestions: true
       }
     });
 
     // Transform data to match frontend expectations
-    const transformedExams = recentExams.map(exam => ({
-      id: exam.id,
-      title: exam.name,
-      subject: exam.class?.name || 'Unknown',
-      date: exam.createdAt,
-      status: exam.isActive ? 'APPROVED' : 'PENDING',
-      type: exam.type === 'ONLINE' ? 'CQ' : 'OMR',
-      createdBy: exam.createdBy?.name || 'Unknown',
-      totalStudents: 0 // This would need to be calculated from examStudentMaps
-    }));
+    const transformedExams = recentExams.map(exam => {
+      let typeLabel = 'OMR';
+
+      if (exam.type === 'ONLINE') {
+        const hasCQ = (exam.cqTotalQuestions ?? 0) > 0;
+        const hasSQ = (exam.sqTotalQuestions ?? 0) > 0;
+        const hasMCQ = !hasCQ && !hasSQ; // Logic fallback if it's ONLINE but no counts specified
+
+        if (hasCQ && hasSQ) typeLabel = 'CQ+SQ';
+        else if (hasCQ) typeLabel = 'CQ';
+        else if (hasSQ) typeLabel = 'SQ';
+        else typeLabel = 'MCQ';
+      }
+
+      return {
+        id: exam.id,
+        title: exam.name,
+        subject: exam.class?.name || 'Unknown',
+        date: new Date(exam.createdAt).toLocaleDateString(),
+        status: exam.isActive ? 'APPROVED' : 'PENDING',
+        type: typeLabel,
+        createdBy: exam.createdBy?.name || 'Unknown',
+        totalStudents: 0
+      };
+    });
 
     return NextResponse.json(transformedExams);
   } catch (error) {

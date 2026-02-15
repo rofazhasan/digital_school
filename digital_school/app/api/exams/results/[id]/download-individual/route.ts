@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const token = await getTokenFromRequest(request);
-    
+
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -56,7 +56,7 @@ export async function GET(
 
     // Find the student's result
     const result = await prismadb.result.findFirst({
-      where: { 
+      where: {
         examId,
         studentId: studentProfile.id
       },
@@ -99,18 +99,20 @@ export async function GET(
 
   } catch (error) {
     console.error('Error generating individual result:', error);
-    
+
+    const err = error as any;
+
     // Handle specific database errors
-    if (error.code === 'P2025') {
+    if (err.code === 'P2025') {
       return NextResponse.json({ error: 'Result not found' }, { status: 404 });
     }
-    
-    if (error.code === 'P2002') {
+
+    if (err.code === 'P2002') {
       return NextResponse.json({ error: 'Database constraint violation' }, { status: 400 });
     }
-    
+
     return NextResponse.json(
-      { error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      { error: `Internal server error: ${err.message || 'Unknown error'}` },
       { status: 500 }
     );
   }
@@ -124,7 +126,7 @@ interface IndividualResultData {
 
 function generateIndividualResultText(data: IndividualResultData): string {
   const { exam, result, institute } = data;
-  
+
   const content = `
 EXAM RESULT - ${exam.name}
 =====================================
@@ -162,6 +164,6 @@ Class: ${result.student.class.name} ${result.student.class.section}
 Generated on: ${new Date().toLocaleString()}
 Verified by: ${institute?.name || 'Educational Institute'}
   `;
-  
+
   return content;
 } 

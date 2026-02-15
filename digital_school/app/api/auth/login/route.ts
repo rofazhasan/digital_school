@@ -3,6 +3,8 @@ import { z } from 'zod';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { createToken, JWTPayload } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
+import { socketService } from '@/lib/socket';
 
 const loginSchema = z.object({
     identifier: z.string().min(1, 'Email or phone number is required'),
@@ -24,10 +26,11 @@ export async function POST(request: NextRequest) {
             const phoneSchema = z.string().regex(/^\+?[\d\s\-\(\)]{10,15}$/, 'Invalid phone number format');
             phoneSchema.parse(identifier);
         }
-        
-        // Find user by email or phone
+
+        // ... find user logic ...
+        // [Existing code for finding user and verifying password]
         const user = await prismadb.user.findFirst({
-            where: loginMethod === 'email' 
+            where: loginMethod === 'email'
                 ? { email: identifier }
                 : { phone: identifier },
             select: {
@@ -39,78 +42,94 @@ export async function POST(request: NextRequest) {
                 role: true,
                 isActive: true,
                 instituteId: true,
-                institute: {
-                    select: {
-                        id: true,
-                        name: true,
-                    },
-                },
+                institute: { select: { id: true, name: true } },
                 studentProfile: {
                     select: {
-                        id: true,
-                        roll: true,
-                        registrationNo: true,
-                        class: {
-                            select: {
-                                id: true,
-                                name: true,
-                                section: true,
-                            },
-                        },
+                        id: true, roll: true, registrationNo: true,
+                        class: { select: { id: true, name: true, section: true } },
                     },
                 },
                 teacherProfile: {
-                    select: {
-                        id: true,
-                        employeeId: true,
-                        department: true,
-                        subjects: true,
-                    },
+                    select: { id: true, employeeId: true, department: true, subjects: true },
                 },
             },
         });
-        
+
         if (!user) {
-            return NextResponse.json(
-                { error: `Invalid ${loginMethod} or password` },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
 
         if (!user.isActive) {
-            return NextResponse.json(
-                { error: 'Account is deactivated. Please contact administrator.' },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: 'Account is deactivated.' }, { status: 401 });
         }
-        
-        // Verify password
+
+        // Check for maintenance
+        const settings = await prismadb.settings.findFirst({ select: { maintenanceMode: true } });
+        if (settings?.maintenanceMode && (user.role === 'STUDENT' || user.role === 'TEACHER')) {
+            return NextResponse.json({ error: 'System is under maintenance.' }, { status: 503 });
+        }
+
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
-            return NextResponse.json(
-                { error: `Invalid ${loginMethod} or password` },
-                { status: 401 }
-            );
+            return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
-        
+
+        // Create Session ID
+        const sessionId = uuidv4();
+
+        // Get device info
+        const userAgent = request.headers.get('user-agent') || 'Unknown Device';
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'Unknown IP';
+
+        let deviceName = 'PC/Browser';
+        if (userAgent.includes('iPhone')) deviceName = 'iPhone';
+        else if (userAgent.includes('Android')) deviceName = 'Android Phone';
+        else if (userAgent.includes('iPad')) deviceName = 'iPad';
+        else if (userAgent.includes('Macintosh')) deviceName = 'Mac';
+        else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
+
+        const sessionInfo = {
+            device: deviceName, ip, time: new Date().toISOString(), userAgent
+        };
+
+        // Emit forced-logout to previous session
+        try {
+            socketService.sendNotificationToUser(user.id, {
+                type: 'forced-logout',
+                message: `New login: ${deviceName} at ${new Date().toLocaleTimeString()}`,
+                info: sessionInfo
+            });
+        } catch (socketError) {
+            console.warn('[LOGIN] Socket emission failed:', socketError);
+        }
+
         // Create JWT token
         const token = await createToken({
             userId: user.id,
             email: user.email || '',
             role: user.role as JWTPayload['role'],
             instituteId: user.instituteId || undefined,
+            sid: sessionId
         });
 
-        // Update last login time
-        await prismadb.user.update({
-            where: { id: user.id },
-            data: { lastLoginAt: new Date() },
-        });
+        // Update user session in DB - DEFENSIVE WRAPPER
+        try {
+            await prismadb.user.update({
+                where: { id: user.id },
+                data: {
+                    lastLoginAt: new Date(),
+                    activeSessionId: sessionId,
+                    lastSessionInfo: sessionInfo
+                } as any,
+            });
+        } catch (dbError: any) {
+            console.error('[LOGIN] DB Session update failed. Run "npx prisma db push".', dbError.message);
+        }
 
         // Return user data without password
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password: _password, ...userWithoutPassword } = user;
-        
+
         // Create response with cookie
         const response = NextResponse.json({
             message: 'Login successful',
@@ -129,14 +148,14 @@ export async function POST(request: NextRequest) {
         return response;
     } catch (error) {
         console.error('Login error:', error);
-        
+
         if (error instanceof z.ZodError) {
             return NextResponse.json(
                 { error: 'Invalid input data', details: error.errors },
                 { status: 400 }
             );
         }
-        
+
         return NextResponse.json(
             { error: 'Internal server error' },
             { status: 500 }

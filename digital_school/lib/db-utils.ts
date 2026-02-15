@@ -25,17 +25,17 @@ export async function withDatabaseTimeout<T>(
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             const db = await DatabaseClient.getInstance();
-            
+
             return await DatabaseClient.executeWithTimeout(
                 async () => {
                     try {
                         return await operation();
                     } catch (error) {
                         // Check if it's a connection error
-                        if (error instanceof Error && 
-                            (error.message.includes('connection') || 
-                             error.message.includes('timeout') ||
-                             error.message.includes('ECONNRESET'))) {
+                        if (error instanceof Error &&
+                            (error.message.includes('connection') ||
+                                error.message.includes('timeout') ||
+                                error.message.includes('ECONNRESET'))) {
                             throw new DatabaseError(
                                 'Database connection lost. Please try again.',
                                 503,
@@ -52,7 +52,7 @@ export async function withDatabaseTimeout<T>(
             console.error(`Database operation attempt ${attempt} failed:`, error);
 
             // If it's the last attempt or a non-retryable error, throw
-            if (attempt === maxRetries || 
+            if (attempt === maxRetries ||
                 (error instanceof DatabaseError && !error.isRetryable)) {
                 throw error;
             }
@@ -66,30 +66,6 @@ export async function withDatabaseTimeout<T>(
     throw lastError || new Error('Database operation failed');
 }
 
-// API response wrapper with proper error handling
-export function createApiResponse<T>(
-    data: T | null,
-    error?: string,
-    statusCode: number = 200
-): NextResponse {
-    if (error) {
-        return NextResponse.json(
-            { 
-                error,
-                timestamp: new Date().toISOString(),
-                statusCode 
-            },
-            { status: statusCode }
-        );
-    }
-
-    return NextResponse.json({
-        data,
-        timestamp: new Date().toISOString(),
-        statusCode
-    });
-}
-
 // Common database operations with error handling
 export async function safeDatabaseOperation<T>(
     operation: () => Promise<T>,
@@ -99,11 +75,11 @@ export async function safeDatabaseOperation<T>(
         return await withDatabaseTimeout(operation);
     } catch (error) {
         console.error(`${operationName} failed:`, error);
-        
+
         if (error instanceof DatabaseError) {
             throw error;
         }
-        
+
         // Handle specific database errors
         if (error instanceof Error) {
             if (error.message.includes('timeout')) {
@@ -121,7 +97,7 @@ export async function safeDatabaseOperation<T>(
                 );
             }
         }
-        
+
         throw new DatabaseError(
             `${operationName} failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             500,
@@ -140,17 +116,17 @@ export async function checkDatabaseHealth(): Promise<{ healthy: boolean; message
             },
             5000 // 5 second timeout for health check
         );
-        
+
         return { healthy: true, message: 'Database is healthy' };
     } catch (error) {
-        return { 
-            healthy: false, 
-            message: `Database health check failed: ${error instanceof Error ? error.message : 'Unknown error'}` 
+        return {
+            healthy: false,
+            message: `Database health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
         };
     }
 }
 
-// Cache management for database connections
+// Cache management with Stale-While-Revalidate support
 export class DatabaseCache {
     private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
 
@@ -160,6 +136,24 @@ export class DatabaseCache {
             timestamp: Date.now(),
             ttl: ttlMs
         });
+    }
+
+    // New: Stale-While-Revalidate pattern
+    // Returns { data: any, isStale: boolean } or null
+    static getSWR(key: string): { data: any; isStale: boolean } | null {
+        const item = this.cache.get(key);
+        if (!item) return null;
+
+        const age = Date.now() - item.timestamp;
+        const isStale = age > item.ttl;
+
+        // If data is older than 2x TTL, consider it completely expired (evict)
+        if (age > item.ttl * 2) {
+            this.cache.delete(key);
+            return null;
+        }
+
+        return { data: item.data, isStale };
     }
 
     static get(key: string): any | null {
@@ -185,4 +179,37 @@ export class DatabaseCache {
             }
         }
     }
+}
+
+// Enhanced API response wrapper with HTTP Caching headers
+export function createApiResponse<T>(
+    data: T | null,
+    error?: string,
+    statusCode: number = 200,
+    options: { cacheControl?: string } = {}
+): NextResponse {
+    if (error) {
+        return NextResponse.json(
+            {
+                error,
+                timestamp: new Date().toISOString(),
+                statusCode
+            },
+            { status: statusCode }
+        );
+    }
+
+    const headers: HeadersInit = {};
+    if (options.cacheControl) {
+        headers['Cache-Control'] = options.cacheControl;
+    }
+
+    return NextResponse.json({
+        data,
+        timestamp: new Date().toISOString(),
+        statusCode
+    }, {
+        status: statusCode,
+        headers
+    });
 } 

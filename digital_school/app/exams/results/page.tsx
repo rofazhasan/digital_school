@@ -12,15 +12,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Download, 
-  Search, 
-  Filter, 
-  Trophy, 
-  Award, 
-  TrendingUp, 
-  Users, 
-  Calendar, 
+import {
+  Download,
+  Search,
+  Filter,
+  Trophy,
+  Award,
+  TrendingUp,
+  Users,
+  Calendar,
   FileText,
   Target,
   BarChart3,
@@ -174,15 +174,15 @@ export default function ExamResultsPage() {
   const fetchUserAndResults = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch current user
       const userResponse = await fetch('/api/user', {
         credentials: 'include'
       });
       if (!userResponse.ok) {
         if (userResponse.status === 401) {
-        router.push('/login');
-        return;
+          router.push('/login');
+          return;
         }
         throw new Error(`Failed to fetch user: ${userResponse.status}`);
       }
@@ -195,11 +195,19 @@ export default function ExamResultsPage() {
       });
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
+
         // Handle different possible data structures
-        const examResults = resultsData.examResults || resultsData.results || resultsData || [];
+        let examResults = [];
+        if (Array.isArray(resultsData)) examResults = resultsData;
+        else if (Array.isArray(resultsData.examResults)) examResults = resultsData.examResults;
+        else if (Array.isArray(resultsData.results)) examResults = resultsData.results;
+        else if (Array.isArray(resultsData.data)) examResults = resultsData.data;
+        else if (resultsData.data?.examResults && Array.isArray(resultsData.data.examResults)) examResults = resultsData.data.examResults;
+        else if (resultsData.data?.results && Array.isArray(resultsData.data.results)) examResults = resultsData.data.results;
+
         console.log('📊 API Response:', resultsData);
         console.log('📊 Processed exam results:', examResults);
-        setExamResults(Array.isArray(examResults) ? examResults : []);
+        setExamResults(examResults);
       } else {
         console.error('Failed to fetch results:', resultsResponse.status);
         toast.error('Failed to load exam results');
@@ -223,10 +231,10 @@ export default function ExamResultsPage() {
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(result => 
+      filtered = filtered.filter(result =>
         result.exam?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.exam?.class?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        result.results?.some(r => 
+        result.results?.some(r =>
           r.student?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.student?.roll?.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -236,7 +244,7 @@ export default function ExamResultsPage() {
     // Sort results
     filtered.sort((a, b) => {
       let comparison = 0;
-      
+
       switch (sortBy) {
         case 'date':
           comparison = new Date(a.exam?.date || 0).getTime() - new Date(b.exam?.date || 0).getTime();
@@ -257,7 +265,7 @@ export default function ExamResultsPage() {
 
   const downloadResultsSheet = async (examId: string, format: 'pdf' | 'csv' = 'pdf') => {
     const downloadKey = `${examId}-${format}`;
-    
+
     if (downloading.has(downloadKey)) {
       return; // Prevent multiple downloads
     }
@@ -265,13 +273,13 @@ export default function ExamResultsPage() {
     try {
       setDownloading(prev => new Set(prev).add(downloadKey));
       const loadingToast = toast.loading(`Generating ${format.toUpperCase()} results sheet...`);
-      
-      const endpoint = format === 'pdf' 
+
+      const endpoint = format === 'pdf'
         ? `/api/exams/results/${examId}/download`
         : `/api/exams/results/${examId}/download-simple`;
-      
+
       console.log('🔍 Download request:', { endpoint, format, examId });
-      
+
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
@@ -279,11 +287,11 @@ export default function ExamResultsPage() {
         },
         credentials: 'include',
       });
-      
-      console.log('🔍 Download response:', { 
-        status: response.status, 
+
+      console.log('🔍 Download response:', {
+        status: response.status,
         statusText: response.statusText,
-        ok: response.ok 
+        ok: response.ok
       });
 
       if (response.ok) {
@@ -291,7 +299,7 @@ export default function ExamResultsPage() {
         if (blob.size === 0) {
           throw new Error('Generated file is empty');
         }
-        
+
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -300,7 +308,7 @@ export default function ExamResultsPage() {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        
+
         toast.dismiss(loadingToast);
         toast.success(`${format.toUpperCase()} results sheet downloaded successfully`);
       } else {
@@ -321,7 +329,7 @@ export default function ExamResultsPage() {
 
   const getGradeColor = (grade?: string) => {
     if (!grade) return 'bg-gray-100 text-gray-800';
-    
+
     switch (grade.toUpperCase()) {
       case 'A+':
       case 'A':
@@ -342,7 +350,7 @@ export default function ExamResultsPage() {
 
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
-    
+
     if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
     if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
     if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
@@ -352,7 +360,7 @@ export default function ExamResultsPage() {
   const getPerformanceAnalysis = (result: Result) => {
     const totalPossible = result.exam.totalMarks;
     const percentage = result.percentage || 0;
-    
+
     let strength = '';
     let weakness = '';
     let recommendation = '';
@@ -408,9 +416,9 @@ export default function ExamResultsPage() {
         <Alert>
           <AlertDescription>
             Error: {error}
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="ml-2"
               onClick={() => {
                 setError(null);
@@ -443,27 +451,39 @@ export default function ExamResultsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Exam Results</h1>
+          <h1 className="text-xl md:text-3xl font-bold tracking-tight">Exam Results</h1>
           <p className="text-muted-foreground">
-            {isStudent 
+            {isStudent
               ? 'View your exam results and performance analysis'
               : 'Manage and view all exam results'
             }
           </p>
         </div>
-        
-        {isStudent && (
-          <div className="flex items-center gap-2">
-            <Badge variant="outline">
-              <Users className="w-3 h-3 mr-1" />
-              {user.studentProfile?.class.name} {user.studentProfile?.class.section}
-            </Badge>
-            <Badge variant="outline">
-              <FileText className="w-3 h-3 mr-1" />
-              Roll: {user.studentProfile?.roll}
-            </Badge>
-          </div>
-        )}
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push('/exams/online')}
+            className="mr-2 gap-2"
+          >
+            <ArrowRight className="w-4 h-4 rotate-180" />
+            Back to Online Exams
+          </Button>
+
+          {isStudent && (
+            <>
+              <Badge variant="outline">
+                <Users className="w-3 h-3 mr-1" />
+                {user.studentProfile?.class.name} {user.studentProfile?.class.section}
+              </Badge>
+              <Badge variant="outline">
+                <FileText className="w-3 h-3 mr-1" />
+                Roll: {user.studentProfile?.roll}
+              </Badge>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Filters and Search - Only for non-students */}
@@ -476,47 +496,45 @@ export default function ExamResultsPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search exams, classes, or students..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 h-10"
                 />
               </div>
-              
               <Select value={selectedExam} onValueChange={setSelectedExam}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Exam" />
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Exam" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Exams</SelectItem>
                   {examResults.map((result) => (
                     <SelectItem key={result.exam.id} value={result.exam.id}>
-                      {result.exam.name} - {result.exam.class.name} {result.exam.class.section}
+                      {result.exam.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-
               <Select value={sortBy} onValueChange={(value: 'date' | 'name' | 'class') => setSortBy(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sort by" />
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="Sort" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="name">Exam Name</SelectItem>
+                  <SelectItem value="name">Name</SelectItem>
                   <SelectItem value="class">Class</SelectItem>
                 </SelectContent>
               </Select>
-
               <Button
                 variant="outline"
+                className="h-10 w-full"
                 onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
               >
-                {sortOrder === 'asc' ? '↑' : '↓'} Sort Order
+                {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
               </Button>
             </div>
           </CardContent>
@@ -548,24 +566,26 @@ export default function ExamResultsPage() {
               return (
                 <Card key={examResult.exam?.id || 'unknown'} className="overflow-hidden">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="w-5 h-5" />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-base md:text-lg">
+                          <FileText className="w-5 h-5 text-primary" />
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
-                        <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
-                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}
+                        <CardDescription className="flex flex-wrap items-center gap-x-2">
+                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={studentResult.isPublished ? "default" : "secondary"}>
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                        <Badge variant={studentResult.isPublished ? "default" : "secondary"} className="px-3">
                           {studentResult.isPublished ? "Published" : "Draft"}
                         </Badge>
                         <Button
                           variant="ghost"
                           size="sm"
+                          className="h-8 w-8 p-0"
                           onClick={() => toggleExpandedResult(examResult.exam.id)}
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -573,7 +593,7 @@ export default function ExamResultsPage() {
                       </div>
                     </div>
                   </CardHeader>
-                  
+
                   {/* Summary Cards */}
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -618,24 +638,24 @@ export default function ExamResultsPage() {
                           <div className="text-xl font-semibold">
                             {studentResult.mcqMarks || 0}
                           </div>
-                          <Progress 
-                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
                         <div className="p-4 border rounded-lg">
                           <div className="text-sm text-muted-foreground">CQ Marks</div>
                           <div className="text-xl font-semibold">{studentResult.cqMarks || 0}</div>
-                          <Progress 
-                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
                         <div className="p-4 border rounded-lg">
                           <div className="text-sm text-muted-foreground">SQ Marks</div>
                           <div className="text-xl font-semibold">{studentResult.sqMarks || 0}</div>
-                          <Progress 
-                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)} 
+                          <Progress
+                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
                             className="mt-2"
                           />
                         </div>
@@ -646,7 +666,7 @@ export default function ExamResultsPage() {
                     {isExpanded && (
                       <div className="mt-6 space-y-6">
                         <Separator />
-                        
+
                         {/* Performance Analysis */}
                         <div className="space-y-4">
                           <h4 className="font-semibold flex items-center gap-2">
@@ -777,7 +797,7 @@ export default function ExamResultsPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Avg. Pass Rate</p>
                       <p className="text-2xl font-bold">
-                        {filteredResults.length > 0 
+                        {filteredResults.length > 0
                           ? (filteredResults.reduce((sum, result) => sum + (result.passRate || 0), 0) / filteredResults.length).toFixed(1)
                           : 0
                         }%
@@ -794,7 +814,7 @@ export default function ExamResultsPage() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Avg. Score</p>
                       <p className="text-2xl font-bold">
-                        {filteredResults.length > 0 
+                        {filteredResults.length > 0
                           ? (filteredResults.reduce((sum, result) => sum + (result.averageScore || 0), 0) / filteredResults.length).toFixed(1)
                           : 0
                         }
@@ -810,22 +830,25 @@ export default function ExamResultsPage() {
               {filteredResults.map((examResult) => (
                 <Card key={examResult.exam?.id || 'unknown'}>
                   <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <FileText className="w-5 h-5" />
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                          <FileText className="w-5 h-5 text-primary" />
                           {examResult.exam?.name || 'Unknown Exam'}
                         </CardTitle>
-                        <CardDescription>
-                          {examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''} • 
-                          {examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'} • 
-                          {examResult.totalStudents || 0} students
+                        <CardDescription className="flex flex-wrap items-center gap-x-2">
+                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {examResult.totalStudents || 0} students</span>
                         </CardDescription>
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <Button
                           variant="outline"
                           size="sm"
+                          className="flex-1 sm:flex-none h-9"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                           disabled={downloading.has(`${examResult.exam.id}-pdf`)}
                         >
@@ -839,6 +862,7 @@ export default function ExamResultsPage() {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="flex-1 sm:flex-none h-9"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                           disabled={downloading.has(`${examResult.exam.id}-csv`)}
                         >
@@ -881,17 +905,19 @@ export default function ExamResultsPage() {
             {filteredResults.map((examResult) => (
               <Card key={examResult.exam.id}>
                 <CardHeader>
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <CardTitle>{examResult.exam.name}</CardTitle>
+                      <CardTitle className="text-lg">{examResult.exam.name}</CardTitle>
                       <CardDescription>
-                        {examResult.exam.class.name} {examResult.exam.class.section} • 
+                        {examResult.exam.class.name} {examResult.exam.class.section} •
                         {new Date(examResult.exam.date).toLocaleDateString()}
                       </CardDescription>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none h-9"
                         onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                         disabled={downloading.has(`${examResult.exam.id}-pdf`)}
                       >
@@ -904,6 +930,8 @@ export default function ExamResultsPage() {
                       </Button>
                       <Button
                         variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-none h-9"
                         onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                         disabled={downloading.has(`${examResult.exam.id}-csv`)}
                       >
@@ -917,49 +945,51 @@ export default function ExamResultsPage() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Rank</TableHead>
-                        <TableHead>Roll</TableHead>
-                        <TableHead>Student Name</TableHead>
-                        <TableHead>MCQ</TableHead>
-                        <TableHead>CQ</TableHead>
-                        <TableHead>SQ</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>Percentage</TableHead>
-                        <TableHead>Grade</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {examResult.results?.map((result) => (
-                        <TableRow key={result.id}>
-                          <TableCell>
-                            {getRankBadge(result.rank)}
-                          </TableCell>
-                          <TableCell className="font-medium">{result.student?.roll || 'N/A'}</TableCell>
-                          <TableCell>{result.student?.user?.name || 'Unknown'}</TableCell>
-                          <TableCell>{result.mcqMarks || 0}</TableCell>
-                          <TableCell>{result.cqMarks || 0}</TableCell>
-                          <TableCell>{result.sqMarks || 0}</TableCell>
-                          <TableCell className="font-semibold">{result.total || 0}</TableCell>
-                          <TableCell>{result.percentage?.toFixed(1) || 0}%</TableCell>
-                          <TableCell>
-                            <Badge className={getGradeColor(result.grade)}>
-                              {result.grade || 'N/A'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      )) || (
+                <CardContent className="p-0 sm:p-6">
+                  <div className="rounded-md border overflow-x-auto no-scrollbar">
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell colSpan={9} className="text-center text-muted-foreground">
-                            No results available
-                          </TableCell>
+                          <TableHead className="min-w-[80px]">Rank</TableHead>
+                          <TableHead className="min-w-[100px]">Roll</TableHead>
+                          <TableHead className="min-w-[150px]">Student Name</TableHead>
+                          <TableHead className="min-w-[80px]">MCQ</TableHead>
+                          <TableHead className="min-w-[80px]">CQ</TableHead>
+                          <TableHead className="min-w-[80px]">SQ</TableHead>
+                          <TableHead className="min-w-[80px]">Total</TableHead>
+                          <TableHead className="min-w-[100px]">Percentage</TableHead>
+                          <TableHead className="min-w-[100px]">Grade</TableHead>
                         </TableRow>
-                      )}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {examResult.results?.map((result) => (
+                          <TableRow key={result.id}>
+                            <TableCell>
+                              {getRankBadge(result.rank)}
+                            </TableCell>
+                            <TableCell className="font-medium">{result.student?.roll || 'N/A'}</TableCell>
+                            <TableCell className="whitespace-nowrap font-medium">{result.student?.user?.name || 'Unknown'}</TableCell>
+                            <TableCell>{result.mcqMarks || 0}</TableCell>
+                            <TableCell>{result.cqMarks || 0}</TableCell>
+                            <TableCell>{result.sqMarks || 0}</TableCell>
+                            <TableCell className="font-bold text-primary">{result.total || 0}</TableCell>
+                            <TableCell>{result.percentage?.toFixed(1) || 0}%</TableCell>
+                            <TableCell>
+                              <Badge className={getGradeColor(result.grade)}>
+                                {result.grade || 'N/A'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        )) || (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                                No results available
+                              </TableCell>
+                            </TableRow>
+                          )}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             ))}

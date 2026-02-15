@@ -16,7 +16,7 @@ function Satellite({ radius, speed }: { radius: number, speed: number }) {
 
     // Memoize the color to avoid recalculation
     const color = useMemo(() =>
-            new THREE.Color(resolvedTheme === 'dark' ? '#5eead4' : '#0d9488'), // teal-300 dark, teal-600 light
+        new THREE.Color(resolvedTheme === 'dark' ? '#5eead4' : '#0d9488'), // teal-300 dark, teal-600 light
         [resolvedTheme]);
 
     // Animate the satellite's position in an orbit
@@ -123,12 +123,12 @@ function Scene() {
 
     return (
         <>
-            <WebGLContextManager 
-                id="hero-canvas" 
+            <WebGLContextManager
+                id="hero-canvas"
                 onContextLost={() => console.log('Hero canvas context lost')}
                 onContextRestored={() => console.log('Hero canvas context restored')}
             />
-            
+
             {/* Lighting Setup */}
             <ambientLight intensity={1.0} />
             <pointLight position={[10, 10, 10]} intensity={200} color="#ffffff" />
@@ -151,22 +151,24 @@ function Scene() {
  */
 export default function HeroCanvas() {
     const webglSupported = useWebGLSupport();
-    
+
     return (
         <div className="absolute inset-0 z-0 opacity-40 dark:opacity-50 transition-opacity duration-500">
             <WebGLFallback webglSupported={webglSupported}>
-                <Canvas 
+                <Canvas
                     camera={{ fov: 50, position: [0, 0, 14] }}
-                    gl={{ 
+                    dpr={[1, 2]} // Limit pixel ratio for performance
+                    frameloop="always"
+                    gl={{
                         powerPreference: "high-performance",
                         antialias: true,
                         alpha: false,
                         stencil: false,
-                        depth: true
+                        depth: true,
+                        preserveDrawingBuffer: false // Optimization
                     }}
                     onCreated={({ gl }) => {
                         gl.setClearColor(0x000000, 0);
-                        gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
                     }}
                 >
                     {/* Suspense provides a fallback while 3D assets are loading */}

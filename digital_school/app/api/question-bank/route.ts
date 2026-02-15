@@ -7,10 +7,10 @@ const prisma = new PrismaClient();
 
 // --- Helper function to get a valid user for development ---
 async function getDeveloperUserId() {
-  // Get the first user in the database (or throw if none found)
-  const user = await prisma.user.findFirst();
-  if (!user) throw new Error('No user found in the database. Please seed a user.');
-  return user.id;
+    // Get the first user in the database (or throw if none found)
+    const user = await prisma.user.findFirst();
+    if (!user) throw new Error('No user found in the database. Please seed a user.');
+    return user.id;
 }
 
 // --- Updated Schema ---
@@ -27,15 +27,25 @@ const questionSchema = z.object({
     options: z.array(z.object({
         text: z.string().min(1, "Option text is required"),
         isCorrect: z.boolean(),
-        explanation: z.string().optional().nullable()
+        explanation: z.string().optional().nullable(),
+        image: z.string().optional().nullable()
     })).nullable().default(null),
     subQuestions: z.array(z.object({
         question: z.string().min(1, "Sub-question text is required"),
         marks: z.number().int().min(1, "Sub-question marks must be at least 1"),
-        modelAnswer: z.string().optional().nullable()
+        modelAnswer: z.string().optional().nullable(),
+        image: z.string().optional().nullable()
     })).nullable().default(null),
     modelAnswer: z.string().optional().nullable(),
+    assertion: z.string().optional().nullable(),
+    reason: z.string().optional().nullable(),
+    correctOption: z.coerce.number().int().min(1).max(5).optional().nullable(),
+    leftColumn: z.array(z.any()).optional().nullable(),
+    rightColumn: z.array(z.any()).optional().nullable(),
+    matches: z.record(z.string(), z.string()).optional().nullable(),
+    explanation: z.string().optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
+    images: z.array(z.string()).optional().nullable(),
 });
 
 const aiGenerationSchema = z.object({
@@ -63,10 +73,10 @@ export async function POST(request: Request) {
         const validation = questionSchema.safeParse(body);
         if (!validation.success) {
             console.error('Validation failed:', validation.error.flatten());
-            return NextResponse.json({ 
-                error: "Invalid input", 
+            return NextResponse.json({
+                error: "Invalid input",
                 details: validation.error.flatten(),
-                receivedData: body 
+                receivedData: body
             }, { status: 400 });
         }
 
@@ -150,13 +160,20 @@ export async function PUT(request: Request) {
         const validation = questionSchema.partial().safeParse(body);
         if (!validation.success) return NextResponse.json({ error: "Invalid input", details: validation.error.flatten() }, { status: 400 });
 
-        const { questionBankIds, ...questionData } = validation.data;
+        const { questionBankIds, assertion, reason, correctOption, leftColumn, rightColumn, matches, explanation, ...questionData } = validation.data;
 
         const updatedQuestion = await prisma.question.update({
             where: { id },
             data: {
                 ...questionData,
-                QuestionToQuestionBank: questionBankIds ? { set: questionBankIds.map(id => ({ question_banks: { connect: { id } } })) } : { set: [] },
+                assertion,
+                reason,
+                correctOption,
+                leftColumn,
+                rightColumn,
+                matches,
+                explanation,
+                QuestionToQuestionBank: questionBankIds ? { set: questionBankIds.map(bankId => ({ question_banks: { connect: { id: bankId } } })) } : { set: [] },
             },
             include: { QuestionToQuestionBank: true, class: true, createdBy: true },
         } as any);
@@ -172,6 +189,18 @@ export async function DELETE(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const ids = searchParams.get('ids');
+
+        if (ids) {
+            const idList = ids.split(',').filter(Boolean);
+            if (idList.length === 0) return NextResponse.json({ error: "No valid IDs provided" }, { status: 400 });
+
+            await prisma.question.deleteMany({
+                where: { id: { in: idList } }
+            });
+            return NextResponse.json({ message: "Questions deleted successfully" });
+        }
+
         if (!id) return NextResponse.json({ error: "Question ID is required" }, { status: 400 });
 
         await prisma.question.delete({ where: { id } });
@@ -179,6 +208,35 @@ export async function DELETE(request: Request) {
     } catch (error) {
         console.error("Failed to delete question:", error);
         return NextResponse.json({ error: "Failed to delete question" }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { ids, isForPractice } = body;
+
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return NextResponse.json({ error: "No IDs provided" }, { status: 400 });
+        }
+
+        if (typeof isForPractice !== 'boolean') {
+            return NextResponse.json({ error: "isForPractice must be a boolean" }, { status: 400 });
+        }
+
+        const updated = await prisma.question.updateMany({
+            where: { id: { in: ids } },
+            data: { isForPractice }
+        });
+
+        return NextResponse.json({
+            message: "Questions updated successfully",
+            count: updated.count
+        });
+
+    } catch (error) {
+        console.error("Failed to bulk update questions:", error);
+        return NextResponse.json({ error: "Failed to bulk update questions" }, { status: 500 });
     }
 }
 
@@ -192,76 +250,139 @@ async function handleAIGeneration(body: any) {
 
     const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
 
-    const responseSchema = {
-        type: "ARRAY",
-        items: {
-            type: "OBJECT",
-            properties: {
-                questionText: { type: "STRING", description: "The main text of the question." },
-                questionLatex: { type: "STRING", description: "LaTeX for math equations. Empty string if none." },
-                marks: { type: "NUMBER", description: "Marks for the question." },
-                ...(questionType === 'MCQ' && {
-                    options: { 
-                        type: "ARRAY", 
-                        description: "MUST contain 4 options for an MCQ question.", 
-                        items: { 
-                            type: "OBJECT", 
-                            properties: { 
-                                text: { type: "STRING" }, 
-                                isCorrect: { type: "BOOLEAN" },
-                                ...(includeAnswers && { explanation: { type: "STRING", description: "Explanation for why this option is correct (only for correct option)" } })
-                            }, 
-                            required: ["text", "isCorrect"] 
-                        } 
-                    }
-                }),
-                ...(questionType === 'CQ' && {
-                    subQuestions: { 
-                        type: "ARRAY", 
-                        description: "MUST contain 2 to 4 sub-questions for a CQ question.", 
-                        items: { 
-                            type: "OBJECT", 
-                            properties: { 
-                                question: { type: "STRING" }, 
-                                marks: { type: "NUMBER" },
-                                ...(includeAnswers && { modelAnswer: { type: "STRING", description: "Model answer for this sub-question" } })
-                            }, 
-                            required: ["question", "marks"] 
-                        } 
-                    }
-                }),
-                ...(questionType === 'SQ' && {
-                    modelAnswer: { type: "STRING", description: "MUST contain a model answer for an SQ question." }
-                })
-            },
-            required: ["questionText", "marks"].concat(
-                questionType === 'MCQ' ? ['options'] :
-                    questionType === 'CQ' ? ['subQuestions'] :
-                        questionType === 'SQ' ? ['modelAnswer'] : []
-            )
-        }
+    // Response schema for Gemini
+    const responseSchema: any = {
+        type: "object",
+        properties: {
+            questions: {
+                type: "array",
+                items: {
+                    type: "object",
+                    properties: {
+                        type: { type: "string", enum: [questionType] },
+                        questionText: { type: "string" },
+                        marks: { type: "number" },
+                        difficulty: { type: "string", enum: ["EASY", "MEDIUM", "HARD"] },
+                        subject: { type: "string" },
+                        topic: { type: "string" },
+                        hasMath: { type: "boolean" },
+                    },
+                    required: ["type", "questionText", "marks", "difficulty", "subject", "topic", "hasMath"]
+                }
+            }
+        },
+        required: ["questions"]
     };
 
-   
- const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
+    const itemProps = responseSchema.properties.questions.items.properties;
+    const itemRequired = responseSchema.properties.questions.items.required;
 
-REQUIREMENTS:
-- Class: ${className}, Subject: ${subject}, Topic: ${topic || 'General'}, Difficulty: ${difficulty}, Type: ${questionType}
-- Each question must be engaging, clear, and appropriate for the specified difficulty level
-- Include mathematical expressions, formulas, and equations where relevant using LaTeX notation
+    if (questionType === 'MCQ' || (questionType as string) === 'MC') {
+        itemProps.options = {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    text: { type: "string" },
+                    isCorrect: { type: "boolean" },
+                    ...(includeAnswers && { explanation: { type: "string" } })
+                },
+                required: ["text", "isCorrect"]
+            }
+        };
+        itemRequired.push("options");
+        if (questionType === 'MCQ') {
+            itemProps.correct = { type: "string" };
+            itemRequired.push("correct");
+        }
+    } else if ((questionType as string) === 'INT') {
+        itemProps.modelAnswer = { type: "string" };
+        itemRequired.push("modelAnswer");
+        if (includeAnswers) {
+            itemProps.explanation = { type: "string" };
+            itemRequired.push("explanation");
+        }
+    } else if ((questionType as string) === 'AR') {
+        itemProps.assertion = { type: "string" };
+        itemProps.reason = { type: "string" };
+        itemProps.correctOption = { type: "number" };
+        itemRequired.push("assertion", "reason", "correctOption");
+        if (includeAnswers) {
+            itemProps.explanation = { type: "string" };
+            itemRequired.push("explanation");
+        }
+    } else if ((questionType as string) === 'MTF') {
+        itemProps.leftColumn = {
+            type: "array",
+            items: {
+                type: "object",
+                properties: { id: { type: "string" }, text: { type: "string" } },
+                required: ["id", "text"]
+            }
+        };
+        itemProps.rightColumn = {
+            type: "array",
+            items: {
+                type: "object",
+                properties: { id: { type: "string" }, text: { type: "string" } },
+                required: ["id", "text"]
+            }
+        };
+        itemProps.matches = { type: "object", additionalProperties: { type: "string" } };
+        itemRequired.push("leftColumn", "rightColumn", "matches");
+        if (includeAnswers) {
+            itemProps.explanation = { type: "string" };
+            itemRequired.push("explanation");
+        }
+    } else if ((questionType as string) === 'CQ') {
+        itemProps.subQuestions = {
+            type: "array",
+            items: {
+                type: "object",
+                properties: {
+                    question: { type: "string" },
+                    marks: { type: "number" },
+                    ...(includeAnswers && { modelAnswer: { type: "string" } })
+                },
+                required: ["question", "marks"]
+            }
+        };
+        itemRequired.push("subQuestions");
+    } else if ((questionType as string) === 'SQ') {
+        itemProps.modelAnswer = { type: "string" };
+        itemRequired.push("modelAnswer");
+        if (includeAnswers) {
+            itemProps.explanation = { type: "string" };
+            itemRequired.push("explanation");
+        }
+    }
 
-QUESTION TYPE SPECIFICATIONS:
+    const prompt = `You are an expert test creator specializing in ${subject} for ${className} level. Generate ${count} unique, high-quality questions based on these specifications:
+- Class/Level: ${className}
+- Subject: ${subject}
+${topic ? `- Topic: ${topic}` : ''}
+- Difficulty: ${difficulty}
+- Question Type: ${questionType}
+- Count: ${count}
+- Language: Provide all content in Bengali, but keep IDs like '1', '2', 'A', 'B' and keys in 'matches' in English.
 
-${questionType === 'MCQ' ? `
-MCQ QUESTIONS:
-- Provide exactly 4 options (A, B, C, D format)
-- Only ONE option should have 'isCorrect: true'
-- All other options should have 'isCorrect: false'
-- Make incorrect options plausible but clearly wrong
-${includeAnswers ? '- Include detailed \'explanation\' for the correct option explaining the reasoning and solution steps' : ''}
-- Use LaTeX for mathematical expressions: $\\frac{a}{b}$, $x^2$, $\\sqrt{x}$, etc.` : ''}
+${(questionType as string) === 'MCQ' || (questionType as string) === 'MC' ? `
+${(questionType as string) === 'MCQ' ? 'MCQ (SINGLE CORRECT) RULES:' : 'MC (MULTIPLE CORRECT) RULES:'}
+- Create a clear, concise question
+- Provide 4-6 plausible options
+- ${(questionType as string) === 'MCQ' ? 'EXACTLY ONE option must be correct' : 'AT LEAST TWO options must be correct'}
+${includeAnswers ? '- Include a helpful \'explanation\' for each correct option' : ''}
+- Avoid "None of the above" or "All of the above" if possible` : ''}
 
-${questionType === 'CQ' ? `
+${(questionType as string) === 'INT' ? `
+INT (INTEGER TYPE) QUESTIONS:
+- The answer MUST be a single integer (whole number)
+- Question should have a clear numerical answer
+- Provide the correct integer answer in 'modelAnswer' field as a number
+${includeAnswers ? '- Include detailed \'explanation\' showing step-by-step solution' : ''}
+- Use LaTeX for mathematical expressions in the question and explanation` : ''}
+
+${(questionType as string) === 'CQ' ? `
 CQ (COMPREHENSIVE) QUESTIONS:
 - Provide 2-4 sub-questions that build upon each other
 - Each sub-question should have appropriate marks (total should equal question marks)
@@ -269,39 +390,40 @@ CQ (COMPREHENSIVE) QUESTIONS:
 ${includeAnswers ? '- Include detailed \'modelAnswer\' for each sub-question with step-by-step solutions' : ''}
 - Use LaTeX for mathematical expressions and solutions` : ''}
 
-${questionType === 'SQ' ? `
+${(questionType as string) === 'SQ' ? `
 SQ (SHORT) QUESTIONS:
 - Focus on a single concept or calculation
 - Question should be clear and direct
 ${includeAnswers ? '- Provide comprehensive \'modelAnswer\' with detailed solution steps and reasoning' : ''}
 - Use LaTeX for mathematical expressions and solutions` : ''}
 
+${(questionType as string) === 'AR' ? `
+AR (ASSERTION-REASON) QUESTIONS:
+- Create two statements: Assertion (A) and Reason (R)
+- Both statements must be factual and clear
+- Students must evaluate both statements and their relationship
+- Provide the correct relationship as option 1-5:
+  1. Both A and R are true, and R is the correct explanation of A
+  2. Both A and R are true, but R is NOT the correct explanation of A
+  3. Assertion is true but Reason is false
+  4. Assertion is false but Reason is true
+  5. Both statements are false
+${includeAnswers ? '- Include a detailed \'explanation\' of why the selected relationship is correct' : ''}
+- Use LaTeX for mathematical expressions in both statements` : ''}
+
+${(questionType as string) === 'MTF' ? `
+MTF (MATCH THE FOLLOWING) QUESTIONS:
+- Create two lists: leftColumn (Column A) and rightColumn (Column B)
+- Column A items should be numbered (1, 2, 3...)
+- Column B items should be lettered (A, B, C...)
+- Provide the correct pairings in the 'matches' field (e.g., {"1": "B", "2": "A"})
+- Right column can have more items than left column (distractors)
+${includeAnswers ? '- Provide detailed \'explanation\' summarizing the correct matches' : ''}
+- Use LaTeX for mathematical expressions and solutions` : ''}
+
 MATHEMATICAL CONTENT AND FORMATTING:
 - For any mathematical content, use proper LaTeX notation
 - Common examples: $x^2 + y^2 = z^2$, $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, $\\int_{a}^{b} f(x) dx$
-- If no mathematical content, set 'questionLatex' to empty string
-
-TABLES AND DATA:
-- When presenting data in tables, use LaTeX table syntax:
-  - Simple table: $\\begin{array}{|c|c|c|} \\hline A & B & C \\\\ \\hline 1 & 2 & 3 \\\\ \\hline \\end{array}$
-  - Matrix: $\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}$
-  - Determinant: $\\begin{vmatrix} a & b \\\\ c & d \\end{vmatrix}$
-- For frequency tables, use: $\\begin{array}{|c|c|} \\hline \\text{Value} & \\text{Frequency} \\\\ \\hline x_1 & f_1 \\\\ \\hline x_2 & f_2 \\\\ \\hline \\end{array}$
-
-GEOMETRY AND DIAGRAMS:
-- For geometric shapes, use LaTeX geometry commands:
-  - Triangle: $\\triangle ABC$ with sides $a$, $b$, $c$
-  - Circle: $\\odot O$ with radius $r$ and center $O$
-  - Rectangle: $\\square ABCD$ with length $l$ and width $w$
-  - Angles: $\\angle ABC = \\theta$
-  - Parallel lines: $AB \\parallel CD$
-  - Perpendicular: $AB \\perp CD$
-- For coordinate geometry: Point $A(x_1, y_1)$, Line $y = mx + c$, Circle $(x-h)^2 + (y-k)^2 = r^2$
-
-RESPONSE FORMAT:
-- Respond ONLY with a valid JSON array matching the provided schema
-- Do not include any explanatory text outside the JSON
-- Ensure all required fields are present and properly formatted
 
 Generate questions that will challenge students appropriately for ${difficulty} level while maintaining clarity and educational value.`;
     const payload = {
@@ -315,9 +437,26 @@ Generate questions that will challenge students appropriately for ${difficulty} 
 
         const result = await geminiResponse.json();
         const text = result.candidates[0].content.parts[0].text;
-        const generatedQuestions = JSON.parse(text);
-        const finalQuestions = generatedQuestions.map((q: any) => ({
-            ...q, type: questionType, subject, topic, difficulty, isAiGenerated: true, hasMath: !!q.questionLatex,
+        const generatedData = JSON.parse(text);
+
+        // Handle both wrapped and unwrapped array responses
+        const questionsArray = Array.isArray(generatedData) ? generatedData : (generatedData.questions || []);
+
+        const finalQuestions = questionsArray.map((q: any) => ({
+            ...q,
+            type: questionType,
+            subject,
+            topic: topic || q.topic,
+            difficulty: difficulty || q.difficulty,
+            isAiGenerated: true,
+            hasMath: Boolean(
+                /\\/.test(q.questionText || '') ||
+                /\\/.test(q.modelAnswer || '') ||
+                /\\/.test(q.assertion || '') ||
+                /\\/.test(q.reason || '') ||
+                (q.options ? q.options.some((o: any) => /\\/.test(o.text)) : false) ||
+                (q.subQuestions ? q.subQuestions.some((sq: any) => /\\/.test(sq.question)) : false)
+            )
         }));
         return NextResponse.json({ questions: finalQuestions });
     } catch (error) {

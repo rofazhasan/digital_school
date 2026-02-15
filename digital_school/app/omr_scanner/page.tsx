@@ -1,524 +1,258 @@
 "use client";
 
-import React, { useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { useDropzone } from 'react-dropzone';
-import { 
-  Scan, 
-  FileText, 
-  Settings, 
-  RotateCcw,
-  Play,
-  Loader2,
-  BarChart3,
-  QrCode,
-  Grid3X3,
-  Target,
-  Zap,
-  Shield,
-  Brain
-} from 'lucide-react';
-
-// UI Components
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useToast } from '@/components/ui/use-toast';
-
-// OMR Scanner Components
-import OMRScanner from './components/OMRScanner';
-import ErrorReview from './components/ErrorReview';
-import ProcessingQueue from './components/ProcessingQueue';
-import ResultsViewer from './components/ResultsViewer';
-import SettingsPanel from './components/SettingsPanel';
-
-// Types
-interface ScanResult {
-  id: string;
-  filename: string;
-  status: 'pending' | 'processing' | 'completed' | 'error' | 'flagged';
-  progress: number;
-  qrData?: Record<string, unknown>;
-  gridData?: Record<string, unknown>;
-  bubbleData?: Record<string, unknown>;
-  errors?: string[];
-  warnings?: string[];
-  metadata?: {
-    examId?: string;
-    setId?: string;
-    studentId?: string;
-    rollNumber?: string;
-    setCode?: string;
-    subjectCode?: string;
-    registrationNo?: string;
-  };
-  results?: {
-    mcqAnswers?: number[];
-    rollNumber?: string;
-    setCode?: string;
-    subjectCode?: string;
-    registrationNo?: string;
-  };
-  processingTime?: number;
-  confidence?: number;
-}
-
-interface ProcessingSettings {
-  // QR Detection
-  qrEnabled: boolean;
-  qrConfidence: number;
-  
-  // Grid Detection
-  autoDetectGrid: boolean;
-  minBubbleSize: number;
-  maxBubbleSize: number;
-  gridTolerance: number;
-  
-  // Bubble Classification
-  classificationMethod: 'ml' | 'threshold' | 'hybrid';
-  fillThreshold: number;
-  mlModelPath?: string;
-  
-  // Image Processing
-  preprocessing: {
-    denoise: boolean;
-    sharpen: boolean;
-    contrast: number;
-    brightness: number;
-    skewCorrection: boolean;
-    perspectiveCorrection: boolean;
-  };
-  
-  // Performance
-  useGPU: boolean;
-  maxConcurrent: number;
-  batchSize: number;
-  
-  // Error Handling
-  autoCorrection: boolean;
-  flagUncertain: boolean;
-  minConfidence: number;
-}
-
-const defaultSettings: ProcessingSettings = {
-  qrEnabled: true,
-  qrConfidence: 0.8,
-  autoDetectGrid: true,
-  minBubbleSize: 12,
-  maxBubbleSize: 30,
-  gridTolerance: 0.1,
-  classificationMethod: 'hybrid',
-  fillThreshold: 0.6,
-  preprocessing: {
-    denoise: true,
-    sharpen: true,
-    contrast: 1.2,
-    brightness: 1.1,
-    skewCorrection: true,
-    perspectiveCorrection: true,
-  },
-  useGPU: false,
-  maxConcurrent: 4,
-  batchSize: 10,
-  autoCorrection: true,
-  flagUncertain: true,
-  minConfidence: 0.85,
-};
+import React, { useState, useRef } from 'react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, ScanLine, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 export default function OMRScannerPage() {
-  const [scanResults, setScanResults] = useState<ScanResult[]>([]);
-  const [settings, setSettings] = useState<ProcessingSettings>(defaultSettings);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('scanner');
-  const [processingStats, setProcessingStats] = useState({
-    total: 0,
-    completed: 0,
-    errors: 0,
-    flagged: 0,
-    averageTime: 0,
-  });
-  
-  const { toast } = useToast();
-  const scannerRef = useRef<React.ComponentRef<typeof OMRScanner>>(null);
+    const [activeTab, setActiveTab] = useState("camera");
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [scanResult, setScanResult] = useState<any>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  // File drop handler
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newResults: ScanResult[] = acceptedFiles.map((file, index) => ({
-      id: `scan-${Date.now()}-${index}`,
-      filename: file.name,
-      status: 'pending',
-      progress: 0,
-    }));
-    
-    setScanResults(prev => [...prev, ...newResults]);
-    toast({
-      title: "Files Added",
-      description: `${acceptedFiles.length} files added to processing queue.`,
-    });
-  }, [toast]);
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const [cameraActive, setCameraActive] = useState(false);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.tiff', '.bmp'],
-      'application/pdf': ['.pdf'],
-      'application/zip': ['.zip'],
-    },
-    multiple: true,
-  });
+    // --- Camera Control ---
+    const startCamera = async () => {
+        try {
+            setCameraActive(true);
+            const stream = await navigator.mediaDevices.getUserMedia({
+                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+            });
+            if (videoRef.current) {
+                videoRef.current.srcObject = stream;
+                videoRef.current.play();
+            }
+        } catch (err) {
+            toast.error("Could not access camera.");
+            setCameraActive(false);
+        }
+    };
 
-  // Start processing
-  const startProcessing = async () => {
-    if (scanResults.length === 0) {
-      toast({
-        title: "No Files",
-        description: "Please add files to process first.",
-        variant: "destructive",
-      });
-      return;
-    }
+    const stopCamera = () => {
+        if (videoRef.current && videoRef.current.srcObject) {
+            const stream = videoRef.current.srcObject as MediaStream;
+            stream.getTracks().forEach(track => track.stop());
+            videoRef.current.srcObject = null;
+        }
+        setCameraActive(false);
+    };
 
-    setIsProcessing(true);
-    setProcessingStats(prev => ({ ...prev, total: scanResults.length }));
+    const capturePhoto = () => {
+        if (videoRef.current) {
+            const canvas = document.createElement("canvas");
+            canvas.width = videoRef.current.videoWidth;
+            canvas.height = videoRef.current.videoHeight;
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+                ctx.drawImage(videoRef.current, 0, 0);
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
+                        setPreviewUrl(URL.createObjectURL(blob));
+                        processFile(file);
+                        stopCamera(); // Stop after capture
+                    }
+                }, "image/jpeg", 0.9);
+            }
+        }
+    };
 
-    try {
-      // Process files in batches
-      const batchSize = settings.batchSize;
-      const batches = [];
-      
-      for (let i = 0; i < scanResults.length; i += batchSize) {
-        batches.push(scanResults.slice(i, i + batchSize));
-      }
+    // --- Processing ---
+    const processFile = async (file: File) => {
+        setIsProcessing(true);
+        setScanResult(null);
 
-      for (const batch of batches) {
-        await Promise.all(
-          batch.map(async (result) => {
-            await processSingleFile(result);
-          })
-        );
-      }
+        const formData = new FormData();
+        formData.append("file", file);
 
-      toast({
-        title: "Processing Complete",
-        description: `Successfully processed ${scanResults.length} files.`,
-      });
-    } catch (error) {
-      console.error('Processing error:', error);
-      toast({
-        title: "Processing Error",
-        description: "An error occurred during processing.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+        try {
+            const res = await fetch("/api/omr/process", {
+                method: "POST",
+                body: formData
+            });
 
-  // Process a single file
-  const processSingleFile = async (result: ScanResult) => {
-    const startTime = Date.now();
-    
-    try {
-      // Update status to processing
-      setScanResults(prev => 
-        prev.map(r => r.id === result.id ? { ...r, status: 'processing', progress: 10 } : r)
-      );
+            const data = await res.json();
 
-      // Step 1: QR Detection (if enabled)
-      if (settings.qrEnabled) {
-        setScanResults(prev => 
-          prev.map(r => r.id === result.id ? { ...r, progress: 30 } : r)
-        );
-        // QR detection logic will be implemented in QRDetector component
-      }
+            if (!res.ok) {
+                throw new Error(data.message || "Scan failed");
+            }
 
-      // Step 2: Grid Detection
-      setScanResults(prev => 
-        prev.map(r => r.id === result.id ? { ...r, progress: 50 } : r)
-      );
-      // Grid detection logic will be implemented in GridDetector component
+            setScanResult(data.data);
+            if (data.data.grading) {
+                toast.success(`Graded! Score: ${data.data.grading.score}/${data.data.grading.total}`);
+            } else {
+                toast.success("OMR Scanned");
+            }
 
-      // Step 3: Bubble Classification
-      setScanResults(prev => 
-        prev.map(r => r.id === result.id ? { ...r, progress: 80 } : r)
-      );
-      // Bubble classification logic will be implemented in BubbleClassifier component
+        } catch (error: any) {
+            toast.error(error.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
 
-      // Step 4: Results Compilation
-      setScanResults(prev => 
-        prev.map(r => r.id === result.id ? { 
-          ...r, 
-          status: 'completed', 
-          progress: 100,
-          processingTime: Date.now() - startTime,
-          confidence: 0.95, // This will be calculated based on actual results
-        } : r)
-      );
+    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setPreviewUrl(URL.createObjectURL(file));
+            processFile(file);
+        }
+    };
 
-      // Update stats
-      setProcessingStats(prev => ({
-        ...prev,
-        completed: prev.completed + 1,
-        averageTime: (prev.averageTime * (prev.completed) + (Date.now() - startTime)) / (prev.completed + 1),
-      }));
-
-    } catch (error) {
-      console.error(`Error processing ${result.filename}:`, error);
-      setScanResults(prev => 
-        prev.map(r => r.id === result.id ? { 
-          ...r, 
-          status: 'error', 
-          errors: [error instanceof Error ? error.message : 'Unknown error'],
-        } : r)
-      );
-      
-      setProcessingStats(prev => ({
-        ...prev,
-        errors: prev.errors + 1,
-      }));
-    }
-  };
-
-  // Export results
-  const exportResults = (format: 'json' | 'excel' | 'pdf') => {
-    const completedResults = scanResults.filter(r => r.status === 'completed');
-    
-    if (completedResults.length === 0) {
-      toast({
-        title: "No Results",
-        description: "No completed results to export.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Export logic will be implemented
-    toast({
-      title: "Export Started",
-      description: `Exporting ${completedResults.length} results as ${format.toUpperCase()}.`,
-    });
-  };
-
-  // Clear all results
-  const clearResults = () => {
-    setScanResults([]);
-    setProcessingStats({
-      total: 0,
-      completed: 0,
-      errors: 0,
-      flagged: 0,
-      averageTime: 0,
-    });
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-      <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center"
-          >
-            <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Universal OMR Scanner
-            </h1>
-            <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
-              Advanced template-free OMR processing with QR integration, dynamic grid detection, 
-              and high-accuracy bubble classification powered by machine learning.
-            </p>
-          </motion.div>
-
-          {/* Feature badges */}
-          <div className="flex flex-wrap justify-center gap-2 mt-6">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <QrCode className="h-3 w-3" />
-              QR Integration
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Grid3X3 className="h-3 w-3" />
-              Auto Grid Detection
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Brain className="h-3 w-3" />
-              ML Classification
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Shield className="h-3 w-3" />
-              Error Recovery
-            </Badge>
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <Zap className="h-3 w-3" />
-              High Accuracy
-            </Badge>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="scanner" className="flex items-center gap-2">
-              <Scan className="h-4 w-4" />
-              Scanner
-            </TabsTrigger>
-            <TabsTrigger value="queue" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Queue
-            </TabsTrigger>
-            <TabsTrigger value="results" className="flex items-center gap-2">
-              <BarChart3 className="h-4 w-4" />
-              Results
-            </TabsTrigger>
-            <TabsTrigger value="settings" className="flex items-center gap-2">
-              <Settings className="h-4 w-4" />
-              Settings
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Scanner Tab */}
-          <TabsContent value="scanner" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Main Scanner */}
-              <div className="lg:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Target className="h-5 w-5" />
-                      Universal OMR Scanner
-                    </CardTitle>
-                    <CardDescription>
-                      Upload images, PDFs, or ZIP files for processing. Supports any bubble layout.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <OMRScanner
-                      ref={scannerRef}
-                      settings={settings}
-                      onFileProcessed={(result) => {
-                        setScanResults(prev => [...prev, result]);
-                      }}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Processing Stats */}
-              <div className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Processing Stats</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-gray-500">Total Files</p>
-                        <p className="text-2xl font-bold">{processingStats.total}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Completed</p>
-                        <p className="text-2xl font-bold text-green-600">{processingStats.completed}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Errors</p>
-                        <p className="text-2xl font-bold text-red-600">{processingStats.errors}</p>
-                      </div>
-                      <div>
-                        <p className="text-gray-500">Flagged</p>
-                        <p className="text-2xl font-bold text-yellow-600">{processingStats.flagged}</p>
-                      </div>
-                    </div>
-                    
-                    {processingStats.averageTime > 0 && (
-                      <div>
-                        <p className="text-gray-500 text-sm">Avg. Processing Time</p>
-                        <p className="text-lg font-semibold">
-                          {(processingStats.averageTime / 1000).toFixed(1)}s
-                        </p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Quick Actions */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Quick Actions</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <Button 
-                      onClick={startProcessing}
-                      disabled={isProcessing || scanResults.length === 0}
-                      className="w-full"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-4 w-4 mr-2" />
-                          Start Processing
-                        </>
-                      )}
-                    </Button>
-                    
-                    <Button 
-                      variant="outline" 
-                      onClick={clearResults}
-                      disabled={scanResults.length === 0}
-                      className="w-full"
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Clear All
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
+    return (
+        <div className="container mx-auto p-4 max-w-5xl min-h-screen">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">OMR Scanner</h1>
+                    <p className="text-muted-foreground">Server-side processing for high accuracy.</p>
+                </div>
+                <Button variant="outline" className="w-full sm:w-auto" onClick={() => { setScanResult(null); setPreviewUrl(null); if (activeTab === 'camera') startCamera(); }}>
+                    <RefreshCw className="w-4 h-4 mr-2" /> Reset
+                </Button>
             </div>
-          </TabsContent>
 
-          {/* Queue Tab */}
-          <TabsContent value="queue">
-            <ProcessingQueue 
-              results={scanResults}
-              onResultUpdate={(updatedResult) => {
-                setScanResults(prev => 
-                  prev.map(r => r.id === updatedResult.id ? updatedResult : r)
-                );
-              }}
-            />
-          </TabsContent>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                {/* Input Section */}
+                <div className="space-y-6">
+                    <Card className="border-2 border-dashed border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900/50">
+                        <CardHeader>
+                            <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'camera') startCamera(); else stopCamera(); }} className="w-full">
+                                <TabsList className="grid w-full grid-cols-2">
+                                    <TabsTrigger value="camera"><Camera className="w-4 h-4 mr-2" /> Camera</TabsTrigger>
+                                    <TabsTrigger value="upload"><Upload className="w-4 h-4 mr-2" /> Upload</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </CardHeader>
+                        <CardContent className="min-h-[300px] flex items-center justify-center relative p-0 overflow-hidden rounded-b-lg">
+                            {previewUrl && !isProcessing && !cameraActive && activeTab === 'camera' && (
+                                <img src={previewUrl} alt="Preview" className="w-full h-full object-contain max-h-[400px]" />
+                            )}
 
-          {/* Results Tab */}
-          <TabsContent value="results">
-            <ResultsViewer 
-              results={scanResults.filter(r => r.status === 'completed')}
-              onExport={exportResults}
-            />
-          </TabsContent>
+                            {activeTab === 'camera' && cameraActive && (
+                                <div className="relative w-full h-full">
+                                    <video ref={videoRef} className="w-full h-full object-cover max-h-[400px]" autoPlay playsInline muted />
+                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
+                                        <Button size="lg" onClick={capturePhoto} className="rounded-full w-16 h-16 p-0 border-4 border-white">
+                                            <div className="w-12 h-12 bg-red-500 rounded-full"></div>
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
 
-          {/* Settings Tab */}
-          <TabsContent value="settings">
-            <SettingsPanel 
-              settings={settings}
-              onSettingsChange={setSettings}
-            />
-          </TabsContent>
-        </Tabs>
+                            {activeTab === 'upload' && (
+                                <div className="p-8 text-center w-full">
+                                    {previewUrl && !isProcessing ? (
+                                        <img src={previewUrl} alt="Preview" className="mx-auto rounded-lg max-h-[300px] mb-4" />
+                                    ) : (
+                                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-lg p-10 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                            <Upload className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                                            <p className="text-sm font-medium">Click to upload Image or PDF</p>
+                                        </div>
+                                    )}
+                                    <Input type="file" className="mt-4" accept="image/*,application/pdf" onChange={handleFileUpload} />
+                                </div>
+                            )}
 
-        {/* Error Review Modal */}
-        <ErrorReview 
-          results={scanResults.filter(r => r.status === 'flagged' || r.status === 'error')}
-          onResultUpdate={(updatedResult: ScanResult) => {
-            setScanResults(prev => 
-              prev.map(r => r.id === updatedResult.id ? updatedResult : r)
-            );
-          }}
-        />
-      </div>
-    </div>
-  );
+                            {isProcessing && (
+                                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white z-10">
+                                    <Loader2 className="w-12 h-12 animate-spin mb-4" />
+                                    <p className="font-semibold text-lg">Processing OMR...</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Results Section */}
+                <div className="space-y-6">
+                    <Card className="h-full">
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <ScanLine className="w-5 h-5" /> Results
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {!scanResult ? (
+                                <div className="text-center py-12 text-muted-foreground">
+                                    <FileText className="w-16 h-16 mx-auto mb-4 opacity-20" />
+                                    <p>Scan a sheet to see results here.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-6">
+                                    {/* Grading Badge */}
+                                    {scanResult.grading && (
+                                        <div className={`p-4 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${scanResult.grading.score > 0 ? "bg-green-100 text-green-900 dark:bg-green-900/30 dark:text-green-300" : "bg-red-100 text-red-900"}`}>
+                                            <div>
+                                                <p className="text-xs font-semibold uppercase opacity-70">Calculated Score</p>
+                                                <p className="text-3xl font-bold">{scanResult.grading.score.toFixed(2)} / {scanResult.grading.total}</p>
+                                            </div>
+                                            <div className="text-left sm:text-right text-xs">
+                                                <p className="font-semibold">{scanResult.grading.examName}</p>
+                                                <p className="opacity-70">Set: {scanResult.grading.setName}</p>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Roll No</p>
+                                            <p className="text-xl font-mono font-bold truncate">{scanResult.roll || "?"}</p>
+                                        </div>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Set Code</p>
+                                            <p className="text-xl font-mono font-bold">{scanResult.set || "?"}</p>
+                                        </div>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1">Answers</p>
+                                            <p className="text-xl font-mono font-bold">{Object.keys(scanResult.answers || {}).length}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Answer Grid */}
+                                    <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4 max-h-[400px] overflow-y-auto">
+                                        <h3 className="font-semibold mb-3 text-sm">Detected Answers</h3>
+                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 xl:grid-cols-4 gap-2 text-xs">
+                                            {/* We want to show 100 questions cleanly */}
+                                            {Array.from({ length: 100 }).map((_, i) => {
+                                                const qNum = i + 1;
+                                                const ans = scanResult.answers[qNum];
+                                                const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
+
+                                                let bgClass = "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700";
+                                                if (grade) {
+                                                    if (grade.status === 'correct') bgClass = "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300";
+                                                    if (grade.status === 'wrong') bgClass = "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300";
+                                                }
+
+                                                return (
+                                                    <div key={qNum} className={`flex justify-between p-2 rounded border ${bgClass}`}>
+                                                        <span className="opacity-70">{qNum}</span>
+                                                        <span className="font-bold">{ans || "-"}</span>
+                                                        {grade && grade.status === 'wrong' && <span className="text-xs opacity-50 ml-1">({grade.expected})</span>}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {scanResult.error && (
+                                        <div className="p-3 bg-yellow-100 text-yellow-800 rounded text-sm">
+                                            <span className="font-bold">Warning:</span> {scanResult.error}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+        </div>
+    );
 }

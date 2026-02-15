@@ -1,11 +1,11 @@
 generator client {
   provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
+  binaryTargets = ["native", "rhel-openssl-1.0.x", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
 }
 
 model User {
@@ -17,6 +17,8 @@ model User {
   name              String
   avatar            String?
   isActive          Boolean                    @default(true)
+  activeSessionId   String?
+  lastSessionInfo   Json?
   lastLoginAt       DateTime?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
@@ -45,8 +47,12 @@ model User {
   resultReviews     ResultReview[]             @relation("ResultReviewer")
   studentProfile    StudentProfile?
   teacherProfile    TeacherProfile?
-  institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
+  admissionReviews  AdmissionApplication[] @relation("AdmissionReviewer")
+  createdInvoices   Invoice[]              @relation("InvoiceCreator")
+  collectedPayments Payment[]              @relation("PaymentCollector")
+  institute         Institute?             @relation("InstituteUsers", fields: [instituteId], references: [id])
 
+  @@index([role]) // Optimized for User Admin List
   @@map("users")
 }
 
@@ -67,6 +73,7 @@ model Institute {
   superUser    User?     @relation("InstituteSuperUser", fields: [superUserId], references: [id])
   settings     Settings?
   users        User[]    @relation("InstituteUsers")
+  examHalls    ExamHall[]
 
   @@map("institutes")
 }
@@ -96,6 +103,9 @@ model StudentProfile {
   results          Result[]
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  seatAllocations  SeatAllocation[]
+  admissionApp     AdmissionApplication?
+  invoices         Invoice[]
 
   @@map("student_profiles")
 }
@@ -134,6 +144,8 @@ model Class {
   questions    Question[]       @relation("ClassQuestions")
   students     StudentProfile[]
   notices      Notice[]         @relation("NoticeToClasses")
+  admissionApplications AdmissionApplication[]
+  feeStructures FeeStructure[]
 
   @@unique([name, section, instituteId])
   @@map("classes")
@@ -155,6 +167,10 @@ model Exam {
   instructions          String?
   // Negative marking for MCQs (percentage)
   mcqNegativeMarking    Float?                    @default(0)
+  // Negative marking for Multiple Correct (percentage)
+  mcNegativeMarking     Float?                    @default(0)
+  // Partial marking for Multiple Correct
+  mcPartialMarking      Boolean?                  @default(true)
   // Question selection settings
   cqTotalQuestions      Int?                      @default(8)
   cqRequiredQuestions   Int?                      @default(5)
@@ -180,7 +196,10 @@ model Exam {
   omrSheets             OMRSheet[]
   resultReviews         ResultReview[]
   results               Result[]
+  seatAllocations       SeatAllocation[]
 
+  @@index([createdAt]) // Optimized for Exam List sorting
+  @@index([classId])   // Optimized for Class filtering
   @@map("exams")
 }
 
@@ -209,19 +228,32 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
-  answerLatex            String?
-  difficultyDetail       String?
-  questionLatex          String?
+  assertion              String?  // AR: Statement A
+  reason                 String?  // AR: Statement R
+  correctOption          Int?     // AR: Correct option (1-5)
+  leftColumn             Json?    // MTF: Left items
+  rightColumn            Json?    // MTF: Right items
+  matches                Json?    // MTF: Correct matches
+  explanation            String?  // General explanation for non-MCQ types
+  isForPractice          Boolean                  @default(false)
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
   class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])
-  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: SetNull, onUpdate: NoAction)
   clones                 Question[]               @relation("ClonedQuestion")
   createdBy              User                     @relation(fields: [createdById], references: [id])
   editedBy               User?                    @relation("EditedQuestions", fields: [editedById], references: [id])
   TeacherProfile         TeacherProfile?          @relation("TeacherQuestions", fields: [teacherProfileId], references: [id])
   examSets               ExamSet[]                @relation("ExamSetToQuestion")
 
+  @@index([type])
+  @@index([subject])
+  @@index([difficulty])
+  @@index([topic])
+  @@index([hasMath])
+  @@index([createdAt])   // Optimized for Dashboard Date Filters
+  @@index([createdById]) // Optimized for "My Questions"
+  @@index([classId])     // Optimized for Class Filter
   @@map("questions")
 }
 
@@ -320,6 +352,7 @@ model AdmitCard {
   student      StudentProfile @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
+  @@index([qrCode])
   @@map("admit_cards")
 }
 
@@ -363,6 +396,7 @@ model Result {
   student          StudentProfile  @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
+  @@index([examId]) // Optimized for Leaderboard
   @@map("results")
 }
 
@@ -413,6 +447,8 @@ model AIActivity {
   userId       String
   user         User     @relation(fields: [userId], references: [id])
 
+  @@index([createdAt])
+  @@index([userId])
   @@map("ai_activities")
 }
 
@@ -426,6 +462,9 @@ model Log {
   userId    String
   user      User       @relation(fields: [userId], references: [id])
 
+  @@index([timestamp])
+  @@index([action])
+  @@index([userId])
   @@map("logs")
 }
 
@@ -438,6 +477,7 @@ model Settings {
   contactInfo   Json?
   features      Json?
   limits        Json?
+  maintenanceMode Boolean   @default(false)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   instituteId   String    @unique
@@ -516,6 +556,7 @@ model ExportJob {
   triggeredById String
   triggeredBy   User            @relation(fields: [triggeredById], references: [id])
 
+  @@index([createdAt])
   @@map("export_jobs")
 }
 
@@ -556,6 +597,8 @@ model ActivityAudit {
   user      User?    @relation(fields: [userId], references: [id])
 
   @@unique([date, module, userId])
+  @@index([date])
+  @@index([module])
   @@map("activity_audits")
 }
 
@@ -565,7 +608,7 @@ model QuestionVersion {
   versionNumber Int
   data          Json
   createdAt     DateTime @default(now())
-  question      Question @relation("QuestionVersions", fields: [questionId], references: [id])
+  question      Question @relation("QuestionVersions", fields: [questionId], references: [id], onDelete: Cascade)
 }
 
 model QuestionToQuestionBank {
@@ -585,6 +628,7 @@ model ExamSubmission {
   examId         String
   examSetId      String?
   answers        Json
+  status         SubmissionStatus        @default(IN_PROGRESS)
   startedAt      DateTime?
   submittedAt    DateTime                @default(now())
   score          Float?
@@ -600,6 +644,10 @@ model ExamSubmission {
   result         Result?
 
   @@unique([studentId, examId])
+  @@index([status])
+  @@index([score])
+  @@index([submittedAt])
+  @@index([examId]) // Optimized for Evaluation List
 }
 
 model ExamSubmissionDrawing {
@@ -663,6 +711,36 @@ model ResultReview {
   @@map("result_reviews")
 }
 
+model ExamHall {
+  id            String          @id @default(cuid())
+  name          String
+  roomNo        String?
+  capacity      Int
+  rows          Int             @default(5)
+  columns       Int             @default(4)
+  seatsPerBench Int             @default(2) 
+  instituteId   String
+  allocations   SeatAllocation[]
+  institute     Institute       @relation(fields: [instituteId], references: [id])
+
+  @@map("exam_halls")
+}
+
+model SeatAllocation {
+  id          String         @id @default(cuid())
+  examId      String
+  studentId   String
+  hallId      String
+  seatLabel   String
+  exam        Exam           @relation(fields: [examId], references: [id])
+  student     StudentProfile @relation(fields: [studentId], references: [id])
+  hall        ExamHall       @relation(fields: [hallId], references: [id])
+
+  @@unique([examId, studentId])
+  @@index([examId, hallId]) // Performance optimization for Hall filtering
+  @@map("seat_allocations")
+}
+
 model Notification {
   id          String           @id @default(cuid())
   userId      String
@@ -676,6 +754,7 @@ model Notification {
   updatedAt   DateTime         @updatedAt
   user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, isRead])
   @@map("notifications")
 }
 
@@ -688,6 +767,10 @@ enum Role {
 
 enum QuestionType {
   MCQ
+  MC   // Multiple Correct
+  INT
+  AR
+  MTF
   CQ
   SQ
 }
@@ -785,8 +868,283 @@ enum NotificationType {
   REVIEW_RESPONSE
 }
 
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
 enum QuestionStatus {
   APPROVED
   NEEDS_REVIEW
   DRAFT
+}
+
+
+// ============================================
+// SCHOOL MANAGEMENT SYSTEM MODELS
+// ============================================
+
+model AdmissionApplication {
+  id                String   @id @default(cuid())
+  applicationNo     String   @unique // AUTO-2026-0001
+  
+  // Student Info
+  studentName       String
+  dateOfBirth       DateTime
+  gender            String
+  bloodGroup        String?
+  photo             String?
+  
+  // Parent Info
+  fatherName        String
+  motherName        String
+  guardianPhone     String
+  guardianEmail     String?
+  address           String
+  
+  // Academic Info
+  previousSchool    String?
+  previousClass     String?
+  previousGPA       Float?
+  
+  // Application Details
+  applyingForClass  String
+  applyingForClassId String?
+  class             Class?   @relation(fields: [applyingForClassId], references: [id])
+  
+  // Documents
+  birthCertificate  String?
+  previousMarksheet String?
+  transferCertificate String?
+  
+  // Status
+  status            AdmissionStatus @default(PENDING)
+  appliedAt         DateTime @default(now())
+  reviewedAt        DateTime?
+  reviewedBy        String?
+  reviewer          User?    @relation("AdmissionReviewer", fields: [reviewedBy], references: [id])
+  
+  // Test Score (if entrance exam)
+  testScore         Float?
+  testDate          DateTime?
+  
+  // Admission
+  admittedAt        DateTime?
+  studentId         String?  @unique
+  student           StudentProfile? @relation(fields: [studentId], references: [id])
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([status])
+  @@index([appliedAt])
+  @@map("admission_applications")
+}
+
+model FeeStructure {
+  id          String   @id @default(cuid())
+  name        String   // "Class 10 - Annual Fee"
+  classId     String
+  class       Class    @relation(fields: [classId], references: [id])
+  
+  // Fee Components
+  tuitionFee  Float    @default(0)
+  admissionFee Float   @default(0)
+  examFee     Float    @default(0)
+  libraryFee  Float    @default(0)
+  labFee      Float    @default(0)
+  sportsFee   Float    @default(0)
+  transportFee Float   @default(0)
+  otherFees   Float    @default(0)
+  
+  totalAmount Float    // Auto-calculated
+  
+  // Payment Schedule
+  frequency   FeeFrequency @default(ANNUAL)
+  dueDay      Int?     // Day of month for payment
+  
+  // Discounts
+  siblingDiscount Float @default(0) // Percentage
+  meritDiscount   Float @default(0) // Percentage
+  
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  invoices    Invoice[]
+
+  @@map("fee_structures")
+}
+
+model Invoice {
+  id              String   @id @default(cuid())
+  invoiceNumber   String   @unique // INV-2026-00001
+  
+  // Student Reference
+  studentId       String
+  student         StudentProfile @relation(fields: [studentId], references: [id])
+  
+  // Fee Details
+  feeStructureId  String
+  feeStructure    FeeStructure @relation(fields: [feeStructureId], references: [id])
+  
+  // Amounts
+  subtotal        Float
+  discount        Float    @default(0)
+  lateFee         Float    @default(0)
+  totalAmount     Float
+  paidAmount      Float    @default(0)
+  balanceAmount   Float    // totalAmount - paidAmount
+  
+  // Dates
+  issueDate       DateTime @default(now())
+  dueDate         DateTime
+  
+  // Status
+  status          InvoiceStatus @default(PENDING)
+  
+  // Verification
+  qrCode          String   @unique // Unique hash for QR verification
+  verificationUrl String   // Public URL to verify
+  
+  // Metadata
+  notes           String?
+  createdBy       String?
+  creator         User?    @relation("InvoiceCreator", fields: [createdBy], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  payments        Payment[]
+
+  @@index([status])
+  @@index([studentId])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  receiptNumber   String   @unique // RCP-2026-00001
+  
+  // Invoice Reference
+  invoiceId       String
+  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
+  
+  // Payment Details
+  amount          Float
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime @default(now())
+  
+  // Transaction Details
+  transactionId   String?  // For online payments
+  bankReference   String?
+  
+  // Status
+  status          PaymentStatus @default(COMPLETED)
+  
+  // Verification
+  qrCode          String   @unique // Receipt QR code
+  verificationUrl String
+  
+  // Metadata
+  notes           String?
+  collectedBy     String?
+  collector       User?    @relation("PaymentCollector", fields: [collectedBy], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([paymentDate])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model VerifiableDocument {
+  id            String   @id @default(cuid())
+  documentType  DocumentType
+  documentNumber String  @unique
+  
+  // Reference (polymorphic)
+  referenceId   String   // Invoice ID, Certificate ID, etc.
+  referenceType String   // "INVOICE", "CERTIFICATE", "ADMIT_CARD"
+  
+  // Verification Data
+  qrHash        String   @unique
+  verificationUrl String
+  issuedDate    DateTime @default(now())
+  expiryDate    DateTime?
+  
+  // Status
+  isValid       Boolean  @default(true)
+  revokedAt     DateTime?
+  revokedBy     String?
+  
+  // Metadata
+  metadata      Json?    // Additional data
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([qrHash])
+  @@index([documentNumber])
+  @@map("verifiable_documents")
+}
+
+// ============================================
+// ENUMS FOR SCHOOL MANAGEMENT
+// ============================================
+
+enum AdmissionStatus {
+  PENDING
+  UNDER_REVIEW
+  TEST_SCHEDULED
+  TEST_COMPLETED
+  ACCEPTED
+  REJECTED
+  ADMITTED
+}
+
+enum FeeFrequency {
+  MONTHLY
+  QUARTERLY
+  HALF_YEARLY
+  ANNUAL
+  ONE_TIME
+}
+
+enum InvoiceStatus {
+  PENDING
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  BANK_TRANSFER
+  CHEQUE
+  ONLINE
+  CARD
+  UPI
+  MOBILE_BANKING
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum DocumentType {
+  INVOICE
+  RECEIPT
+  CERTIFICATE
+  ADMIT_CARD
+  ID_CARD
+  TRANSFER_CERTIFICATE
+  ADMISSION_LETTER
 }

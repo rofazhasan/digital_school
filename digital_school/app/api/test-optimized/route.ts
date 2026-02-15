@@ -4,12 +4,12 @@ import ServerlessDatabaseManager from '@/lib/db-optimized';
 export async function GET() {
     try {
         const startTime = Date.now();
-        
-        const result = await ServerlessDatabaseManager.executeWithConnection(async (db) => {
+
+        const result = await (prisma as any).executeWithConnection(async (db: any) => {
             // Simple query to test performance
             const examCount = await db.exam.count();
             const userCount = await db.user.count();
-            
+
             return {
                 examCount,
                 userCount,
@@ -18,7 +18,7 @@ export async function GET() {
         });
 
         const responseTime = Date.now() - startTime;
-        
+
         return NextResponse.json({
             success: true,
             data: result,

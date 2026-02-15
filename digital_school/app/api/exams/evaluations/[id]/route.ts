@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
+import { evaluateMCQuestion } from "@/lib/evaluation/mcEvaluation";
+import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
 
 export async function GET(
   req: NextRequest,
@@ -18,44 +20,116 @@ export async function GET(
 
     // Check if user has access to this exam
     let exam;
-    if (tokenData.user.role === "SUPER_USER") {
-      exam = await prisma.exam.findUnique({
-        where: { id: examId },
-        include: {
-          class: true,
-          createdBy: {
+
+    // Fast-path: Define filters early
+    const submissionWhere = studentId ? { studentId: studentId } : {};
+    const auxiliaryWhere = studentId ? { examId: examId, studentId: studentId } : { examId: examId };
+
+    // PARALLELIZATION START ---------------------
+
+    // 1. Kick off Results fetch immediately (Independent query)
+    const resultsPromise = prisma.result.findMany({
+      where: auxiliaryWhere,
+      select: {
+        studentId: true,
+        mcqMarks: true,
+        cqMarks: true,
+        sqMarks: true,
+        total: true
+      }
+    });
+
+    // 2. Pre-fetch Map (Needed for Exam Set filtering)
+    // We selecting studentId too so we can reuse this record later
+    let preFetchedStudentMap: { studentId: string, examSetId: string | null } | null = null;
+    let targetExamSetId: string | undefined = undefined;
+
+    if (studentId) {
+      preFetchedStudentMap = await prisma.examStudentMap.findUnique({
+        where: {
+          studentId_examId: {
+            studentId,
+            examId
+          }
+        },
+        select: {
+          studentId: true,
+          examSetId: true
+        }
+      });
+      if (preFetchedStudentMap?.examSetId) {
+        targetExamSetId = preFetchedStudentMap.examSetId;
+      }
+    }
+
+    // -------------------------------------------
+
+    // Dynamic ExamSet filtering
+    const examSetWhere = studentId
+      ? (targetExamSetId ? { id: targetExamSetId } : { id: 'none' })
+      : {};
+
+    // Common selection object for sub-relations to reuse
+    const examInclude = {
+      class: true,
+      createdBy: {
+        select: {
+          name: true,
+          email: true
+        }
+      },
+      examSets: {
+        // Optimize: Filter by specific set ID if known
+        where: examSetWhere,
+        // Optimize: Only fetch ID and questions, skip metadata
+        select: {
+          id: true,
+          questionsJson: true
+        }
+      },
+      examSubmissions: {
+        where: submissionWhere, // Filter by studentId if present
+        select: {
+          id: true,
+          studentId: true,
+          answers: true,
+          status: true,
+          submittedAt: true,
+          score: true,
+          evaluatorNotes: true,
+          evaluatedAt: true,
+          student: {
             select: {
-              name: true,
-              email: true
-            }
-          },
-          examSets: true,
-          examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: {
-                      name: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { submittedAt: 'asc' }
-          },
-          evaluationAssignments: {
-            include: {
-              evaluator: {
+              id: true,
+              roll: true,
+              registrationNo: true,
+              user: {
                 select: {
-                  name: true,
-                  email: true,
-                  role: true
+                  name: true
                 }
               }
             }
           }
+        },
+        orderBy: { submittedAt: 'asc' }
+      },
+      evaluationAssignments: {
+        include: {
+          evaluator: {
+            select: {
+              name: true,
+              email: true,
+              role: true
+            }
+          }
         }
+      }
+    };
+
+    if (tokenData.user.role === "SUPER_USER") {
+      exam = await prisma.exam.findUnique({
+        where: { id: examId },
+        include: examInclude as any // Type assertion for complex include
       });
     } else {
       // For TEACHER/ADMIN, only show if assigned
@@ -68,41 +142,7 @@ export async function GET(
             }
           }
         },
-        include: {
-          class: true,
-          createdBy: {
-            select: {
-              name: true,
-              email: true
-            }
-          },
-          examSets: true,
-          examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: {
-                      name: true
-                    }
-                  }
-                }
-              }
-            },
-            orderBy: { submittedAt: 'asc' }
-          },
-          evaluationAssignments: {
-            include: {
-              evaluator: {
-                select: {
-                  name: true,
-                  email: true,
-                  role: true
-                }
-              }
-            }
-          }
-        }
+        include: examInclude as any
       });
     }
 
@@ -110,10 +150,29 @@ export async function GET(
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
+    // -------------------------------------------------------------------------
+    // AUTO-RELEASE TRIGGER (Teacher View Fallback)
+    // -------------------------------------------------------------------------
+    try {
+      const { isMCQOnlyExam, finalizeAndReleaseExam } = await import("@/lib/exam-logic");
+      const isMCQOnly = isMCQOnlyExam(exam, (exam as any).examSets);
+      const isTimeOver = (new Date() > new Date(exam.endTime));
+
+      // If MCQ only and time is over, trigger release (handled safely/idempotently by lib)
+      if (isMCQOnly && isTimeOver) {
+        // Run in background but await to ensure consistency if this is the first view
+        await finalizeAndReleaseExam(exam.id);
+      }
+    } catch (e) {
+      console.error("Auto-release trigger failed in evaluation API:", e);
+      // Continue loading page even if trigger fails
+    }
+    // -------------------------------------------------------------------------
+
     // Get questions from exam sets - each student might have different questions
     const allQuestions: any[] = [];
     const studentQuestionsMap = new Map();
-    
+
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
       const generatedSet = exam.generatedSet as any;
@@ -121,14 +180,14 @@ export async function GET(
         allQuestions.push(...generatedSet.questions);
       }
     }
-    
+
     // Get questions from examSets
     if ((exam as any).examSets) {
       for (const examSet of (exam as any).examSets) {
         if (examSet.questionsJson) {
           try {
-            const questionsJson = typeof examSet.questionsJson === 'string' 
-              ? JSON.parse(examSet.questionsJson) 
+            const questionsJson = typeof examSet.questionsJson === 'string'
+              ? JSON.parse(examSet.questionsJson)
               : examSet.questionsJson;
             if (Array.isArray(questionsJson)) {
               // Store questions by examSet ID
@@ -141,178 +200,222 @@ export async function GET(
         }
       }
     }
-    
 
+    // Collect all question IDs to fetch fresh difficultyDetail/explanation
+    const questionIds = new Set<string>();
+    allQuestions.forEach(q => {
+      if (q && q.id) {
+        questionIds.add(q.id);
+      }
+    });
 
-    // Process submissions to include evaluation data
-    const processedSubmissions = await Promise.all(
-      (exam as any).examSubmissions.map(async (submission: any) => {
-        // Get questions for this specific student based on their exam set
-        let studentQuestions = allQuestions;
-        
-        // Try to get student's specific exam set questions
-        const examStudentMap = await prisma.examStudentMap.findUnique({
+    // Fetch fresh details from DB
+    const questionDetailsMap = new Map<string, string>();
+    if (questionIds.size > 0) {
+      try {
+        const dbQuestions = await prisma.question.findMany({
           where: {
-            studentId_examId: {
-              studentId: submission.studentId,
-              examId: examId
+            id: {
+              in: Array.from(questionIds)
             }
-          }
-        });
-        
-        if (examStudentMap?.examSetId && studentQuestionsMap.has(examStudentMap.examSetId)) {
-          studentQuestions = studentQuestionsMap.get(examStudentMap.examSetId);
-        }
-        
-        // Calculate total marks and earned marks
-        let totalMarks = 0;
-        let earnedMarks = 0;
-
-        // Fix image answers by mapping blob URLs to actual file paths
-        const fixedAnswers = { ...submission.answers };
-        for (const [questionId, answer] of Object.entries(submission.answers)) {
-          if (questionId.endsWith('_images') && Array.isArray(answer)) {
-            const questionBaseId = questionId.replace('_images', '');
-            // Look for uploaded images for this question
-            const uploadDir = `public/uploads/exam-answers/${examId}/${submission.studentId}/${questionBaseId}`;
-            try {
-              const fs = require('fs');
-              const path = require('path');
-              if (fs.existsSync(uploadDir)) {
-                const files = fs.readdirSync(uploadDir);
-                const imageFiles = files.filter((file: string) => 
-                  file.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                );
-                if (imageFiles.length > 0) {
-                  // Replace blob URLs with actual file paths
-                  fixedAnswers[questionId] = imageFiles.map((file: string) => 
-                    `/uploads/exam-answers/${examId}/${submission.studentId}/${questionBaseId}/${file}`
-                  );
-                }
-              }
-            } catch (error) {
-              console.error('Error fixing image paths:', error);
-            }
-          }
-        }
-
-        for (const question of studentQuestions) {
-          totalMarks += question.marks;
-          
-          const answer = fixedAnswers[question.id];
-          if (question.type === 'MCQ') {
-            // Auto-grade MCQ
-            if (answer) {
-              const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
-              const userAns = normalize(answer);
-              let isCorrect = false;
-              
-              // Enhanced MCQ answer comparison logic
-              if (question.options && Array.isArray(question.options)) {
-                // Check if student answer matches any option marked as correct
-                const correctOption = question.options.find((opt: any) => opt.isCorrect);
-                if (correctOption) {
-                  const correctOptionText = normalize(correctOption.text || String(correctOption));
-                  isCorrect = userAns === correctOptionText;
-                }
-              }
-              
-              // Fallback: Check if there's a direct correctAnswer field
-              if (!isCorrect && question.correctAnswer) {
-                const correctAnswer = question.correctAnswer;
-                
-                if (typeof correctAnswer === 'number') {
-                  isCorrect = userAns === normalize(String(correctAnswer));
-                } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-                  isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
-                } else if (Array.isArray(correctAnswer)) {
-                  // Handle array format (e.g., ["answer1", "answer2"])
-                  isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
-                } else {
-                  isCorrect = userAns === normalize(String(correctAnswer));
-                }
-              }
-              
-              // Final fallback: use question.correct
-              if (!isCorrect && question.correct) {
-                const correctAns = normalize(String(question.correct));
-                isCorrect = userAns === correctAns;
-              }
-              
-              if (isCorrect) {
-                earnedMarks += question.marks;
-              } else {
-                // Apply negative marking for wrong answers
-                if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-                  const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
-                  earnedMarks -= negativeMarks;
-                }
-              }
-            }
-          } else {
-            // For CQ/SQ, get manually assigned marks
-            const manualMarks = submission.answers[`${question.id}_marks`] || 0;
-            earnedMarks += manualMarks;
-          }
-        }
-
-        // Get evaluation status - check if submission has evaluation data
-        let evaluationStatus = 'PENDING';
-        
-        // Check if any questions have been manually graded
-        const hasManualGrading = Object.keys(submission.answers).some(key => 
-          key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
-        );
-        
-        if (submission.evaluatedAt) {
-          evaluationStatus = 'COMPLETED';
-        } else if (hasManualGrading || submission.evaluatorNotes) {
-          evaluationStatus = 'IN_PROGRESS';
-        }
-
-        // Get result data for this submission
-        const result = await prisma.result.findFirst({
-          where: {
-            studentId: submission.studentId,
-            examId: examId
-          }
-        });
-
-        const submissionData = {
-          id: submission.id,
-          student: {
-            id: submission.student.id,
-            name: submission.student.user.name,
-            roll: submission.student.roll,
-            registrationNo: submission.student.registrationNo
           },
-          answers: fixedAnswers,
-          submittedAt: submission.submittedAt.toISOString(),
-          totalMarks,
-          earnedMarks: result ? result.total : earnedMarks, // Use result total if available
-          status: evaluationStatus,
-          evaluatorNotes: submission.evaluatorNotes || null,
-          result: result ? {
-            mcqMarks: result.mcqMarks,
-            cqMarks: result.cqMarks,
-            sqMarks: result.sqMarks,
-            total: result.total
-          } : null
-        };
+          select: {
+            id: true,
 
-        console.log(`📊 Submission ${submission.id} result data:`, {
-          mcqMarks: result?.mcqMarks,
-          total: result?.total,
-          hasResult: !!result
+          }
         });
 
-        return submissionData;
-      })
-    );
+        dbQuestions.forEach(q => {
+
+        });
+      } catch (error) {
+        console.error("Error fetching question details:", error);
+      }
+    }
+
+    // RESULT & MAP PROCESSING ------------------
+
+    // Reuse or Fetch Maps:
+    // If we have a preFetched map, use it. Otherwise fetch (Teacher View).
+    let examStudentMaps: { studentId: string, examSetId: string | null }[] = [];
+
+    if (preFetchedStudentMap) {
+      // Zero-Cost: Reuse the already fetched record
+      examStudentMaps = [preFetchedStudentMap];
+    } else {
+      // Teacher View: Fetch all maps
+      examStudentMaps = await prisma.examStudentMap.findMany({
+        where: auxiliaryWhere,
+        select: {
+          studentId: true,
+          examSetId: true
+        }
+      });
+    }
+
+    // Create lookup map: studentId -> examSetId
+    const studentExamSetMap = new Map<string, string>();
+    examStudentMaps.forEach(map => {
+      if (map.examSetId) studentExamSetMap.set(map.studentId, map.examSetId);
+    });
+
+    // Await parallel results
+    const examResults = await resultsPromise;
+
+    // Create lookup map: studentId -> Result
+    const studentResultMap = new Map<string, any>();
+    examResults.forEach(res => {
+      studentResultMap.set(res.studentId, res);
+    });
+
+    // Process submissions using in-memory lookups
+    const processedSubmissions = (exam as any).examSubmissions.map((submission: any) => {
+      // Get questions for this specific student based on their exam set
+      let studentQuestions = allQuestions;
+
+      // Efficient Lookup
+      const examSetId = studentExamSetMap.get(submission.studentId);
+      if (examSetId && studentQuestionsMap.has(examSetId)) {
+        studentQuestions = studentQuestionsMap.get(examSetId);
+      }
+
+      // Calculate total marks and earned marks
+      let totalMarks = 0;
+      let earnedMarks = 0;
+
+      // Use submission answers directly as Cloudinary URLs are now authoritative
+      const fixedAnswers = { ...submission.answers };
+
+      for (const question of studentQuestions) {
+        totalMarks += question.marks;
+
+        const answer = fixedAnswers[question.id];
+        const type = (question.type || "").toUpperCase();
+        if (type === 'MCQ') {
+          // Auto-grade MCQ
+          if (answer) {
+            const normalize = (s: string) => String(s).trim().toLowerCase();
+            const userAns = normalize(answer);
+            let isCorrect = false;
+
+            // Enhanced MCQ answer comparison logic
+            if (question.options && Array.isArray(question.options)) {
+              const correctOption = question.options.find((opt: any) => opt.isCorrect);
+              if (correctOption) {
+                const correctOptionText = normalize(correctOption.text || String(correctOption));
+                isCorrect = userAns === correctOptionText;
+              }
+            }
+
+            if (!isCorrect && question.correctAnswer) {
+              const correctAnswer = question.correctAnswer;
+              if (typeof correctAnswer === 'number') {
+                isCorrect = userAns === normalize(String(correctAnswer));
+              } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
+                isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
+              } else if (Array.isArray(correctAnswer)) {
+                isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
+              } else {
+                isCorrect = userAns === normalize(String(correctAnswer));
+              }
+            }
+
+            if (!isCorrect && (question.correct !== undefined)) {
+              const correctAns = normalize(String(question.correct));
+              isCorrect = userAns === correctAns;
+            }
+
+            if (isCorrect) {
+              earnedMarks += question.marks;
+            } else if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
+              const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
+              earnedMarks -= negativeMarks;
+            }
+          }
+        } else if (type === 'MC') {
+          // Auto-grade Multiple Correct
+          if (answer && answer.selectedOptions) {
+            const score = evaluateMCQuestion(
+              question,
+              answer,
+              {
+                partialMarking: true, // Defaulting to true for now
+                negativeMarking: (exam as any).mcqNegativeMarking || 0
+              }
+            );
+            earnedMarks += score;
+          }
+        } else if (type === 'AR') {
+          // Auto-grade Assertion-Reason
+          if (answer && answer.selectedOption) {
+            const isCorrect = Number(answer.selectedOption) === Number(question.correct || question.correctOption);
+            if (isCorrect) earnedMarks += question.marks;
+          }
+        } else if (type === 'MTF') {
+          // Auto-grade Match the Following (Partial marking only, no negative)
+          if (answer) {
+            const result = evaluateMTFQuestion(question, answer);
+            earnedMarks += Math.max(0, result.score);
+          }
+        } else if (type === 'INT' || type === 'NUMERIC') {
+          // Auto-grade Integer
+          if (answer && answer.answer !== undefined) {
+            const isCorrect = Number(answer.answer) === Number(question.correct || question.answer);
+            if (isCorrect) earnedMarks += question.marks;
+          }
+        } else {
+          // For CQ/SQ, get manually assigned marks
+          const manualMarks = submission.answers[`${question.id}_marks`] || 0;
+          earnedMarks += manualMarks;
+        }
+      }
+
+      // Get evaluation status - check if submission has evaluation data
+      let evaluationStatus = 'PENDING';
+
+      // Check if any questions have been manually graded
+      const hasManualGrading = Object.keys(submission.answers).some(key =>
+        key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
+      );
+
+      if (submission.evaluatedAt) {
+        evaluationStatus = 'COMPLETED';
+      } else if (hasManualGrading || submission.evaluatorNotes) {
+        evaluationStatus = 'IN_PROGRESS';
+      }
+
+      // Efficient Result Lookup
+      const result = studentResultMap.get(submission.studentId);
+
+      const submissionData = {
+        id: submission.id,
+        student: {
+          id: submission.student.id,
+          name: submission.student.user.name,
+          roll: submission.student.roll,
+          registrationNo: submission.student.registrationNo
+        },
+        answers: fixedAnswers,
+        submittedAt: submission.submittedAt.toISOString(),
+        totalMarks,
+        earnedMarks: result ? result.total : earnedMarks, // Use result total if available
+        status: evaluationStatus,
+        evaluatorNotes: submission.evaluatorNotes || null,
+        result: result ? {
+          mcqMarks: result.mcqMarks,
+          cqMarks: result.cqMarks,
+          sqMarks: result.sqMarks,
+          total: result.total
+        } : null,
+        submissionStatus: submission.status // Expose raw submission status (IN_PROGRESS/SUBMITTED)
+      };
+
+      return submissionData;
+    });
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
-    
+
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
       const generatedSet = exam.generatedSet as any;
@@ -320,14 +423,14 @@ export async function GET(
         baseQuestions = generatedSet.questions;
       }
     }
-    
+
     // If no questions from generatedSet, try to get from exam sets
     if (baseQuestions.length === 0 && studentQuestionsMap.size > 0) {
       // Use the first available exam set's questions
       const firstExamSetId = Array.from(studentQuestionsMap.keys())[0];
       baseQuestions = studentQuestionsMap.get(firstExamSetId);
     }
-    
+
     // If still no questions, try to get from a specific student's exam set
     if (baseQuestions.length === 0 && processedSubmissions.length > 0) {
       const firstStudent = processedSubmissions[0];
@@ -339,33 +442,51 @@ export async function GET(
           }
         }
       });
-      
+
       if (studentMap?.examSetId && studentQuestionsMap.has(studentMap.examSetId)) {
         baseQuestions = studentQuestionsMap.get(studentMap.examSetId);
       }
     }
-    
 
-    
+
+
     const examData = {
       id: exam.id,
       name: exam.name,
       description: exam.description || '',
       totalMarks: exam.totalMarks,
+      class: exam.class,
+      subject: (exam as any).subject || null,
+      startTime: exam.startTime,
+      endTime: exam.endTime,
+      duration: exam.duration,
+      mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
+      cqRequiredQuestions: (exam as any).cqRequiredQuestions,
+      sqRequiredQuestions: (exam as any).sqRequiredQuestions,
       questions: baseQuestions.map((q: any) => {
         // Parse subQuestions if it's a JSON string
         let parsedSubQuestions = null;
         if (q.subQuestions) {
           try {
-            parsedSubQuestions = typeof q.subQuestions === 'string' 
-              ? JSON.parse(q.subQuestions) 
+            parsedSubQuestions = typeof q.subQuestions === 'string'
+              ? JSON.parse(q.subQuestions)
               : q.subQuestions;
           } catch (e) {
             console.error('Error parsing subQuestions:', e);
             parsedSubQuestions = null;
           }
         }
-        
+
+        // Extract explanation: DB > Question Level > Option Level
+        let explanation = questionDetailsMap.get(q.id) || q.explanation;
+
+        if (!explanation && Array.isArray(q.options)) {
+          const correctOpt = q.options.find((opt: any) => opt.isCorrect);
+          if (correctOpt && correctOpt.explanation) {
+            explanation = correctOpt.explanation;
+          }
+        }
+
         return {
           id: q.id,
           type: q.type.toLowerCase(),
@@ -374,7 +495,18 @@ export async function GET(
           correct: q.correct,
           options: q.options,
           subQuestions: parsedSubQuestions,
-          modelAnswer: q.modelAnswer || null
+          modelAnswer: q.modelAnswer || null,
+          explanation: explanation || null,
+          assertion: q.assertion || null,
+          reason: q.reason || null,
+          correctOption: q.correctOption || q.correct || null,
+          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
+          // New fields for MTF
+          leftColumn: q.leftColumn,
+          rightColumn: q.rightColumn,
+          matches: q.matches,
+          // New INT field
+          correctAnswer: q.correctAnswer || q.answer
         };
       }),
       submissions: processedSubmissions

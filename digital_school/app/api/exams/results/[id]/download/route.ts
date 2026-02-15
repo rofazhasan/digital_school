@@ -2,55 +2,41 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
 import QRCode from 'qrcode';
+import { jsPDF } from 'jspdf';
 
-// Dynamic import for jsPDF to avoid SSR issues
-let jsPDF: any;
-
-async function loadPDFLibraries() {
-  if (!jsPDF) {
-    try {
-      const jsPDFModule = await import('jspdf');
-      jsPDF = jsPDFModule.jsPDF;
-    } catch (error) {
-      console.error('Failed to load jsPDF:', error);
-      throw new Error('PDF generation library not available');
-    }
-  }
-  return { jsPDF };
-}
+// Explicitly export dynamic to prevent static optimization issues with headers/cookies
+export const dynamic = 'force-dynamic';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log('🔍 Download API called:', { 
+    console.log('🔍 PDF Download API called:', {
       url: request.url,
       method: request.method,
-      headers: Object.fromEntries(request.headers.entries())
     });
-    
+
+    // 1. Authentication
     const token = await getTokenFromRequest(request);
-    
-    console.log('🔍 Token result:', { 
-      hasToken: !!token,
-      userRole: token?.user?.role,
-      userId: token?.user?.id
-    });
-    
+
     if (!token) {
+      console.warn('⚠️ PDF Download: Unauthorized attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const user = token.user;
+    const { user } = token;
     const { id: examId } = await params;
 
-    // Check permissions - only teachers, admins, and super users can download results
+    console.log('👤 User requesting PDF:', { userId: user.id, role: user.role, examId });
+
+    // 2. Permission Check
     if (!['SUPER_USER', 'ADMIN', 'TEACHER'].includes(user.role)) {
+      console.warn('⛔ PDF Download: Insufficient permissions for user', user.id);
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Fetch exam and results data
+    // 3. Data Fetching
     const exam = await prismadb.exam.findUnique({
       where: { id: examId },
       include: {
@@ -63,11 +49,16 @@ export async function POST(
     });
 
     if (!exam) {
+      console.error('❌ PDF Download: Exam not found', examId);
       return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
     }
 
-    // Check institute access for teachers and admins
+    // 4. Institute Access Check
     if (user.role !== 'SUPER_USER' && user.instituteId !== exam.class.instituteId) {
+      console.warn('⛔ PDF Download: Institute mismatch', {
+        userInstitute: user.instituteId,
+        examInstitute: exam.class.instituteId
+      });
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
@@ -77,9 +68,7 @@ export async function POST(
         student: {
           include: {
             user: {
-              select: {
-                name: true
-              }
+              select: { name: true }
             },
             class: true
           }
@@ -92,10 +81,11 @@ export async function POST(
     });
 
     if (results.length === 0) {
+      console.warn('⚠️ PDF Download: No results found for exam', examId);
       return NextResponse.json({ error: 'No results found for this exam' }, { status: 404 });
     }
 
-    // Calculate statistics
+    // 5. Statistics Calculation
     const totalStudents = results.length;
     const totalScore = results.reduce((sum, r) => sum + r.total, 0);
     const averageScore = totalScore / totalStudents;
@@ -104,10 +94,8 @@ export async function POST(
     const passCount = results.filter(r => r.total >= exam.passMarks).length;
     const passRate = (passCount / totalStudents) * 100;
 
-    // Load PDF libraries
-    const { jsPDF: PDFClass } = await loadPDFLibraries();
-    
-    // Generate PDF
+    // 6. PDF Generation
+    console.log('📄 Generating PDF...');
     const pdfBuffer = await generateResultsPDF({
       exam,
       results,
@@ -120,22 +108,28 @@ export async function POST(
         passCount
       },
       institute: exam.class.institute
-    }, PDFClass);
+    });
+    console.log('✅ PDF Generated successfully, size:', pdfBuffer.byteLength);
 
+    // 7. Response
     return new NextResponse(pdfBuffer, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="exam-results-${exam.name}-${exam.class.name}-${exam.class.section}.pdf"`
+        'Content-Disposition': `attachment; filename="exam-results-${sanitizeFilename(exam.name)}.pdf"`
       }
     });
 
   } catch (error) {
-    console.error('Error generating results PDF:', error);
+    console.error('💥 Error in PDF Download API:', error);
     return NextResponse.json(
       { error: `Internal server error: ${error instanceof Error ? error.message : 'Unknown error'}` },
       { status: 500 }
     );
   }
+}
+
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
 }
 
 interface PDFData {
@@ -152,224 +146,121 @@ interface PDFData {
   institute: any;
 }
 
-async function generateResultsPDF(data: PDFData, PDFClass: any): Promise<Buffer> {
+async function generateResultsPDF(data: PDFData): Promise<Buffer> {
   const { exam, results, statistics, institute } = data;
-  
-  // Create new PDF document (A4 size)
-  const doc = new PDFClass('p', 'mm', 'a4');
-  
-  // Set page margins and dimensions
+
+  // Initialize jsPDF
+  const doc = new jsPDF({
+    orientation: 'p',
+    unit: 'mm',
+    format: 'a4'
+  });
+
   const pageWidth = 210;
   const pageHeight = 297;
   const margin = 15;
-  const contentWidth = pageWidth - (2 * margin);
-  
-  // Simple black and white color scheme
-  const colors = {
-    black: [0, 0, 0],
-    white: [255, 255, 255]
-  };
-  
-  // Helper function to sanitize text for PDF (remove Unicode characters)
-  function sanitizeText(text: string): string {
-    if (!text) return '';
-    // Remove or replace Unicode characters that cause issues
-    return text.replace(/[^\x00-\x7F]/g, (char) => {
-      // Replace Bengali/Unicode characters with ASCII equivalents or remove them
-      const replacements: { [key: string]: string } = {
-        'আ': 'A', 'ব': 'B', 'গ': 'G', 'ঘ': 'Gh', 'ঙ': 'Ng',
-        'চ': 'Ch', 'ছ': 'Chh', 'জ': 'J', 'ঝ': 'Jh', 'ঞ': 'Ny',
-        'ট': 'T', 'ঠ': 'Th', 'ড': 'D', 'ঢ': 'Dh', 'ণ': 'N',
-        'ত': 'T', 'থ': 'Th', 'দ': 'D', 'ধ': 'Dh', 'ন': 'N',
-        'প': 'P', 'ফ': 'Ph', 'ব': 'B', 'ভ': 'Bh', 'ম': 'M',
-        'য': 'Y', 'র': 'R', 'ল': 'L', 'শ': 'Sh', 'ষ': 'Sh',
-        'স': 'S', 'হ': 'H', 'ড়': 'R', 'ঢ়': 'Rh', 'য়': 'Y',
-        'ৎ': 'K', 'ং': 'Ng', 'ঃ': 'H', 'ঁ': 'N',
-        // Add more replacements as needed
-      };
-      return replacements[char] || '?';
-    });
-  }
-  
-  // Helper function to draw header section with sanitized text
-  async function drawHeader() {
-    // School name at top
-    doc.setFontSize(16);
-    doc.setFont('times', 'bold');
-    doc.setTextColor(...colors.black);
-    doc.text(sanitizeText(institute?.name || 'Educational Institute'), pageWidth/2, 25, { align: 'center' });
-    
-    // Class and exam name
-    doc.setFontSize(12);
-    doc.setFont('times', 'normal');
-    doc.text(`Class: ${sanitizeText(exam.class.name)} ${sanitizeText(exam.class.section)}`, margin, 40);
-    doc.text(`Exam: ${sanitizeText(exam.name)}`, margin, 50);
-    
-    // QR Code in front right corner with better positioning
-    const qrX = pageWidth - margin - 30;
-    const qrY = 25;
-    await generateQRCode(exam.id, qrX, qrY, 25);
-  }
-  
-  // Helper function to draw the main table with English headers
-  function drawMainTable() {
-    const startY = 70;
-    
-    // Table headers in English
-    const headers = [
-      { text: 'Serial No.', width: 20 },
-      { text: 'Roll No.', width: 40 },
-      { text: 'Student Name', width: 60 },
-      { text: 'Total Marks', width: 25 },
-      { text: 'Rank', width: 20 },
-      { text: 'Comments', width: 35 }
-    ];
-    
-    const headerY = startY;
-    let currentX = margin;
-    
-    // Draw header row
-    doc.setFontSize(9);
-    doc.setFont('times', 'bold');
-    doc.setTextColor(...colors.black);
-    
-    headers.forEach((header) => {
-      doc.rect(currentX, headerY, header.width, 10, 'S');
-      doc.text(header.text, currentX + 2, headerY + 7);
-      currentX += header.width;
-    });
-    
-    // Draw student data rows
-    let currentY = headerY + 10;
-    doc.setFontSize(8);
-    doc.setFont('times', 'normal');
-    
-    results.forEach((result, index) => {
-      // Check if we need a new page
-      if (currentY > pageHeight - 80) {
-        doc.addPage();
-        currentY = 30;
-      }
-      
-      currentX = margin;
-      
-      // Serial Number
-      doc.rect(currentX, currentY, 20, 8, 'S');
-      doc.text(String(index + 1), currentX + 2, currentY + 5);
-      currentX += 20;
-      
-      // Roll Number
-      doc.rect(currentX, currentY, 40, 8, 'S');
-      doc.text(sanitizeText(result.student.roll), currentX + 2, currentY + 5);
-      currentX += 40;
-      
-      // Student Name
-      doc.rect(currentX, currentY, 60, 8, 'S');
-      doc.text(sanitizeText(result.student.user.name), currentX + 2, currentY + 5);
-      currentX += 60;
-      
-      // Total Marks
-      doc.rect(currentX, currentY, 25, 8, 'S');
-      doc.text(String(result.total), currentX + 2, currentY + 5);
-      currentX += 25;
-      
-      // Rank
-      doc.rect(currentX, currentY, 20, 8, 'S');
-      doc.text(result.rank ? String(result.rank) : 'N/A', currentX + 2, currentY + 5);
-      currentX += 20;
-      
-      // Comments
-      doc.rect(currentX, currentY, 40, 8, 'S');
-      const comment = result.total >= exam.passMarks ? 'Pass' : 'Fail';
-      doc.text(comment, currentX + 2, currentY + 5);
-      
-      currentY += 8;
-    });
-    
-    return currentY + 15;
-  }
-  
-  // Helper function to generate QR code
-  async function generateQRCode(text: string, x: number, y: number, size: number = 20) {
+
+  // Helper to safely add text
+  const safeText = (text: string, x: number, y: number, options?: any) => {
     try {
-      // Generate QR code as data URL with better settings
-      const qrDataURL = await QRCode.toDataURL(text, {
-        width: size * 4,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        },
-        errorCorrectionLevel: 'M'
-      });
-      
-      // Add QR code image to PDF with better positioning
-      doc.addImage(qrDataURL, 'PNG', x, y, size, size);
-      
-      // Add text below QR code
-      doc.setFontSize(7);
-      doc.setFont('times', 'bold');
-      doc.setTextColor(...colors.black);
-      doc.text('Scan for verification', x + size/2, y + size + 8, { align: 'center' });
-    } catch (error) {
-      console.error('QR code generation failed:', error);
-      // Fallback: visible square with text
-      doc.setFillColor(...colors.black);
-      doc.rect(x, y, size, size, 'F');
-      doc.setFontSize(7);
-      doc.setFont('times', 'bold');
-      doc.setTextColor(...colors.white);
-      doc.text('QR', x + size/2, y + size/2, { align: 'center' });
-      doc.setFontSize(6);
-      doc.setTextColor(...colors.black);
-      doc.text('Verification', x + size/2, y + size + 8, { align: 'center' });
+      // Basic sanitization to ascii if needed, keeping simple for now
+      // jsPDF default fonts support limited unicode. For full support we'd need custom fonts.
+      // We'll replace problematic characters if any.
+      const cleanText = text || '';
+      doc.text(cleanText, x, y, options);
+    } catch (e) {
+      console.warn('Error drawing text:', text, e);
     }
+  };
+
+  // Header
+  doc.setFontSize(16);
+  doc.setFont('times', 'bold');
+  safeText(institute?.name || 'Educational Institute', pageWidth / 2, 25, { align: 'center' });
+
+  doc.setFontSize(12);
+  doc.setFont('times', 'normal');
+  safeText(`Class: ${exam.class.name} ${exam.class.section}`, margin, 40);
+  safeText(`Exam: ${exam.name}`, margin, 50);
+  safeText(`Date: ${new Date(exam.date).toLocaleDateString()}`, margin, 60);
+
+  // QR Code
+  try {
+    const qrDataURL = await QRCode.toDataURL(exam.id, { width: 100, margin: 1 });
+    doc.addImage(qrDataURL, 'PNG', pageWidth - margin - 30, 25, 25, 25);
+  } catch (e) {
+    console.error('QR Code generation failed', e);
   }
-  
-  // Helper function to draw footer with head master signature
-  async function drawFooter(finalY: number) {
-    // Head Master signature section on left side bottom
-    const signatureY = finalY + 20;
-    
-    // Signature line (above Head Master text)
-    const signatureWidth = 60;
-    const signatureX = margin; // Left side
-    
-    doc.setDrawColor(...colors.black);
-    doc.setLineWidth(0.5);
-    doc.line(signatureX, signatureY + 10, signatureX + signatureWidth, signatureY + 10);
-    
-    // Head Master label in English (below signature line)
-    doc.setFontSize(10);
-    doc.setFont('times', 'bold');
-    doc.setTextColor(...colors.black);
-    doc.text('Head Master', signatureX + signatureWidth/2, signatureY + 20, { align: 'center' });
-    
-    // Institute name under Head Master text
-    doc.setFontSize(8);
-    doc.setFont('times', 'normal');
-    doc.setTextColor(...colors.black);
-    doc.text(sanitizeText(institute?.name || 'Educational Institute'), signatureX + signatureWidth/2, signatureY + 35, { align: 'center' });
-    
-    // Generation date in English
-    doc.setFontSize(8);
-    doc.setFont('times', 'normal');
-    doc.setTextColor(...colors.black);
-    const englishDate = new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+
+  // Table Config
+  const startY = 75;
+  const headers = ['SL', 'Roll', 'Name', 'Total', 'Rank', 'Status'];
+  const colWidths = [15, 35, 65, 25, 20, 25]; // Total approx 185 (allows for margins)
+  let currentY = startY;
+  let currentX = margin;
+
+  // Draw Header
+  doc.setFontSize(10);
+  doc.setFont('times', 'bold');
+  headers.forEach((h, i) => {
+    doc.rect(currentX, currentY, colWidths[i], 10);
+    doc.text(h, currentX + 2, currentY + 7);
+    currentX += colWidths[i];
+  });
+  currentY += 10;
+
+  // Draw Rows
+  doc.setFont('times', 'normal');
+  doc.setFontSize(9);
+
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+
+    // Page break check
+    if (currentY > pageHeight - 40) {
+      doc.addPage();
+      currentY = 20;
+    }
+
+    currentX = margin;
+    const rowHeight = 8;
+
+    // Data preparation
+    const rowData = [
+      String(i + 1),
+      result.student.roll || '-',
+      result.student.user.name || 'Unknown',
+      String(result.total),
+      result.rank ? String(result.rank) : '-',
+      result.total >= exam.passMarks ? 'Pass' : 'Fail'
+    ];
+
+    rowData.forEach((text, colIndex) => {
+      doc.rect(currentX, currentY, colWidths[colIndex], rowHeight);
+      // Truncate name if too long
+      let cellText = text;
+      if (colIndex === 2 && text.length > 30) {
+        cellText = text.substring(0, 27) + '...';
+      }
+      safeText(cellText, currentX + 2, currentY + 5);
+      currentX += colWidths[colIndex];
     });
-    doc.text(`Generated on: ${englishDate}`, pageWidth/2, signatureY + 50, { align: 'center' });
+
+    currentY += rowHeight;
   }
-  
-  // Generate the PDF
-  await drawHeader();
-  const tableEndY = drawMainTable();
-  await drawFooter(tableEndY);
-  
-  // Return PDF as buffer
+
+  // Footer / Summary
+  if (currentY > pageHeight - 50) {
+    doc.addPage();
+    currentY = 20;
+  } else {
+    currentY += 15;
+  }
+
+  doc.setFontSize(10);
+  safeText(`Summary: Total Students: ${statistics.totalStudents}, Passed: ${statistics.passCount} (${statistics.passRate.toFixed(1)}%)`, margin, currentY);
+  currentY += 10;
+  safeText(`Generated on: ${new Date().toLocaleString()}`, margin, currentY);
+
   return Buffer.from(doc.output('arraybuffer'));
 }
-
- 

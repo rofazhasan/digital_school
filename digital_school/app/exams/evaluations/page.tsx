@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 
 interface Exam {
@@ -30,7 +31,7 @@ interface Exam {
   totalStudents: number;
   submittedStudents: number;
   publishedResults: number;
-  evaluationAssignment: {
+  evaluationAssignments: Array<{
     id: string;
     status: string;
     evaluator: {
@@ -43,7 +44,7 @@ interface Exam {
       email: string;
     };
     notes: string;
-  } | null;
+  }>;
   status: string;
 }
 
@@ -59,6 +60,7 @@ interface Evaluator {
 }
 
 export default function EvaluationsPage() {
+  const router = useRouter();
   const [exams, setExams] = useState<Exam[]>([]);
   const [evaluators, setEvaluators] = useState<Evaluator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +70,7 @@ export default function EvaluationsPage() {
   const [selectedEvaluator, setSelectedEvaluator] = useState<string>("");
   const [assignmentNotes, setAssignmentNotes] = useState("");
   const [isSuperUser, setIsSuperUser] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
 
 
@@ -109,6 +112,7 @@ export default function EvaluationsPage() {
         if (response.ok) {
           const userData = await response.json();
           setIsSuperUser(userData.user.role === "SUPER_USER");
+          setIsAdmin(userData.user.role === "ADMIN");
         }
       } catch (error) {
         console.error("Error fetching user data:", error);
@@ -163,13 +167,39 @@ export default function EvaluationsPage() {
       });
 
       if (response.ok) {
+        // Find evaluator name for optimistic UI update
+        const evalObj = evaluators.find(e => e.id === selectedEvaluator);
+
+        // Update local state optimistically
+        setExams(prev => prev.map(exam => {
+          if (exam.id === selectedExam.id) {
+            const newAssignment = {
+              id: Date.now().toString(), // Temporary ID
+              status: "PENDING",
+              evaluator: {
+                name: evalObj?.name || "Assigned Evaluator",
+                email: evalObj?.email || "",
+                role: evalObj?.role || ""
+              },
+              assignedBy: { name: "You", email: "" },
+              notes: assignmentNotes
+            };
+            return {
+              ...exam,
+              status: "PENDING",
+              evaluationAssignments: [...(exam.evaluationAssignments || []), newAssignment]
+            };
+          }
+          return exam;
+        }));
+
         const data = await response.json();
         toast.success(data.message);
         setAssignDialogOpen(false);
         setSelectedExam(null);
         setSelectedEvaluator("");
         setAssignmentNotes("");
-        fetchExams();
+        // fetchExams();
       } else {
         const error = await response.json();
         toast.error(error.error);
@@ -190,9 +220,14 @@ export default function EvaluationsPage() {
       });
 
       if (response.ok) {
+        // Update local state optimistically
+        setExams(prev => prev.map(exam =>
+          exam.id === examId ? { ...exam, publishedResults: exam.submittedStudents } : exam
+        ));
+
         const data = await response.json();
         toast.success(data.message);
-        fetchExams();
+        // fetchExams();
       } else {
         const error = await response.json();
         toast.error(error.error);
@@ -240,21 +275,32 @@ export default function EvaluationsPage() {
 
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Exam Evaluations</h1>
-        <p className="text-gray-600">
-          {isSuperUser 
-            ? "Manage exam evaluations and assign evaluators" 
-            : "View your assigned exam evaluations"
-          }
-        </p>
-
+    <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-4 md:p-6 lg:p-8">
+      <div className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">Exam Evaluations</h1>
+          <p className="text-base md:text-lg text-gray-600">
+            {isSuperUser
+              ? "Manage exam evaluations and assign evaluators"
+              : "View your assigned exam evaluations"
+            }
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 md:gap-3">
+          <Button variant="outline" size="sm" onClick={() => router.push('/dashboard')} className="flex-1 sm:flex-none">
+            <LayoutDashboard className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Dashboard</span>
+            <span className="sm:hidden">Home</span>
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push('/exams')} className="flex-1 sm:flex-none">
+            <FileText className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Exams</span>
+            <span className="sm:hidden">Exams</span>
+          </Button>
+        </div>
       </div>
 
-      <div className="mb-6 flex gap-4">
+      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-48">
+          <SelectTrigger className="w-full sm:w-48 bg-white">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -267,13 +313,11 @@ export default function EvaluationsPage() {
             <SelectItem value="REJECTED">Rejected</SelectItem>
           </SelectContent>
         </Select>
-        
+
         {isSuperUser && (
-          <div className="text-sm text-gray-600 flex items-center gap-2">
-            <span>Showing:</span>
-            <Badge variant="outline" className="bg-blue-50 text-blue-700">
-              All Exams (Active & Inactive)
-            </Badge>
+          <div className="text-sm text-gray-600 flex items-center gap-2 bg-blue-50/50 px-3 py-1.5 rounded-full border border-blue-100">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span>Showing All Exams</span>
           </div>
         )}
       </div>
@@ -282,12 +326,12 @@ export default function EvaluationsPage() {
         {exams.map((exam) => (
           <Card key={exam.id} className="hover:shadow-md transition-shadow">
             <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-xl">{exam.name}</CardTitle>
-                  <p className="text-gray-600 mt-1">{exam.description}</p>
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
+                  <p className="text-gray-600 mt-1 line-clamp-2">{exam.description}</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                   <Badge className={getStatusColor(exam.status)}>
                     <div className="flex items-center gap-1">
                       {getStatusIcon(exam.status)}
@@ -303,68 +347,93 @@ export default function EvaluationsPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {new Date(exam.date).toLocaleDateString()}
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <Calendar className="h-5 w-5 text-indigo-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Date</span>
+                    <span className="text-sm font-medium">
+                      {new Date(exam.date).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {exam.submittedStudents}/{exam.totalStudents} students
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <Users className="h-5 w-5 text-blue-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Submissions</span>
+                    <span className="text-sm font-medium">
+                      {exam.submittedStudents}/{exam.totalStudents} students
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {exam.publishedResults} results published
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <FileText className="h-5 w-5 text-emerald-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Published</span>
+                    <span className="text-sm font-medium">
+                      {exam.publishedResults} results
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">
-                    Class: {exam.class.name} {exam.class.section}
-                  </span>
+                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                  <LayoutDashboard className="h-5 w-5 text-amber-500" />
+                  <div className="flex flex-col">
+                    <span className="text-xs text-gray-500 uppercase font-semibold">Class info</span>
+                    <span className="text-sm font-medium">
+                      {exam.class.name} {exam.class.section}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {exam.evaluationAssignment && (
-                <div className="bg-gray-50 p-3 rounded-lg mb-4">
-                  <h4 className="font-medium text-sm mb-2">Assignment Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-600">Evaluator:</span> {exam.evaluationAssignment.evaluator.name}
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Role:</span> {exam.evaluationAssignment.evaluator.role}
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Assigned by:</span> {exam.evaluationAssignment.assignedBy.name}
-                    </div>
-                    {exam.evaluationAssignment.notes && (
-                      <div>
-                        <span className="text-gray-600">Notes:</span> {exam.evaluationAssignment.notes}
-                      </div>
-                    )}
-                  </div>
+              {exam.publishedResults > 0 && (
+                <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-800">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Results Released</span>
+                  <span className="text-sm">({exam.publishedResults} results published)</span>
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  View Evaluation
-                </Button>
-                
-                {isSuperUser && !exam.evaluationAssignment && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
+              {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
+                <div className="bg-gray-50 p-3 rounded-lg mb-4 space-y-3">
+                  <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
+                  {exam.evaluationAssignments.map((assignment) => (
+                    <div key={assignment.id} className="border-b border-gray-200 last:border-0 pb-2 last:pb-0 text-sm">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div>
+                          <span className="text-gray-600">Name:</span> {assignment.evaluator.name} <span className="text-xs text-gray-500">({assignment.evaluator.role})</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <Badge variant="outline" className={`ml-2 ${getStatusColor(assignment.status)}`}>
+                            {assignment.status.replace("_", " ")}
+                          </Badge>
+                        </div>
+                      </div>
+                      {assignment.notes && <div className="text-xs text-gray-500 mt-1 italic">Note: {assignment.notes}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* View Evaluation - Hidden for Admins unless they are also evaluators (handled by logic) */}
+                {(!isAdmin || isSuperUser) && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                    onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
+                  >
+                    <Eye className="h-4 w-4 mr-2" />
+                    View Evaluation
+                  </Button>
+                )}
+
+                {/* Assign Evaluator - Visible for Admin and Super User */}
+                {(isSuperUser || isAdmin) && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto text-indigo-600 border-indigo-200 hover:bg-indigo-50"
                     onClick={() => {
                       setSelectedExam(exam);
                       setAssignDialogOpen(true);
@@ -375,11 +444,12 @@ export default function EvaluationsPage() {
                   </Button>
                 )}
 
-                    
-                {isSuperUser && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
-                  <Button 
-                    variant="outline" 
-                    size="sm"
+
+                {/* Release Results - Super User (Always) or Admin/Teacher (Only if COMPLETED) */}
+                {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto text-green-600 border-green-200 hover:bg-green-50"
                     onClick={() => releaseResults(exam.id)}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />
@@ -397,7 +467,7 @@ export default function EvaluationsPage() {
           <div className="text-gray-500 text-lg">No exams found</div>
           <p className="text-gray-400 mt-2">
             {selectedStatus && selectedStatus !== "ALL"
-              ? `No exams with status "${selectedStatus}"` 
+              ? `No exams with status "${selectedStatus}"`
               : "No exams available for evaluation"
             }
           </p>

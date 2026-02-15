@@ -18,8 +18,8 @@ export async function GET(
     const questionId = searchParams.get('questionId');
     const imageIndex = parseInt(searchParams.get('imageIndex') || '0');
 
-    if (!studentId || !questionId) {
-      return NextResponse.json({ error: 'Missing studentId or questionId' }, { status: 400 });
+    if (!studentId) {
+      return NextResponse.json({ error: 'Missing studentId' }, { status: 400 });
     }
 
     // Validate user has permission to view this exam
@@ -50,7 +50,22 @@ export async function GET(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get the drawing data
+    // If questionId is not provided, return all drawings for the student
+    if (!questionId) {
+      const drawings = await prisma.examSubmissionDrawing.findMany({
+        where: {
+          studentId,
+          examId
+        }
+      });
+
+      return NextResponse.json({
+        success: true,
+        drawings: drawings || []
+      });
+    }
+
+    // Get a specific drawing
     const drawing = await prisma.examSubmissionDrawing.findFirst({
       where: {
         studentId,
@@ -59,15 +74,15 @@ export async function GET(
       }
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       drawing: drawing || null
     });
 
   } catch (error) {
     console.error('Error fetching drawing:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch drawing' }, 
+      { error: 'Failed to fetch drawing' },
       { status: 500 }
     );
   }

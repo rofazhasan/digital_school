@@ -2,37 +2,51 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, 
-  Filter, Calendar, Clock, Users, BookOpen, Eye, MoreVertical,
-  Globe, Monitor, FileText, BarChart3, Settings, Download,
-  RefreshCw, SortAsc, SortDesc, FilterX
+import { Checkbox } from "@/components/ui/checkbox";
+
+import {
+  Edit, Trash2, CheckCircle, Plus, Award, AlertTriangle, Search, Filter, Calendar, Clock, BookOpen, RefreshCw, Save,
+  FileText, Monitor, Globe, MoreVertical, Library,
+  SortAsc, SortDesc, BarChart3, LayoutDashboard, AlertCircle, CheckCircle2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 
 // Mock user role (replace with real auth logic)
-const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
+// const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
 
 type Exam = {
   id: string;
   name: string;
   description: string;
   date: string;
+  startTime?: string;
+  endTime?: string;
+  duration?: number;
   subject: string;
   totalMarks: number;
   isActive: boolean;
@@ -67,16 +81,67 @@ export default function ExamsPage() {
     status: 'all',
     type: 'all',
     subject: 'all',
-    sortBy: 'date',
+    sortBy: 'created',
     sortOrder: 'desc'
   });
   const [activeTab, setActiveTab] = useState('all');
+  const [userRole, setUserRole] = useState<string>("");
+  const [selectedExams, setSelectedExams] = useState<string[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(12);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
+
+
+  // Edit Modal State
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  // Form states
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    duration: 0,
+    allowRetake: false
+  });
+
   const { toast } = useToast();
   const router = useRouter();
 
   useEffect(() => {
     fetchExams();
+    fetchUserRole();
   }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(filters.search);
+      setCurrentPage(1); // Reset to first page on search
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [filters.search]);
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await fetch("/api/user");
+      if (response.ok) {
+        const result = await response.json();
+        // Handle wrapped response
+        const user = result.user || result.data?.user;
+        console.log("Fetched user role:", user?.role);
+        if (user && user.role) {
+          setUserRole(user.role);
+        }
+      } else {
+        console.error("Failed to fetch user role, status:", response.status);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user role:", error);
+    }
+  };
 
   const fetchExams = async () => {
     setLoading(true);
@@ -84,15 +149,24 @@ export default function ExamsPage() {
       const response = await fetch("/api/exams");
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
-      // Handle both array and object with data property
-      const data = Array.isArray(result) ? result : result.data || [];
+
+      // Handle array, wrapped array, or wrapped object with exams property
+      let data = [];
+      if (Array.isArray(result)) {
+        data = result;
+      } else if (Array.isArray(result.data)) {
+        data = result.data;
+      } else if (result.data?.exams && Array.isArray(result.data.exams)) {
+        data = result.data.exams;
+      }
+
       setExams(data);
     } catch (error) {
       console.error("Error fetching exams:", error);
-      toast({ 
-        title: "Error", 
-        description: "Failed to fetch exams.", 
-        variant: "destructive" 
+      toast({
+        title: "Error",
+        description: "Failed to fetch exams.",
+        variant: "destructive"
       });
       setExams([]);
     } finally {
@@ -107,29 +181,114 @@ export default function ExamsPage() {
     toast({ title: "Refreshed", description: "Exam list updated." });
   };
 
-  const handleEdit = async (id: string) => {
+  const handleEdit = (id: string) => {
     const exam = exams.find((e) => e.id === id);
     if (!exam) return;
-    
-    const name = prompt('Edit exam name:', exam.name);
-    const description = prompt('Edit description:', exam.description || '');
-    if (name === null) return;
-    
+
+    setEditingExam(exam);
+
+    // Parse times
+    const dateObj = new Date(exam.date);
+    const startDate = exam.startTime ? new Date(exam.startTime) : dateObj;
+    const endDate = exam.endTime ? new Date(exam.endTime) : dateObj;
+
+    const formatDateTime = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    const formatDate = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    setEditForm({
+      name: exam.name,
+      description: exam.description || '',
+      date: formatDate(dateObj),
+      startTime: formatDateTime(startDate),
+      endTime: formatDateTime(endDate),
+      duration: exam.duration || 0,
+      allowRetake: exam.allowRetake || false
+    });
+
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateExam = async () => {
+    if (!editingExam) return;
+
+    setLoading(true);
+    try {
+      // Reconstruct ISO strings
+      const startDateTime = new Date(editForm.startTime);
+      const endDateTime = new Date(editForm.endTime);
+
+      // Calculate duration if it's 0 or invalid, otherwise use user input
+      let duration = Number(editForm.duration);
+      if (!duration || duration <= 0) {
+        const diffMs = endDateTime.getTime() - startDateTime.getTime();
+        if (diffMs > 0) {
+          duration = Math.round(diffMs / 60000); // Convert to minutes
+        }
+      }
+
+      const res = await fetch(`/api/exams?id=${editingExam.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          date: new Date(editForm.date).toISOString(),
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          duration: duration,
+          allowRetake: editForm.allowRetake
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update exam');
+
+      toast({ title: 'Success', description: 'Exam updated successfully.' });
+      setIsEditOpen(false);
+      await fetchExams();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update exam.',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
     setLoading(true);
     try {
       const res = await fetch(`/api/exams?id=${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, description }),
+        body: JSON.stringify({ isActive: !currentStatus }),
       });
-      if (!res.ok) throw new Error('Failed to update exam');
-      toast({ title: 'Success', description: 'Exam updated successfully.' });
-      await fetchExams();
-    } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to update exam.', 
-        variant: "destructive" 
+
+      if (!res.ok) throw new Error('Failed to toggle status');
+
+      // Update local state optimistically
+      setExams(prev => prev.map(exam =>
+        exam.id === id ? { ...exam, isActive: !currentStatus } : exam
+      ));
+
+      toast({
+        title: 'Success',
+        description: `Exam ${!currentStatus ? 'activated' : 'deactivated'} successfully.`
+      });
+      // await fetchExams(); // No longer needed as we updated state optimistically
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update exam status.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -140,7 +299,7 @@ export default function ExamsPage() {
     if (!confirm(`⚠️ PERMANENT DELETION WARNING ⚠️\n\nAre you sure you want to delete this exam?\n\nThis will permanently delete:\n• All student submissions\n• All uploaded answer images\n• All evaluation data and results\n• All exam sets and questions\n• All related records\n\nThis action CANNOT be undone!`)) {
       return;
     }
-    
+
     const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
     if (confirmation !== 'DELETE') return;
 
@@ -148,38 +307,66 @@ export default function ExamsPage() {
     try {
       const res = await fetch(`/api/exams?id=${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete exam');
-      toast({ 
-        title: 'Success', 
-        description: 'Exam and all related data deleted permanently.' 
+
+      // Update local state optimistically
+      setExams(prev => prev.filter(exam => exam.id !== id));
+
+      toast({
+        title: 'Success',
+        description: 'Exam and all related data deleted permanently.'
       });
-      await fetchExams();
-    } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to delete exam.', 
-        variant: "destructive" 
+      // await fetchExams();
+      // Remove from selection if selected
+      if (selectedExams.includes(id)) {
+        setSelectedExams(prev => prev.filter(examId => examId !== id));
+      }
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete exam.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApprove = async (id: string) => {
+  const handleBulkDelete = async () => {
+    if (selectedExams.length === 0) return;
+
+    if (!confirm(`⚠️ BULK PERMANENT DELETION WARNING ⚠️\n\nAre you sure you want to delete ${selectedExams.length} exams?\n\nThis will permanently delete:\n• All student submissions\n• All uploaded answer images\n• All evaluation data and results\n• All exam sets and questions\n• All related records\n\nThis action CANNOT be undone!`)) {
+      return;
+    }
+
+    const confirmation = prompt('Type "DELETE" to confirm permanent deletion:');
+    if (confirmation !== 'DELETE') return;
+
     setLoading(true);
     try {
-      const res = await fetch(`/api/exams?id=${id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/exams`, {
+        method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isActive: true }),
+        body: JSON.stringify({ ids: selectedExams })
       });
-      if (!res.ok) throw new Error('Failed to approve exam');
-      toast({ title: 'Success', description: 'Exam approved successfully.' });
-      await fetchExams();
-    } catch (error) {
-      toast({ 
-        title: 'Error', 
-        description: 'Failed to approve exam.', 
-        variant: "destructive" 
+
+      if (!res.ok) throw new Error('Failed to delete exams');
+
+      // Update local state optimistically
+      setExams(prev => prev.filter(exam => !selectedExams.includes(exam.id)));
+      setSelectedExams([]);
+
+      const data = await res.json();
+      toast({
+        title: 'Success',
+        description: data.message || 'Exams deleted successfully.'
+      });
+
+      // await fetchExams();
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete exams.',
+        variant: "destructive"
       });
     } finally {
       setLoading(false);
@@ -192,6 +379,23 @@ export default function ExamsPage() {
 
   const handleExamClick = (id: string) => {
     router.push(`/exams/${id}`);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = filteredAndSortedExams.map(e => e.id);
+      setSelectedExams(allIds);
+    } else {
+      setSelectedExams([]);
+    }
+  };
+
+  const handleSelectExam = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedExams(prev => [...prev, id]);
+    } else {
+      setSelectedExams(prev => prev.filter(examId => examId !== id));
+    }
   };
 
   const resetFilters = () => {
@@ -214,22 +418,22 @@ export default function ExamsPage() {
 
   // Filter and sort exams
   const filteredAndSortedExams = useMemo(() => {
-    let filtered = exams.filter(exam => {
-      const matchesSearch = !filters.search || 
-        exam.name.toLowerCase().includes(filters.search.toLowerCase()) ||
-        exam.description?.toLowerCase().includes(filters.search.toLowerCase()) ||
-        exam.subject.toLowerCase().includes(filters.search.toLowerCase());
-      
-      const matchesStatus = filters.status === 'all' || 
+    const filtered = exams.filter(exam => {
+      const matchesSearch = !debouncedSearch ||
+        exam.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        exam.description?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+        exam.subject.toLowerCase().includes(debouncedSearch.toLowerCase());
+
+      const matchesStatus = filters.status === 'all' ||
         (filters.status === 'active' && exam.isActive) ||
         (filters.status === 'pending' && !exam.isActive);
-      
+
       const matchesType = filters.type === 'all' || exam.type === filters.type;
       const matchesSubject = filters.subject === 'all' || exam.subject === filters.subject;
       const matchesNegativeMarking = !filters.negativeMarking || filters.negativeMarking === 'all' ||
         (filters.negativeMarking === 'with' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) ||
         (filters.negativeMarking === 'without' && (!exam.mcqNegativeMarking || exam.mcqNegativeMarking === 0));
-      
+
       // Handle tab-based filtering
       let matchesTab = true;
       if (activeTab === 'active') {
@@ -241,14 +445,15 @@ export default function ExamsPage() {
       } else if (activeTab === 'negative-marking') {
         matchesTab = !!(exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0);
       }
-      
+
       return matchesSearch && matchesStatus && matchesType && matchesSubject && matchesNegativeMarking && matchesTab;
     });
 
     // Sort exams
     filtered.sort((a, b) => {
-      let aValue: any, bValue: any;
-      
+      let aValue: string | number | Date = '';
+      let bValue: string | number | Date = '';
+
       switch (filters.sortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -266,11 +471,15 @@ export default function ExamsPage() {
           aValue = a.subject.toLowerCase();
           bValue = b.subject.toLowerCase();
           break;
+        case 'created':
+          aValue = a.createdAt ? new Date(a.createdAt) : new Date(0);
+          bValue = b.createdAt ? new Date(b.createdAt) : new Date(0);
+          break;
         default:
           aValue = new Date(a.date);
           bValue = new Date(b.date);
       }
-      
+
       if (filters.sortOrder === 'asc') {
         return aValue > bValue ? 1 : -1;
       } else {
@@ -279,7 +488,15 @@ export default function ExamsPage() {
     });
 
     return filtered;
-  }, [exams, filters]);
+  }, [exams, debouncedSearch, filters, activeTab]);
+
+  // Pagination Logic
+  const paginatedExams = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return filteredAndSortedExams.slice(startIndex, startIndex + pageSize);
+  }, [filteredAndSortedExams, currentPage, pageSize]);
+
+  const totalPages = Math.ceil(filteredAndSortedExams.length / pageSize);
 
   // Statistics
   const stats = useMemo(() => {
@@ -292,77 +509,106 @@ export default function ExamsPage() {
     const withNegativeMarking = exams.filter(e => e.mcqNegativeMarking && e.mcqNegativeMarking > 0).length;
     const withCQ = exams.filter(e => e.cqTotalQuestions && e.cqTotalQuestions > 0).length;
     const withSQ = exams.filter(e => e.sqTotalQuestions && e.sqTotalQuestions > 0).length;
-    
+
     return { total, active, pending, online, offline, mixed, withNegativeMarking, withCQ, withSQ };
   }, [exams]);
 
   const getStatusColor = (isActive: boolean) => {
-    return isActive 
-      ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    return isActive
+      ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-800"
+      : "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-100 dark:border-amber-800";
   };
 
   const getTypeIcon = (type?: string) => {
     switch (type) {
-      case 'ONLINE': return <Monitor className="w-4 h-4" />;
-      case 'OFFLINE': return <FileText className="w-4 h-4" />;
-      case 'MIXED': return <Globe className="w-4 h-4" />;
-      default: return <FileText className="w-4 h-4" />;
+      case 'ONLINE': return <Monitor className="w-3 h-3" />;
+      case 'OFFLINE': return <FileText className="w-3 h-3" />;
+      case 'MIXED': return <Globe className="w-3 h-3" />;
+      default: return <FileText className="w-3 h-3" />;
     }
   };
 
   const getTypeColor = (type?: string) => {
     switch (type) {
-      case 'ONLINE': return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-      case 'OFFLINE': return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-      case 'MIXED': return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-      default: return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+      case 'ONLINE': return "bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-100 dark:border-purple-800";
+      case 'OFFLINE': return "bg-slate-50 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-100 dark:border-slate-800";
+      case 'MIXED': return "bg-orange-50 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-100 dark:border-orange-800";
+      default: return "bg-slate-50 text-slate-700 dark:bg-slate-900/30 dark:text-slate-400 border border-slate-100 dark:border-slate-800";
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
-      <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <TooltipProvider>
           {/* Header Section */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mb-8"
           >
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-bold tracking-tight text-gray-900 dark:text-white">
-                  Exam Management
+                <h1 className="text-3xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-blue-800 to-indigo-900 dark:from-white dark:to-gray-400 font-fancy">
+                  Exam Hub
                 </h1>
-                <p className="mt-2 text-lg text-gray-600 dark:text-gray-300">
-                  Create, manage, and monitor all your examinations
+                <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-400 font-medium">
+                  Simplify your academic evaluations with premium management tools.
                 </p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/dashboard')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/exams/evaluations')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">Evaluations</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/question-bank')}
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all font-bold text-indigo-600 dark:text-indigo-400"
+                >
+                  <Library className="w-4 h-4" />
+                  <span className="hidden sm:inline">Question Bank</span>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                  Refresh
+                  <span className="hidden sm:inline">Refresh Sync</span>
                 </Button>
-                <Button
-                  onClick={handleCreate}
-                  className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                >
-                  <Plus className="w-4 h-4" />
-                  Create Exam
-                </Button>
+                {userRole !== 'TEACHER' && (
+                  <Button
+                    onClick={handleCreate}
+                    className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-[1.02] active:scale-95 text-white shadow-xl shadow-blue-500/20 rounded-full px-6 transition-all duration-300"
+                  >
+                    <Plus className="w-5 h-5" />
+                    <span className="font-semibold">Create Exam</span>
+                  </Button>
+                )}
               </div>
             </div>
           </motion.div>
 
           {/* Statistics Cards */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
@@ -442,430 +688,527 @@ export default function ExamsPage() {
           </motion.div>
 
           {/* Filters and Tabs */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
             className="mb-6"
           >
-            <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
-              <CardContent className="p-6">
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                  <TabsList className="grid w-full grid-cols-5 bg-gray-100 dark:bg-gray-700">
-                    <TabsTrigger value="all">All Exams</TabsTrigger>
-                    <TabsTrigger value="active">Active</TabsTrigger>
-                    <TabsTrigger value="pending">Pending</TabsTrigger>
-                    <TabsTrigger value="online">Online</TabsTrigger>
-                    <TabsTrigger value="negative-marking">Negative Marking</TabsTrigger>
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+                  <TabsList className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200 dark:border-gray-700 p-1 rounded-xl">
+                    <TabsTrigger value="all" className="rounded-lg px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white">All</TabsTrigger>
+                    <TabsTrigger value="active" className="rounded-lg px-6 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Active</TabsTrigger>
+                    <TabsTrigger value="pending" className="rounded-lg px-6 data-[state=active]:bg-amber-600 data-[state=active]:text-white">Pending</TabsTrigger>
+                    <TabsTrigger value="online" className="rounded-lg px-6 data-[state=active]:bg-purple-600 data-[state=active]:text-white">Online</TabsTrigger>
                   </TabsList>
+                </Tabs>
 
-                  <div className="mt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
-                      <div className="lg:col-span-2">
-                        <Label htmlFor="search">Search</Label>
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                          <Input
-                            id="search"
-                            placeholder="Search exams..."
-                            value={filters.search}
-                            onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                            className="pl-10"
-                          />
+                <div className="flex items-center gap-3 w-full md:w-auto">
+                  {selectedExams.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex items-center gap-2 px-3 py-1.5 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-xl"
+                    >
+                      <span className="text-xs font-bold text-red-600 dark:text-red-400">{selectedExams.length} selected</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleBulkDelete}
+                        className="h-8 text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-lg p-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </motion.div>
+                  )}
+                  <div className="flex items-center gap-2 mr-2">
+                    <Checkbox
+                      id="select-all"
+                      checked={selectedExams.length === filteredAndSortedExams.length && filteredAndSortedExams.length > 0}
+                      onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                      className="rounded-md border-gray-300"
+                    />
+                    <Label htmlFor="select-all" className="text-xs font-medium text-gray-500 cursor-pointer hidden lg:inline">Select All</Label>
+                  </div>
+                  <div className="relative flex-1 md:min-w-[300px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <Input
+                      placeholder="Search exam name or subject..."
+                      value={filters.search}
+                      onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
+                      className="pl-10 rounded-xl border-gray-200 focus:ring-blue-500 transition-all bg-white/50 backdrop-blur-sm"
+                    />
+                  </div>
+                  <Button
+                    variant={showFilters ? "secondary" : "outline"}
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="rounded-xl flex items-center gap-2"
+                  >
+                    <Filter className="w-4 h-4" />
+                    <span className="hidden sm:inline">Filters</span>
+                  </Button>
+                </div>
+              </div>
+
+              <AnimatePresence>
+                {showFilters && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="overflow-hidden"
+                  >
+                    <Card className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border-gray-200 dark:border-gray-700 rounded-2xl p-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Subject</Label>
+                          <Select
+                            value={filters.subject}
+                            onValueChange={(v) => setFilters(p => ({ ...p, subject: v }))}
+                          >
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Subjects" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Subjects</SelectItem>
+                              {uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Type</Label>
+                          <Select
+                            value={filters.type}
+                            onValueChange={(v) => setFilters(p => ({ ...p, type: v }))}
+                          >
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Types" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Types</SelectItem>
+                              <SelectItem value="ONLINE">Online</SelectItem>
+                              <SelectItem value="OFFLINE">Offline</SelectItem>
+                              <SelectItem value="MIXED">Mixed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Negative Marking</Label>
+                          <Select
+                            value={filters.negativeMarking || 'all'}
+                            onValueChange={(v) => setFilters(p => ({ ...p, negativeMarking: v }))}
+                          >
+                            <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200">
+                              <SelectValue placeholder="All Exams" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">All Exams</SelectItem>
+                              <SelectItem value="with">With Negative Marking</SelectItem>
+                              <SelectItem value="without">Without Negative Marking</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label className="text-xs font-bold uppercase tracking-wider text-gray-500">Sort By</Label>
+                          <div className="flex gap-2">
+                            <Select
+                              value={filters.sortBy}
+                              onValueChange={(v) => setFilters(p => ({ ...p, sortBy: v }))}
+                            >
+                              <SelectTrigger className="rounded-xl bg-white dark:bg-gray-900 border-gray-200 flex-1">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="date">Date</SelectItem>
+                                <SelectItem value="created">Recently Added</SelectItem>
+                                <SelectItem value="marks">Total Marks</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <Button
+                              variant="outline"
+                              onClick={() => setFilters(p => ({ ...p, sortOrder: p.sortOrder === 'asc' ? 'desc' : 'asc' }))}
+                              className="rounded-xl w-10 p-0"
+                            >
+                              {filters.sortOrder === 'asc' ? <SortAsc className="w-4 h-4" /> : <SortDesc className="w-4 h-4" />}
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="flex items-end justify-end sm:col-span-2 lg:col-span-4">
+                          <Button variant="ghost" onClick={resetFilters} className="text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4" />
+                            Reset All
+                          </Button>
                         </div>
                       </div>
-
-                      <div>
-                        <Label htmlFor="status-filter">Status</Label>
-                        <Select 
-                          value={filters.status} 
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}
-                        >
-                          <SelectTrigger id="status-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="type-filter">Type</Label>
-                        <Select 
-                          value={filters.type} 
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, type: value }))}
-                        >
-                          <SelectTrigger id="type-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Types</SelectItem>
-                            <SelectItem value="ONLINE">Online</SelectItem>
-                            <SelectItem value="OFFLINE">Offline</SelectItem>
-                            <SelectItem value="MIXED">Mixed</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="subject-filter">Subject</Label>
-                        <Select 
-                          value={filters.subject} 
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, subject: value }))}
-                        >
-                          <SelectTrigger id="subject-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Subjects</SelectItem>
-                            {uniqueSubjects.map(subject => (
-                              <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div>
-                        <Label htmlFor="negative-marking-filter">Negative Marking</Label>
-                        <Select 
-                          value={filters.negativeMarking || 'all'} 
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, negativeMarking: value }))}
-                        >
-                          <SelectTrigger id="negative-marking-filter">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="all">All Exams</SelectItem>
-                            <SelectItem value="with">With Negative Marking</SelectItem>
-                            <SelectItem value="without">Without Negative Marking</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="flex items-end gap-2">
-                        <Button 
-                          variant="outline" 
-                          onClick={resetFilters}
-                          className="flex items-center gap-2"
-                        >
-                          <FilterX className="w-4 h-4" />
-                          Reset
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="sort-by">Sort by:</Label>
-                        <Select 
-                          value={filters.sortBy} 
-                          onValueChange={(value) => setFilters(prev => ({ ...prev, sortBy: value }))}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="date">Date</SelectItem>
-                            <SelectItem value="name">Name</SelectItem>
-                            <SelectItem value="marks">Marks</SelectItem>
-                            <SelectItem value="subject">Subject</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setFilters(prev => ({ 
-                          ...prev, 
-                          sortOrder: prev.sortOrder === 'asc' ? 'desc' : 'asc' 
-                        }))}
-                        className="flex items-center gap-2"
-                      >
-                        {filters.sortOrder === 'asc' ? (
-                          <SortAsc className="w-4 h-4" />
-                        ) : (
-                          <SortDesc className="w-4 h-4" />
-                        )}
-                        {filters.sortOrder === 'asc' ? 'Ascending' : 'Descending'}
-                      </Button>
-                    </div>
-                  </div>
-                </Tabs>
-              </CardContent>
-            </Card>
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
 
           {/* Exam Cards Grid */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }
+            }
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
           >
-            {loading ? (
-              <div className="flex justify-center items-center h-64">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                  <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
+            {
+              loading ? (
+                <div className="flex justify-center items-center h-64" >
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading exams...</p>
+                  </div>
+                </div>
+              ) : filteredAndSortedExams.length === 0 ? (
+                <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
+                  <CardContent className="p-12 text-center">
+                    <div className="flex flex-col items-center gap-4">
+                      <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
+                        <BookOpen className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          No exams found
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 mb-4">
+                          {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
+                            ? 'Try adjusting your filters or search terms.'
+                            : 'Get started by creating your first exam.'}
+                        </p>
+                        {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
+                          <Button onClick={handleCreate} className="flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Create Your First Exam
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <AnimatePresence mode="popLayout">
+                    {paginatedExams.map((exam, index) => (
+                      <motion.div
+                        key={exam.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ delay: index * 0.1 }}
+                        whileHover={{
+                          scale: 1.02,
+                          y: -4,
+                          transition: { duration: 0.2 }
+                        }}
+                        className="group"
+                      >
+                        <Card
+                          onClick={() => handleExamClick(exam.id)}
+                          className={`group relative h-full bg-white dark:bg-gray-800 border-gray-200/50 dark:border-gray-700/50 overflow-hidden card-premium rounded-[2rem] p-1 flex flex-col ${selectedExams.includes(exam.id) ? 'ring-2 ring-blue-500 ring-offset-2 dark:ring-offset-gray-900' : ''}`}
+                        >
+                          <div className="p-6 flex flex-col h-full bg-white dark:bg-gray-800 rounded-[1.75rem] shadow-sm group-hover:shadow-xl transition-all">
+                            {/* Top Section: Status & Actions */}
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex flex-wrap gap-2">
+                                <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter ${getStatusColor(exam.isActive)}`}>
+                                  {exam.isActive ? 'Active' : 'Pending'}
+                                </Badge>
+                                <Badge className={`rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter flex items-center gap-1 ${getTypeColor(exam.type)}`}>
+                                  {getTypeIcon(exam.type)}
+                                  {exam.type}
+                                </Badge>
+                                {exam.allowRetake && (
+                                  <Badge className="rounded-full px-3 py-1 font-bold text-[10px] uppercase tracking-tighter bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                                    <RefreshCw className="w-3 h-3" />
+                                    Retake
+                                  </Badge>
+                                )}
+                              </div>
+                              {userRole !== 'TEACHER' && (
+                                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={selectedExams.includes(exam.id)}
+                                    onCheckedChange={(checked) => handleSelectExam(exam.id, checked as boolean)}
+                                    className="rounded-md border-gray-300 mr-2"
+                                  />
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors p-0">
+                                        <MoreVertical className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="rounded-2xl border-gray-200 shadow-2xl p-2 min-w-[180px]">
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleEdit(exam.id)}>
+                                        <Edit className="w-4 h-4 text-blue-500" />
+                                        <span>Edit Exam</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
+                                        <BarChart3 className="w-4 h-4 text-emerald-500" />
+                                        <span>View Results</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleToggleActive(exam.id, exam.isActive)}>
+                                        {exam.isActive ? (
+                                          <>
+                                            <AlertCircle className="w-4 h-4 text-amber-500" />
+                                            <span>Make Pending</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                            <span>Activate Exam</span>
+                                          </>
+                                        )}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator className="my-2" />
+                                      <DropdownMenuItem className="rounded-xl flex items-center gap-2 text-rose-500 focus:bg-rose-50 focus:text-rose-600" onClick={() => handleDelete(exam.id)}>
+                                        <Trash2 className="w-4 h-4" />
+                                        <span>Delete Exam</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Subject & Name */}
+                            <div className="mb-4">
+                              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
+                                {exam.subject || 'Academic Exam'}
+                              </span>
+                              <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 min-h-[3rem] font-fancy">
+                                {exam.name}
+                              </h3>
+                            </div>
+
+                            {/* Quick Stats Grid */}
+                            <div className="grid grid-cols-2 gap-3 mb-6">
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                  <Award className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Total Marks</span>
+                                </div>
+                                <p className="text-base font-bold text-gray-900 dark:text-white font-fancy">{exam.totalMarks}</p>
+                              </div>
+                              <div className="bg-gray-50 dark:bg-gray-900/50 p-3 rounded-2xl border border-gray-100 dark:border-gray-800">
+                                <div className="flex items-center gap-1.5 text-gray-500 dark:text-gray-400 mb-0.5">
+                                  <AlertCircle className="w-3.5 h-3.5" />
+                                  <span className="text-[10px] font-bold uppercase tracking-wider">Minus Marks</span>
+                                </div>
+                                <p className="text-base font-bold text-red-600 dark:text-red-400 font-fancy">
+                                  {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0
+                                    ? `-${exam.mcqNegativeMarking >= 1 ? exam.mcqNegativeMarking : Math.round(exam.mcqNegativeMarking * 100)}%`
+                                    : '0'
+                                  }
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Detailed Stats & Metadata */}
+                            <div className="mt-auto pt-4 flex items-center justify-between border-t border-gray-100 dark:border-gray-800">
+                              <div className="flex items-center gap-2">
+                                <div className="h-8 w-8 rounded-full bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-xs">
+                                  {exam.createdBy?.charAt(0) || 'U'}
+                                </div>
+                                <div className="flex flex-col">
+                                  <p className="text-[10px] font-bold text-gray-500 leading-none mb-0.5 tracking-wider uppercase">Author</p>
+                                  <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 line-clamp-1 truncate max-w-[80px]">{exam.createdBy || 'Unknown'}</p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-3">
+                                <div className="flex flex-col items-end">
+                                  <div className="flex items-center gap-1 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 rounded-lg px-2 py-1">
+                                    <Clock className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                    <span className="text-xs font-bold">{exam.duration}m</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-gray-400 dark:text-gray-500 mt-0.5">
+                                    <Calendar className="w-3 h-3" />
+                                    <span className="text-[9px] font-bold uppercase tracking-tighter">
+                                      {new Date(exam.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                                    </span>
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
+                                >
+                                  Open
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+              )}
+          </motion.div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-12 flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-md p-4 rounded-2xl border border-gray-200 dark:border-gray-700"
+            >
+              <div className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                Showing <span className="text-blue-600 dark:text-blue-400">{(currentPage - 1) * pageSize + 1}</span> to <span className="text-blue-600 dark:text-blue-400">{Math.min(currentPage * pageSize, filteredAndSortedExams.length)}</span> of <span className="font-bold">{filteredAndSortedExams.length}</span> exams
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="rounded-xl px-4"
+                >
+                  Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show only first, last, and pages around current
+                    if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                      return (
+                        <Button
+                          key={pageNum}
+                          variant={currentPage === pageNum ? "default" : "ghost"}
+                          size="sm"
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`w-9 h-9 rounded-xl ${currentPage === pageNum ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30' : ''}`}
+                        >
+                          {pageNum}
+                        </Button>
+                      );
+                    } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                      return <span key={pageNum} className="text-gray-400">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className="rounded-xl px-4"
+                >
+                  Next
+                </Button>
+              </div>
+            </motion.div>
+          )}
+        </TooltipProvider>
+
+        <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <DialogContent className="sm:max-w-[600px]">
+            <DialogHeader>
+              <DialogTitle>Edit Exam</DialogTitle>
+              <DialogDescription>
+                Make changes to the exam here. Click save when you&apos;re done.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="name" className="text-right">
+                  Name
+                </Label>
+                <Input
+                  id="name"
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="description" className="text-right">
+                  Description
+                </Label>
+                <Textarea
+                  id="description"
+                  value={editForm.description}
+                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="date" className="text-right">
+                  Date
+                </Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={editForm.date}
+                  onChange={(e) => setEditForm({ ...editForm, date: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="startTime" className="text-right">
+                  Start Time
+                </Label>
+                <Input
+                  id="startTime"
+                  type="datetime-local"
+                  value={editForm.startTime}
+                  onChange={(e) => setEditForm({ ...editForm, startTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="endTime" className="text-right">
+                  End Time
+                </Label>
+                <Input
+                  id="endTime"
+                  type="datetime-local"
+                  value={editForm.endTime}
+                  onChange={(e) => setEditForm({ ...editForm, endTime: e.target.value })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="duration" className="text-right">
+                  Duration (mins)
+                </Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  value={editForm.duration}
+                  onChange={(e) => setEditForm({ ...editForm, duration: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="retake" className="text-right">
+                  Allow Retake
+                </Label>
+                <div className="col-span-3 flex items-center space-x-2">
+                  <Switch
+                    id="retake"
+                    checked={editForm.allowRetake}
+                    onCheckedChange={(checked) => setEditForm({ ...editForm, allowRetake: checked })}
+                  />
+                  <Label htmlFor="retake">{editForm.allowRetake ? 'Yes' : 'No'}</Label>
                 </div>
               </div>
-            ) : filteredAndSortedExams.length === 0 ? (
-              <Card className="bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg">
-                <CardContent className="p-12 text-center">
-                  <div className="flex flex-col items-center gap-4">
-                    <div className="p-4 bg-gray-100 dark:bg-gray-700 rounded-full">
-                      <BookOpen className="w-8 h-8 text-gray-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                        No exams found
-                      </h3>
-                      <p className="text-gray-600 dark:text-gray-400 mb-4">
-                        {filters.search || filters.status !== 'all' || filters.type !== 'all' || filters.subject !== 'all'
-                          ? 'Try adjusting your filters or search terms.'
-                          : 'Get started by creating your first exam.'}
-                      </p>
-                      {!filters.search && filters.status === 'all' && filters.type === 'all' && filters.subject === 'all' && (
-                        <Button onClick={handleCreate} className="flex items-center gap-2">
-                          <Plus className="w-4 h-4" />
-                          Create Your First Exam
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                <AnimatePresence>
-                  {filteredAndSortedExams.map((exam, index) => (
-                    <motion.div
-                      key={exam.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ 
-                        scale: 1.02, 
-                        y: -4,
-                        transition: { duration: 0.2 }
-                      }}
-                      className="group"
-                    >
-                      <Card className="h-full bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer overflow-hidden">
-                        <CardHeader className="pb-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-                                {exam.name}
-                              </CardTitle>
-                              <CardDescription className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
-                                {exam.description || 'No description provided'}
-                              </CardDescription>
-                            </div>
-                            
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}>
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View Details
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}>
-                                  <BarChart3 className="w-4 h-4 mr-2" />
-                                  View Results
-                                </DropdownMenuItem>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(exam.id); }}>
-                                  <Edit className="w-4 h-4 mr-2" />
-                                  Edit Exam
-                                </DropdownMenuItem>
-                                {userRole === "SUPER_USER" && !exam.isActive && (
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleApprove(exam.id); }}>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Approve Exam
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={(e) => { e.stopPropagation(); handleDelete(exam.id); }}
-                                  className="text-red-600 focus:text-red-600"
-                                >
-                                  <Trash2 className="w-4 h-4 mr-2" />
-                                  Delete Exam
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            <Badge className={getStatusColor(exam.isActive)}>
-                              {exam.isActive ? (
-                                <>
-                                  <CheckCircle className="w-3 h-3 mr-1" />
-                                  Active
-                                </>
-                              ) : (
-                                <>
-                                  <AlertTriangle className="w-3 h-3 mr-1" />
-                                  Pending
-                                </>
-                              )}
-                            </Badge>
-                            
-                            <Badge className={getTypeColor(exam.type)}>
-                              {getTypeIcon(exam.type)}
-                              <span className="ml-1">
-                                {exam.type === 'ONLINE' ? 'Online' : 
-                                 exam.type === 'OFFLINE' ? 'Offline' : 
-                                 exam.type === 'MIXED' ? 'Mixed' : 'Type'}
-                              </span>
-                            </Badge>
-
-                            {exam.allowRetake && (
-                              <Badge variant="outline" className="text-orange-600 border-orange-600">
-                                Retake Allowed
-                              </Badge>
-                            )}
-
-                            {exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0 && (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Badge variant="outline" className="text-red-600 border-red-600 cursor-help">
-                                    -{exam.mcqNegativeMarking}% MCQ
-                                  </Badge>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>Negative marking of {exam.mcqNegativeMarking}% for incorrect MCQ answers</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            )}
-                          </div>
-                        </CardHeader>
-
-                        <CardContent className="pt-0">
-                          <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <BookOpen className="w-3 h-3" />
-                                Subject
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">{exam.subject}</p>
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Award className="w-3 h-3" />
-                                Marks
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">{exam.totalMarks}</p>
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Calendar className="w-3 h-3" />
-                                Date
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                {new Date(exam.date).toLocaleDateString()}
-                              </p>
-                            </div>
-                            
-                            <div>
-                              <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                <Users className="w-3 h-3" />
-                                Created By
-                              </div>
-                              <p className="font-medium text-gray-900 dark:text-white">
-                                {exam.createdBy || 'Unknown'}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* CQ/SQ Information */}
-                          {(exam.cqTotalQuestions || exam.sqTotalQuestions) && (
-                            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
-                                {exam.cqTotalQuestions && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="cursor-help">
-                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                          <FileText className="w-3 h-3" />
-                                          CQ Questions
-                                        </div>
-                                        <p className="font-medium text-gray-900 dark:text-white">
-                                          {exam.cqRequiredQuestions || 0}/{exam.cqTotalQuestions}
-                                        </p>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Creative Questions: {exam.cqRequiredQuestions || 0} required out of {exam.cqTotalQuestions} total</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                                
-                                {exam.sqTotalQuestions && (
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <div className="cursor-help">
-                                        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400 mb-1">
-                                          <FileText className="w-3 h-3" />
-                                          SQ Questions
-                                        </div>
-                                        <p className="font-medium text-gray-900 dark:text-white">
-                                          {exam.sqRequiredQuestions || 0}/{exam.sqTotalQuestions}
-                                        </p>
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Short Questions: {exam.sqRequiredQuestions || 0} required out of {exam.sqTotalQuestions} total</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            </div>
-                          )}
-
-                          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                            <div className="flex items-center justify-between">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); handleExamClick(exam.id); }}
-                                className="flex items-center gap-2"
-                              >
-                                <Eye className="w-4 h-4" />
-                                View Details
-                              </Button>
-                              
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}
-                                className="flex items-center gap-2"
-                              >
-                                <BarChart3 className="w-4 h-4" />
-                                Results
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            )}
-          </motion.div>
-        </TooltipProvider>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+              <Button onClick={handleUpdateExam} disabled={loading}>
+                {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Save Changes
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

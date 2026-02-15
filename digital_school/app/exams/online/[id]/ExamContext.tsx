@@ -1,8 +1,29 @@
-"use client";
-
-import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback, useMemo } from "react";
 
 const ExamContext = createContext<any>(null);
+
+function useOnlineStatus() {
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  return isOnline;
+}
 
 function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   const callback = useRef(effect);
@@ -14,44 +35,56 @@ function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   }, [...deps, delay]);
 }
 
-export function ExamContextProvider({ 
-  exam, 
-  children 
-}: { 
-  exam: any; 
+export function ExamContextProvider({
+  exam,
+  children
+}: {
+  exam: any;
   children: React.ReactNode;
 }) {
-  const [answers, setAnswers] = useState<any>({});
+  const [answers, setAnswers] = useState<any>(exam.savedAnswers || {});
   const [navigation, setNavigation] = useState<any>({ current: 0, marked: {} });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
   const [highContrast, setHighContrast] = useState(false);
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
-  
-  const localKey = `exam-answers-${exam.id}`;
-  const navigationKey = `exam-navigation-${exam.id}`;
+  const [isUploading, setIsUploading] = useState(false); // New Internal State
+  const [warnings, setWarnings] = useState(0); // Lifted state
+  const isOnline = useOnlineStatus();
+
+  // Scope to specific submission to prevent retake bleed-over
+  const submissionId = exam.submissionId || 'new';
+  const localKey = `exam-answers-${exam.id}-${submissionId}`;
+  const navigationKey = `exam-navigation-${exam.id}-${submissionId}`;
+  const warningsKey = `exam-warnings-${exam.id}-${submissionId}`;
 
   // Load answers and navigation from localStorage on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
-    
+
     // Load answers
     const savedAnswers = localStorage.getItem(localKey);
     if (savedAnswers) {
       try {
         setAnswers(JSON.parse(savedAnswers));
-      } catch {}
+      } catch { }
     }
-    
+
     // Load navigation state
     const savedNavigation = localStorage.getItem(navigationKey);
     if (savedNavigation) {
       try {
         const parsedNavigation = JSON.parse(savedNavigation);
         setNavigation(parsedNavigation);
-      } catch {}
+      } catch { }
     }
-  }, [localKey, navigationKey]);
+
+    // Load warnings
+    const savedWarnings = localStorage.getItem(warningsKey);
+    if (savedWarnings) {
+      setWarnings(parseInt(savedWarnings) || 0);
+    }
+  }, [localKey, navigationKey, warningsKey]);
 
   // Save answers to localStorage on every change
   useEffect(() => {
@@ -65,31 +98,48 @@ export function ExamContextProvider({
     localStorage.setItem(navigationKey, JSON.stringify(navigation));
   }, [navigation, navigationKey]);
 
+  // Save warnings to localStorage
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(warningsKey, warnings.toString());
+  }, [warnings, warningsKey]);
+
+  // CONSISTENT QUESTION SORTING (Groups MCQ -> MC -> AR -> MTF -> CQ -> SQ -> Numeric)
+  const sortedQuestions = useMemo(() => {
+    if (!exam.questions) return [];
+
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], other: [] };
+
+    exam.questions.forEach((q: any) => {
+      const type = (q.type || q.questionType || '').toLowerCase();
+      if (grouped[type]) grouped[type].push(q);
+      else grouped.other.push(q);
+    });
+
+    return [
+      ...grouped.mcq,
+      ...grouped.mc,
+      ...grouped.ar,
+      ...grouped.mtf,
+      ...grouped.cq,
+      ...grouped.sq,
+      ...grouped.int,
+      ...grouped.numeric,
+      ...grouped.other
+    ];
+  }, [exam.questions]);
+
   // Simple autosave with Appwrite image handling
   const saveAnswers = useCallback(async (answersToSave: any) => {
     try {
       setSaveStatus("saving");
-      
+
       // Process answers to include Appwrite image information
       const processedAnswers = { ...answersToSave };
-      
-      // Extract Appwrite image data for questions with images
-      Object.keys(processedAnswers).forEach(key => {
-        if (key.endsWith('_images') && Array.isArray(processedAnswers[key])) {
-          processedAnswers[key] = processedAnswers[key].map((img: any) => ({
-            appwriteFileId: img.appwriteFileId,
-            appwriteUrl: img.appwriteUrl,
-            appwriteFilename: img.appwriteFilename,
-            timestamp: img.timestamp,
-            questionId: img.questionId,
-            questionText: img.questionText,
-            uploadedAt: img.uploadedAt,
-            // Keep preview for fallback if needed
-            preview: img.preview
-          }));
-        }
-      });
-      
+
+      // Process answers
+
       const response = await fetch(`/api/exams/${exam.id}/responses`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -97,7 +147,7 @@ export function ExamContextProvider({
       });
 
       if (!response.ok) throw new Error("Failed to save");
-      
+
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 1500);
     } catch (error) {
@@ -112,17 +162,17 @@ export function ExamContextProvider({
     if (Object.keys(answers).length > 0) {
       saveAnswers(answers);
     }
-  }, [answers, saveAnswers], 2000); // 2 second debounce
+  }, [answers, saveAnswers], 5000); // Increased to 5 second debounce for 1000+ parallel users
 
   // Enhanced navigation with performance optimizations
   const navigateToQuestion = useCallback((index: number) => {
-    if (index >= 0 && index < (exam.questions?.length || 0)) {
-      setNavigation(prev => ({ ...prev, current: index }));
+    if (index >= 0 && index < (sortedQuestions.length || 0)) {
+      setNavigation((prev: any) => ({ ...prev, current: index }));
     }
-  }, [exam.questions?.length]);
+  }, [sortedQuestions.length]);
 
   const markQuestion = useCallback((questionId: string, marked: boolean) => {
-    setNavigation(prev => ({
+    setNavigation((prev: any) => ({
       ...prev,
       marked: {
         ...prev.marked,
@@ -134,7 +184,7 @@ export function ExamContextProvider({
   // Performance-optimized question filtering
   const getQuestionsByType = useCallback((type: string) => {
     if (!exam.questions) return [];
-    return exam.questions.filter((q: any) => 
+    return exam.questions.filter((q: any) =>
       (q.type || q.questionType || "").toLowerCase() === type.toLowerCase()
     );
   }, [exam.questions]);
@@ -165,7 +215,28 @@ export function ExamContextProvider({
     navigateToQuestion,
     markQuestion,
     getQuestionsByType,
-    saveAnswers
+    saveAnswers,
+    isOnline,
+    isUploading,
+    setIsUploading,
+    warnings,
+    setWarnings,
+    sortedQuestions,
+    groupedQuestions: useMemo(() => {
+      if (!exam.questions) return {};
+      const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], other: [] };
+      exam.questions.forEach((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        if (g[type]) g[type].push(q);
+        else g.other.push(q);
+      });
+      // Return structured groups for UI
+      return {
+        creative: [...g.cq],
+        short: [...g.sq],
+        objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
+      };
+    }, [exam.questions])
   };
 
   return (

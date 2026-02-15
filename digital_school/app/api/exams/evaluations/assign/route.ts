@@ -5,7 +5,7 @@ import prisma from "@/lib/db";
 export async function POST(req: NextRequest) {
   try {
     const tokenData = await getTokenFromRequest(req);
-    if (!tokenData || tokenData.user.role !== "SUPER_USER") {
+    if (!tokenData || (tokenData.user.role !== "SUPER_USER" && tokenData.user.role !== "ADMIN")) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -67,10 +67,10 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       assignment,
-      message: `Evaluator ${evaluator.name} assigned to exam ${exam.name}` 
+      message: `Evaluator ${evaluator.name} assigned to exam ${exam.name}`
     });
   } catch (error) {
     console.error("Error assigning evaluator:", error);

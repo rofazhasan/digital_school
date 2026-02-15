@@ -8,6 +8,11 @@ const prisma = new PrismaClient();
 // --- Helper function to get a valid user for development ---
 // This ensures a valid user exists before any operation that needs one.
 const getDeveloperUserId = async () => {
+    // SECURITY: Only allow dummy user creation in development
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('Operation not allowed in production: No valid user context found.');
+    }
+
     const email = 'developer@example.com';
     let user = await prisma.user.findUnique({ where: { email } });
 

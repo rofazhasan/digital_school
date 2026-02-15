@@ -1,3 +1,8 @@
+// Minimal type definitions for test runner
+declare var describe: (name: string, fn: () => void) => void;
+declare var it: (name: string, fn: () => void) => void;
+declare var expect: (actual: any) => { toBe: (expected: any) => void; toBeCloseTo: (expected: number, precision?: number) => void; };
+
 import { calculateMCQMarks, validateQuestionSelection, getQuestionSelectionSummary } from './exam-utils';
 
 describe('Exam Utils', () => {
@@ -11,10 +16,10 @@ describe('Exam Utils', () => {
     it('should return negative marks for wrong answers based on percentage', () => {
       // 25% negative marking on 1 mark question = -0.25 marks
       expect(calculateMCQMarks(false, 1, 25)).toBe(-0.25);
-      
+
       // 50% negative marking on 2 mark question = -1 mark
       expect(calculateMCQMarks(false, 2, 50)).toBe(-1);
-      
+
       // 100% negative marking on 1 mark question = -1 mark
       expect(calculateMCQMarks(false, 1, 100)).toBe(-1);
     });
@@ -27,7 +32,7 @@ describe('Exam Utils', () => {
     it('should handle decimal percentages correctly', () => {
       // 12.5% negative marking on 1 mark question = -0.125 marks
       expect(calculateMCQMarks(false, 1, 12.5)).toBe(-0.125);
-      
+
       // 33.33% negative marking on 3 mark question = -1 mark
       expect(calculateMCQMarks(false, 3, 33.33)).toBeCloseTo(-1, 2);
     });
