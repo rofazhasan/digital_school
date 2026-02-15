@@ -10,6 +10,28 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { ZoomIn } from "lucide-react";
+
+// Image Zoom Component
+const ZoomableImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <div className={`relative group cursor-zoom-in ${className}`}>
+          <img src={src} alt={alt} className="w-full h-full object-contain transition-transform duration-300" />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+            <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 drop-shadow-md transition-opacity" />
+          </div>
+        </div>
+      </DialogTrigger>
+      <DialogContent className="max-w-4xl w-full h-fit max-h-[90vh] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
+        <DialogTitle className="sr-only">Zoomed Image</DialogTitle>
+        <img src={src} alt={alt} className="w-auto h-auto max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl bg-white" />
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 interface QuestionCardProps {
   disabled?: boolean;
@@ -98,7 +120,11 @@ const MCQOption = memo(({
         {option?.image && (
           <div className="mt-4">
             {/* @ts-ignore */}
-            <img src={option.image} alt="Option" className="max-h-48 rounded-lg border border-gray-100 bg-white p-1 object-contain shadow-sm group-hover:shadow-md transition-shadow" />
+            <ZoomableImage
+              src={option.image}
+              alt="Option"
+              className="max-h-48 w-full rounded-lg border border-gray-100 bg-white p-1 shadow-sm group-hover:shadow-md transition-shadow"
+            />
           </div>
         )}
       </div>
@@ -203,9 +229,20 @@ const MTFGrid = ({
   const matches = userAnswer || {};
   const correctMatches = question.matches || {};
 
+  // Mobile Selection State
+  const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
+
+  // Helper to get text for right item
+  const getRightText = (id: string) => {
+    const item = rightColumn.find((r: any) => r.id === id);
+    return item ? item.text : id;
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
+
+      {/* --- DESKTOP VIEW (Table) --- */}
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
@@ -269,8 +306,130 @@ const MTFGrid = ({
         </table>
       </div>
 
+      {/* --- MOBILE VIEW (Card Stack) --- */}
+      <div className="md:hidden space-y-3">
+        {leftColumn.map((lc: any) => {
+          const currentMatchId = matches[lc.id];
+          const currentMatchText = currentMatchId ? getRightText(currentMatchId) : null;
+
+          // Result Logic for Mobile
+          const uAns = matches[lc.id];
+          const cAns = correctMatches[lc.id];
+          const isCorrect = showResult && uAns === cAns;
+          const isWrong = showResult && uAns && uAns !== cAns;
+
+          return (
+            <Dialog key={lc.id} open={activeLeftId === lc.id} onOpenChange={(open) => setActiveLeftId(open ? lc.id : null)}>
+              <DialogTrigger asChild>
+                <div
+                  className={`
+                    p-4 rounded-xl border-2 transition-all active:scale-[0.98] cursor-pointer
+                    ${isCorrect ? 'bg-green-50 border-green-200' : isWrong ? 'bg-red-50 border-red-200' : currentMatchId ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-100 hover:border-indigo-100'}
+                  `}
+                  onClick={() => !disabled && !showResult && setActiveLeftId(lc.id)}
+                >
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="w-6 h-6 rounded bg-black/5 text-gray-600 flex items-center justify-center font-bold text-xs">
+                      {lc.id}
+                    </span>
+                    {currentMatchId && (
+                      <Badge variant={isCorrect ? "default" : isWrong ? "destructive" : "secondary"} className={isCorrect ? "bg-green-600" : ""}>
+                        Matched: {currentMatchId}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="font-medium text-gray-800 mb-3">
+                    <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                  </div>
+
+                  {/* Connected Right Item Preview */}
+                  {currentMatchId ? (
+                    <div className="p-2 bg-white/50 rounded-lg border border-black/5 text-sm text-gray-600 flex items-center gap-2">
+                      <div className="w-1 h-8 bg-indigo-500 rounded-full"></div>
+                      <div className="line-clamp-2 w-full">
+                        <UniversalMathJax inline dynamic>{currentMatchText}</UniversalMathJax>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="py-2 text-center text-xs text-gray-400 border-t border-dashed border-gray-200 mt-2">
+                      Tap to select match
+                    </div>
+                  )}
+
+                  {/* Correct Answer Display in Result Mode */}
+                  {showResult && !isCorrect && (
+                    <div className="mt-2 text-xs text-green-600 font-bold bg-green-50 p-2 rounded">
+                      Correct: {cAns} - {getRightText(cAns)}
+                    </div>
+                  )}
+                </div>
+              </DialogTrigger>
+
+              {!disabled && !showResult && (
+                <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-3xl">
+                  <DialogTitle>Select Match for {lc.id}</DialogTitle>
+                  <div className="py-2 space-y-2">
+                    <div className="p-3 bg-gray-50 rounded-lg mb-4 text-sm text-gray-600">
+                      <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
+                    </div>
+                    <div className="h-px bg-gray-100 my-4" />
+                    {rightColumn.map((rc: any) => {
+                      const isSelected = currentMatchId === rc.id;
+                      return (
+                        <button
+                          key={rc.id}
+                          onClick={() => {
+                            onSelect(lc.id, rc.id);
+                            setActiveLeftId(null);
+                          }}
+                          className={`
+                               w-full text-left p-4 rounded-xl border transition-all flex items-start gap-3
+                               ${isSelected ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-100 hover:bg-gray-50'}
+                             `}
+                        >
+                          <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                            {rc.id}
+                          </span>
+                          <div className="text-sm font-medium text-gray-700">
+                            <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
+                          </div>
+                        </button>
+                      )
+                    })}
+                  </div>
+                </DialogContent>
+              )}
+            </Dialog>
+          );
+        })}
+      </div>
+
       {showResult && (
-        <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+        <div className="md:hidden bg-blue-50/50 rounded-xl p-4 border border-blue-100">
+          <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Detailed Results</p>
+          <div className="grid grid-cols-1 gap-2">
+            {leftColumn.map((lc: any) => {
+              const uAns = matches[lc.id];
+              const cAns = correctMatches[lc.id];
+              const isCorrect = uAns === cAns;
+              return (
+                <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
+                  <span className="font-bold text-gray-500">{lc.id}</span>
+                  <div className="flex items-center gap-2">
+                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>{uAns || '?'}</span>
+                    <span className="text-gray-300">→</span>
+                    <span className="text-green-700 font-bold">{cAns}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {showResult && (
+        <div className="hidden md:block bg-blue-50/50 rounded-xl p-4 border border-blue-100">
           <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Detailed Results</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {leftColumn.map((lc: any) => {
@@ -525,7 +684,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                             <div className="flex flex-wrap gap-2">
                               {allImages.map((imgUrl: string, idx: number) => (
                                 <div key={idx} className="relative group">
-                                  <img
+                                  <ZoomableImage
                                     src={imgUrl}
                                     alt={`Answer ${idx + 1}`}
                                     className="h-20 w-20 object-cover rounded border border-gray-300"
@@ -644,7 +803,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                         </div>
                         {subQ.image && (
                           <div className="mt-2">
-                            <img src={subQ.image} alt="Sub-question" className="max-h-32 rounded border bg-white object-contain" />
+                            <ZoomableImage src={subQ.image} alt="Sub-question" className="max-h-32 w-full rounded border bg-white object-contain" />
                           </div>
                         )}
 
@@ -669,7 +828,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                                   <div className="flex flex-wrap gap-2">
                                     {allImages.map((imgUrl: string, imgIdx: number) => (
                                       <div key={imgIdx} className="relative group">
-                                        <img
+                                        <ZoomableImage
                                           src={imgUrl}
                                           alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
                                           className="h-20 w-20 object-cover rounded border border-gray-300"

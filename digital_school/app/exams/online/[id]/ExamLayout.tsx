@@ -435,7 +435,7 @@ export default function ExamLayout() {
 
       {/* --- MAIN CONTENT --- */}
       <main className={cn(
-        "flex-grow mx-auto w-full transition-all duration-500",
+        "flex-grow mx-auto w-full transition-all duration-500 pb-24 md:pb-10", // Added pb-24 for mobile sticky footer
         illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
       )}>
 
@@ -509,7 +509,7 @@ export default function ExamLayout() {
 
           {/* --- STANDARD BOTTOM BAR (Normal Mode) --- */}
           {!illusionMode && (
-            <div className="flex items-center justify-between gap-4 py-4 mt-auto">
+            <div className="sticky bottom-0 z-30 flex items-center justify-between gap-4 py-4 px-4 -mx-4 md:mx-0 md:px-0 bg-background/80 backdrop-blur-lg border-t md:border-t-0 md:bg-transparent md:backdrop-blur-none md:static mt-auto transition-all">
               <Button
                 variant="outline"
                 size="lg"
