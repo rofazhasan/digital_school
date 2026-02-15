@@ -22,7 +22,11 @@ import {
     ChevronDown,
     Users,
     Clock,
-    CheckCircle
+    CheckCircle,
+    Sparkles,
+    Plus,
+    Search,
+    ArrowRight
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppFooter } from '@/components/AppFooter';
@@ -56,7 +60,6 @@ interface SidebarItem {
 
 const sidebarItems: SidebarItem[] = [
     { id: 'overview', label: 'Overview', icon: Home, href: '#overview' },
-    // { id: 'users', label: 'Users', icon: Users, href: '/admin/users' }, // EXCLUDED FOR TEACHER
     { id: 'classes', label: 'Classes', icon: GraduationCap, href: '#classes' },
     { id: 'exams', label: 'Exams', icon: FileText, href: '/exams' },
     { id: 'questions', label: 'Question Bank', icon: BookOpen, href: '/question-bank' },
@@ -65,7 +68,6 @@ const sidebarItems: SidebarItem[] = [
     { id: 'omr-scanner', label: 'OMR Scanner', icon: Scan, href: '/omr_scanner' },
     { id: 'attendance', label: 'Attendance', icon: Calendar, href: '#attendance' },
     { id: 'notices', label: 'Notices', icon: Bell, href: '#notices' },
-    // { id: 'billing', label: 'Billing', icon: CreditCard, href: '#billing' }, // EXCLUDED FOR TEACHER
     { id: 'chat', label: 'Chat Support', icon: MessageSquare, href: '#chat' },
     { id: 'analytics', label: 'Analytics', icon: Activity, href: '#analytics' },
     { id: 'security', label: 'Security', icon: Shield, href: '#security' },
@@ -341,13 +343,19 @@ export default function TeacherDashboard() {
                             >
                                 {activeTab === 'overview' && (
                                     <div className="space-y-6">
-                                        <div className="mb-6">
-                                            <h1 className="text-3xl font-bold mb-2">Teacher Dashboard</h1>
-                                            <p className="text-muted-foreground">Manage your classes, exams, and students.</p>
+                                        <div className="mb-6 lg:mb-8">
+                                            <motion.div
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: 0.1 }}
+                                            >
+                                                <h1 className="text-3xl font-bold mb-2 tracking-tight">Teacher Dashboard</h1>
+                                                <p className="text-muted-foreground">Welcome back, {user?.name.split(' ')[0]}! Manage your classes, exams, and students.</p>
+                                            </motion.div>
                                         </div>
 
-                                        {/* Mock Stats */}
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                                        {/* Premium Stats Cards */}
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
                                             {[
                                                 { label: 'Total Students', value: '1,234', icon: Users, color: 'blue', bg: 'bg-blue-500' },
                                                 { label: 'Upcoming Exams', value: '3', icon: FileText, color: 'purple', bg: 'bg-purple-500' },
@@ -360,25 +368,59 @@ export default function TeacherDashboard() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: i * 0.1 }}
                                                 >
-                                                    <Card className="border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 overflow-hidden relative group">
-                                                        <div className={`absolute top-0 right-0 w-20 h-20 ${stat.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
+                                                    <Card className="rounded-2xl border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+                                                        <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
                                                         <CardContent className="p-6">
                                                             <div className="flex items-center justify-between mb-4">
-                                                                <div className={`p-2 rounded-lg ${stat.bg} bg-opacity-10 text-${stat.color}-600`}>
+                                                                <div className={`p-2 rounded-xl ${stat.bg} bg-opacity-10 text-${stat.color}-600`}>
                                                                     <stat.icon className="h-5 w-5" />
                                                                 </div>
+                                                                <Badge variant="outline" className={`bg-${stat.color}-50 text-${stat.color}-600 border-${stat.color}-200`}>
+                                                                    This Week
+                                                                </Badge>
                                                             </div>
-                                                            <div className="text-2xl font-bold mb-1">{stat.value}</div>
-                                                            <div className="text-xs text-muted-foreground">{stat.label}</div>
+                                                            <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{stat.value}</div>
+                                                            <div className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{stat.label}</div>
                                                         </CardContent>
                                                     </Card>
                                                 </motion.div>
                                             ))}
                                         </div>
 
+                                        {/* Quick Actions */}
+                                        <div className="mb-8">
+                                            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+                                                <Sparkles className="w-5 h-5 text-blue-500" /> Quick Actions
+                                            </h2>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                {[
+                                                    { label: 'Create Exam', icon: FileText, color: 'text-blue-500', href: '/exams/create' },
+                                                    { label: 'Question Bank', icon: BookOpen, color: 'text-amber-500', href: '/question-bank' },
+                                                    { label: 'Attendance', icon: Calendar, color: 'text-emerald-500', href: '#attendance' },
+                                                    { label: 'Results', icon: BarChart3, color: 'text-purple-500', href: '/exams/results' },
+                                                ].map((action, i) => (
+                                                    <motion.button
+                                                        key={i}
+                                                        whileHover={{ scale: 1.02, y: -2 }}
+                                                        whileTap={{ scale: 0.98 }}
+                                                        onClick={() => {
+                                                            if (action.href.startsWith('/')) router.push(action.href);
+                                                            else setActiveTab(action.href.replace('#', ''));
+                                                        }}
+                                                        className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all group"
+                                                    >
+                                                        <div className={`p-4 rounded-full bg-gray-50 dark:bg-gray-800 mb-3 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors`}>
+                                                            <action.icon className={`h-6 w-6 ${action.color}`} />
+                                                        </div>
+                                                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">{action.label}</span>
+                                                    </motion.button>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             {/* Recent Activity */}
-                                            <Card className="border-0 shadow-sm">
+                                            <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
                                                 <CardHeader>
                                                     <CardTitle>Recent Activity</CardTitle>
                                                     <CardDescription>Latest updates from your classes</CardDescription>
@@ -386,18 +428,21 @@ export default function TeacherDashboard() {
                                                 <CardContent>
                                                     <div className="space-y-4">
                                                         {[
-                                                            { title: "Exam 'Math Midterm' Published", time: "2 hours ago", icon: FileText, color: "text-blue-500" },
-                                                            { title: "Class 10-A Attendance Marked", time: "4 hours ago", icon: CheckCircle, color: "text-green-500" },
-                                                            { title: "New Question Added to Bank", time: "Yesterday", icon: BookOpen, color: "text-amber-500" },
+                                                            { title: "Exam 'Math Midterm' Published", time: "2 hours ago", icon: FileText, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
+                                                            { title: "Class 10-A Attendance Marked", time: "4 hours ago", icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
+                                                            { title: "New Question Added to Bank", time: "Yesterday", icon: BookOpen, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
                                                         ].map((item, i) => (
-                                                            <div key={i} className="flex items-start gap-3 pb-3 border-b last:border-0">
-                                                                <div className="mt-1">
-                                                                    <item.icon className={`h-4 w-4 ${item.color}`} />
+                                                            <div key={i} className="flex items-start gap-4 pb-4 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
+                                                                <div className={`w-10 h-10 rounded-full ${item.bg} flex items-center justify-center flex-shrink-0`}>
+                                                                    <item.icon className={`h-5 w-5 ${item.color}`} />
                                                                 </div>
-                                                                <div>
-                                                                    <div className="text-sm font-medium">{item.title}</div>
-                                                                    <div className="text-xs text-muted-foreground">{item.time}</div>
+                                                                <div className="flex-1">
+                                                                    <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{item.title}</h4>
+                                                                    <p className="text-xs text-muted-foreground mt-0.5">{item.time}</p>
                                                                 </div>
+                                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400">
+                                                                    <ArrowRight className="w-4 h-4" />
+                                                                </Button>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -405,27 +450,30 @@ export default function TeacherDashboard() {
                                             </Card>
 
                                             {/* Schedule */}
-                                            <Card className="border-0 shadow-sm">
+                                            <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
                                                 <CardHeader>
                                                     <CardTitle>Today&apos;s Schedule</CardTitle>
-                                                    <CardDescription>Your upcoming classes</CardDescription>
+                                                    <CardDescription>Your upcoming classes & tasks</CardDescription>
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="space-y-3">
                                                         {[
-                                                            { time: "09:00 AM", class: "Class 10 - Section A", subject: "Mathematics" },
-                                                            { time: "11:00 AM", class: "Class 9 - Section B", subject: "Physics" },
-                                                            { time: "02:00 PM", class: "Class 11 - Section A", subject: "Further Math" },
+                                                            { time: "09:00 AM", class: "Class 10 - Section A", subject: "Mathematics", status: "Completed" },
+                                                            { time: "11:00 AM", class: "Class 9 - Section B", subject: "Physics", status: "In Progress" },
+                                                            { time: "02:00 PM", class: "Class 11 - Section A", subject: "Further Math", status: "Upcoming" },
                                                         ].map((item, i) => (
-                                                            <div key={i} className="flex items-center gap-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800">
-                                                                <div className="flex flex-col items-center justify-center min-w-[60px] p-2 bg-white dark:bg-gray-800 rounded-md shadow-sm">
+                                                            <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-gray-50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 hover:border-blue-200 dark:hover:border-blue-800 transition-colors">
+                                                                <div className="flex flex-col items-center justify-center min-w-[60px] p-2 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-100 dark:border-gray-700">
                                                                     <Clock className="h-4 w-4 text-primary mb-1" />
                                                                     <span className="text-[10px] font-bold whitespace-nowrap">{item.time}</span>
                                                                 </div>
-                                                                <div>
+                                                                <div className="flex-1">
                                                                     <div className="font-semibold text-sm">{item.subject}</div>
                                                                     <div className="text-xs text-muted-foreground">{item.class}</div>
                                                                 </div>
+                                                                <Badge variant={item.status === 'Completed' ? 'secondary' : item.status === 'In Progress' ? 'default' : 'outline'}>
+                                                                    {item.status}
+                                                                </Badge>
                                                             </div>
                                                         ))}
                                                     </div>
@@ -445,16 +493,17 @@ export default function TeacherDashboard() {
 
                                 {/* Placeholders for sections that are primarily link-based but might have inline content */}
                                 {['classes', 'omr-scanner'].includes(activeTab) && (
-                                    <div className="flex flex-col items-center justify-center h-64 text-center">
-                                        <div className="p-4 rounded-full bg-blue-50 text-blue-500 mb-4">
-                                            <Settings className="w-8 h-8" />
+                                    <div className="flex flex-col items-center justify-center h-96 text-center">
+                                        <div className="p-6 rounded-full bg-blue-50 text-blue-500 mb-6 relative">
+                                            <div className="absolute inset-0 bg-blue-100/50 rounded-full animate-ping" />
+                                            <Settings className="w-12 h-12 relative z-10" />
                                         </div>
-                                        <h3 className="text-lg font-semibold text-gray-900">Module Loaded</h3>
-                                        <p className="text-gray-500 max-w-sm mt-2">
-                                            This module is either integrated via navigation links or currently under development for the Teacher view.
+                                        <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">Module Under Development</h3>
+                                        <p className="text-muted-foreground max-w-md mb-8">
+                                            This specialized module for the Teacher Dashboard is being enhanced to provide better functionality.
                                         </p>
-                                        <Button className="mt-4" onClick={() => router.push('/dashboard')}>
-                                            Return to Dashboard
+                                        <Button size="lg" className="rounded-full px-8 shadow-lg shadow-primary/25" onClick={() => setActiveTab('overview')}>
+                                            Return to Overview
                                         </Button>
                                     </div>
                                 )}
@@ -462,8 +511,14 @@ export default function TeacherDashboard() {
                             </motion.div>
                         </AnimatePresence>
                     </div>
+                    {/* Page-Specific Footer already rendered at global layout, but hidden by us in AppFooter.tsx.
+                        We can add an internal footer if we want, but for dashboard cleanness, usually no large footer is needed.
+                        We add a copyright line only.
+                     */}
+                    <div className="mt-12 mb-4 text-center text-xs text-muted-foreground">
+                        <p>© {new Date().getFullYear()} Digital School. All rights reserved.</p>
+                    </div>
                 </main>
-                <AppFooter />
             </div>
         </div>
     );

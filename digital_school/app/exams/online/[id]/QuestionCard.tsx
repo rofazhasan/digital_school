@@ -1,5 +1,5 @@
 "use client";
-import React, { useRef, useState, useMemo, useCallback, memo } from "react";
+import React, { useRef, useState, useMemo, useCallback, memo, useEffect } from "react";
 import { useExamContext } from "./ExamContext";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
@@ -61,7 +61,8 @@ const MCQOption = memo(({
   userAnswer,
   disabled,
   submitted,
-  onSelect
+  onSelect,
+  fontSize = 'md'
 }: {
   option: any;
   index: number;
@@ -72,8 +73,11 @@ const MCQOption = memo(({
   disabled: boolean;
   submitted: boolean;
   onSelect: (label: string) => void;
+  fontSize?: 'md' | 'lg' | 'xl';
 }) => {
   const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
+
+  const textSizeClass = fontSize === 'xl' ? 'text-xl md:text-2xl' : fontSize === 'lg' ? 'text-lg md:text-xl' : 'text-base md:text-lg';
 
   // Premium State styles
   const getStyles = () => {
@@ -110,7 +114,7 @@ const MCQOption = memo(({
       </div>
 
       {/* Option Text */}
-      <div className="flex-1 pt-1 text-base md:text-lg leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+      <div className={`flex-1 pt-1 ${textSizeClass} leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors`}>
         <div className="min-w-0">
           <MathJax inline dynamic>
             <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
@@ -151,7 +155,8 @@ const MCOption = memo(({
   showResult,
   disabled,
   submitted,
-  onSelect
+  onSelect,
+  fontSize = 'md'
 }: {
   option: any;
   index: number;
@@ -161,8 +166,11 @@ const MCOption = memo(({
   disabled: boolean;
   submitted: boolean;
   onSelect: (index: number) => void;
+  fontSize?: 'md' | 'lg' | 'xl';
 }) => {
   const label = typeof option === "object" && option !== null ? (option.text || String(option)) : String(option);
+
+  const textSizeClass = fontSize === 'xl' ? 'text-xl md:text-2xl' : fontSize === 'lg' ? 'text-lg md:text-xl' : 'text-base md:text-lg';
 
   const getStyles = () => {
     const base = "w-full text-left p-4 md:p-5 rounded-2xl border flex items-start gap-4 md:gap-5 transition-all duration-300 group relative overflow-hidden backdrop-blur-sm";
@@ -192,7 +200,7 @@ const MCOption = memo(({
       `}>
         <Check className={`w-4 h-4 md:w-5 md:h-5 ${isSelected || (showResult && isCorrect) ? 'scale-100' : 'scale-0'} transition-transform duration-200`} />
       </div>
-      <div className="flex-1 pt-0.5 text-base md:text-lg leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
+      <div className={`flex-1 pt-0.5 ${textSizeClass} leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors`}>
         <MathJax inline dynamic>
           <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
         </MathJax>
@@ -455,14 +463,18 @@ const MTFGrid = ({
 };
 
 export default function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
-  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading } = useExamContext();
+  const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading, fontSize } = useExamContext();
   const questions = exam.questions || [];
 
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
 
-  // if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
-  // Hook violation fix: Moved check to render time
+  // Dynamic Font Size Classes
+  const getTextSize = (base: string) => {
+    if (fontSize === 'lg') return base === 'text-base' ? 'text-lg' : 'text-xl';
+    if (fontSize === 'xl') return base === 'text-base' ? 'text-xl' : 'text-2xl';
+    return base; // md (default)
+  };
 
   const text = question?.text || question?.questionText || "(No text)";
   const type = (question?.type || "").toLowerCase();
@@ -481,6 +493,38 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
       });
     } catch (e) { console.error("Autosave failed", e); }
   }, [disabled, answers, question?.id, setAnswers, exam.id]);
+
+  // Keyboard Shortcuts for MCQ (A-D / 1-4)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (disabled || submitted || !question || type !== 'mcq') return;
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement).tagName)) return;
+
+      const key = e.key.toUpperCase();
+      const options = question.options || [];
+      let selectedIndex = -1;
+
+      // Map 1-4 to 0-3
+      if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(key)) {
+        selectedIndex = parseInt(key) - 1;
+      }
+      // Map A-H to 0-7
+      else if (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].includes(key)) {
+        selectedIndex = key.charCodeAt(0) - 65;
+      }
+
+      if (selectedIndex >= 0 && selectedIndex < options.length) {
+        const opt = options[selectedIndex];
+        const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
+        handleAnswerChange(label);
+
+        // Optional: Visual feedback or toast could go here
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [disabled, submitted, question, type, handleAnswerChange]);
 
   const handleMarkQuestion = useCallback(() => {
     if (!question) return;
@@ -541,7 +585,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
           </div>
 
           {/* Question Text */}
-          <div className="prose prose-indigo max-w-none text-gray-800 text-base md:text-xl font-medium leading-relaxed mb-8">
+          <div className={`prose prose-indigo max-w-none text-gray-800 font-medium leading-relaxed mb-8 ${getTextSize('text-base md:text-xl')}`}>
             {type === "ar" ? (
               <div className="space-y-4">
                 <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-2">
@@ -588,6 +632,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       disabled={!!disabled}
                       submitted={!!submitted}
                       onSelect={(val) => handleAnswerChange(val)}
+                      fontSize={fontSize} // Pass props
                     />
                   );
                 })}
@@ -616,6 +661,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                           : [...currentSelected, idx];
                         handleAnswerChange({ selectedOptions: newSelection });
                       }}
+                      fontSize={fontSize} // Pass props
                     />
                   );
                 })}
@@ -640,6 +686,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       disabled={!!disabled}
                       submitted={!!submitted}
                       onSelect={() => handleAnswerChange({ selectedOption: val })}
+                      fontSize={fontSize} // Pass props
                     />
                   );
                 })}

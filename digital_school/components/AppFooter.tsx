@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -16,6 +17,7 @@ interface InstituteSettings {
 }
 
 export function AppFooter() {
+    const pathname = usePathname();
     const [settings, setSettings] = useState<InstituteSettings | null>(null);
 
     useEffect(() => {
@@ -28,6 +30,11 @@ export function AppFooter() {
             })
             .catch(console.error);
     }, []);
+
+    // Hide Footer on Dashboard routes to prevent "Double Footer" issue
+    if (pathname?.startsWith('/teacher') || pathname?.startsWith('/admin') || pathname?.startsWith('/student') || pathname?.startsWith('/exams/online')) {
+        return null;
+    }
 
     const name = settings?.instituteName || "Digital School";
     const address = settings?.address || "123 Education Street, Dhaka, Bangladesh";

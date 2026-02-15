@@ -69,7 +69,9 @@ export default function ExamLayout() {
     isUploading, // Get from context
     warnings: contextWarnings,
     setWarnings: setContextWarnings,
-    sortedQuestions
+    sortedQuestions,
+    fontSize,
+    setFontSize
   } = useExamContext();
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
@@ -410,7 +412,32 @@ export default function ExamLayout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            {/* Font Size Toggle - Desktop Only */}
+            <div className="hidden md:flex items-center bg-muted/50 rounded-lg p-0.5 border">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFontSize((prev: string) => prev === 'xl' ? 'lg' : 'md')}
+                className={cn("h-8 w-8 p-0", fontSize === 'md' ? "text-muted-foreground" : "")}
+                title="Decrease Font Size"
+                disabled={fontSize === 'md'}
+              >
+                <span className="text-xs font-bold">A-</span>
+              </Button>
+              <div className="w-px h-4 bg-border mx-0.5" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setFontSize((prev: string) => prev === 'md' ? 'lg' : 'xl')}
+                className={cn("h-8 w-8 p-0", fontSize === 'xl' ? "text-muted-foreground" : "")}
+                title="Increase Font Size"
+                disabled={fontSize === 'xl'}
+              >
+                <span className="text-sm font-bold">A+</span>
+              </Button>
+            </div>
+
             {/* Illusion Mode Toggle (Desktop Header) */}
             <Button variant="ghost" size="icon" onClick={toggleIllusionMode} title="Enter Focus Mode" className="hidden sm:flex text-muted-foreground hover:text-primary">
               <Eye className="w-5 h-5" />
