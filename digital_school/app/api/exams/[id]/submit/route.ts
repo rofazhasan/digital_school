@@ -58,11 +58,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (existingSubmission?.startedAt) {
       const startTime = new Date(existingSubmission.startedAt).getTime();
       const durationMs = exam.duration * 60 * 1000;
-      const bufferMs = 15 * 1000; // 15 seconds buffer
+      const bufferMs = 120 * 1000; // 2 minutes buffer to account for network latency/client clock skew
       const now = Date.now();
 
       if (now > startTime + durationMs + bufferMs) {
         console.log(`[Submit] Time Limit Exceeded for user ${studentId}. Started: ${existingSubmission.startedAt}, Limit: ${durationMs / 60000}m`);
+        // If it's marginally late (within reasonable bounds), we might want to accept it anyway or flag it.
+        // For now, we still return 403 if it's > 2 mins late, but this should cover the auto-submit cases.
         return NextResponse.json({ error: "Exam time limit exceeded" }, { status: 403 });
       }
     }

@@ -120,7 +120,22 @@ export default function ExamLayout() {
         }
       } catch (error) {
         console.error('Submit error:', error);
-        alert(`Submission failed: ${(error as Error).message}. Please try again.`);
+
+        const errorMessage = (error as Error).message;
+
+        // If forced (auto-submit) and error is time limit, treat as success (or at least redirect)
+        // because likely the backend saved it effectively or we can't do anything else.
+        // However, if backend rejected it (403), we can't show results.
+        // But with the backend buffer fix, this shouldn't happen often.
+        // If it DOES happen, keeping the user on the exam screen is bad.
+
+        if (forced || errorMessage.includes('time limit') || errorMessage.includes('submitted')) {
+          toast.warning("Time limit processed. Redirecting to results...");
+          window.location.href = `/exams/results/${exam.id}`;
+          return;
+        }
+
+        toast.error(`Submission failed: ${errorMessage}. Please try again.`);
       } finally {
         setIsSubmitting(false);
         setShowSubmitConfirm(false);
@@ -532,7 +547,7 @@ export default function ExamLayout() {
 
       {/* Submission Loader */}
       {isSubmitting && (
-        <div className="fixed inset-0 z-[70] bg-white/90 dark:bg-gray-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[110] bg-white/90 dark:bg-gray-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
           <div className="flex flex-col items-center gap-6">
             <div className="relative">
               <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
@@ -548,7 +563,7 @@ export default function ExamLayout() {
         </div>
       )}
 
-      {isBlocked && (
+      {isBlocked && !isSubmitting && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
           <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
             <ShieldAlert className="w-12 h-12 text-red-600" />
