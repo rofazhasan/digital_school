@@ -273,17 +273,16 @@ export default function ExamLayout() {
 
 
   if (showInstructions) {
-    const mcqQuestions = questions.filter((q: any) => q.type === 'MCQ');
-    const cqQuestions = questions.filter((q: any) => q.type === 'CQ');
-    const sqQuestions = questions.filter((q: any) => q.type === 'SQ');
+    const mcqQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'mcq' || q.questionType?.toLowerCase() === 'mcq');
+    const creativeQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'cq' || q.questionType?.toLowerCase() === 'cq');
+    const shortQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'sq' || q.questionType?.toLowerCase() === 'sq');
+    const otherQuestions = questions.filter((q: any) => {
+      const t = (q.type || q.questionType || '').toLowerCase();
+      return !['mcq', 'cq', 'sq'].includes(t);
+    });
 
     const mcqMarks = mcqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 1), 0);
-    const cqMarks = cqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
-    const sqMarks = sqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 0), 0);
-
-    // Determine pass mark (default to 33% if not set, or show N/A)
-    // Assuming passMarks might be in exam object, otherwise 33% of total
-    const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + cqMarks + sqMarks)) * 0.33);
+    const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + creativeQuestions.length * 10)) * 0.33);
 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans animate-in fade-in duration-500">
@@ -293,75 +292,117 @@ export default function ExamLayout() {
             <div className="flex justify-center mb-4">
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
-            <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
-            <p className="text-sm md:text-lg text-muted-foreground">পরীক্ষা শুরু করতে প্রস্তুত?</p>
+            <h1 className="text-xl md:text-3xl font-bold text-foreground mb-1 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
+            <p className="text-sm md:text-lg text-muted-foreground">Class: {exam.className || 'N/A'}</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl text-center border border-blue-100/50 dark:border-blue-900/30">
-              <div className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">সময় (Time)</div>
+              <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">Time (সময়)</div>
               <p className="text-xl font-bold text-blue-700 dark:text-blue-300">
                 {Math.floor(exam.duration / 60) > 0 ? `${Math.floor(exam.duration / 60)}h ` : ''}{exam.duration % 60}m
               </p>
             </div>
             <div className="bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl text-center border border-purple-100/50 dark:border-purple-900/30">
-              <div className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-1">মোট প্রশ্ন</div>
+              <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-1">Total Questions</div>
               <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{totalQuestions}</p>
-              <div className="text-[10px] text-purple-500 dark:text-purple-400/80 mt-1 font-medium">
-                {mcqQuestions.length > 0 && `MCQ: ${mcqQuestions.length} `}
-                {cqQuestions.length > 0 && `CQ: ${cqQuestions.length} `}
-                {sqQuestions.length > 0 && `SQ: ${sqQuestions.length}`}
-              </div>
             </div>
             <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-xl text-center border border-emerald-100/50 dark:border-emerald-900/30">
-              <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">পূর্ণমান (Marks)</div>
-              <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
+              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Total Marks</div>
+              <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{exam.totalMarks}</p>
             </div>
             <div className="bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-xl text-center border border-rose-100/50 dark:border-rose-900/30">
-              <div className="text-xs text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">পাস মার্ক</div>
+              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">Pass Mark</div>
               <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{passMark}</p>
             </div>
           </div>
 
-          <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-5 text-sm space-y-4">
-            <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200 border-b border-amber-200/50 dark:border-amber-900/30 pb-2">
-              <AlertCircle className="w-5 h-5" /> গুরুত্বপূর্ণ নির্দেশনা (Instructions)
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Question Breakdown */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Menu className="w-4 h-4 text-primary" /> Question Distribution
+              </h3>
+              <div className="space-y-2">
+                {mcqQuestions.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                    <span className="text-sm font-medium">MCQ Questions</span>
+                    <Badge variant="secondary" className="font-bold">{mcqQuestions.length} ({mcqMarks} Marks)</Badge>
+                  </div>
+                )}
+                {creativeQuestions.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">Creative (CQ)</span>
+                      <span className="text-[10px] text-muted-foreground">Answer {exam.cqRequiredQuestions || creativeQuestions.length} out of {creativeQuestions.length}</span>
+                    </div>
+                    <Badge variant="secondary" className="font-bold">Total {creativeQuestions.length}</Badge>
+                  </div>
+                )}
+                {shortQuestions.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">Short (SQ)</span>
+                      <span className="text-[10px] text-muted-foreground">Answer {exam.sqRequiredQuestions || shortQuestions.length} out of {shortQuestions.length}</span>
+                    </div>
+                    <Badge variant="secondary" className="font-bold">Total {shortQuestions.length}</Badge>
+                  </div>
+                )}
+                {otherQuestions.length > 0 && (
+                  <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
+                    <span className="text-sm font-medium">Other Types</span>
+                    <Badge variant="secondary" className="font-bold">{otherQuestions.length}</Badge>
+                  </div>
+                )}
+              </div>
             </div>
-            <ul className="space-y-2 text-amber-900/90 dark:text-amber-300/90 font-medium">
-              <li className="flex items-start gap-2">
-                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
-                <span>ফুলস্ক্রিন মোড থেকে বের হবেন না বা ট্যাব পরিবর্তন করবেন না (সতর্কতা রেকর্ড করা হবে)।</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
-                <span>স্থিতিশীল ইন্টারনেট সংযোগ নিশ্চিত করুন।</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
-                <span>৪টি সতর্কতার (Warning) পর পরীক্ষা স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</span>
-              </li>
-              {exam.mcqNegativeMarking > 0 && (
+
+            {/* General Instructions */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-amber-500" /> Key Guidelines
+              </h3>
+              <ul className="space-y-2 text-xs font-medium text-muted-foreground">
                 <li className="flex items-start gap-2">
-                  <span className="text-red-500 mt-1">•</span>
-                  <span className="text-red-700 dark:text-red-400 font-bold">প্রতিটি ভুল MCQ উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কাটা যাবে।</span>
+                  <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Maintain fullscreen mode. Exiting or switching tabs will record a violation.</span>
                 </li>
-              )}
-              {hasCQorSQ && (
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
-                  <span>সৃজনশীল/সংক্ষিপ্ত প্রশ্নের উত্তর খাতায় লিখে ছবি তুলে আপলোড করতে পারবেন।</span>
+                  <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Exam will auto-submit after 4 security warnings.</span>
                 </li>
-              )}
-            </ul>
+                {exam.mcqNegativeMarking > 0 && (
+                  <li className="flex items-start gap-2">
+                    <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
+                    <span className="text-red-600 dark:text-red-400 font-bold">Negative Marking: {exam.mcqNegativeMarking}% for wrong MCQs.</span>
+                  </li>
+                )}
+                <li className="flex items-start gap-2">
+                  <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                  <span>Ensure a stable internet connection for auto-saving.</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <Button
             onClick={handleStartExam}
             disabled={isStarting}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-6 text-lg rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98]"
+            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98] group"
           >
-            {isStarting ? "লোডিং হচ্ছে..." : "পরীক্ষা শুরু করুন (Start Exam)"}
+            {isStarting ? (
+              <div className="flex items-center gap-2">
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>Preparing environment...</span>
+              </div>
+            ) : (
+              <div className="flex items-center justify-center gap-2">
+                <span>Start Assessment Now</span>
+                <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
+              </div>
+            )}
           </Button>
+          <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-widest font-bold opacity-50">Authorized by {instituteName}</p>
         </Card>
       </div>
     );

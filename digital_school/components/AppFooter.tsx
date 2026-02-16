@@ -135,20 +135,20 @@ export function AppFooter() {
 
                         {mounted && (
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                className="h-8 px-2 rounded-lg hover:bg-muted font-bold flex items-center gap-2"
+                                className="h-9 px-4 rounded-full border-muted-foreground/20 hover:border-primary hover:bg-primary/5 font-bold flex items-center gap-2 transition-all"
                             >
                                 {theme === 'dark' ? (
                                     <>
-                                        <Sun className="h-4 w-4 text-yellow-500" />
-                                        <span className="hidden sm:inline">Light Mode</span>
+                                        <Sun className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                                        <span>Light Mode</span>
                                     </>
                                 ) : (
                                     <>
-                                        <Moon className="h-4 w-4 text-slate-700" />
-                                        <span className="hidden sm:inline">Dark Mode</span>
+                                        <Moon className="h-4 w-4 text-slate-700 fill-slate-700" />
+                                        <span>Dark Mode</span>
                                     </>
                                 )}
                             </Button>
