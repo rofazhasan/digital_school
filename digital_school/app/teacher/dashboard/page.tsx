@@ -163,7 +163,7 @@ export default function TeacherDashboard() {
                             <Menu className="h-6 w-6" />
                         </Button>
                         <div className="truncate flex flex-col justify-center pl-2">
-                            <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400 px-1 truncate leading-tight">
+                            <h1 className="text-xl md:text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 px-1 truncate leading-tight">
                                 {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
                             </h1>
                         </div>
@@ -260,7 +260,7 @@ export default function TeacherDashboard() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: i * 0.1 }}
                                                 >
-                                                    <Card className="rounded-2xl border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+                                                    <Card className="rounded-2xl border border-border shadow-lg shadow-gray-200/50 dark:shadow-none bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
                                                         <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
                                                         <CardContent className="p-6">
                                                             <div className="flex items-center justify-between mb-4">
@@ -301,10 +301,10 @@ export default function TeacherDashboard() {
                                                         }}
                                                         className="flex flex-col items-center justify-center p-6 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group"
                                                     >
-                                                        <div className={`p-4 rounded-full bg-muted mb-3 group-hover:bg-muted/80 transition-colors`}>
+                                                        <div className={`p-4 rounded-full bg-muted/50 group-hover:bg-accent transition-colors`}>
                                                             <action.icon className={`h-6 w-6 ${action.color}`} />
                                                         </div>
-                                                        <span className="font-semibold text-sm text-foreground">{action.label}</span>
+                                                        <span className="font-semibold text-sm text-foreground/80 group-hover:text-foreground transition-colors">{action.label}</span>
                                                     </motion.button>
                                                 ))}
                                             </div>
@@ -312,7 +312,7 @@ export default function TeacherDashboard() {
 
                                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                             {/* Recent Activity */}
-                                            <Card className="rounded-2xl border-0 shadow-sm bg-card">
+                                            <Card className="rounded-2xl border border-border shadow-sm bg-card">
                                                 <CardHeader>
                                                     <CardTitle>Recent Activity</CardTitle>
                                                     <CardDescription>Latest updates from your classes</CardDescription>
@@ -342,7 +342,7 @@ export default function TeacherDashboard() {
                                             </Card>
 
                                             {/* Schedule */}
-                                            <Card className="rounded-2xl border-0 shadow-sm bg-card">
+                                            <Card className="rounded-2xl border border-border shadow-sm bg-card">
                                                 <CardHeader>
                                                     <CardTitle>Today&apos;s Schedule</CardTitle>
                                                     <CardDescription>Your upcoming classes & tasks</CardDescription>
@@ -386,8 +386,8 @@ export default function TeacherDashboard() {
                                 {/* Placeholders for sections that are primarily link-based but might have inline content */}
                                 {['classes', 'omr-scanner'].includes(activeTab) && (
                                     <div className="flex flex-col items-center justify-center h-96 text-center">
-                                        <div className="p-6 rounded-full bg-blue-50 text-blue-500 mb-6 relative">
-                                            <div className="absolute inset-0 bg-blue-100/50 rounded-full animate-ping" />
+                                        <div className="p-6 rounded-full bg-primary/10 text-primary mb-6 relative">
+                                            <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping" />
                                             <Settings className="w-12 h-12 relative z-10" />
                                         </div>
                                         <h3 className="text-2xl font-bold text-foreground mb-2">Module Under Development</h3>

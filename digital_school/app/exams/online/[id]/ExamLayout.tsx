@@ -35,10 +35,10 @@ const MobileNavigator = memo(({
         const isAnswered = !!answers[q.id];
         const isMarked = !!marked[q.id];
 
-        let bgClass = "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 text-gray-500 hover:bg-gray-50";
-        if (isCurrent) bgClass = "bg-blue-600 text-white border-blue-600 ring-2 ring-blue-200 dark:ring-blue-900 shadow-lg shadow-blue-500/30 scale-110";
-        else if (isMarked) bgClass = "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/50 dark:text-amber-400";
-        else if (isAnswered) bgClass = "bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/50 dark:text-emerald-400";
+        let bgClass = "bg-card border-border text-muted-foreground hover:bg-accent";
+        if (isCurrent) bgClass = "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20 shadow-lg shadow-primary/30 scale-110";
+        else if (isMarked) bgClass = "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-800";
+        else if (isAnswered) bgClass = "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-800";
 
         return (
           <button
@@ -298,57 +298,57 @@ export default function ExamLayout() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            <div className="bg-blue-50/50 p-4 rounded-xl text-center border border-blue-100/50">
-              <div className="text-xs text-blue-600/80 font-bold uppercase tracking-wider mb-1">সময় (Time)</div>
-              <p className="text-xl font-bold text-blue-700">
+            <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl text-center border border-blue-100/50 dark:border-blue-900/30">
+              <div className="text-xs text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">সময় (Time)</div>
+              <p className="text-xl font-bold text-blue-700 dark:text-blue-300">
                 {Math.floor(exam.duration / 60) > 0 ? `${Math.floor(exam.duration / 60)}h ` : ''}{exam.duration % 60}m
               </p>
             </div>
-            <div className="bg-purple-50/50 p-4 rounded-xl text-center border border-purple-100/50">
-              <div className="text-xs text-purple-600/80 font-bold uppercase tracking-wider mb-1">মোট প্রশ্ন</div>
-              <p className="text-xl font-bold text-purple-700">{totalQuestions}</p>
-              <div className="text-[10px] text-purple-500/80 mt-1 font-medium">
+            <div className="bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl text-center border border-purple-100/50 dark:border-purple-900/30">
+              <div className="text-xs text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-1">মোট প্রশ্ন</div>
+              <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{totalQuestions}</p>
+              <div className="text-[10px] text-purple-500 dark:text-purple-400/80 mt-1 font-medium">
                 {mcqQuestions.length > 0 && `MCQ: ${mcqQuestions.length} `}
                 {cqQuestions.length > 0 && `CQ: ${cqQuestions.length} `}
                 {sqQuestions.length > 0 && `SQ: ${sqQuestions.length}`}
               </div>
             </div>
-            <div className="bg-emerald-50/50 p-4 rounded-xl text-center border border-emerald-100/50">
-              <div className="text-xs text-emerald-600/80 font-bold uppercase tracking-wider mb-1">পূর্ণমান (Marks)</div>
-              <p className="text-xl font-bold text-emerald-700">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
+            <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-xl text-center border border-emerald-100/50 dark:border-emerald-900/30">
+              <div className="text-xs text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">পূর্ণমান (Marks)</div>
+              <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{exam.totalMarks || (mcqMarks + cqMarks + sqMarks)}</p>
             </div>
-            <div className="bg-rose-50/50 p-4 rounded-xl text-center border border-rose-100/50">
-              <div className="text-xs text-rose-600/80 font-bold uppercase tracking-wider mb-1">পাস মার্ক</div>
-              <p className="text-xl font-bold text-rose-700">{passMark}</p>
+            <div className="bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-xl text-center border border-rose-100/50 dark:border-rose-900/30">
+              <div className="text-xs text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">পাস মার্ক</div>
+              <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{passMark}</p>
             </div>
           </div>
 
-          <div className="bg-amber-50/50 border border-amber-100 rounded-xl p-5 text-sm space-y-4">
-            <div className="flex items-center gap-2 font-bold text-amber-900 border-b border-amber-200/50 pb-2">
+          <div className="bg-amber-50/50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl p-5 text-sm space-y-4">
+            <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200 border-b border-amber-200/50 dark:border-amber-900/30 pb-2">
               <AlertCircle className="w-5 h-5" /> গুরুত্বপূর্ণ নির্দেশনা (Instructions)
             </div>
-            <ul className="space-y-2 text-amber-900/90 font-medium">
+            <ul className="space-y-2 text-amber-900/90 dark:text-amber-300/90 font-medium">
               <li className="flex items-start gap-2">
-                <span className="text-amber-600 mt-1">•</span>
+                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
                 <span>ফুলস্ক্রিন মোড থেকে বের হবেন না বা ট্যাব পরিবর্তন করবেন না (সতর্কতা রেকর্ড করা হবে)।</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-amber-600 mt-1">•</span>
+                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
                 <span>স্থিতিশীল ইন্টারনেট সংযোগ নিশ্চিত করুন।</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-amber-600 mt-1">•</span>
+                <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
                 <span>৪টি সতর্কতার (Warning) পর পরীক্ষা স্বয়ংক্রিয়ভাবে জমা হয়ে যাবে।</span>
               </li>
               {exam.mcqNegativeMarking > 0 && (
                 <li className="flex items-start gap-2">
                   <span className="text-red-500 mt-1">•</span>
-                  <span className="text-red-700 font-bold">প্রতিটি ভুল MCQ উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কাটা যাবে।</span>
+                  <span className="text-red-700 dark:text-red-400 font-bold">প্রতিটি ভুল MCQ উত্তরের জন্য {exam.mcqNegativeMarking}% নম্বর কাটা যাবে।</span>
                 </li>
               )}
               {hasCQorSQ && (
                 <li className="flex items-start gap-2">
-                  <span className="text-amber-600 mt-1">•</span>
+                  <span className="text-amber-600 dark:text-amber-500 mt-1">•</span>
                   <span>সৃজনশীল/সংক্ষিপ্ত প্রশ্নের উত্তর খাতায় লিখে ছবি তুলে আপলোড করতে পারবেন।</span>
                 </li>
               )}
@@ -594,17 +594,17 @@ export default function ExamLayout() {
 
       {/* Submission Loader */}
       {isSubmitting && (
-        <div className="fixed inset-0 z-[110] bg-white/90 dark:bg-gray-950/90 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[110] bg-background/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
           <div className="flex flex-col items-center gap-6">
             <div className="relative">
-              <div className="w-16 h-16 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+              <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
-                <Check className="w-6 h-6 text-indigo-600 animate-pulse" />
+                <Check className="w-6 h-6 text-primary animate-pulse" />
               </div>
             </div>
             <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">উত্তরপত্র জমা দেওয়া হচ্ছে...</h2>
-              <p className="text-gray-500 font-medium">অনুগ্রহ করে অপেক্ষা করুন (Processing Result...)</p>
+              <h2 className="text-2xl font-bold text-foreground">উত্তরপত্র জমা দেওয়া হচ্ছে...</h2>
+              <p className="text-muted-foreground font-medium">অনুগ্রহ করে অপেক্ষা করুন (Processing Result...)</p>
             </div>
           </div>
         </div>
@@ -612,8 +612,8 @@ export default function ExamLayout() {
 
       {isBlocked && !isSubmitting && (
         <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-          <div className="w-24 h-24 bg-red-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
-            <ShieldAlert className="w-12 h-12 text-red-600" />
+          <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+            <ShieldAlert className="w-12 h-12 text-destructive" />
           </div>
           <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Security Violation Detected</h1>
           <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">

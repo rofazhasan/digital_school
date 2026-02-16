@@ -561,7 +561,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/dashboard')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <LayoutDashboard className="w-4 h-4" />
                   <span className="hidden sm:inline">Dashboard</span>
@@ -570,7 +570,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/exams/evaluations')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Evaluations</span>
@@ -579,7 +579,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/question-bank')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all font-bold text-indigo-600 dark:text-indigo-400"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all font-bold text-primary dark:border-primary/30"
                 >
                   <Library className="w-4 h-4" />
                   <span className="hidden sm:inline">Question Bank</span>
@@ -589,7 +589,7 @@ export default function ExamsPage() {
                   size="sm"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                   <span className="hidden sm:inline">Refresh Sync</span>
@@ -614,7 +614,7 @@ export default function ExamsPage() {
             transition={{ delay: 0.1 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
           >
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -628,7 +628,7 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -642,7 +642,7 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -656,7 +656,7 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -670,7 +670,7 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1210,6 +1210,6 @@ export default function ExamsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
+    </div >
   );
 }

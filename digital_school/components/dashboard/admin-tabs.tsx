@@ -155,17 +155,17 @@ export function AttendanceTab() {
             </CardHeader>
             <CardContent>
                 <div className="grid gap-4 md:grid-cols-3 mb-6">
-                    <div className="p-4 border rounded-lg bg-green-50 border-green-100">
-                        <div className="text-sm font-medium text-green-800">Present</div>
-                        <div className="text-2xl font-bold text-green-900">850</div>
+                    <div className="p-4 border rounded-lg bg-green-50 border-green-100 dark:bg-green-900/20 dark:border-green-800">
+                        <div className="text-sm font-medium text-green-800 dark:text-green-300">Present</div>
+                        <div className="text-2xl font-bold text-green-900 dark:text-green-100">850</div>
                     </div>
-                    <div className="p-4 border rounded-lg bg-red-50 border-red-100">
-                        <div className="text-sm font-medium text-red-800">Absent</div>
-                        <div className="text-2xl font-bold text-red-900">45</div>
+                    <div className="p-4 border rounded-lg bg-red-50 border-red-100 dark:bg-red-900/20 dark:border-red-800">
+                        <div className="text-sm font-medium text-red-800 dark:text-red-300">Absent</div>
+                        <div className="text-2xl font-bold text-red-900 dark:text-red-100">45</div>
                     </div>
-                    <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-100">
-                        <div className="text-sm font-medium text-yellow-800">Late</div>
-                        <div className="text-2xl font-bold text-yellow-900">32</div>
+                    <div className="p-4 border rounded-lg bg-yellow-50 border-yellow-100 dark:bg-yellow-900/20 dark:border-yellow-800">
+                        <div className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Late</div>
+                        <div className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">32</div>
                     </div>
                 </div>
 
@@ -277,9 +277,9 @@ export function BillingTab() {
                                     <TableCell>{inv.amount}</TableCell>
                                     <TableCell>
                                         <Badge className={
-                                            inv.status === 'Paid' ? 'bg-green-100 text-green-800' :
-                                                inv.status === 'Pending' ? 'bg-yellow-100 text-yellow-800' :
-                                                    'bg-red-100 text-red-800'
+                                            inv.status === 'Paid' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' :
+                                                inv.status === 'Pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100' :
+                                                    'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100'
                                         }>{inv.status}</Badge>
                                     </TableCell>
                                     <TableCell className="whitespace-nowrap">{inv.date}</TableCell>
@@ -296,12 +296,12 @@ export function BillingTab() {
 
 export function ChatTab() {
     return (
-        <div className="grid grid-cols-1 md:grid-cols-3 h-auto md:h-[600px] border rounded-lg overflow-hidden bg-white shadow-sm">
-            <div className="border-b md:border-b-0 md:border-r col-span-1 bg-gray-50 p-4 overflow-y-auto">
+        <div className="grid grid-cols-1 md:grid-cols-3 h-auto md:h-[600px] border rounded-lg overflow-hidden bg-card shadow-sm">
+            <div className="border-b md:border-b-0 md:border-r col-span-1 bg-muted p-4 overflow-y-auto">
                 <div className="mb-4">
                     <div className="relative">
                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                        <Input placeholder="Search contacts..." className="pl-9 bg-white" />
+                        <Input placeholder="Search contacts..." className="pl-9 bg-card" />
                     </div>
                 </div>
                 <div className="flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-x-visible no-scrollbar pb-3 md:pb-0">
@@ -319,14 +319,14 @@ export function ChatTab() {
                 </div>
             </div>
             <div className="col-span-1 md:col-span-2 flex flex-col min-h-[400px]">
-                <div className="p-4 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+                <div className="p-4 border-b flex justify-between items-center bg-card sticky top-0 z-10">
                     <div className="font-medium">Support Team</div>
                     <Button variant="ghost" size="sm"><Settings className="h-4 w-4" /></Button>
                 </div>
-                <div className="flex-1 p-4 bg-gray-50 flex items-center justify-center text-muted-foreground">
+                <div className="flex-1 p-4 bg-muted flex items-center justify-center text-muted-foreground">
                     Select a chat to start messaging
                 </div>
-                <div className="p-3 border-t bg-white flex gap-2 sticky bottom-0 z-10">
+                <div className="p-3 border-t bg-card flex gap-2 sticky bottom-0 z-10">
                     <Input placeholder="Type a message..." className="flex-1" />
                     <Button className="px-6">Send</Button>
                 </div>
@@ -429,7 +429,7 @@ export function AdminAdmitCardsTab() {
                         <Button variant="secondary" className="w-full sm:w-auto">Filter Results</Button>
                     </div>
                 </div>
-                <div className="border rounded-lg p-8 text-center text-muted-foreground bg-gray-50 border-dashed">
+                <div className="border rounded-lg p-8 text-center text-muted-foreground bg-muted border-dashed">
                     Select an exam and class to view generated admit cards.
                 </div>
             </CardContent>

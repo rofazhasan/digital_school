@@ -85,12 +85,12 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
   return (
     <div className={`
       flex items-center gap-2 px-3 py-1.5 rounded-full text-sm md:text-base font-bold transition-all shadow-sm border
-      ${isLowTime ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-white text-gray-900 border-gray-200'}
+      ${isLowTime ? 'bg-destructive/10 text-destructive border-destructive/20 animate-pulse' : 'bg-card text-foreground border-border'}
     `}>
       <Clock className="w-4 h-4" />
       <span className="tabular-nums tracking-wide">{formatTime(secondsLeft)}</span>
       {!isOnline && (
-        <span className="flex items-center text-[10px] text-red-500 bg-red-50 px-1.5 py-0.5 rounded border border-red-100 ml-1">
+        <span className="flex items-center text-[10px] text-destructive bg-destructive/5 px-1.5 py-0.5 rounded border border-destructive/10 ml-1">
           <WifiOff className="w-3 h-3 mr-1" />
         </span>
       )}

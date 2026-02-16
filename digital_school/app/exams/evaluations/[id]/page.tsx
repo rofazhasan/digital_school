@@ -2609,10 +2609,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         const isSelected = Number(currentAnswer?.selectedOption) === optionId;
                                         const isCorrect = Number(currentQuestion.correct || (currentQuestion as any).correctOption) === optionId;
 
-                                        let bgClass = "bg-white border-gray-200 hover:bg-gray-50";
-                                        if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
-                                        if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
-                                        if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
+                                        let bgClass = "bg-card border-border hover:bg-accent";
+                                        if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300 dark:bg-green-900/20 dark:border-green-800 dark:ring-green-900/40";
+                                        if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300 dark:bg-red-900/20 dark:border-red-800 dark:ring-red-900/40";
+                                        if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500 dark:bg-green-900/40 dark:border-green-600 dark:ring-green-900/60";
 
                                         return (
                                           <div key={i} className={`p-3 rounded-lg border transition-all flex items-center gap-3 ${bgClass}`}>
@@ -2642,7 +2642,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="space-y-2">
                                         <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column A</div>
                                         {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: p.left, text: p.left })))?.map((item: any, i: number) => (
-                                          <div key={i} className="p-3 bg-white border rounded shadow-sm text-sm min-h-[40px] flex items-center">
+                                          <div key={i} className="p-3 bg-card border border-border rounded shadow-sm text-sm min-h-[40px] flex items-center">
                                             <span className="font-bold mr-2 text-gray-500">{i + 1}.</span>
                                             <UniversalMathJax inline>{cleanupMath(item.text || item.id)}</UniversalMathJax>
                                           </div>
@@ -2651,7 +2651,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="space-y-2">
                                         <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">Column B</div>
                                         {((currentQuestion as any).rightColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: p.right, text: p.right })))?.map((item: any, i: number) => (
-                                          <div key={i} className="p-3 bg-white border rounded shadow-sm text-sm min-h-[40px] flex items-center">
+                                          <div key={i} className="p-3 bg-card border border-border rounded shadow-sm text-sm min-h-[40px] flex items-center">
                                             <span className="font-bold mr-2 text-gray-500">{String.fromCharCode(65 + i)}.</span>
                                             <UniversalMathJax inline>{cleanupMath(item.text || item.id)}</UniversalMathJax>
                                           </div>
@@ -2660,16 +2660,16 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
 
                                     {/* Match Analysis Table */}
-                                    <div className="overflow-hidden rounded-lg border border-gray-200">
+                                    <div className="overflow-hidden rounded-lg border border-border">
                                       <table className="w-full text-sm">
-                                        <thead className="bg-gray-50 text-xs text-gray-500 font-bold uppercase text-left">
+                                        <thead className="bg-muted text-xs text-muted-foreground font-bold uppercase text-left">
                                           <tr>
                                             <th className="px-3 py-2">Item</th>
                                             <th className="px-3 py-2">Your Match</th>
                                             <th className="px-3 py-2 text-center">Status</th>
                                           </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100">
+                                        <tbody className="divide-y divide-border">
                                           {((currentQuestion as any).leftColumn || (currentQuestion as any).pairs?.map((p: any, i: number) => ({ id: i, text: p.left })))?.map((leftItem: any, lIdx: number) => {
                                             // Determine Student's Match
                                             let studentRightText = "Unmatched";

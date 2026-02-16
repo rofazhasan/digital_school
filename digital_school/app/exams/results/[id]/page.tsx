@@ -1559,12 +1559,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : type === 'MTF' ? (
                                     <div className="mb-4">
-                                      <div className="text-gray-800 mb-4 font-medium">
+                                      <div className="text-foreground mb-4 font-medium">
                                         <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {(question as any).pairs?.map((p: any, pidx: number) => (
-                                          <div key={pidx} className="flex items-center justify-between p-2 bg-white rounded text-xs border border-gray-100 shadow-sm">
+                                          <div key={pidx} className="flex items-center justify-between p-2 bg-card rounded text-xs border border-border shadow-sm">
                                             <div className="font-medium"><UniversalMathJax dynamic>{p.left}</UniversalMathJax></div>
                                             <div className="px-2">→</div>
                                             <div className="font-medium text-blue-700"><UniversalMathJax dynamic>{p.right}</UniversalMathJax></div>
@@ -1574,7 +1574,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : (
                                     <div className="mb-4">
-                                      <div className="text-lg font-medium text-gray-800">
+                                      <div className="text-lg font-medium text-foreground">
                                         <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                     </div>
@@ -1626,23 +1626,23 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           if (isSelected && isCorrectOpt) {
                                             // 1. Correct and Selected -> GREEN
-                                            containerStyle = "border-green-500 bg-green-50 text-green-900 shadow-md ring-1 ring-green-200 transform scale-[1.01]";
-                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-100" />;
-                                            labelStyle = "bg-green-200 text-green-800";
+                                            containerStyle = "border-green-500 bg-green-50 text-green-900 shadow-md ring-1 ring-green-200 transform scale-[1.01] dark:bg-green-900/20 dark:text-green-100 dark:ring-green-900/40";
+                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-100 dark:fill-green-900/40" />;
+                                            labelStyle = "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200";
                                           } else if (isSelected && !isCorrectOpt) {
                                             // 2. Wrong and Selected -> RED
-                                            containerStyle = "border-red-500 bg-red-50 text-red-900 shadow-md ring-1 ring-red-200";
-                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-100" />;
-                                            labelStyle = "bg-red-200 text-red-800";
+                                            containerStyle = "border-red-500 bg-red-50 text-red-900 shadow-md ring-1 ring-red-200 dark:bg-red-900/20 dark:text-red-100 dark:ring-red-900/40";
+                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-100 dark:fill-red-900/40" />;
+                                            labelStyle = "bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200";
                                           } else if (!isSelected && isCorrectOpt) {
                                             // 3. Correct but NOT Selected -> BLUE/TEAL (Distinct)
-                                            containerStyle = "border-teal-400 bg-teal-50 text-teal-900 border-dashed ring-1 ring-teal-100";
+                                            containerStyle = "border-teal-400 bg-teal-50 text-teal-900 border-dashed ring-1 ring-teal-100 dark:bg-teal-900/20 dark:text-teal-100 dark:ring-teal-900/40";
                                             icon = <CheckCircle className="h-5 w-5 text-teal-600 flex-shrink-0" />;
-                                            labelStyle = "bg-teal-200 text-teal-800";
+                                            labelStyle = "bg-teal-200 text-teal-800 dark:bg-teal-800 dark:text-teal-200";
                                           } else {
                                             // 4. Wrong and NOT Selected -> GRAY (Faded)
-                                            containerStyle = "border-gray-100 bg-white text-gray-400 opacity-60 hover:opacity-100 transition-opacity";
-                                            labelStyle = "bg-gray-100 text-gray-500";
+                                            containerStyle = "border-border bg-card text-muted-foreground opacity-60 hover:opacity-100 transition-opacity";
+                                            labelStyle = "bg-muted text-muted-foreground";
                                           }
 
                                           return (

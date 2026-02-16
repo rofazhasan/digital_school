@@ -85,15 +85,15 @@ const MCQOption = memo(({
 
     // Result mode
     if (showResult) {
-      if (isCorrect) return `${base} bg-emerald-50/90 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10`;
-      if (isSelected && !isCorrect) return `${base} bg-rose-50/90 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10`;
-      return `${base} bg-gray-50/50 border-gray-100/50 text-gray-400 opacity-60 grayscale`;
+      if (isCorrect) return `${base} bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-100`;
+      if (isSelected && !isCorrect) return `${base} bg-rose-50 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10 dark:bg-rose-950/30 dark:border-rose-700 dark:text-rose-100`;
+      return `${base} bg-muted/30 border-border text-muted-foreground opacity-60 grayscale`;
     }
 
     // Interaction mode
-    if (isSelected) return `${base} bg-blue-50/90 border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500 transform scale-[1.01] z-10`;
+    if (isSelected) return `${base} bg-primary/10 border-primary shadow-lg shadow-primary/20 ring-1 ring-primary transform scale-[1.01] z-10 dark:bg-primary/20 dark:ring-primary/40`;
 
-    return `${base} bg-white/60 dark:bg-gray-900/60 border-gray-200/50 dark:border-gray-800/50 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5`;
+    return `${base} bg-card border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5`;
   };
 
   return (
@@ -107,8 +107,8 @@ const MCQOption = memo(({
         flex-shrink-0 w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-sm md:text-base font-bold transition-all duration-300 shadow-sm
         ${showResult && isCorrect ? 'bg-emerald-500 text-white shadow-emerald-200' :
           showResult && isSelected && !isCorrect ? 'bg-rose-500 text-white shadow-rose-200' :
-            isSelected ? 'bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-blue-200 scale-110' :
-              'bg-gray-100/80 text-gray-500 group-hover:bg-white group-hover:text-blue-600 group-hover:shadow-md group-hover:scale-110'}
+            isSelected ? 'bg-primary text-primary-foreground shadow-primary/20 scale-110' :
+              'bg-muted text-muted-foreground group-hover:bg-card group-hover:text-primary group-hover:shadow-md group-hover:scale-110'}
       `}>
         {String.fromCharCode(65 + index)}
       </div>
@@ -127,7 +127,7 @@ const MCQOption = memo(({
             <ZoomableImage
               src={option.image}
               alt="Option"
-              className="max-h-48 w-full rounded-lg border border-gray-100 bg-white p-1 shadow-sm group-hover:shadow-md transition-shadow"
+              className="max-h-48 w-full rounded-lg border border-border bg-card p-1 shadow-sm group-hover:shadow-md transition-shadow"
             />
           </div>
         )}
@@ -136,8 +136,8 @@ const MCQOption = memo(({
       {/* Result Icons */}
       {showResult && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
-          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-white rounded-full p-1 shadow-sm" />}
-          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-white rounded-full p-1 shadow-sm" />}
+          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-background rounded-full p-1 shadow-sm" />}
+          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-background rounded-full p-1 shadow-sm" />}
         </div>
       )}
     </button>
@@ -176,14 +176,14 @@ const MCOption = memo(({
     const base = "w-full text-left p-4 md:p-5 rounded-2xl border flex items-start gap-4 md:gap-5 transition-all duration-300 group relative overflow-hidden backdrop-blur-sm";
 
     if (showResult) {
-      if (isCorrect) return `${base} bg-emerald-50/90 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10`;
-      if (isSelected && !isCorrect) return `${base} bg-rose-50/90 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10`;
-      return `${base} bg-gray-50/50 border-gray-100 text-gray-400 opacity-60 grayscale`;
+      if (isCorrect) return `${base} bg-emerald-50 border-emerald-500 text-emerald-900 shadow-md shadow-emerald-500/10 dark:bg-emerald-950/30 dark:border-emerald-700 dark:text-emerald-100`;
+      if (isSelected && !isCorrect) return `${base} bg-rose-50 border-rose-500 text-rose-900 shadow-md shadow-rose-500/10 dark:bg-rose-950/30 dark:border-rose-700 dark:text-rose-100`;
+      return `${base} bg-muted/30 border-border text-muted-foreground opacity-60 grayscale`;
     }
 
-    if (isSelected) return `${base} bg-blue-50/90 border-blue-500 shadow-lg shadow-blue-500/20 ring-1 ring-blue-500 transform scale-[1.01] z-10`;
+    if (isSelected) return `${base} bg-primary/10 border-primary shadow-lg shadow-primary/20 ring-1 ring-primary transform scale-[1.01] z-10 dark:bg-primary/20 dark:ring-primary/40`;
 
-    return `${base} bg-white/60 dark:bg-gray-900/60 border-gray-200/50 dark:border-gray-800/50 hover:border-blue-300 hover:bg-blue-50/40 hover:shadow-lg hover:shadow-blue-500/5 hover:-translate-y-0.5`;
+    return `${base} bg-card border-border hover:border-primary/50 hover:bg-accent/50 hover:shadow-lg hover:shadow-primary/5 hover:-translate-y-0.5`;
   };
 
   return (
@@ -194,7 +194,7 @@ const MCOption = memo(({
     >
       <div className={`
         flex-shrink-0 w-6 h-6 md:w-7 md:h-7 rounded-lg border-2 flex items-center justify-center transition-all duration-300
-        ${isSelected ? 'bg-blue-600 border-blue-600 text-white shadow-sm scale-110' : 'bg-white border-gray-300 text-transparent group-hover:border-blue-400'}
+        ${isSelected ? 'bg-primary border-primary text-primary-foreground shadow-sm scale-110' : 'bg-card border-border text-transparent group-hover:border-primary/50'}
         ${showResult && isCorrect ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-100' : ''}
         ${showResult && isSelected && !isCorrect ? 'bg-rose-600 border-rose-600 text-white shadow-rose-100' : ''}
       `}>
@@ -250,18 +250,18 @@ const MTFGrid = ({
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
 
       {/* --- DESKTOP VIEW (Table) --- */}
-      <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-100 shadow-sm bg-white">
+      <div className="hidden md:block overflow-x-auto rounded-2xl border border-border shadow-sm bg-card">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="bg-gray-50/50">
-              <th className="p-4 text-left text-sm font-bold text-gray-400 uppercase tracking-widest border-b border-gray-100">Item</th>
+            <tr className="bg-muted/30">
+              <th className="p-4 text-left text-sm font-bold text-muted-foreground uppercase tracking-widest border-b border-border">Item</th>
               {rightColumn.map((rc: any) => (
-                <th key={rc.id} className="p-4 text-center border-b border-gray-100">
+                <th key={rc.id} className="p-4 text-center border-b border-border">
                   <div className="flex flex-col items-center gap-1">
-                    <span className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-indigo-50">
+                    <span className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm shadow-sm ring-2 ring-primary/20">
                       {rc.id}
                     </span>
-                    <div className="text-[10px] md:text-xs font-medium text-gray-500 max-w-[80px] truncate">
+                    <div className="text-[10px] md:text-xs font-medium text-muted-foreground max-w-[80px] truncate">
                       <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
                     </div>
                   </div>
@@ -271,13 +271,13 @@ const MTFGrid = ({
           </thead>
           <tbody>
             {leftColumn.map((lc: any) => (
-              <tr key={lc.id} className="group hover:bg-indigo-50/20 transition-colors">
-                <td className="p-4 border-b border-gray-50">
+              <tr key={lc.id} className="group hover:bg-primary/5 transition-colors">
+                <td className="p-4 border-b border-border">
                   <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded bg-gray-100 text-gray-600 flex items-center justify-center font-bold text-xs">
+                    <span className="w-6 h-6 rounded bg-muted text-muted-foreground flex items-center justify-center font-bold text-xs">
                       {lc.id}
                     </span>
-                    <div className="text-sm md:text-base font-semibold text-gray-800">
+                    <div className="text-sm md:text-base font-semibold text-foreground/80">
                       <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
                     </div>
                   </div>
@@ -289,16 +289,16 @@ const MTFGrid = ({
                   const isMissedCorrect = showResult && !isSelected && correctMatches[lc.id] === rc.id;
 
                   return (
-                    <td key={rc.id} className="p-4 text-center border-b border-gray-50">
+                    <td key={rc.id} className="p-4 text-center border-b border-border">
                       <button
                         onClick={() => onSelect(lc.id, rc.id)}
                         disabled={disabled || showResult}
                         className={`
                           w-8 h-8 rounded-full border-2 transition-all duration-200 flex items-center justify-center
-                          ${isSelected ? 'bg-indigo-600 border-indigo-600 text-white scale-110 shadow-md' : 'bg-white border-gray-200 hover:border-indigo-300 hover:bg-indigo-50'}
-                          ${showResult && isCorrect ? 'bg-green-600 border-green-600 text-white shadow-green-200' : ''}
+                          ${isSelected ? 'bg-primary border-primary text-primary-foreground scale-110 shadow-md' : 'bg-card border-border hover:border-primary/50 hover:bg-primary/5'}
+                          ${showResult && isCorrect ? 'bg-emerald-600 border-emerald-600 text-white shadow-emerald-200' : ''}
                           ${showResult && isWrongSelection ? 'bg-red-600 border-red-600 text-white shadow-red-200' : ''}
-                          ${showResult && isMissedCorrect ? 'border-green-500 border-dashed animate-pulse ring-2 ring-green-50' : ''}
+                          ${showResult && isMissedCorrect ? 'border-emerald-500 border-dashed animate-pulse ring-2 ring-emerald-50 dark:ring-emerald-900/30' : ''}
                           ${showResult && !isSelected && !isCorrect ? 'opacity-30 grayscale' : ''}
                         `}
                       >
@@ -332,12 +332,12 @@ const MTFGrid = ({
                 <div
                   className={`
                     p-4 rounded-xl border-2 transition-all active:scale-[0.98] cursor-pointer
-                    ${isCorrect ? 'bg-green-50 border-green-200' : isWrong ? 'bg-red-50 border-red-200' : currentMatchId ? 'bg-indigo-50 border-indigo-200' : 'bg-white border-gray-100 hover:border-indigo-100'}
+                    ${isCorrect ? 'bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800' : isWrong ? 'bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-800' : currentMatchId ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/40' : 'bg-card border-border hover:border-primary/20'}
                   `}
                   onClick={() => !disabled && !showResult && setActiveLeftId(lc.id)}
                 >
                   <div className="flex justify-between items-center mb-2">
-                    <span className="w-6 h-6 rounded bg-black/5 text-gray-600 flex items-center justify-center font-bold text-xs">
+                    <span className="w-6 h-6 rounded bg-muted text-muted-foreground flex items-center justify-center font-bold text-xs">
                       {lc.id}
                     </span>
                     {currentMatchId && (
@@ -347,14 +347,14 @@ const MTFGrid = ({
                     )}
                   </div>
 
-                  <div className="font-medium text-gray-800 mb-3">
+                  <div className="font-medium text-foreground/90 mb-3">
                     <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
                   </div>
 
                   {/* Connected Right Item Preview */}
                   {currentMatchId ? (
-                    <div className="p-2 bg-white/50 rounded-lg border border-black/5 text-sm text-gray-600 flex items-center gap-2">
-                      <div className="w-1 h-8 bg-indigo-500 rounded-full"></div>
+                    <div className="p-2 bg-muted/30 rounded-lg border border-border text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="w-1 h-8 bg-primary rounded-full"></div>
                       <div className="line-clamp-2 w-full">
                         <UniversalMathJax inline dynamic>{currentMatchText}</UniversalMathJax>
                       </div>
@@ -414,22 +414,22 @@ const MTFGrid = ({
       </div>
 
       {showResult && (
-        <div className="md:hidden bg-blue-50/50 rounded-xl p-4 border border-blue-100">
-          <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Detailed Results</p>
+        <div className="md:hidden bg-blue-50/50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-100 dark:border-blue-900/30">
+          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-2">Detailed Results</p>
           <div className="grid grid-cols-1 gap-2">
             {leftColumn.map((lc: any) => {
               const uAns = matches[lc.id];
               const cAns = correctMatches[lc.id];
               const isCorrect = uAns === cAns;
               return (
-                <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
-                  <span className="font-bold text-gray-500">{lc.id}</span>
+                <div key={lc.id} className="flex items-center justify-between p-2 bg-card rounded border border-border text-sm">
+                  <span className="font-bold text-muted-foreground">{lc.id}</span>
                   <div className="flex items-center gap-2">
-                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>
+                    <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}>
                       <UniversalMathJax inline dynamic>{uAns ? getRightText(uAns) : '?'}</UniversalMathJax>
                     </span>
-                    <span className="text-gray-300">→</span>
-                    <span className="text-green-700 font-bold">
+                    <span className="text-muted-foreground/30">→</span>
+                    <span className="text-emerald-700 dark:text-emerald-300 font-bold">
                       <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
                     </span>
                   </div>
@@ -441,22 +441,22 @@ const MTFGrid = ({
       )}
 
       {showResult && (
-        <div className="hidden md:block bg-blue-50/50 rounded-xl p-4 border border-blue-100">
-          <p className="text-xs font-bold text-blue-700 uppercase tracking-widest mb-2">Detailed Results</p>
+        <div className="hidden md:block bg-blue-50/50 dark:bg-blue-950/20 rounded-xl p-4 border border-blue-100 dark:border-blue-900/30">
+          <p className="text-xs font-bold text-blue-700 dark:text-blue-400 uppercase tracking-widest mb-2">Detailed Results</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
             {leftColumn.map((lc: any) => {
               const uAns = matches[lc.id];
               const cAns = correctMatches[lc.id];
               const isCorrect = uAns === cAns;
               return (
-                <div key={lc.id} className="flex items-center justify-between p-2 bg-white rounded border border-gray-100 text-sm">
-                  <span className="font-bold text-gray-500">{lc.id}</span>
+                <div key={lc.id} className="flex items-center justify-between p-2 bg-card rounded border border-border text-sm">
+                  <span className="font-bold text-muted-foreground">{lc.id}</span>
                   <div className="flex items-center gap-2">
-                    <span className={isCorrect ? 'text-green-600' : 'text-red-500'}>
+                    <span className={isCorrect ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-500 dark:text-rose-400'}>
                       <UniversalMathJax inline dynamic>{uAns ? getRightText(uAns) : '?'}</UniversalMathJax>
                     </span>
-                    <span className="text-gray-300">→</span>
-                    <span className="text-green-700 font-bold">
+                    <span className="text-muted-foreground/30">→</span>
+                    <span className="text-emerald-700 dark:text-emerald-300 font-bold">
                       <UniversalMathJax inline dynamic>{getRightText(cAns)}</UniversalMathJax>
                     </span>
                   </div>
@@ -561,17 +561,17 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
-      <Card className="w-full max-w-3xl mx-auto shadow-sm border border-gray-100 bg-white rounded-2xl overflow-hidden font-exam-online">
+      <Card className="w-full max-w-3xl mx-auto shadow-sm border border-border bg-card rounded-2xl overflow-hidden font-exam-online">
         <CardContent className="p-6 md:p-8">
 
           {/* Header Meta */}
           <div className="flex justify-between items-start mb-6">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <Badge variant="outline" className="text-xs font-semibold tracking-wider text-gray-500 border-gray-200">
+                <Badge variant="outline" className="text-xs font-semibold tracking-wider text-muted-foreground border-border">
                   {(type || "").toUpperCase()}
                 </Badge>
-                <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-transparent">
+                <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-transparent">
                   {question.marks} Point{Number(question.marks) !== 1 && 's'}
                 </Badge>
               </div>
@@ -581,7 +581,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                 variant="ghost"
                 size="sm"
                 onClick={handleMarkQuestion}
-                className={`gap-2 text-xs font-medium ${navigation.marked[question.id] ? 'text-amber-600 bg-amber-50' : 'text-gray-400 hover:text-gray-600'}`}
+                className={`gap-2 text-xs font-medium ${navigation.marked[question.id] ? 'text-amber-600 bg-amber-50 dark:bg-amber-950/20' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 {navigation.marked[question.id] ? (
                   <><Check className="w-3.5 h-3.5" /> Reviewed</>
@@ -593,22 +593,22 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
           </div>
 
           {/* Question Text */}
-          <div className={`prose prose-indigo max-w-none text-gray-800 font-medium leading-relaxed mb-8 ${getTextSize('text-base md:text-xl')}`}>
+          <div className={`prose prose-indigo dark:prose-invert max-w-none text-foreground/90 font-medium leading-relaxed mb-8 ${getTextSize('text-base md:text-xl')}`}>
             {type === "ar" ? (
               <div className="space-y-4">
-                <div className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 flex flex-col gap-2">
+                <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-indigo-600 text-white hover:bg-indigo-700 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Assertion (A)</Badge>
+                    <Badge className="bg-primary text-primary-foreground hover:bg-primary/90 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Assertion (A)</Badge>
                   </div>
-                  <div className="text-base md:text-lg text-gray-800 leading-relaxed font-semibold">
+                  <div className="text-base md:text-lg text-foreground/90 leading-relaxed font-semibold">
                     <UniversalMathJax inline dynamic>{cleanupMath(question.assertion || text || "")}</UniversalMathJax>
                   </div>
                 </div>
-                <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-100 flex flex-col gap-2">
+                <div className="p-4 bg-purple-50/50 dark:bg-purple-950/20 rounded-xl border border-purple-100 dark:border-purple-900/30 flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <Badge className="bg-purple-600 text-white hover:bg-purple-700 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Reason (R)</Badge>
+                    <Badge className="bg-purple-600 dark:bg-purple-500 text-white hover:bg-purple-700 pointer-events-none px-2 py-0 h-5 text-[10px] font-bold uppercase">Reason (R)</Badge>
                   </div>
-                  <div className="text-base md:text-lg text-gray-800 leading-relaxed font-semibold">
+                  <div className="text-base md:text-lg text-foreground/90 leading-relaxed font-semibold">
                     <UniversalMathJax inline dynamic>{cleanupMath(question.reason || "")}</UniversalMathJax>
                   </div>
                 </div>
@@ -722,7 +722,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                       value={userAnswer || ""}
                       onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
                       disabled={disabled || submitted}
-                      className="w-full min-h-[200px] p-4 rounded-xl border border-gray-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none resize-y text-base"
+                      className="w-full min-h-[200px] p-4 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-y text-base"
                       placeholder="Type your answer here..."
                     />
                     <div className="space-y-2">
@@ -735,14 +735,14 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
                         return allImages.length > 0 ? (
                           <div>
-                            <div className="text-xs font-semibold text-gray-600 mb-2">Uploaded Images ({allImages.length}/5)</div>
+                            <div className="text-xs font-semibold text-muted-foreground mb-2">Uploaded Images ({allImages.length}/5)</div>
                             <div className="flex flex-wrap gap-2">
                               {allImages.map((imgUrl: string, idx: number) => (
                                 <div key={idx} className="relative group">
                                   <ZoomableImage
                                     src={imgUrl}
                                     alt={`Answer ${idx + 1}`}
-                                    className="h-20 w-20 object-cover rounded border border-gray-300"
+                                    className="h-20 w-20 object-cover rounded border border-border"
                                   />
                                   {!disabled && !submitted && (
                                     <button

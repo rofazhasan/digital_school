@@ -470,7 +470,7 @@ export default function StudentDashboardPage() {
                   </motion.div>
 
                   <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                    <Card className="border-0 shadow-lg shadow-green-500/10 hover:shadow-green-500/20 transition-all bg-white/60 dark:bg-gray-900/60 backdrop-blur-md group overflow-hidden">
+                    <Card className="border-border shadow-lg shadow-green-500/10 hover:shadow-green-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-green-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground z-10">Last Result</CardTitle>
@@ -497,7 +497,7 @@ export default function StudentDashboardPage() {
                   </motion.div>
 
                   <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                    <Card className="border-0 shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all bg-white/60 dark:bg-gray-900/60 backdrop-blur-md group overflow-hidden">
+                    <Card className="border-border shadow-lg shadow-purple-500/10 hover:shadow-purple-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-purple-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground z-10">Attendance</CardTitle>
@@ -515,7 +515,7 @@ export default function StudentDashboardPage() {
                   </motion.div>
 
                   <motion.div whileHover={{ y: -5 }} transition={{ type: "spring", stiffness: 300 }}>
-                    <Card className="border-0 shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all bg-white/60 dark:bg-gray-900/60 backdrop-blur-md group overflow-hidden">
+                    <Card className="border-border shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 transition-all bg-card/60 backdrop-blur-md group overflow-hidden">
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-orange-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium text-muted-foreground z-10">GPA / Grade</CardTitle>
@@ -535,7 +535,7 @@ export default function StudentDashboardPage() {
 
                 {/* Attendance & Class Rank Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  <Card className="lg:col-span-2 shadow-lg shadow-gray-200/50 dark:shadow-none border-0 bg-white dark:bg-gray-900">
+                  <Card className="lg:col-span-2 shadow-lg shadow-gray-200/50 dark:shadow-none border border-border bg-card">
                     <CardHeader>
                       <CardTitle className="flex items-center">
                         <Calendar className="h-5 w-5 mr-2 text-primary" />
@@ -582,7 +582,7 @@ export default function StudentDashboardPage() {
                     </CardContent>
                   </Card>
 
-                  <Card className="shadow-lg shadow-primary/5 border-primary/10 bg-gradient-to-b from-white to-blue-50/30 dark:from-gray-900 dark:to-gray-900/50">
+                  <Card className="shadow-lg shadow-primary/5 border border-border bg-card">
                     <CardHeader>
                       <CardTitle className="flex items-center">
                         <Users className="h-5 w-5 mr-2 text-primary" />
@@ -622,7 +622,7 @@ export default function StudentDashboardPage() {
                   <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Achievements</h2>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2">
-                      <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border-0 h-full bg-white dark:bg-gray-900">
+                      <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border border-border h-full bg-card">
                         <CardHeader>
                           <CardTitle className="flex items-center">
                             <Trophy className="h-5 w-5 mr-2 text-yellow-500" />
@@ -657,7 +657,7 @@ export default function StudentDashboardPage() {
                       </Card>
                     </div>
 
-                    <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border-0 h-full bg-white dark:bg-gray-900">
+                    <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border border-border h-full bg-card">
                       <CardHeader>
                         <CardTitle className="flex items-center">
                           <TrendingUp className="h-5 w-5 mr-2 text-blue-500" />
@@ -709,7 +709,7 @@ export default function StudentDashboardPage() {
                   <Card className="border-t-4 border-t-primary shadow-lg shadow-gray-200/50 dark:shadow-none border-x-0 border-b-0">
                     <Accordion type="single" collapsible className="w-full">
                       {notices.map((notice, index) => (
-                        <AccordionItem key={notice.id} value={`item-${index}`} className="px-4 border-b border-gray-100 dark:border-gray-800">
+                        <AccordionItem key={notice.id} value={`item-${index}`} className="px-4 border-b border-border">
                           <AccordionTrigger className="hover:no-underline py-4 group">
                             <div className="flex items-center gap-3 text-left w-full pr-4">
                               <Badge className={`${getPriorityColor(notice.priority)} border-0`}>
@@ -720,7 +720,7 @@ export default function StudentDashboardPage() {
                             </div>
                           </AccordionTrigger>
                           <AccordionContent className="pb-4 pt-1 text-muted-foreground">
-                            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-xl text-sm leading-relaxed border border-gray-100 dark:border-gray-800">
+                            <div className="bg-muted p-4 rounded-xl text-sm leading-relaxed border border-border">
                               {notice.content}
                             </div>
                           </AccordionContent>
@@ -762,7 +762,7 @@ export default function StudentDashboardPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.1 }}
                       >
-                        <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-white dark:bg-gray-900">
+                        <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-card">
                           <CardHeader className="bg-gray-50/50 dark:bg-gray-900 pb-4 border-b border-gray-100 dark:border-gray-800">
                             <div className="flex items-center justify-between mb-2">
                               <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'} className="uppercase text-[10px] tracking-wider font-bold">
