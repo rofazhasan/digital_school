@@ -95,7 +95,7 @@ export function StudentAnalyticsTab({ analytics }: StudentAnalyticsTabProps) {
                 beginAtZero: true,
                 max: 100,
                 grid: {
-                    color: 'rgba(0, 0, 0, 0.05)'
+                    color: 'rgba(156, 163, 175, 0.1)'
                 }
             },
             x: {
@@ -123,7 +123,7 @@ export function StudentAnalyticsTab({ analytics }: StudentAnalyticsTabProps) {
             )}
 
             <div className="grid gap-6 md:grid-cols-2">
-                <Card className="shadow-sm border-none bg-slate-50/50">
+                <Card className="shadow-sm border-none bg-muted/50">
                     <CardHeader>
                         <CardTitle className="text-lg">Academic Progress</CardTitle>
                         <CardDescription>Your performance trend across all exams.</CardDescription>
@@ -139,7 +139,7 @@ export function StudentAnalyticsTab({ analytics }: StudentAnalyticsTabProps) {
                     </CardContent>
                 </Card>
 
-                <Card className="shadow-sm border-none bg-slate-50/50">
+                <Card className="shadow-sm border-none bg-muted/50">
                     <CardHeader>
                         <CardTitle className="text-lg">Subject-wise Mastery</CardTitle>
                         <CardDescription>Average scores across different subjects.</CardDescription>

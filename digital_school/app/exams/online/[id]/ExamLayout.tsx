@@ -29,7 +29,7 @@ const MobileNavigator = memo(({
   marked: any;
 }) => {
   return (
-    <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar pb-2 bg-white/50 dark:bg-gray-950/50 backdrop-blur-md rounded-2xl mb-4 border border-gray-100 dark:border-gray-800">
+    <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar pb-2 bg-background/50 backdrop-blur-md rounded-2xl mb-4 border border-border">
       {questions.map((q, idx) => {
         const isCurrent = idx === currentIndex;
         const isAnswered = !!answers[q.id];
@@ -372,7 +372,7 @@ export default function ExamLayout() {
   return (
     <div className={cn(
       "min-h-screen flex flex-col font-exam-online transition-colors duration-500 ease-in-out",
-      illusionMode ? "illusion-mode" : "bg-gray-50 dark:bg-background",
+      illusionMode ? "illusion-mode" : "bg-background",
       isExamActive && (!isFullscreen || !isTabActive) ? 'select-none blur-sm' : ''
     )}>
 

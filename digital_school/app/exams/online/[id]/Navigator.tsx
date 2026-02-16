@@ -71,7 +71,7 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
 
   return (
     <div className={`
-          flex flex-col bg-white/60 dark:bg-gray-950/60 backdrop-blur-xl transition-all duration-300
+          flex flex-col bg-background/60 backdrop-blur-xl transition-all duration-300
           ${isCollapsed ? 'w-14 items-center' : 'w-full'}
           h-full max-h-full overflow-hidden
         `}>

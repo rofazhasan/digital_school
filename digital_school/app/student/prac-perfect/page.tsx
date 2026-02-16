@@ -109,15 +109,15 @@ export default function PracPerfectPage() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div className="min-h-screen bg-slate-50 font-fancy">
+            <div className="min-h-screen bg-background font-fancy">
                 {/* Header Section */}
-                <div className="bg-white border-b sticky top-0 z-30 shadow-sm">
+                <div className="bg-card border-b sticky top-0 z-30 shadow-sm">
                     <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                         <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/student/dashboard')}>
                             <div className="bg-gradient-to-br from-indigo-500 to-violet-600 p-2 rounded-lg shadow-lg shadow-indigo-200">
                                 <Sparkles className="w-5 h-5 text-white" />
                             </div>
-                            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-violet-600">
+                            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
                                 PracPerfect
                             </span>
                         </div>
@@ -128,12 +128,12 @@ export default function PracPerfectPage() {
                 </div>
 
                 {/* Hero / Welcome */}
-                <div className="bg-white border-b border-slate-100 py-8">
+                <div className="bg-card border-b border-border py-8">
                     <div className="max-w-7xl mx-auto px-4">
                         <h1 className="text-3xl font-extrabold text-slate-900 mb-2">
                             Your Personal <span className="text-indigo-600">Practice Studio</span>
                         </h1>
-                        <p className="text-slate-500">
+                        <p className="text-muted-foreground">
                             Select questions from your class curriculum and start a practice session to master your subjects.
                         </p>
                     </div>
@@ -146,7 +146,7 @@ export default function PracPerfectPage() {
                         <div className="lg:col-span-3 space-y-6">
 
                             {/* Filter Bar */}
-                            <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-col md:flex-row gap-4 items-center sticky top-20 z-30">
+                            <div className="bg-card p-4 rounded-xl shadow-sm border border-border flex flex-col md:flex-row gap-4 items-center sticky top-20 z-30">
                                 <div className="relative flex-1 w-full">
                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                                     <Input
@@ -183,7 +183,7 @@ export default function PracPerfectPage() {
                                             {uniqueTopics.map(t => <SelectItem key={t} value={t!}>{t}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
-                                    <div className="flex bg-slate-100 p-1 rounded-md">
+                                    <div className="flex bg-muted p-1 rounded-md">
                                         <button onClick={() => setViewMode('grid')} className={`p-2 rounded ${viewMode === 'grid' ? 'bg-white shadow' : ''}`}><LayoutGrid className="w-4 h-4" /></button>
                                         <button onClick={() => setViewMode('list')} className={`p-2 rounded ${viewMode === 'list' ? 'bg-white shadow' : ''}`}><ListIcon className="w-4 h-4" /></button>
                                     </div>
@@ -193,7 +193,7 @@ export default function PracPerfectPage() {
                             {/* Questions Grid */}
                             <div>
                                 <div className="flex justify-between items-center mb-4 px-1">
-                                    <p className="font-semibold text-slate-700">Available Questions ({filteredQuestions.length})</p>
+                                    <p className="font-semibold text-muted-foreground">Available Questions ({filteredQuestions.length})</p>
                                     {filteredQuestions.length > 0 && (
                                         <div className="flex gap-2">
                                             {selectedIds.size > 0 && (
@@ -218,7 +218,7 @@ export default function PracPerfectPage() {
                                                     onClick={() => toggleSelection(q.id)}
                                                     className={`
                                                         group relative rounded-xl border-2 transition-all cursor-pointer overflow-hidden
-                                                        ${isSelected ? 'bg-indigo-50/50 border-indigo-500 shadow-md' : 'bg-white border-transparent hover:border-indigo-200 hover:shadow-lg'}
+                                                        ${isSelected ? 'bg-primary/5 border-primary shadow-md' : 'bg-card border-transparent hover:border-primary/20 hover:shadow-lg'}
                                                         ${viewMode === 'list' ? 'p-4 flex gap-4 items-center' : 'p-5 flex flex-col gap-4'}
                                                     `}
                                                 >
@@ -229,7 +229,7 @@ export default function PracPerfectPage() {
                                                     <div className="flex-1 space-y-2">
                                                         <div className="flex flex-wrap gap-2 text-[10px] font-bold uppercase tracking-wider">
                                                             <Badge variant="outline">{q.subject}</Badge>
-                                                            {q.topic && <Badge variant="secondary" className="bg-indigo-50 text-indigo-700 border-indigo-100">{q.topic}</Badge>}
+                                                            {q.topic && <Badge variant="secondary" className="bg-muted text-muted-foreground border-border">{q.topic}</Badge>}
                                                             <Badge className={q.difficulty === 'HARD' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}>{q.difficulty}</Badge>
                                                         </div>
                                                         <div className="text-sm font-medium text-slate-800 line-clamp-3">
@@ -247,13 +247,13 @@ export default function PracPerfectPage() {
                         {/* RIGHT: Stats / Action */}
                         <div className="hidden lg:block">
                             <div className="sticky top-28 space-y-4">
-                                <div className="bg-white rounded-xl shadow-lg border border-indigo-100 p-6">
+                                <div className="bg-card rounded-xl shadow-lg border border-border p-6">
                                     <h3 className="font-bold text-lg mb-1">Your Session</h3>
                                     <p className="text-xs text-slate-500 mb-4">Ready to practice?</p>
 
-                                    <div className="bg-indigo-50 rounded-lg p-4 mb-4 flex justify-between items-center">
-                                        <span className="text-indigo-900 font-medium">Selected</span>
-                                        <span className="text-2xl font-bold text-indigo-600">{selectedIds.size}</span>
+                                    <div className="bg-muted rounded-lg p-4 mb-4 flex justify-between items-center">
+                                        <span className="text-foreground font-medium">Selected</span>
+                                        <span className="text-2xl font-bold text-primary">{selectedIds.size}</span>
                                     </div>
 
                                     <Button
@@ -266,7 +266,7 @@ export default function PracPerfectPage() {
                                     </Button>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-violet-500 to-fuchsia-600 rounded-xl p-6 text-white shadow-lg">
+                                <div className="bg-gradient-to-br from-primary/80 to-primary rounded-xl p-6 text-primary-foreground shadow-lg">
                                     <GraduationCap className="w-8 h-8 mb-2 opacity-80" />
                                     <h4 className="font-bold text-lg">Pro Tip</h4>
                                     <p className="text-sm opacity-90 mt-1">

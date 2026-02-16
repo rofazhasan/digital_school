@@ -270,8 +270,8 @@ export default function StudentDashboardPage() {
     <div className="min-h-screen bg-background text-foreground font-sans relative overflow-x-hidden">
       {/* Background Elements */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
       </div>
 
       {/* Header */}
@@ -285,7 +285,7 @@ export default function StudentDashboardPage() {
                   {/* Use a clear specific text or Icon if image fails, but here we keep the image logic if present, else fallback */}
                   {instituteLogo && instituteLogo !== '/logo.png' ? <img src={instituteLogo} alt={instituteName} className="h-6 w-auto object-contain brightness-0 invert" /> : "DS"}
                 </div>
-                <span className="font-bold text-xl hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
+                <span className="font-bold text-xl hidden sm:block tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
                   {instituteName}
                 </span>
               </div>
@@ -310,8 +310,8 @@ export default function StudentDashboardPage() {
                       }
                     }}
                     className={`flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 ${activeTab === item.id
-                      ? 'bg-white dark:bg-gray-950 text-blue-600 dark:text-blue-400 shadow-sm ring-1 ring-black/5 dark:ring-white/10'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-gray-200/50 dark:hover:bg-gray-700/50'
+                      ? 'bg-card text-primary shadow-sm ring-1 ring-border'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                       }`}
                   >
                     <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-blue-500' : ''}`} />
@@ -337,8 +337,8 @@ export default function StudentDashboardPage() {
                   </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90" align="end" forceMount>
-                <div className="px-3 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-xl mb-2">
+              <DropdownMenuContent className="w-64 p-2 rounded-2xl shadow-xl border-border backdrop-blur-xl bg-card/90" align="end" forceMount>
+                <div className="px-3 py-3 bg-muted/50 rounded-xl mb-2">
                   <p className="text-sm font-semibold leading-none">{user.name}</p>
                   <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
                 </div>
@@ -363,7 +363,7 @@ export default function StudentDashboardPage() {
       </header>
 
       {/* Mobile Navigation */}
-      <div className="lg:hidden sticky top-20 z-40 border-b border-gray-200/50 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-xl overflow-hidden shadow-sm">
+      <div className="lg:hidden sticky top-20 z-40 border-b border-border bg-background/80 backdrop-blur-xl overflow-hidden shadow-sm">
         <div className="max-w-7xl mx-auto px-4">
           <div className="flex space-x-2 py-3 overflow-x-auto no-scrollbar scroll-smooth snap-x items-center custom-scrollbar">
             {[
@@ -384,8 +384,8 @@ export default function StudentDashboardPage() {
                   }
                 }}
                 className={`flex-shrink-0 flex items-center space-x-1.5 px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${activeTab === item.id
-                  ? 'bg-black dark:bg-white text-white dark:text-black border-transparent shadow-md'
-                  : 'bg-white dark:bg-gray-900 text-muted-foreground border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+                  ? 'bg-foreground text-background border-transparent shadow-md'
+                  : 'bg-card text-muted-foreground border-border hover:border-primary/50'
                   }`}
               >
                 <item.icon className="h-3.5 w-3.5" />
@@ -411,7 +411,7 @@ export default function StudentDashboardPage() {
               <>
                 {/* Welcome Section */}
                 <div className="mb-8">
-                  <h1 className="text-3xl md:text-3xl font-bold mb-2 bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  <h1 className="text-3xl md:text-3xl font-bold mb-2 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
                     Welcome back, {user.name}! 👋
                   </h1>
                   <p className="text-muted-foreground text-base md:text-lg">
@@ -591,7 +591,7 @@ export default function StudentDashboardPage() {
                     </CardHeader>
                     <CardContent className="flex flex-col items-center justify-center py-6">
                       <div className="relative mb-4">
-                        <div className="w-32 h-32 rounded-full border-8 border-white dark:border-gray-800 bg-white dark:bg-gray-900 shadow-2xl flex items-center justify-center ring-4 ring-primary/10">
+                        <div className="w-32 h-32 rounded-full border-8 border-card bg-card shadow-2xl flex items-center justify-center ring-4 ring-primary/10">
                           <span className="text-3xl md:text-5xl font-bold text-primary">#{classRank}</span>
                         </div>
                         <div className="absolute -bottom-2 -right-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-full shadow-lg flex items-center">
@@ -679,7 +679,7 @@ export default function StudentDashboardPage() {
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shadow-sm ${student.rank === 1 ? 'bg-gradient-to-br from-yellow-300 to-yellow-500 text-white' :
                                   student.rank === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-400 text-white' :
                                     student.rank === 3 ? 'bg-gradient-to-br from-orange-300 to-orange-500 text-white' :
-                                      'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500'
+                                      'bg-card border border-border text-muted-foreground'
                                   }`}>
                                   {student.rank}
                                 </div>

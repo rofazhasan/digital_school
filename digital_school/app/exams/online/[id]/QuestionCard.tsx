@@ -27,7 +27,7 @@ const ZoomableImage = ({ src, alt, className }: { src: string, alt: string, clas
       </DialogTrigger>
       <DialogContent className="max-w-4xl w-full h-fit max-h-[90vh] p-0 overflow-hidden bg-transparent border-none shadow-none flex items-center justify-center">
         <DialogTitle className="sr-only">Zoomed Image</DialogTitle>
-        <img src={src} alt={alt} className="w-auto h-auto max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl bg-white" />
+        <img src={src} alt={alt} className="w-auto h-auto max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl bg-background" />
       </DialogContent>
     </Dialog>
   );
@@ -108,13 +108,13 @@ const MCQOption = memo(({
         ${showResult && isCorrect ? 'bg-emerald-500 text-white shadow-emerald-200' :
           showResult && isSelected && !isCorrect ? 'bg-rose-500 text-white shadow-rose-200' :
             isSelected ? 'bg-primary text-primary-foreground shadow-primary/20 scale-110' :
-              'bg-muted text-muted-foreground group-hover:bg-card group-hover:text-primary group-hover:shadow-md group-hover:scale-110'}
+              'bg-muted text-muted-foreground group-hover:bg-card-foreground/5 group-hover:text-primary group-hover:shadow-md group-hover:scale-110'}
       `}>
         {String.fromCharCode(65 + index)}
       </div>
 
       {/* Option Text */}
-      <div className={`flex-1 pt-1 ${textSizeClass} leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors`}>
+      <div className={`flex-1 pt-1 ${textSizeClass} leading-relaxed font-medium text-foreground group-hover:text-primary transition-colors`}>
         <div className="min-w-0">
           <MathJax inline dynamic>
             <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
@@ -200,7 +200,7 @@ const MCOption = memo(({
       `}>
         <Check className={`w-4 h-4 md:w-5 md:h-5 ${isSelected || (showResult && isCorrect) ? 'scale-100' : 'scale-0'} transition-transform duration-200`} />
       </div>
-      <div className={`flex-1 pt-0.5 ${textSizeClass} leading-relaxed font-medium text-gray-700 dark:text-gray-200 group-hover:text-gray-900 dark:group-hover:text-white transition-colors`}>
+      <div className={`flex-1 pt-0.5 ${textSizeClass} leading-relaxed font-medium text-foreground group-hover:text-primary transition-colors`}>
         <MathJax inline dynamic>
           <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
         </MathJax>
@@ -209,8 +209,8 @@ const MCOption = memo(({
       {/* Result Icons */}
       {showResult && (
         <div className="absolute right-4 top-1/2 -translate-y-1/2">
-          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-white rounded-full p-1 shadow-sm" />}
-          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-white rounded-full p-1 shadow-sm" />}
+          {isCorrect && <Check className="w-6 h-6 text-emerald-600 bg-background rounded-full p-1 shadow-sm" />}
+          {isSelected && !isCorrect && <X className="w-6 h-6 text-rose-500 bg-background rounded-full p-1 shadow-sm" />}
         </div>
       )}
     </button>
@@ -360,14 +360,14 @@ const MTFGrid = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="py-2 text-center text-xs text-gray-400 border-t border-dashed border-gray-200 mt-2">
+                    <div className="py-2 text-center text-xs text-muted-foreground border-t border-dashed border-border mt-2">
                       Tap to select match
                     </div>
                   )}
 
                   {/* Correct Answer Display in Result Mode */}
                   {showResult && !isCorrect && (
-                    <div className="mt-2 text-xs text-green-600 font-bold bg-green-50 p-2 rounded">
+                    <div className="mt-2 text-xs text-green-600 font-bold bg-green-500/10 p-2 rounded">
                       Correct: {cAns} - {getRightText(cAns)}
                     </div>
                   )}
@@ -378,10 +378,10 @@ const MTFGrid = ({
                 <DialogContent className="max-w-[90vw] max-h-[85vh] overflow-y-auto rounded-3xl">
                   <DialogTitle>Select Match for {lc.id}</DialogTitle>
                   <div className="py-2 space-y-2">
-                    <div className="p-3 bg-gray-50 rounded-lg mb-4 text-sm text-gray-600">
+                    <div className="p-3 bg-muted rounded-lg mb-4 text-sm text-muted-foreground">
                       <UniversalMathJax inline dynamic>{lc.text}</UniversalMathJax>
                     </div>
-                    <div className="h-px bg-gray-100 my-4" />
+                    <div className="h-px bg-border my-4" />
                     {rightColumn.map((rc: any) => {
                       const isSelected = currentMatchId === rc.id;
                       return (
@@ -393,13 +393,13 @@ const MTFGrid = ({
                           }}
                           className={`
                                w-full text-left p-4 rounded-xl border transition-all flex items-start gap-3
-                               ${isSelected ? 'bg-indigo-50 border-indigo-500 ring-1 ring-indigo-500' : 'bg-white border-gray-100 hover:bg-gray-50'}
+                               ${isSelected ? 'bg-primary/10 border-primary ring-1 ring-primary' : 'bg-card border-border hover:bg-muted'}
                              `}
                         >
-                          <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600'}`}>
+                          <span className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
                             {rc.id}
                           </span>
-                          <div className="text-sm font-medium text-gray-700">
+                          <div className="text-sm font-medium text-foreground">
                             <UniversalMathJax inline dynamic>{rc.text}</UniversalMathJax>
                           </div>
                         </button>
@@ -546,7 +546,7 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
     }
   }, [question?.id, navigation.marked, markQuestion, setNavigation, navigation]);
 
-  if (!question) return <div className="p-8 text-center text-gray-500">Question not found</div>;
+  if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
   const userAnswer = answers[question.id];
   const showResult = submitted && result;

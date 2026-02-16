@@ -256,7 +256,7 @@ export default function PracPerfectSessionPage() {
         }
     };
 
-    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50"><div className="animate-pulse">Loading Session...</div></div>;
+    if (loading) return <div className="h-screen flex items-center justify-center bg-background"><div className="animate-pulse">Loading Session...</div></div>;
     if (!questions[currentIndex]) return null;
 
     const currentQ = questions[currentIndex];
@@ -265,11 +265,11 @@ export default function PracPerfectSessionPage() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
+            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-slate-900' : 'bg-background'}`}>
 
                 {/* 1. TOP BAR (Floating) */}
                 <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-50 pointer-events-none">
-                    <div className="pointer-events-auto flex items-center gap-2 bg-white/90 backdrop-blur shadow-sm p-2 rounded-full border border-slate-200">
+                    <div className="pointer-events-auto flex items-center gap-2 bg-card/90 backdrop-blur shadow-sm p-2 rounded-full border border-border">
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => router.push('/student/prac-perfect')}>
                             <ArrowLeft className="w-4 h-4" />
                         </Button>
@@ -278,7 +278,7 @@ export default function PracPerfectSessionPage() {
                         </span>
                     </div>
 
-                    <div className="pointer-events-auto bg-white/90 backdrop-blur shadow-sm px-4 py-2 rounded-full border border-slate-200 flex items-center gap-4 text-sm font-medium tabular-nums text-slate-700">
+                    <div className="pointer-events-auto bg-card/90 backdrop-blur shadow-sm px-4 py-2 rounded-full border border-border flex items-center gap-4 text-sm font-medium tabular-nums text-foreground">
                         <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-indigo-500" />
                             {formatTime(elapsedTime)}
@@ -308,7 +308,7 @@ export default function PracPerfectSessionPage() {
                         ref={questionContainerRef}
                         className="absolute top-20 left-4 md:left-10 w-[95vw] md:w-[600px] lg:w-[900px] xl:w-[1100px] 2xl:w-[1200px] max-h-[calc(100vh-160px)] z-40 overflow-y-auto custom-scrollbar transition-all duration-300 scroll-smooth"
                     >
-                        <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-slate-900/5 ${isDark ? 'bg-slate-900/80 text-white' : 'bg-white/80 text-slate-900'} transition-all duration-500`}>
+                        <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-border ${isDark ? 'bg-slate-900/80 text-white' : 'bg-card/80 text-foreground'} transition-all duration-500`}>
                             <div className="p-6 space-y-6">
                                 {/* Question Header */}
                                 <div className="flex items-start justify-between gap-4">
@@ -520,8 +520,8 @@ export default function PracPerfectSessionPage() {
 
                 {/* 5. SESSION SUMMARY MODAL */}
                 {showSummary && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-6 font-fancy">
-                        <Card className="w-full max-w-md bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-md p-6 font-fancy">
+                        <Card className="w-full max-w-md bg-card shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
                             <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-center text-white">
                                 <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-4">
                                     <Sparkles className="w-10 h-10 text-white" />

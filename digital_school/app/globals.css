@@ -211,11 +211,11 @@
 
 /* Glassmorphism */
 .glass {
-  @apply bg-white/70 dark:bg-slate-900/70 border border-white/20 dark:border-white/10 backdrop-blur-xl shadow-premium;
+  @apply bg-card/70 border border-border backdrop-blur-xl shadow-premium;
 }
 
 .glass-heavy {
-  @apply bg-white/90 dark:bg-slate-900/90 border border-white/20 backdrop-blur-2xl shadow-lg;
+  @apply bg-card/90 border border-border backdrop-blur-2xl shadow-lg;
 }
 
 .glass-panel {
@@ -225,11 +225,11 @@
 }
 
 .glass-card {
-  @apply bg-white/60 dark:bg-slate-900/60 border border-white/20 dark:border-white/10 backdrop-blur-md shadow-premium transition-all duration-300;
+  @apply bg-card/60 border border-border backdrop-blur-md shadow-premium transition-all duration-300;
 }
 
 .glass-card:hover {
-  @apply bg-white/80 dark:bg-slate-900/80 shadow-glow border-primary/20;
+  @apply bg-card/80 shadow-glow border-primary/20;
 }
 
 /* Gradients */
@@ -278,12 +278,12 @@
 
 /* Paper Texture for Exam */
 .paper-texture {
-  background-color: #ffffff;
+  @apply bg-card;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 
 .dark .paper-texture {
-  background-color: #1a1a1a;
+  @apply bg-card;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.02'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }
 

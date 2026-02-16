@@ -381,7 +381,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       <div className="space-y-6 animate-in fade-in duration-500">
         {/* Modern Stats Overview */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-white border-none shadow-md shadow-blue-100/50 hover:shadow-lg transition-shadow">
+          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Active Now</p>
@@ -390,13 +390,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <span className="text-xs text-blue-400 font-medium">students</span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-50 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
                 <Activity className="h-6 w-6 text-blue-600 animate-pulse" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-none shadow-md shadow-green-100/50 hover:shadow-lg transition-shadow">
+          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Submitted</p>
@@ -405,13 +405,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <span className="text-xs text-green-400 font-medium">finished</span>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-green-50 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-none shadow-md shadow-purple-100/50 hover:shadow-lg transition-shadow">
+          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Completion Rate</p>
@@ -421,19 +421,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   </p>
                 </div>
               </div>
-              <div className="h-12 w-12 rounded-full bg-purple-50 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
                 <Trophy className="h-6 w-6 text-purple-600" />
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white border-none shadow-md shadow-gray-100/50 hover:shadow-lg transition-shadow">
+          <Card className="bg-card border-none shadow-md hover:shadow-lg transition-shadow">
             <CardContent className="p-5 flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500">Total Candidates</p>
                 <p className="text-3xl font-bold text-gray-700">{totalStudents}</p>
               </div>
-              <div className="h-12 w-12 rounded-full bg-gray-50 flex items-center justify-center">
+              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
                 <User className="h-6 w-6 text-gray-600" />
               </div>
             </CardContent>
@@ -441,7 +441,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         </div>
 
         {/* Action Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl shadow-sm border border-border">
           <div className="flex items-center gap-4 w-full md:w-auto">
             {/* ... Search ... */}
             <div className="relative w-full md:w-64">
@@ -449,7 +449,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 placeholder="Search student..."
                 value={monitorSearch}
                 onChange={(e) => setMonitorSearch(e.target.value)}
-                className="pl-9 h-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                className="pl-9 h-10 bg-muted/50 border-border focus:bg-card transition-colors"
               />
               <ZoomIn className="w-4 h-4 absolute left-3 top-3 text-gray-400" />
             </div>
@@ -478,11 +478,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           </div>
 
           <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            <div className="bg-gray-100 p-1 rounded-lg flex gap-1">
+            <div className="bg-muted p-1 rounded-lg flex gap-1">
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-8 px-2 ${monitorViewMode === 'grid' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                className={`h-8 px-2 ${monitorViewMode === 'grid' ? 'bg-card shadow text-primary font-bold' : 'text-muted-foreground'}`}
                 onClick={() => setMonitorViewMode('grid')}
               >
                 <LayoutDashboard className="w-4 h-4" />
@@ -490,7 +490,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               <Button
                 variant="ghost"
                 size="sm"
-                className={`h-8 px-2 ${monitorViewMode === 'list' ? 'bg-white shadow text-primary' : 'text-gray-500'}`}
+                className={`h-8 px-2 ${monitorViewMode === 'list' ? 'bg-card shadow text-primary font-bold' : 'text-muted-foreground'}`}
                 onClick={() => setMonitorViewMode('list')}
               >
                 <Menu className="w-4 h-4" />
@@ -578,12 +578,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                     {/* Stats Grid inside Card */}
                     <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-gray-50 p-2 rounded border border-gray-100">
-                        <span className="text-gray-400 block mb-1">Answered</span>
-                        <span className="font-semibold text-gray-700">{student.answered} / {student.totalQuestions}</span>
+                      <div className="bg-muted/50 p-2 rounded border border-border">
+                        <span className="text-muted-foreground block mb-1">Answered</span>
+                        <span className="font-semibold">{student.answered} / {student.totalQuestions}</span>
                       </div>
-                      <div className="bg-gray-50 p-2 rounded border border-gray-100">
-                        <span className="text-gray-400 block mb-1">Score</span>
+                      <div className="bg-muted/50 p-2 rounded border border-border">
+                        <span className="text-muted-foreground block mb-1">Score</span>
                         <span className="font-semibold text-primary">{student.score}</span>
                       </div>
                     </div>
@@ -620,8 +620,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             </div>
           ) : (
             /* List View */
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-              <div className="grid grid-cols-12 gap-4 p-4 border-b bg-gray-50/50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+              <div className="grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 <div className="col-span-4">Student</div>
                 <div className="col-span-2 text-center">Status</div>
                 <div className="col-span-3">Progress</div>
