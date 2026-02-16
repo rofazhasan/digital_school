@@ -235,10 +235,10 @@ export default function StudentDashboardPage() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'HIGH': return 'text-red-600 bg-red-50 dark:bg-red-900/20';
-      case 'MEDIUM': return 'text-amber-600 bg-amber-50 dark:bg-amber-900/20';
-      case 'LOW': return 'text-green-600 bg-green-50 dark:bg-green-900/20';
-      default: return 'text-gray-600 bg-gray-50';
+      case 'HIGH': return 'text-destructive bg-destructive/10';
+      case 'MEDIUM': return 'text-amber-600 bg-amber-500/10';
+      case 'LOW': return 'text-emerald-600 bg-emerald-500/10';
+      default: return 'text-muted-foreground bg-muted';
     }
   };
 
@@ -342,8 +342,8 @@ export default function StudentDashboardPage() {
                   <p className="text-sm font-semibold leading-none">{user.name}</p>
                   <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
                 </div>
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
@@ -351,8 +351,8 @@ export default function StudentDashboardPage() {
                   <User className="mr-2 h-4 w-4" />
                   <span>Change Password</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/10 rounded-lg cursor-pointer py-2.5">
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer py-2.5">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -535,7 +535,7 @@ export default function StudentDashboardPage() {
 
                 {/* Attendance & Class Rank Section */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-                  <Card className="lg:col-span-2 shadow-lg shadow-gray-200/50 dark:shadow-none border border-border bg-card">
+                  <Card className="lg:col-span-2 shadow-lg border border-border bg-card">
                     <CardHeader>
                       <CardTitle className="flex items-center">
                         <Calendar className="h-5 w-5 mr-2 text-primary" />
@@ -568,7 +568,7 @@ export default function StudentDashboardPage() {
                                 ? 'bg-yellow-500'
                                 : i < (attendanceData.present + attendanceData.late + attendanceData.absent)
                                   ? 'bg-red-500'
-                                  : 'bg-gray-200 dark:bg-gray-800 text-gray-400'
+                                  : 'bg-muted text-muted-foreground'
                               }`}
                           >
                             {i < (attendanceData.present + attendanceData.late + attendanceData.absent) ? (
@@ -604,7 +604,7 @@ export default function StudentDashboardPage() {
                           <span>Percentile</span>
                           <span>92%</span>
                         </div>
-                        <div className="w-full bg-gray-200 dark:bg-gray-800 rounded-full h-2.5 overflow-hidden">
+                        <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
                             animate={{ width: '92%' }}
@@ -622,7 +622,7 @@ export default function StudentDashboardPage() {
                   <h2 className="text-xl md:text-2xl font-bold mb-4 flex items-center gap-2"><Award className="w-6 h-6 text-yellow-500" /> Achievements</h2>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div className="md:col-span-2">
-                      <Card className="shadow-lg shadow-gray-200/50 dark:shadow-none border border-border h-full bg-card">
+                      <Card className="shadow-lg border border-border h-full bg-card">
                         <CardHeader>
                           <CardTitle className="flex items-center">
                             <Trophy className="h-5 w-5 mr-2 text-yellow-500" />
@@ -637,7 +637,7 @@ export default function StudentDashboardPage() {
                                 initial={{ opacity: 0, scale: 0.9 }}
                                 animate={{ opacity: 1, scale: 1 }}
                                 transition={{ delay: i * 0.1 }}
-                                className="flex items-center space-x-3 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900 hover:bg-white dark:hover:bg-gray-800 hover:shadow-md transition-all cursor-default group"
+                                className="flex items-center space-x-3 p-3 rounded-xl border border-border bg-muted/30 hover:bg-card hover:shadow-md transition-all cursor-default group"
                               >
                                 <div className="text-3xl group-hover:scale-110 transition-transform duration-300 filter drop-shadow-sm">{badge.icon || '🏅'}</div>
                                 <div>
@@ -647,7 +647,7 @@ export default function StudentDashboardPage() {
                                 </div>
                               </motion.div>
                             )) : (
-                              <div className="col-span-full py-8 text-center text-muted-foreground bg-gray-50 dark:bg-gray-900/50 rounded-xl border border-dashed">
+                              <div className="col-span-full py-8 text-center text-muted-foreground bg-muted/20 rounded-xl border border-dashed">
                                 <Award className="w-12 h-12 mx-auto mb-2 opacity-20" />
                                 No badges earned yet. Keep performing well!
                               </div>
@@ -671,8 +671,8 @@ export default function StudentDashboardPage() {
                             <div
                               key={student.rank}
                               className={`flex items-center justify-between p-3 rounded-xl transition-all ${student.isCurrent
-                                ? 'bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800/30'
-                                : 'hover:bg-gray-50 dark:hover:bg-gray-800'
+                                ? 'bg-primary/10 border border-primary/20'
+                                : 'hover:bg-muted'
                                 }`}
                             >
                               <div className="flex items-center space-x-3">
@@ -728,7 +728,7 @@ export default function StudentDashboardPage() {
                       ))}
                       {notices.length === 0 && (
                         <div className="p-12 text-center flex flex-col items-center justify-center text-muted-foreground">
-                          <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
+                          <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
                             <Bell className="w-8 h-8 text-gray-400" />
                           </div>
                           <p>No new notices at the moment.</p>
@@ -763,12 +763,12 @@ export default function StudentDashboardPage() {
                         transition={{ delay: i * 0.1 }}
                       >
                         <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-card">
-                          <CardHeader className="bg-gray-50/50 dark:bg-gray-900 pb-4 border-b border-gray-100 dark:border-gray-800">
+                          <CardHeader className="bg-muted/30 pb-4 border-b border-border">
                             <div className="flex items-center justify-between mb-2">
                               <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'} className="uppercase text-[10px] tracking-wider font-bold">
                                 {exam.type}
                               </Badge>
-                              <span className="text-xs font-mono text-muted-foreground bg-white dark:bg-gray-950 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-800">
+                              <span className="text-xs font-mono text-muted-foreground bg-background px-2 py-1 rounded-md border border-border">
                                 {exam.time ? new Date(`2000-01-01T${exam.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
                               </span>
                             </div>
@@ -789,12 +789,12 @@ export default function StudentDashboardPage() {
                               if (result) {
                                 return (
                                   <div className="grid grid-cols-2 gap-2 mb-4">
-                                    <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg text-center border border-blue-100 dark:border-blue-900/30">
-                                      <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider">Marks</div>
-                                      <div className="text-lg font-bold text-blue-700 dark:text-blue-300">{result.total} / {exam.totalMarks}</div>
+                                    <div className="bg-primary/10 p-2 rounded-lg text-center border border-primary/20">
+                                      <div className="text-[10px] text-primary font-bold uppercase tracking-wider">Marks</div>
+                                      <div className="text-lg font-bold text-primary">{result.total} / {exam.totalMarks}</div>
                                     </div>
-                                    <div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg text-center border border-amber-100 dark:border-amber-900/30">
-                                      <div className="text-lg font-bold text-amber-700 dark:text-amber-300">#{result.rank || '-'}</div>
+                                    <div className="bg-amber-500/10 p-2 rounded-lg text-center border border-amber-500/20">
+                                      <div className="text-lg font-bold text-amber-600">#{result.rank || '-'}</div>
                                     </div>
                                   </div>
                                 );
@@ -809,7 +809,7 @@ export default function StudentDashboardPage() {
                                   Start Exam
                                 </Button>
                               ) : (
-                                <Button variant="outline" className="w-full rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800">
+                                <Button variant="outline" className="w-full rounded-xl">
                                   <Download className="h-4 w-4 mr-2" />
                                   Admit Card
                                 </Button>
@@ -820,8 +820,8 @@ export default function StudentDashboardPage() {
                       </motion.div>
                     ))
                   ) : (
-                    <div className="col-span-full flex flex-col items-center justify-center py-16 bg-gray-50/50 dark:bg-gray-900/50 rounded-2xl border border-dashed border-gray-200 dark:border-gray-800 text-center">
-                      <div className="bg-white dark:bg-gray-950 p-4 rounded-full shadow-sm mb-4">
+                    <div className="col-span-full flex flex-col items-center justify-center py-16 bg-muted/30 rounded-2xl border border-dashed border-border text-center">
+                      <div className="bg-background p-4 rounded-full shadow-sm mb-4">
                         <FileText className="w-8 h-8 text-muted-foreground" />
                       </div>
                       <h3 className="font-semibold text-lg">No Upcoming Exams</h3>
@@ -840,7 +840,7 @@ export default function StudentDashboardPage() {
         </AnimatePresence>
       </main>
 
-      <div className="relative z-10 mt-12 bg-white dark:bg-black">
+      <div className="relative z-10 mt-12 bg-background">
         <AppFooter />
       </div>
     </div>

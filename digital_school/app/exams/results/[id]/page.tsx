@@ -839,7 +839,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             transition={{ delay: 0.2 }}
             className="mb-8"
           >
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
@@ -872,7 +872,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             transition={{ delay: 0.3 }}
             className="mb-8"
           >
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5" />
@@ -1268,7 +1268,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1285,7 +1285,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1302,7 +1302,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1319,7 +1319,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1682,7 +1682,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       })()}
                                     </div>
                                   ) : (type === 'INT' || type === 'NUMERIC') ? (
-                                    <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-col gap-4">
+                                    <div className="p-4 bg-card rounded-lg border-2 border-primary/20 flex flex-col gap-4">
                                       <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-4">
                                           <div className="text-sm font-bold text-gray-600">
@@ -1843,7 +1843,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                           {/* Pagination Controls */}
                           {totalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+                            <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1999,7 +1999,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 src={imageUrl}
                                                 alt={`Your answer image ${index + 1}`}
                                                 crossOrigin="anonymous"
-                                                className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                 onLoad={() => {
                                                   console.log('Student answer image loaded successfully:', imageUrl);
                                                 }}
@@ -2058,7 +2058,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 src={drawing.imageData}
                                                 alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
                                                 crossOrigin="anonymous"
-                                                className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                 onError={(e) => {
                                                   console.error('Annotated image failed to load:', drawing.imageData);
                                                   // Show error placeholder
@@ -2105,7 +2105,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
                                       <div className="space-y-2">
                                         {question.subQuestions.map((subQ, subIndex) => (
-                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                          <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
                                             <div className="mb-2">
                                               <p className="text-gray-700 font-medium">
                                                 {subQ.questionText || subQ.text || subQ.question || ''}
@@ -2215,7 +2215,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-8 mt-6">
                                       <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
                                       {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
-                                        <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                        <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
                                           {/* Sub-question Header */}
                                           <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
                                             <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
@@ -2355,7 +2355,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   <img
                                                     src={imageUrl}
                                                     alt={`Your answer image ${index + 1}`}
-                                                    className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                     onError={(e) => {
                                                       console.error('Student answer image failed to load:', imageUrl);
                                                       e.currentTarget.style.display = 'none';
@@ -2408,7 +2408,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   <img
                                                     src={drawing.imageData}
                                                     alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                                    className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                     onError={(e) => {
                                                       console.error('Annotated image failed to load:', drawing.imageData);
                                                       e.currentTarget.style.display = 'none';
@@ -2456,7 +2456,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
                                       <div className="space-y-2">
                                         {question.subQuestions.map((subQ, subIndex) => (
-                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                          <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
                                             <div className="mb-2">
                                               <p className="text-gray-700 font-medium">
                                                 {subQ.questionText || subQ.text || subQ.question || ''}
@@ -2615,7 +2615,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <img
                       src={annotatedImageFailed ? originalImageFallback : zoomedImage}
                       alt={annotatedImageFailed ? `${zoomedImageTitle} (Original Image)` : zoomedImageTitle}
-                      className="max-w-full max-h-full object-contain rounded-lg bg-white shadow-lg"
+                      className="max-w-full max-h-full object-contain rounded-lg bg-card shadow-lg"
                       onError={(e) => {
                         console.error('Modal image failed to load:', zoomedImage);
 

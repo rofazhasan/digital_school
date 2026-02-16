@@ -269,7 +269,7 @@ export default function PracPerfectSessionPage() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-slate-900' : 'bg-background'}`}>
+            <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-background' : 'bg-background'}`}>
 
                 {/* 1. TOP BAR (Floating) */}
                 <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-50 pointer-events-none">
@@ -277,7 +277,7 @@ export default function PracPerfectSessionPage() {
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" onClick={() => router.push('/student/prac-perfect')}>
                             <ArrowLeft className="w-4 h-4" />
                         </Button>
-                        <span className="text-sm font-bold px-2 text-slate-700">
+                        <span className="text-sm font-bold px-2 text-foreground">
                             Q{currentIndex + 1} / {questions.length}
                         </span>
                     </div>
@@ -287,7 +287,7 @@ export default function PracPerfectSessionPage() {
                             <Clock className="w-4 h-4 text-indigo-500" />
                             {formatTime(elapsedTime)}
                         </div>
-                        <div className="w-px h-4 bg-slate-300"></div>
+                        <div className="w-px h-4 bg-border"></div>
                         <div className="flex items-center gap-2">
                             <CheckCircle className="w-4 h-4 text-green-500" />
                             {score}
@@ -312,7 +312,7 @@ export default function PracPerfectSessionPage() {
                         ref={questionContainerRef}
                         className="absolute top-20 left-4 md:left-10 w-[95vw] md:w-[600px] lg:w-[900px] xl:w-[1100px] 2xl:w-[1200px] max-h-[calc(100vh-160px)] z-40 overflow-y-auto custom-scrollbar transition-all duration-300 scroll-smooth"
                     >
-                        <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-border ${isDark ? 'bg-slate-900/80 text-white' : 'bg-card/80 text-foreground'} transition-all duration-500`}>
+                        <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-border ${isDark ? 'bg-background/80 text-foreground' : 'bg-card/80 text-foreground'} transition-all duration-500`}>
                             <div className="p-6 space-y-6">
                                 {/* Question Header */}
                                 <div className="flex items-start justify-between gap-4">
@@ -349,7 +349,7 @@ export default function PracPerfectSessionPage() {
                                 {currentQ.type === 'CQ' && Array.isArray(currentQ.subQuestions) && (
                                     <div className="space-y-6 mt-4">
                                         {currentQ.subQuestions.map((sub: any, idx: number) => (
-                                            <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-muted/30 border-border'}`}>
+                                            <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-muted/40 border-border' : 'bg-muted/30 border-border'}`}>
                                                 <div className="flex gap-3 items-start">
                                                     <span className="font-bold text-indigo-600 flex-shrink-0">({String.fromCharCode(97 + idx)})</span>
                                                     <div className="flex-1 text-sm font-medium leading-relaxed">
@@ -413,9 +413,9 @@ export default function PracPerfectSessionPage() {
                                                     className={`premium-option w-full text-left p-4 rounded-xl border-2 transition-all flex items-start gap-4 shadow-sm ${stateClass}`}
                                                 >
                                                     <div className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-black transition-colors 
-                                                        ${isChecked && (idx === selectedOption || isThisCorrect) ? 'bg-white text-indigo-900 border-white' :
-                                                            idx === selectedOption ? 'bg-indigo-600 border-indigo-600 text-white' :
-                                                                'bg-slate-100/50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                                                        ${isChecked && (idx === selectedOption || isThisCorrect) ? 'bg-card text-foreground border-border' :
+                                                            idx === selectedOption ? 'bg-primary border-primary text-primary-foreground' :
+                                                                'bg-muted/50 dark:bg-muted border-border'}`}>
                                                         {String.fromCharCode(65 + idx)}
                                                     </div>
                                                     <div className="text-option font-fancy font-medium pt-1">
@@ -532,8 +532,8 @@ export default function PracPerfectSessionPage() {
                 {showSummary && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-md p-6 font-fancy">
                         <Card className="w-full max-w-md bg-card shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-                            <div className="bg-gradient-to-br from-indigo-600 to-violet-700 p-8 text-center text-white">
-                                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-white/20 backdrop-blur-sm mb-4">
+                            <div className="bg-gradient-to-br from-primary to-primary/80 p-8 text-center text-primary-foreground">
+                                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary-foreground/20 backdrop-blur-sm mb-4">
                                     <Sparkles className="w-10 h-10 text-white" />
                                 </div>
                                 <h2 className="text-3xl font-black">Practice Session Complete!</h2>
@@ -542,34 +542,34 @@ export default function PracPerfectSessionPage() {
 
                             <div className="p-8 space-y-6">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <div className="p-4 rounded-2xl bg-green-50 border border-green-100 text-center">
-                                        <div className="text-green-600 font-black text-3xl mb-1">
+                                    <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/20 text-center">
+                                        <div className="text-green-600 dark:text-green-400 font-black text-3xl mb-1">
                                             {Object.values(sessionResults).filter(v => v === 'correct').length}
                                         </div>
-                                        <div className="text-xs font-bold text-green-700 uppercase tracking-widest">Correct</div>
+                                        <div className="text-xs font-bold text-green-700 dark:text-green-500 uppercase tracking-widest">Correct</div>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-red-50 border border-red-100 text-center">
-                                        <div className="text-red-600 font-black text-3xl mb-1">
+                                    <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-center">
+                                        <div className="text-red-600 dark:text-red-400 font-black text-3xl mb-1">
                                             {Object.values(sessionResults).filter(v => v === 'wrong').length}
                                         </div>
-                                        <div className="text-xs font-bold text-red-700 uppercase tracking-widest">Wrong</div>
+                                        <div className="text-xs font-bold text-red-700 dark:text-red-500 uppercase tracking-widest">Wrong</div>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 text-center">
-                                        <div className="text-slate-600 font-black text-3xl mb-1">
+                                    <div className="p-4 rounded-2xl bg-muted border border-border text-center">
+                                        <div className="text-muted-foreground font-black text-3xl mb-1">
                                             {questions.length - Object.values(sessionResults).length}
                                         </div>
-                                        <div className="text-xs font-bold text-slate-700 uppercase tracking-widest">Not Answered</div>
+                                        <div className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Not Answered</div>
                                     </div>
-                                    <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 text-center">
-                                        <div className="text-indigo-600 font-black text-3xl mb-1">{questions.length}</div>
-                                        <div className="text-xs font-bold text-indigo-700 uppercase tracking-widest">Total Q</div>
+                                    <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20 text-center">
+                                        <div className="text-primary font-black text-3xl mb-1">{questions.length}</div>
+                                        <div className="text-xs font-bold text-primary uppercase tracking-widest">Total Q</div>
                                     </div>
                                 </div>
 
                                 <div className="pt-2">
                                     <Button
                                         onClick={() => router.push('/student/prac-perfect')}
-                                        className="w-full h-14 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-lg font-bold shadow-xl shadow-indigo-200 transition-all hover:scale-[1.02]"
+                                        className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl text-lg font-bold shadow-xl shadow-primary/20 transition-all hover:scale-[1.02]"
                                     >
                                         Back to Practice Hub <ArrowRight className="w-5 h-5 ml-2" />
                                     </Button>

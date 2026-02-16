@@ -1557,21 +1557,21 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   return (
     <MathJaxContext version={3} config={mathJaxConfig}>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background">
         <div className="container mx-auto p-4 lg:p-6">
           {/* Review Alert Banner */}
           {showReviewAlert && (
-            <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="mb-4 p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
                     <MessageSquare className="h-6 w-6 text-yellow-600" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-yellow-800">
+                    <h3 className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
                       New Review Request{newReviewCount > 1 ? 's' : ''} Received!
                     </h3>
-                    <p className="text-sm text-yellow-700 mt-1">
+                    <p className="text-sm text-yellow-600/80 dark:text-yellow-400/80 mt-1">
                       {newReviewCount} student{newReviewCount > 1 ? 's have' : ' has'} requested a review of their exam results.
                     </p>
                   </div>
@@ -1604,26 +1604,26 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
           <div className="mb-6">
             <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-6">
               <div>
-                <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
-                <p className="text-gray-600">{exam.description}</p>
+                <h1 className="text-xl md:text-3xl font-bold text-foreground mb-2">{exam.name}</h1>
+                <p className="text-muted-foreground">{exam.description}</p>
 
                 {/* Permission and Status Summary */}
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Badge className={
-                    isSuperUser ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                    isSuperUser ? 'bg-purple-500/10 text-purple-600 dark:text-purple-400' : 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                   }>
                     {isSuperUser ? '👑 Super User' : '👨‍🏫 Evaluator'}
                   </Badge>
 
-                  <Badge className="bg-gray-100 text-gray-800">
+                  <Badge variant="outline" className="bg-muted/50 text-muted-foreground border-border">
                     📊 {exam.submissions.length} Students
                   </Badge>
 
-                  <Badge className="bg-gray-100 text-gray-800">
+                  <Badge variant="outline" className="bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20">
                     ✅ {exam.submissions.filter(s => s.status === 'COMPLETED').length} Completed
                   </Badge>
 
-                  <Badge className="bg-gray-100 text-gray-800">
+                  <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                     ⏳ {exam.submissions.filter(s => s.status !== 'COMPLETED').length} Pending
                   </Badge>
 
@@ -1637,7 +1637,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
               <div className="flex flex-col sm:flex-row xl:items-center gap-4">
                 {/* Debug Info */}
-                <div className="text-xs text-gray-500 bg-gray-100 p-2 rounded-md hidden md:block">
+                <div className="text-xs text-muted-foreground bg-muted p-2 rounded-md hidden md:block">
                   <div>Questions: {exam.questions?.length || 0}</div>
                   <div>Submissions: {exam.submissions?.length || 0}</div>
                 </div>
@@ -1682,7 +1682,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
           {/* Tabs */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="bg-white border mb-4 inline-flex">
+            <TabsList className="bg-muted border border-border mb-4 inline-flex">
               <TabsTrigger value="evaluation" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700">Evaluation</TabsTrigger>
               <TabsTrigger value="live" className="data-[state=active]:bg-red-50 data-[state=active]:text-red-700 flex items-center gap-2">
                 <Video className="w-4 h-4 ml-1 mr-1 animate-pulse text-red-500" /> Live Monitor
@@ -1716,10 +1716,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     </Button>
 
                     <div className="text-center min-w-[120px]">
-                      <div className="font-semibold text-gray-900 truncate max-w-[150px] sm:max-w-none">
+                      <div className="font-semibold text-foreground truncate max-w-[150px] sm:max-w-none">
                         {currentStudent?.student.name}
                       </div>
-                      <div className="text-xs text-gray-500 font-medium">
+                      <div className="text-xs text-muted-foreground font-medium">
                         Roll: {currentStudent?.student.roll} • {currentStudentIndex + 1}/{exam.submissions.length}
                       </div>
                     </div>
@@ -1854,7 +1854,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               {/* Question Type Filter */}
               <div className="mb-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                  <span className="text-sm font-medium text-gray-700">Filter by type:</span>
+                  <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
                   <div className="flex flex-wrap gap-2">
                     {(['all', 'mcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq'] as const).map((type) => (
                       <Button
@@ -1872,7 +1872,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     ))}
                   </div>
                 </div>
-                <div className="text-sm text-gray-500 mt-2 sm:mt-0">
+                <div className="text-sm text-muted-foreground mt-2 sm:mt-0">
                   Showing {filteredQuestions.length} of {exam.questions.length} questions
                 </div>
               </div>
@@ -1880,10 +1880,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               {/* Marks Summary */}
               {currentStudent && (
                 <div className="mb-4">
-                  <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
+                  <Card className="bg-gradient-to-r from-blue-500/5 to-purple-500/5 border-blue-500/20">
                     <CardContent className="p-4">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <h3 className="text-lg font-semibold text-gray-800">Marks Summary</h3>
+                        <h3 className="text-lg font-semibold text-foreground/90">Marks Summary</h3>
                         <div className="text-sm font-medium text-blue-700 bg-blue-100/50 px-2 py-1 rounded">
                           Total: {totalMarks} marks
                         </div>
@@ -2036,7 +2036,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       Prev
                     </Button>
 
-                    <div className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                    <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
                       Q {currentQuestionIndex + 1} / {filteredQuestions.length}
                     </div>
 
@@ -2072,15 +2072,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                         <CardContent className="space-y-3">
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div>
-                              <label className="text-xs font-medium text-gray-500">Name</label>
+                              <label className="text-xs font-medium text-muted-foreground">Name</label>
                               <div className="font-semibold truncate">{currentStudent.student.name}</div>
                             </div>
                             <div>
-                              <label className="text-xs font-medium text-gray-500">Roll</label>
+                              <label className="text-xs font-medium text-muted-foreground">Roll</label>
                               <div className="font-semibold">{currentStudent.student.roll}</div>
                             </div>
                             <div className="col-span-2">
-                              <label className="text-xs font-medium text-gray-500">Registration</label>
+                              <label className="text-xs font-medium text-muted-foreground">Registration</label>
                               <div className="font-semibold text-xs">{currentStudent.student.registrationNo}</div>
                             </div>
                           </div>
@@ -2214,7 +2214,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   }>
                                     {currentQuestion.type.toUpperCase()}
                                   </Badge>
-                                  <div className="text-sm text-gray-600">
+                                  <div className="text-sm text-muted-foreground">
                                     {currentQuestion.marks} mark{currentQuestion.marks > 1 ? 's' : ''}
                                   </div>
                                 </div>
@@ -2225,7 +2225,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 {/* Subquestions */}
                                 {currentQuestion.subQuestions && Array.isArray(currentQuestion.subQuestions) && currentQuestion.subQuestions.length > 0 && (
                                   <div className="mt-4 space-y-3">
-                                    <h5 className="font-medium text-gray-700">Sub-questions:</h5>
+                                    <h5 className="font-medium text-muted-foreground">Sub-questions:</h5>
                                     {currentQuestion.subQuestions.map((subQ: any, idx: number) => (
                                       <div key={idx} className="pl-4 border-l-2 border-gray-200">
                                         <div className="flex items-center justify-between mb-1">
@@ -2255,7 +2255,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               {/* Student Answer */}
                               <div>
                                 <h4 className="font-semibold mb-2">Student Answer:</h4>
-                                <div className="bg-gray-50 p-4 rounded-lg">
+                                <div className="bg-muted/50 p-4 rounded-lg border border-border">
                                   {['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion.type.toLowerCase()) ? (
                                     <div className="space-y-4">
                                       {currentAnswer ? (
@@ -2274,7 +2274,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                           {/* Type Specific Rendering */}
                                           {currentQuestion.type?.toLowerCase() === 'mcq' && (
-                                            <div className="text-base md:text-lg p-2 bg-white rounded border border-gray-100 italic">
+                                            <div className="text-base md:text-lg p-2 bg-card rounded border border-border italic">
                                               <UniversalMathJax inline dynamic>{cleanupMath(String(currentAnswer))}</UniversalMathJax>
                                             </div>
                                           )}
@@ -2286,7 +2286,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 const isCorrect = opt.isCorrect;
                                                 if (!isSelected && !isCorrect) return null;
                                                 return (
-                                                  <div key={idx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-gray-50 border-gray-200 opacity-60'}`}>
+                                                  <div key={idx} className={`p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-500/10 border-green-500/20' : 'bg-red-500/10 border-red-500/20') : 'bg-muted/30 border-border opacity-60'}`}>
                                                     <div className="flex items-center gap-2">
                                                       <span className="font-bold text-gray-500 w-5">{MCQ_LABELS[idx]}.</span>
                                                       <UniversalMathJax inline dynamic>{cleanupMath(opt.text || String(opt))}</UniversalMathJax>
@@ -2300,7 +2300,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           )}
 
                                           {currentQuestion.type?.toLowerCase() === 'ar' && (
-                                            <div className="p-3 bg-white rounded border border-gray-100">
+                                            <div className="p-3 bg-card rounded border border-border">
                                               <div className="text-sm font-semibold text-indigo-600 mb-1">Selected Option {currentAnswer.selectedOption}:</div>
                                               <div className="text-sm text-gray-700 italic">
                                                 {(() => {
@@ -2358,7 +2358,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           )}
 
                                           {(currentQuestion.type?.toLowerCase() === 'int' || currentQuestion.type?.toLowerCase() === 'numeric') && (
-                                            <div className="text-lg font-bold p-3 bg-white rounded border border-gray-100 flex items-center gap-2">
+                                            <div className="text-lg font-bold p-3 bg-card rounded border border-border flex items-center gap-2">
                                               <span>Answer:</span>
                                               <span className="text-indigo-600 bg-indigo-50 px-3 py-1 rounded">{currentAnswer.answer}</span>
                                             </div>
@@ -2399,12 +2399,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       src={displayUrl}
                                                       alt={`Answer Attachment ${imgIdx + 1}`}
                                                       crossOrigin="anonymous"
-                                                      className="h-32 w-32 rounded border bg-white object-cover cursor-pointer transition-transform hover:scale-105"
+                                                      className="h-32 w-32 rounded border border-border bg-muted/50 object-cover cursor-pointer transition-transform hover:scale-105"
                                                       onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
                                                     />
                                                     <button
                                                       onClick={() => openAnnotation(imgUrl, currentQuestion.id, imgIdx, currentStudent.student.id)}
-                                                      className="absolute top-2 right-2 bg-white/90 p-1.5 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                      className="absolute top-2 right-2 bg-background/90 p-1.5 rounded-full shadow-sm hover:bg-muted text-primary"
                                                     >
                                                       <PenTool className="w-4 h-4" />
                                                     </button>
@@ -2466,12 +2466,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               src={displayUrl}
                                                               alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
                                                               crossOrigin="anonymous"
-                                                              className="h-24 w-24 rounded border bg-white object-cover cursor-pointer hover:scale-105 transition-transform"
+                                                              className="h-24 w-24 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
                                                               onClick={() => openAnnotation(imgUrl, currentQuestion.id, questionIndex, currentStudent.student.id)}
                                                             />
                                                             <button
                                                               onClick={() => openAnnotation(imgUrl, currentQuestion.id, questionIndex, currentStudent.student.id)}
-                                                              className="absolute top-1 right-1 bg-white/90 p-1 rounded-full shadow-sm hover:bg-indigo-50 text-indigo-600"
+                                                              className="absolute top-1 right-1 bg-background/90 p-1 rounded-full shadow-sm hover:bg-muted text-primary"
                                                             >
                                                               <PenTool className="w-3 h-3" />
                                                             </button>
@@ -2512,7 +2512,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         const isSelected = currentAnswer && normalize(currentAnswer) === normalize(optText);
                                         const isCorrect = opt.isCorrect;
 
-                                        let bgClass = "bg-white border-gray-200";
+                                        let bgClass = "bg-card border-border";
                                         if (isCorrect) bgClass = "bg-green-50 border-green-300 ring-1 ring-green-300";
                                         if (isSelected && !isCorrect) bgClass = "bg-red-50 border-red-300 ring-1 ring-red-300";
                                         if (isSelected && isCorrect) bgClass = "bg-green-100 border-green-500 ring-2 ring-green-500";
@@ -2528,7 +2528,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   </span>
                                                   {opt.image && (
                                                     <div className="mt-1">
-                                                      <img src={opt.image} alt="Option" className="max-h-24 rounded border bg-white object-contain" />
+                                                      <img src={opt.image} alt="Option" className="max-h-24 rounded border border-border bg-muted/50 object-contain" />
                                                     </div>
                                                   )}
                                                 </div>
@@ -2560,7 +2560,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         return (
                                           <div key={oidx} className={`p-3 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-50 border-green-400' : 'bg-red-50 border-red-400') : (isCorrect ? 'bg-green-100/50 border-dashed border-green-300 opacity-60' : 'bg-gray-50 border-gray-100')}`}>
                                             <div className="flex items-center gap-2">
-                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-white flex items-center justify-center border">{MCQ_LABELS[oidx]}</span>
+                                              <span className="text-xs font-bold w-5 h-5 rounded-full bg-card flex items-center justify-center border border-border">{MCQ_LABELS[oidx]}</span>
                                               <span className="text-sm"><UniversalMathJax dynamic>{cleanupMath(opt.text)}</UniversalMathJax></span>
                                             </div>
                                             <div className="flex gap-1">
@@ -2616,7 +2616,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                         return (
                                           <div key={i} className={`p-3 rounded-lg border transition-all flex items-center gap-3 ${bgClass}`}>
-                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${isSelected || isCorrect ? 'bg-white border-gray-300' : 'bg-gray-100 text-gray-400'}`}>
+                                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border ${isSelected || isCorrect ? 'bg-card border-border' : 'bg-muted text-muted-foreground'}`}>
                                               {optionId}
                                             </div>
                                             <span className={`text-sm flex-1 ${isCorrect ? 'font-medium text-green-900' : isSelected ? 'text-red-900' : 'text-gray-700'}`}>
@@ -2764,7 +2764,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   <div className="mb-4">
                                     <div className="flex flex-col sm:flex-row gap-4">
                                       {/* Comparison Box */}
-                                      <div className="flex-1 bg-white border rounded-xl overflow-hidden shadow-sm flex">
+                                      <div className="flex-1 bg-card border border-border rounded-xl overflow-hidden shadow-sm flex">
                                         <div className={`w-2 ${Number(currentAnswer?.answer) === Number(currentQuestion.correct || (currentQuestion as any).answer) ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                         <div className="flex-1 p-4 grid grid-cols-2 gap-4 divide-x">
                                           <div className="pr-4">
@@ -2800,7 +2800,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                 {/* Explanation */}
                                 {currentQuestion.explanation && (
-                                  <div className="p-3 bg-blue-50 border border-blue-200 rounded">
+                                  <div className="p-3 bg-blue-500/5 border border-blue-500/20 rounded">
                                     <h5 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
                                       <div className="bg-blue-200 rounded-full w-4 h-4 flex items-center justify-center text-[10px] font-bold text-blue-800">i</div>
                                       Explanation:

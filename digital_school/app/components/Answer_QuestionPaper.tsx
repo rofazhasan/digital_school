@@ -342,8 +342,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <div key={lIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
                                 <span className="font-bold text-green-700">{vLeftLabel}.</span>
                                 <span className="text-sm">→</span>
-                                <span className="font-bold text-green-700">{vRightLabel}</span>
-                                <span className="text-xs text-gray-600 truncate">
+                                <span className="text-xs text-black font-medium">
                                   (<UniversalMathJax inline>{leftItem?.text || ''}</UniversalMathJax> - <UniversalMathJax inline>{rightItem?.text || ''}</UniversalMathJax>)
                                 </span>
                               </div>

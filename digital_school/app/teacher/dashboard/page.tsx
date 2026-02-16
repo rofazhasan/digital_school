@@ -267,7 +267,7 @@ export default function TeacherDashboard() {
                                                                 <div className={`p-2 rounded-xl ${stat.bg} bg-opacity-10 text-${stat.color}-600`}>
                                                                     <stat.icon className="h-5 w-5" />
                                                                 </div>
-                                                                <Badge variant="outline" className={`bg-${stat.color}-50 text-${stat.color}-600 border-${stat.color}-200`}>
+                                                                <Badge variant="outline" className={`bg-${stat.color}-500/10 text-${stat.color}-600 border-${stat.color}-500/20`}>
                                                                     This Week
                                                                 </Badge>
                                                             </div>
@@ -320,9 +320,9 @@ export default function TeacherDashboard() {
                                                 <CardContent>
                                                     <div className="space-y-4">
                                                         {[
-                                                            { title: "Exam 'Math Midterm' Published", time: "2 hours ago", icon: FileText, color: "text-blue-500", bg: "bg-blue-50 dark:bg-blue-900/20" },
-                                                            { title: "Class 10-A Attendance Marked", time: "4 hours ago", icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-50 dark:bg-emerald-900/20" },
-                                                            { title: "New Question Added to Bank", time: "Yesterday", icon: BookOpen, color: "text-amber-500", bg: "bg-amber-50 dark:bg-amber-900/20" },
+                                                            { title: "Exam 'Math Midterm' Published", time: "2 hours ago", icon: FileText, color: "text-blue-500", bg: "bg-blue-500/10" },
+                                                            { title: "Class 10-A Attendance Marked", time: "4 hours ago", icon: CheckCircle, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                                                            { title: "New Question Added to Bank", time: "Yesterday", icon: BookOpen, color: "text-amber-500", bg: "bg-amber-500/10" },
                                                         ].map((item, i) => (
                                                             <div key={i} className="flex items-start gap-4 pb-4 border-b border-border last:border-0 last:pb-0">
                                                                 <div className={`w-10 h-10 rounded-full ${item.bg} flex items-center justify-center flex-shrink-0`}>

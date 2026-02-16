@@ -521,7 +521,7 @@ export default function ProblemSolvingSession() {
 
     if (loading || !currentQ) {
         return (
-            <div className="h-screen flex flex-col items-center justify-center bg-white">
+            <div className="h-screen flex flex-col items-center justify-center bg-background">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
                 <p className="text-gray-500 font-medium">Preparing Studio...</p>
             </div>
@@ -530,7 +530,7 @@ export default function ProblemSolvingSession() {
 
     return (
         <MathJaxContext config={MATHJAX_CONFIG} version={3}>
-            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
+            <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-background'}`}>
 
                 {/* 1. TOP BAR */}
                 <div className="absolute top-0 left-0 right-0 h-16 flex items-center justify-between px-6 z-40 pointer-events-none bg-gradient-to-b from-black/10 to-transparent no-print">
@@ -548,10 +548,10 @@ export default function ProblemSolvingSession() {
                         </div>
                     </div>
 
-                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-white/80 backdrop-blur px-4 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
+                    <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-4 bg-card/90 backdrop-blur px-4 py-1.5 rounded-full border border-border shadow-sm pointer-events-auto">
                         <div className="flex items-center gap-2 border-r border-gray-200 pr-4">
-                            <User className="w-4 h-4 text-indigo-500" />
-                            <span className="text-sm font-medium text-gray-700">Instructor</span>
+                            <User className="w-4 h-4 text-primary" />
+                            <span className="text-sm font-medium text-foreground/90">Instructor</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <div className="flex items-center gap-2">
@@ -560,7 +560,7 @@ export default function ProblemSolvingSession() {
                             </div>
                             <div className="w-px h-4 bg-gray-300"></div>
                             {/* Clock Component */}
-                            <div className="flex items-center gap-2 text-gray-600 font-medium font-mono text-sm bg-gray-50 px-2 py-1 rounded">
+                            <div className="flex items-center gap-2 text-muted-foreground font-medium font-mono text-sm bg-muted px-2 py-1 rounded">
                                 <Clock className="w-3.5 h-3.5" />
                                 <LiveClock />
                             </div>
@@ -573,12 +573,12 @@ export default function ProblemSolvingSession() {
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2 bg-white/80 backdrop-blur px-3 py-1.5 rounded-full border border-gray-100 shadow-sm pointer-events-auto">
-                        <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-white/80 hover:bg-white rounded-full">
+                    <div className="flex items-center gap-2 bg-card/90 backdrop-blur px-3 py-1.5 rounded-full border border-border shadow-sm pointer-events-auto">
+                        <Button variant="ghost" size="icon" onClick={() => setShowOverlay(!showOverlay)} className="bg-card/80 hover:bg-card rounded-full">
                             {showOverlay ? <Eye className="w-5 h-5 text-indigo-600" /> : <Eye className="w-5 h-5 text-gray-400" />}
                         </Button>
 
-                        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-white/80 hover:bg-white rounded-full">
+                        <Button variant="ghost" size="icon" onClick={toggleFullscreen} className="bg-card/80 hover:bg-card rounded-full">
                             {isFullscreen ? <Minimize2 className="w-5 h-5 text-gray-600" /> : <Maximize2 className="w-5 h-5 text-gray-600" />}
                         </Button>
                     </div>

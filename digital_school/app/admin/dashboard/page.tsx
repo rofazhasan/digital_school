@@ -230,8 +230,8 @@ export default function AdminDashboard() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 rounded-lg cursor-pointer py-2.5">
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer py-2.5">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -386,12 +386,12 @@ function OverviewTab() {
                 </div>
                 <Badge variant="outline" className="bg-background text-destructive border-destructive/20">Urgent</Badge>
               </div>
-              <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/20">
+              <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-amber-500" />
                   <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Approve Teacher Leave</span>
                 </div>
-                <Badge variant="outline" className="bg-white dark:bg-gray-950 text-amber-600 border-amber-200">Pending</Badge>
+                <Badge variant="outline" className="bg-background text-amber-600 border-amber-500/20">Pending</Badge>
               </div>
             </div>
           </CardContent>
@@ -457,7 +457,7 @@ function ClassesTab() {
               whileHover={{ y: -4 }}
               transition={{ duration: 0.2 }}
             >
-              <Card className="overflow-hidden border border-border shadow-lg shadow-gray-200/50 dark:shadow-none bg-card rounded-2xl group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
+              <Card className="overflow-hidden border border-border bg-card rounded-2xl group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
                 <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500" />
                 <CardHeader>
                   <div className="flex justify-between items-start">
@@ -486,7 +486,7 @@ function ClassesTab() {
                     </div>
                   </div>
                   <div className="mt-6 flex gap-2 pt-4 border-t border-border">
-                    <Button variant="ghost" size="sm" className="w-full hover:text-blue-600 hover:bg-blue-50">View Details</Button>
+                    <Button variant="ghost" size="sm" className="w-full hover:text-primary hover:bg-primary/10">View Details</Button>
                   </div>
                 </CardContent>
               </Card>

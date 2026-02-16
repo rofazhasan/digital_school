@@ -611,7 +611,7 @@ export default function SuperUserDashboardPage() {
                           animate={{ opacity: 1, y: 0 }}
                           transition={{ delay: index * 0.1 }}
                         >
-                          <Card className="hover:shadow-lg transition-shadow duration-300 border-indigo-100/50">
+                          <Card className="hover:shadow-lg transition-shadow duration-300 border-primary/20">
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                               <CardTitle className="text-xs md:text-sm font-medium">{item.title}</CardTitle>
                               <item.icon className="h-4 w-4 text-muted-foreground" />
@@ -673,7 +673,7 @@ export default function SuperUserDashboardPage() {
                           <CardContent>
                             <div className="space-y-3 md:space-y-4">
                               {(pendingApprovals || []).slice(0, 3).map((approval) => (
-                                <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0 hover:bg-slate-50 transition-colors">
+                                <div key={approval.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 border rounded-lg space-y-2 sm:space-y-0 hover:bg-muted transition-colors">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs md:text-sm font-medium truncate">{approval.title}</p>
                                     <p className="text-xs text-muted-foreground">
@@ -752,10 +752,10 @@ export default function SuperUserDashboardPage() {
                                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-primary/10 hover:text-primary transition-colors">
                                         <Eye className="h-4 w-4" />
                                       </Button>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 transition-colors">
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-blue-500/10 hover:text-blue-600 transition-colors">
                                         <Edit className="h-4 w-4" />
                                       </Button>
-                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20 transition-colors">
+                                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-destructive/10 hover:text-destructive transition-colors">
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>

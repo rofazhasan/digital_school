@@ -373,259 +373,264 @@ export default function ExamLayout() {
     <div className={cn(
       "min-h-screen flex flex-col font-exam-online transition-colors duration-500 ease-in-out",
       illusionMode ? "illusion-mode" : "bg-background",
-      isExamActive && (!isFullscreen || !isTabActive) ? 'select-none blur-sm' : ''
+      isBlocked ? "select-none overflow-hidden" : ""
     )}>
-
-      {/* --- HEADER (Hidden in Illusion Mode) --- */}
-      <header className={cn(
-        "sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md shadow-sm transition-all duration-500",
-        illusionMode ? "-translate-y-full opacity-0 pointer-events-none absolute" : "translate-y-0 opacity-100"
-      )}>
-        <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="lg:hidden">
-                  <Menu className="w-5 h-5 text-muted-foreground" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-[300px] p-0">
-                <div className="p-4 border-b bg-muted/30">
-                  <h2 className="font-bold text-lg">Navigator</h2>
-                </div>
-                <div className="p-4">
-                  <Navigator questions={questions} />
-                </div>
-              </SheetContent>
-            </Sheet>
-
-            <div className="flex items-center gap-3">
-              <img src={instituteLogo} alt="Logo" className="h-8 w-auto hidden sm:block rounded" />
-              <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
-            </div>
-          </div>
-
-          {/* Centered Timer */}
-          <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-1">
-            <div className="pointer-events-auto">
-              <Timer onTimeUp={() => handleSubmit(true)} />
-            </div>
-            {/* Conditional Proctor Warning in Header */}
-            {warnings > 0 && (
-              <div className="pointer-events-auto animate-in fade-in slide-in-from-top-1 duration-300">
-                <Badge variant="destructive" className="flex items-center gap-1 text-[10px] px-2 h-5 bg-red-600 hover:bg-red-700 animate-pulse">
-                  <ShieldAlert className="w-3 h-3" />
-                  <span>Warning: {warnings}/4</span>
-                </Badge>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 md:gap-3">
-            {/* Font Size Toggle - Desktop Only */}
-            <div className="hidden md:flex items-center bg-muted/50 rounded-lg p-0.5 border">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFontSize((prev: string) => prev === 'xl' ? 'lg' : 'md')}
-                className={cn("h-8 w-8 p-0", fontSize === 'md' ? "text-muted-foreground" : "")}
-                title="Decrease Font Size"
-                disabled={fontSize === 'md'}
-              >
-                <span className="text-xs font-bold">A-</span>
-              </Button>
-              <div className="w-px h-4 bg-border mx-0.5" />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setFontSize((prev: string) => prev === 'md' ? 'lg' : 'xl')}
-                className={cn("h-8 w-8 p-0", fontSize === 'xl' ? "text-muted-foreground" : "")}
-                title="Increase Font Size"
-                disabled={fontSize === 'xl'}
-              >
-                <span className="text-sm font-bold">A+</span>
-              </Button>
-            </div>
-
-            {/* Illusion Mode Toggle (Desktop Header) */}
-            <Button variant="ghost" size="icon" onClick={toggleIllusionMode} title="Enter Focus Mode" className="hidden sm:flex text-muted-foreground hover:text-primary">
-              <Eye className="w-5 h-5" />
-            </Button>
-
-            <Button
-              onClick={() => handleSubmit(false)}
-              className={cn("rounded-full px-6 transition-all shadow-md", showSubmitConfirm ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")}
-            >
-              {showSubmitConfirm ? "Confirm" : "Submit"}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* --- PROGRESS BAR (Hidden in Illusion) --- */}
-      {!illusionMode && (
-        <div className="w-full h-1 bg-muted fixed top-16 z-40">
-          <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
-        </div>
-      )}
-
-      {/* --- MAIN CONTENT --- */}
-      <main className={cn(
-        "flex-grow mx-auto w-full transition-all duration-500 pb-24 md:pb-10", // Added pb-24 for mobile sticky footer
-        illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
+      <div className={cn(
+        "flex flex-col flex-1",
+        isBlocked ? "blur-sm" : ""
       )}>
 
-        {/* --- LEFT SIDEBAR (Desktop Navigator) --- */}
-        {!illusionMode && (
-          <aside className="hidden lg:block lg:col-span-3">
-            <div className="sticky top-24 space-y-4">
-              <Card className="p-4 border shadow-sm bg-card/50 backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-medium text-muted-foreground">Question Navigator</span>
-                  <Badge variant="secondary" className="bg-primary/10 text-primary">{answeredCount}/{totalQuestions}</Badge>
-                </div>
-                <Navigator questions={questions} onSubmit={() => handleSubmit(false)} />
-              </Card>
-
-              {/* Warnings Widget */}
-              {warnings > 0 && (
-                <div className="bg-destructive/5 text-destructive border border-destructive/20 p-4 rounded-xl flex items-center gap-3">
-                  <ShieldAlert className="w-5 h-5" />
-                  <div className="text-sm font-semibold">
-                    <p>Security Warnings</p>
-                    <p className="text-xs opacity-80">{warnings}/4 Recorded</p>
+        {/* --- HEADER (Hidden in Illusion Mode) --- */}
+        <header className={cn(
+          "sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md shadow-sm transition-all duration-500",
+          illusionMode ? "-translate-y-full opacity-0 pointer-events-none absolute" : "translate-y-0 opacity-100"
+        )}>
+          <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto px-4 h-16 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="lg:hidden">
+                    <Menu className="w-5 h-5 text-muted-foreground" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-[300px] p-0">
+                  <div className="p-4 border-b bg-muted/30">
+                    <h2 className="font-bold text-lg">Navigator</h2>
                   </div>
+                  <div className="p-4">
+                    <Navigator questions={questions} />
+                  </div>
+                </SheetContent>
+              </Sheet>
+
+              <div className="flex items-center gap-3">
+                <img src={instituteLogo} alt="Logo" className="h-8 w-auto hidden sm:block rounded" />
+                <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
+              </div>
+            </div>
+
+            {/* Centered Timer */}
+            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-1">
+              <div className="pointer-events-auto">
+                <Timer onTimeUp={() => handleSubmit(true)} />
+              </div>
+              {/* Conditional Proctor Warning in Header */}
+              {warnings > 0 && (
+                <div className="pointer-events-auto animate-in fade-in slide-in-from-top-1 duration-300">
+                  <Badge variant="destructive" className="flex items-center gap-1 text-[10px] px-2 h-5 bg-red-600 hover:bg-red-700 animate-pulse">
+                    <ShieldAlert className="w-3 h-3" />
+                    <span>Warning: {warnings}/4</span>
+                  </Badge>
                 </div>
               )}
             </div>
-          </aside>
-        )}
 
-        {/* --- CENTER CONTENT --- */}
-        <div className={cn("flex flex-col gap-6", illusionMode ? "w-full" : "lg:col-span-9")}>
-
-          {/* Mobile Navigator (Normal Mode Only) */}
-          {!illusionMode && (
-            <div className="lg:hidden mb-2">
-              <MobileNavigator
-                questions={questions}
-                currentIndex={navigation.current}
-                onNavigate={navigateToQuestion}
-                answers={answers || {}}
-                marked={navigation.marked || {}}
-              />
-            </div>
-          )}
-
-          {/* Question Card Container */}
-          <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "")}>
-            <QuestionCard
-              questionIdx={navigation.current}
-              questionOverride={currentQuestion}
-              disabled={isSubmitting}
-            />
-          </div>
-
-          {/* --- FLOATING CONTROLS (Illusion Mode) --- */}
-          {illusionMode && (
-            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/80 backdrop-blur-md rounded-full px-6 py-3 shadow-2xl z-50 text-white border border-white/10">
-              <Button variant="ghost" size="icon" onClick={handlePrevious} disabled={navigation.current === 0} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
-                <ChevronLeft className="w-6 h-6" />
-              </Button>
-              <span className="text-sm font-mono opacity-80 mx-2">{navigation.current + 1} / {totalQuestions}</span>
-              <Button variant="ghost" size="icon" onClick={handleNext} disabled={navigation.current === totalQuestions - 1} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
-                <ChevronRight className="w-6 h-6" />
-              </Button>
-              <div className="w-px h-6 bg-white/20 mx-2" />
-              <Button variant="ghost" size="icon" onClick={toggleIllusionMode} className="text-white hover:bg-white/20 rounded-full h-10 w-10 text-amber-300">
-                <EyeOff className="w-5 h-5" />
-              </Button>
-            </div>
-          )}
-
-          {/* --- STANDARD BOTTOM BAR (Normal Mode) --- */}
-          {!illusionMode && (
-            <div className="sticky bottom-0 z-30 flex items-center justify-between gap-4 py-4 px-4 -mx-4 md:mx-0 md:px-0 bg-background/80 backdrop-blur-lg border-t md:border-t-0 md:bg-transparent md:backdrop-blur-none md:static mt-auto transition-all">
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={handlePrevious}
-                disabled={navigation.current === 0 || isSubmitting}
-                className="rounded-full px-6 border-border hover:bg-muted text-muted-foreground"
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" /> Previous
-              </Button>
-
-              <div className="block sm:hidden">
-                <Button variant="secondary" size="icon" onClick={toggleIllusionMode} className="rounded-full w-12 h-12 shadow-md">
-                  <Eye className="w-5 h-5" />
+            <div className="flex items-center gap-2 md:gap-3">
+              {/* Font Size Toggle - Desktop Only */}
+              <div className="hidden md:flex items-center bg-muted/50 rounded-lg p-0.5 border">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFontSize((prev: string) => prev === 'xl' ? 'lg' : 'md')}
+                  className={cn("h-8 w-8 p-0", fontSize === 'md' ? "text-muted-foreground" : "")}
+                  title="Decrease Font Size"
+                  disabled={fontSize === 'md'}
+                >
+                  <span className="text-xs font-bold">A-</span>
+                </Button>
+                <div className="w-px h-4 bg-border mx-0.5" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setFontSize((prev: string) => prev === 'md' ? 'lg' : 'xl')}
+                  className={cn("h-8 w-8 p-0", fontSize === 'xl' ? "text-muted-foreground" : "")}
+                  title="Increase Font Size"
+                  disabled={fontSize === 'xl'}
+                >
+                  <span className="text-sm font-bold">A+</span>
                 </Button>
               </div>
 
+              {/* Illusion Mode Toggle (Desktop Header) */}
+              <Button variant="ghost" size="icon" onClick={toggleIllusionMode} title="Enter Focus Mode" className="hidden sm:flex text-muted-foreground hover:text-primary">
+                <Eye className="w-5 h-5" />
+              </Button>
+
               <Button
-                size="lg"
-                onClick={handleNext}
-                disabled={navigation.current === totalQuestions - 1 || isSubmitting}
-                className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                onClick={() => handleSubmit(false)}
+                className={cn("rounded-full px-6 transition-all shadow-md", showSubmitConfirm ? "bg-destructive hover:bg-destructive/90" : "bg-primary hover:bg-primary/90")}
               >
-                Next <ChevronRight className="w-4 h-4 ml-2" />
+                {showSubmitConfirm ? "Confirm" : "Submit"}
               </Button>
             </div>
+          </div>
+        </header>
+
+        {/* --- PROGRESS BAR (Hidden in Illusion) --- */}
+        {!illusionMode && (
+          <div className="w-full h-1 bg-muted fixed top-16 z-40">
+            <div className="h-full bg-primary transition-all duration-500 ease-out" style={{ width: `${progress}%` }} />
+          </div>
+        )}
+
+        {/* --- MAIN CONTENT --- */}
+        <main className={cn(
+          "flex-grow mx-auto w-full transition-all duration-500 pb-24 md:pb-10", // Added pb-24 for mobile sticky footer
+          illusionMode ? "max-w-4xl px-4 py-8 md:py-12 flex flex-col justify-center min-h-screen" : "max-w-7xl 2xl:max-w-[95vw] px-4 py-6 md:py-10 grid grid-cols-1 lg:grid-cols-12 gap-8"
+        )}>
+
+          {/* --- LEFT SIDEBAR (Desktop Navigator) --- */}
+          {!illusionMode && (
+            <aside className="hidden lg:block lg:col-span-3">
+              <div className="sticky top-24 space-y-4">
+                <Card className="p-4 border shadow-sm bg-card/50 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm font-medium text-muted-foreground">Question Navigator</span>
+                    <Badge variant="secondary" className="bg-primary/10 text-primary">{answeredCount}/{totalQuestions}</Badge>
+                  </div>
+                  <Navigator questions={questions} onSubmit={() => handleSubmit(false)} />
+                </Card>
+
+                {/* Warnings Widget */}
+                {warnings > 0 && (
+                  <div className="bg-destructive/5 text-destructive border border-destructive/20 p-4 rounded-xl flex items-center gap-3">
+                    <ShieldAlert className="w-5 h-5" />
+                    <div className="text-sm font-semibold">
+                      <p>Security Warnings</p>
+                      <p className="text-xs opacity-80">{warnings}/4 Recorded</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </aside>
           )}
-        </div>
-      </main>
 
-      {/* --- OVERLAYS --- */}
-      {showSubmitConfirm && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <Card className="max-w-sm w-full p-6 text-center shadow-2xl border-border bg-card">
-            <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
-            </div>
-            <h3 className="text-lg font-bold text-foreground mb-2">Submit Assessment?</h3>
-            <p className="text-muted-foreground text-sm mb-6">You are about to submit your answers. This action cannot be undone.</p>
-            <div className="grid grid-cols-2 gap-3">
-              <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">Cancel</Button>
-              <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">Submit Now</Button>
-            </div>
-          </Card>
-        </div>
-      )}
+          {/* --- CENTER CONTENT --- */}
+          <div className={cn("flex flex-col gap-6", illusionMode ? "w-full" : "lg:col-span-9")}>
 
-      {/* Submission Loader */}
-      {isSubmitting && (
-        <div className="fixed inset-0 z-[110] bg-background/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Check className="w-6 h-6 text-primary animate-pulse" />
+            {/* Mobile Navigator (Normal Mode Only) */}
+            {!illusionMode && (
+              <div className="lg:hidden mb-2">
+                <MobileNavigator
+                  questions={questions}
+                  currentIndex={navigation.current}
+                  onNavigate={navigateToQuestion}
+                  answers={answers || {}}
+                  marked={navigation.marked || {}}
+                />
+              </div>
+            )}
+
+            {/* Question Card Container */}
+            <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "")}>
+              <QuestionCard
+                questionIdx={navigation.current}
+                questionOverride={currentQuestion}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            {/* --- FLOATING CONTROLS (Illusion Mode) --- */}
+            {illusionMode && (
+              <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/80 backdrop-blur-md rounded-full px-6 py-3 shadow-2xl z-50 text-white border border-white/10">
+                <Button variant="ghost" size="icon" onClick={handlePrevious} disabled={navigation.current === 0} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
+                  <ChevronLeft className="w-6 h-6" />
+                </Button>
+                <span className="text-sm font-mono opacity-80 mx-2">{navigation.current + 1} / {totalQuestions}</span>
+                <Button variant="ghost" size="icon" onClick={handleNext} disabled={navigation.current === totalQuestions - 1} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
+                  <ChevronRight className="w-6 h-6" />
+                </Button>
+                <div className="w-px h-6 bg-white/20 mx-2" />
+                <Button variant="ghost" size="icon" onClick={toggleIllusionMode} className="text-white hover:bg-white/20 rounded-full h-10 w-10 text-amber-300">
+                  <EyeOff className="w-5 h-5" />
+                </Button>
+              </div>
+            )}
+
+            {/* --- STANDARD BOTTOM BAR (Normal Mode) --- */}
+            {!illusionMode && (
+              <div className="sticky bottom-0 z-30 flex items-center justify-between gap-4 py-4 px-4 -mx-4 md:mx-0 md:px-0 bg-background/80 backdrop-blur-lg border-t md:border-t-0 md:bg-transparent md:backdrop-blur-none md:static mt-auto transition-all">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  onClick={handlePrevious}
+                  disabled={navigation.current === 0 || isSubmitting}
+                  className="rounded-full px-6 border-border hover:bg-muted text-muted-foreground"
+                >
+                  <ChevronLeft className="w-4 h-4 mr-2" /> Previous
+                </Button>
+
+                <div className="block sm:hidden">
+                  <Button variant="secondary" size="icon" onClick={toggleIllusionMode} className="rounded-full w-12 h-12 shadow-md">
+                    <Eye className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                <Button
+                  size="lg"
+                  onClick={handleNext}
+                  disabled={navigation.current === totalQuestions - 1 || isSubmitting}
+                  className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                >
+                  Next <ChevronRight className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </main>
+
+        {/* --- OVERLAYS --- */}
+        {showSubmitConfirm && (
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <Card className="max-w-sm w-full p-6 text-center shadow-2xl border-border bg-card">
+              <div className="w-12 h-12 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground mb-2">Submit Assessment?</h3>
+              <p className="text-muted-foreground text-sm mb-6">You are about to submit your answers. This action cannot be undone.</p>
+              <div className="grid grid-cols-2 gap-3">
+                <Button variant="outline" onClick={() => setShowSubmitConfirm(false)} className="rounded-xl h-12">Cancel</Button>
+                <Button onClick={() => handleSubmit(false)} className="bg-red-600 hover:bg-red-700 text-white rounded-xl h-12">Submit Now</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Submission Loader */}
+        {isSubmitting && (
+          <div className="fixed inset-0 z-[110] bg-background/95 backdrop-blur-md flex items-center justify-center animate-in fade-in duration-300">
+            <div className="flex flex-col items-center gap-6">
+              <div className="relative">
+                <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Check className="w-6 h-6 text-primary animate-pulse" />
+                </div>
+              </div>
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold text-foreground">উত্তরপত্র জমা দেওয়া হচ্ছে...</h2>
+                <p className="text-muted-foreground font-medium">অনুগ্রহ করে অপেক্ষা করুন (Processing Result...)</p>
               </div>
             </div>
-            <div className="text-center space-y-2">
-              <h2 className="text-2xl font-bold text-foreground">উত্তরপত্র জমা দেওয়া হচ্ছে...</h2>
-              <p className="text-muted-foreground font-medium">অনুগ্রহ করে অপেক্ষা করুন (Processing Result...)</p>
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {isBlocked && !isSubmitting && (
-        <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-          <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-            <ShieldAlert className="w-12 h-12 text-destructive" />
+        {isBlocked && !isSubmitting && (
+          <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
+            <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
+              <ShieldAlert className="w-12 h-12 text-destructive" />
+            </div>
+            <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Security Violation Detected</h1>
+            <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
+              Please return to fullscreen mode immediately.
+              <br />
+              <span className="font-bold text-red-500 mt-2 block">Warning Level: {warnings}/4</span>
+            </p>
+            <Button size="lg" onClick={enterFullscreen} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl">
+              <Maximize2 className="w-6 h-6 mr-2" /> Return to Fullscreen
+            </Button>
           </div>
-          <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Security Violation Detected</h1>
-          <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
-            Please return to fullscreen mode immediately.
-            <br />
-            <span className="font-bold text-red-500 mt-2 block">Warning Level: {warnings}/4</span>
-          </p>
-          <Button size="lg" onClick={enterFullscreen} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl">
-            <Maximize2 className="w-6 h-6 mr-2" /> Return to Fullscreen
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
