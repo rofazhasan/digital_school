@@ -278,8 +278,8 @@ export default function EvaluationsPage() {
     <div className="w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-4 md:p-6 lg:p-8">
       <div className="mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2 tracking-tight">Exam Evaluations</h1>
-          <p className="text-base md:text-lg text-gray-600">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2 tracking-tight">Exam Evaluations</h1>
+          <p className="text-base md:text-lg text-muted-foreground">
             {isSuperUser
               ? "Manage exam evaluations and assign evaluators"
               : "View your assigned exam evaluations"
@@ -300,7 +300,7 @@ export default function EvaluationsPage() {
 
       <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-full sm:w-48 bg-white">
+          <SelectTrigger className="w-full sm:w-48">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
@@ -315,7 +315,7 @@ export default function EvaluationsPage() {
         </Select>
 
         {isSuperUser && (
-          <div className="text-sm text-gray-600 flex items-center gap-2 bg-blue-50/50 px-3 py-1.5 rounded-full border border-blue-100">
+          <div className="text-sm text-muted-foreground flex items-center gap-2 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             <span>Showing All Exams</span>
           </div>
@@ -329,7 +329,7 @@ export default function EvaluationsPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
-                  <p className="text-gray-600 mt-1 line-clamp-2">{exam.description}</p>
+                  <p className="text-muted-foreground mt-1 line-clamp-2">{exam.description}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                   <Badge className={getStatusColor(exam.status)}>
@@ -348,37 +348,37 @@ export default function EvaluationsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                   <Calendar className="h-5 w-5 text-indigo-500" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Date</span>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Date</span>
                     <span className="text-sm font-medium">
                       {new Date(exam.date).toLocaleDateString()}
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                   <Users className="h-5 w-5 text-blue-500" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Submissions</span>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Submissions</span>
                     <span className="text-sm font-medium">
                       {exam.submittedStudents}/{exam.totalStudents} students
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                   <FileText className="h-5 w-5 text-emerald-500" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Published</span>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Published</span>
                     <span className="text-sm font-medium">
                       {exam.publishedResults} results
                     </span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3 bg-gray-50/50 p-3 rounded-lg border border-gray-100">
+                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
                   <LayoutDashboard className="h-5 w-5 text-amber-500" />
                   <div className="flex flex-col">
-                    <span className="text-xs text-gray-500 uppercase font-semibold">Class info</span>
+                    <span className="text-xs text-muted-foreground uppercase font-semibold">Class info</span>
                     <span className="text-sm font-medium">
                       {exam.class.name} {exam.class.section}
                     </span>
@@ -387,7 +387,7 @@ export default function EvaluationsPage() {
               </div>
 
               {exam.publishedResults > 0 && (
-                <div className="bg-green-50 border border-green-200 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-800">
+                <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-600 dark:text-green-400">
                   <CheckCircle className="h-5 w-5" />
                   <span className="font-medium">Results Released</span>
                   <span className="text-sm">({exam.publishedResults} results published)</span>
@@ -395,22 +395,22 @@ export default function EvaluationsPage() {
               )}
 
               {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
-                <div className="bg-gray-50 p-3 rounded-lg mb-4 space-y-3">
+                <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-3">
                   <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
                   {exam.evaluationAssignments.map((assignment) => (
-                    <div key={assignment.id} className="border-b border-gray-200 last:border-0 pb-2 last:pb-0 text-sm">
+                    <div key={assignment.id} className="border-b border-border last:border-0 pb-2 last:pb-0 text-sm">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div>
-                          <span className="text-gray-600">Name:</span> {assignment.evaluator.name} <span className="text-xs text-gray-500">({assignment.evaluator.role})</span>
+                          <span className="text-muted-foreground">Name:</span> {assignment.evaluator.name} <span className="text-xs text-muted-foreground">({assignment.evaluator.role})</span>
                         </div>
                         <div>
-                          <span className="text-gray-600">Status:</span>
+                          <span className="text-muted-foreground">Status:</span>
                           <Badge variant="outline" className={`ml-2 ${getStatusColor(assignment.status)}`}>
                             {assignment.status.replace("_", " ")}
                           </Badge>
                         </div>
                       </div>
-                      {assignment.notes && <div className="text-xs text-gray-500 mt-1 italic">Note: {assignment.notes}</div>}
+                      {assignment.notes && <div className="text-xs text-muted-foreground mt-1 italic">Note: {assignment.notes}</div>}
                     </div>
                   ))}
                 </div>
@@ -464,8 +464,8 @@ export default function EvaluationsPage() {
 
       {exams.length === 0 && (
         <div className="text-center py-12">
-          <div className="text-gray-500 text-lg">No exams found</div>
-          <p className="text-gray-400 mt-2">
+          <div className="text-muted-foreground text-lg">No exams found</div>
+          <p className="text-muted-foreground/60 mt-2">
             {selectedStatus && selectedStatus !== "ALL"
               ? `No exams with status "${selectedStatus}"`
               : "No exams available for evaluation"

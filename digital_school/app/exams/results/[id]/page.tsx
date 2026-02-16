@@ -36,7 +36,8 @@ import {
   Lock,
   Camera,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Star
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -632,8 +633,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading your result...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-muted-foreground">Loading your result...</p>
         </motion.div>
       </div>
     );
@@ -826,8 +827,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   Your Result
                 </h1>
               </div>
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">{result.exam.name}</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">{result.exam.description}</p>
+              <h2 className="text-2xl font-semibold text-foreground mb-2">{result.exam.name}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">{result.exam.description}</p>
             </div>
           </motion.div>
 
@@ -848,15 +849,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Name</label>
+                    <label className="text-sm font-medium text-muted-foreground">Name</label>
                     <div className="text-lg font-semibold">{result.student.name}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Roll</label>
+                    <label className="text-sm font-medium text-muted-foreground">Roll</label>
                     <div className="text-lg">{result.student.roll}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Class</label>
+                    <label className="text-sm font-medium text-muted-foreground">Class</label>
                     <div className="text-lg">{result.student.class}</div>
                   </div>
                 </div>
@@ -881,7 +882,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Exam Date</label>
+                    <label className="text-sm font-medium text-muted-foreground">Exam Date</label>
                     <div className="text-lg font-semibold">
                       {new Date(result.exam.startTime).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -891,11 +892,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Duration</label>
+                    <label className="text-sm font-medium text-muted-foreground">Duration</label>
                     <div className="text-lg">{result.exam.duration} minutes</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Time Taken</label>
+                    <label className="text-sm font-medium text-muted-foreground">Time Taken</label>
                     <div className="text-lg">
                       {result.submission.startedAt ? (() => {
                         const startTime = new Date(result.submission.startedAt);
@@ -908,7 +909,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Submission Time</label>
+                    <label className="text-sm font-medium text-muted-foreground">Submission Time</label>
                     <div className="text-lg">
                       {new Date(result.submission.submittedAt).toLocaleTimeString('en-US', {
                         hour: '2-digit',
@@ -919,11 +920,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Total Marks</label>
+                    <label className="text-sm font-medium text-muted-foreground">Total Marks</label>
                     <div className="text-lg font-semibold">{result.exam.totalMarks}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Time Efficiency</label>
+                    <label className="text-sm font-medium text-muted-foreground">Time Efficiency</label>
                     <div className="text-lg">
                       {result.submission.startedAt ? (() => {
                         const startTime = new Date(result.submission.startedAt);
@@ -938,7 +939,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         return (
                           <div className="flex flex-col">
-                            <span className={Number(efficiency) > 0 ? "text-green-600 font-bold" : "text-gray-600"}>
+                            <span className={Number(efficiency) > 0 ? "text-green-600 dark:text-green-400 font-bold" : "text-muted-foreground"}>
                               {efficiency}% Efficient
                             </span>
                             <span className="text-xs text-gray-500">
@@ -979,7 +980,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </CardTitle>
               </CardHeader>
               {hasUnevaluatedQuestions() && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="bg-yellow-500/10 border-l-4 border-yellow-500 p-4">
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-yellow-600" />
                     <div>
@@ -1010,7 +1011,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               )}
               {/* Suspended Exam Alert */}
               {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
-                <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                <div className="bg-red-500/10 border-l-4 border-red-500 p-4">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-5 w-5 text-red-600" />
                     <div>
@@ -1048,11 +1049,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Marks Breakdown */}
                     <div className="space-y-6">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Marks Breakdown</h3>
+                      <h3 className="text-xl font-semibold text-foreground mb-4">Marks Breakdown</h3>
 
                       <div className="space-y-4">
                         {objectiveQuestions.length > 0 && (
-                          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <CheckSquare className="h-5 w-5 text-blue-600" />
                               <span className="font-medium">Objective Marks</span>
@@ -1501,11 +1502,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       return (
                         <div id="objective-questions-section">
                           <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <CheckSquare className="h-4 w-4 text-blue-600" />
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <CheckSquare className="h-4 w-4 text-primary" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
-                            <Badge className="bg-blue-100 text-blue-800">
+                            <h3 className="text-2xl font-bold text-foreground">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
                               {filteredQuestions.length} Questions
                             </Badge>
                           </div>
@@ -1522,15 +1523,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: 0.1 * index }}
-                                  className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 ${isCorrect ? 'bg-green-50/20 border-green-100' : hasAnswer ? 'bg-red-50/20 border-red-100' : 'bg-gray-50 border-gray-200'}`}
+                                  className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 
+                                      ${isCorrect
+                                      ? 'bg-green-500/5 border-green-500/20 dark:bg-green-500/10'
+                                      : hasAnswer
+                                        ? 'bg-red-500/5 border-red-500/20 dark:bg-red-500/10'
+                                        : 'bg-muted/30 border-border opacity-90'}`}
                                 >
                                   {/* Question Header */}
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                      <Badge className="bg-blue-100 text-blue-800">
+                                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
                                         {type}
                                       </Badge>
-                                      <span className="text-sm text-gray-600 font-bold">Question {globalIndex + 1}</span>
+                                      <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
@@ -1543,15 +1549,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   {type === 'AR' ? (
                                     <div className="mb-4">
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
-                                          <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
-                                          <div className="text-sm">
+                                        <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                                          <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Assertion (A)</div>
+                                          <div className="text-sm text-foreground">
                                             <UniversalMathJax dynamic>{(question as any).assertion || question.questionText}</UniversalMathJax>
                                           </div>
                                         </div>
-                                        <div className="p-3 bg-purple-50/50 rounded-lg border border-purple-100">
-                                          <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
-                                          <div className="text-sm">
+                                        <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                                          <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase mb-1">Reason (R)</div>
+                                          <div className="text-sm text-foreground">
                                             <UniversalMathJax dynamic>{(question as any).reason || ""}</UniversalMathJax>
                                           </div>
                                         </div>
@@ -1631,19 +1637,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           if (isSelected && isCorrectOpt) {
                                             // 1. Correct and Selected -> GREEN
-                                            containerStyle = "border-green-500 bg-green-50 text-green-900 shadow-md ring-1 ring-green-200 transform scale-[1.01] dark:bg-green-900/20 dark:text-green-100 dark:ring-green-900/40";
-                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-100 dark:fill-green-900/40" />;
-                                            labelStyle = "bg-green-200 text-green-800 dark:bg-green-800 dark:text-green-200";
+                                            containerStyle = "border-green-500 bg-green-500/10 text-foreground shadow-md ring-1 ring-green-500/20 transform scale-[1.01]";
+                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-500/10" />;
+                                            labelStyle = "bg-green-500 text-white";
                                           } else if (isSelected && !isCorrectOpt) {
                                             // 2. Wrong and Selected -> RED
-                                            containerStyle = "border-red-500 bg-red-50 text-red-900 shadow-md ring-1 ring-red-200 dark:bg-red-900/20 dark:text-red-100 dark:ring-red-900/40";
-                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-100 dark:fill-red-900/40" />;
-                                            labelStyle = "bg-red-200 text-red-800 dark:bg-red-800 dark:text-red-200";
+                                            containerStyle = "border-red-500 bg-red-500/10 text-foreground shadow-md ring-1 ring-red-500/20";
+                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-500/10" />;
+                                            labelStyle = "bg-red-500 text-white";
                                           } else if (!isSelected && isCorrectOpt) {
                                             // 3. Correct but NOT Selected -> BLUE/TEAL (Distinct)
-                                            containerStyle = "border-teal-400 bg-teal-50 text-teal-900 border-dashed ring-1 ring-teal-100 dark:bg-teal-900/20 dark:text-teal-100 dark:ring-teal-900/40";
+                                            containerStyle = "border-teal-500/50 bg-teal-500/5 text-foreground border-dashed ring-1 ring-teal-500/10";
                                             icon = <CheckCircle className="h-5 w-5 text-teal-600 flex-shrink-0" />;
-                                            labelStyle = "bg-teal-200 text-teal-800 dark:bg-teal-800 dark:text-teal-200";
+                                            labelStyle = "bg-teal-500 text-white";
                                           } else {
                                             // 4. Wrong and NOT Selected -> GRAY (Faded)
                                             containerStyle = "border-border bg-card text-muted-foreground opacity-60 hover:opacity-100 transition-opacity";
@@ -1699,38 +1705,38 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : type === 'MTF' ? (
                                     <div className="space-y-4">
-                                      <div className="grid grid-cols-2 gap-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase">Column A</div>
+                                          <div className="text-xs font-bold text-muted-foreground uppercase">Column A</div>
                                           {(question as any).leftColumn?.map((item: any, i: number) => (
-                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2">{i + 1}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2 text-muted-foreground">{i + 1}.</span>
+                                              <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                             </div>
                                           ))}
                                         </div>
                                         <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase">Column B</div>
+                                          <div className="text-xs font-bold text-muted-foreground uppercase">Column B</div>
                                           {(question as any).rightColumn?.map((item: any, i: number) => (
-                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2 text-muted-foreground">{String.fromCharCode(65 + i)}.</span>
+                                              <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                             </div>
                                           ))}
                                         </div>
                                       </div>
-                                      <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                                        <div className="text-xs font-bold text-indigo-700 uppercase mb-3 text-center">Match Analysis</div>
-                                        <div className="overflow-hidden rounded-lg border border-indigo-200">
-                                          <table className="w-full text-sm">
-                                            <thead className="bg-indigo-100 text-indigo-800">
+                                      <div className="p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-3 text-center">Match Analysis</div>
+                                        <div className="overflow-x-auto rounded-lg border border-indigo-500/20 shadow-sm">
+                                          <table className="w-full text-sm min-w-[500px]">
+                                            <thead className="bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
                                               <tr>
-                                                <th className="p-2 text-left w-1/3">Question (Left)</th>
-                                                <th className="p-2 text-left w-1/3">Your Match</th>
-                                                <th className="p-2 text-left w-1/3">Correct Match</th>
+                                                <th className="p-3 text-left w-1/3">Question (Left)</th>
+                                                <th className="p-3 text-left w-1/3">Your Match</th>
+                                                <th className="p-3 text-left w-1/3">Correct Match</th>
                                               </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-indigo-100 bg-white">
+                                            <tbody className="divide-y divide-indigo-500/10 bg-card">
                                               {(question as any).leftColumn?.map((item: any, lIdx: number) => {
                                                 const correctMatches = (question as any).matches || {};
                                                 const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
@@ -1739,7 +1745,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 let studentRightId = null;
                                                 if (Array.isArray(studentMatches)) {
                                                   const match = studentMatches.find((m: any) => m.leftIndex === lIdx || m.leftId === item.id);
-                                                  if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
+                                                  if (match) studentRightId = match.studentRightId || match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
                                                 } else {
                                                   studentRightId = studentMatches[item.id];
                                                 }
@@ -1761,20 +1767,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                                 // Row styling
                                                 const rowClass = isMatchCorrect
-                                                  ? "bg-green-50"
+                                                  ? "bg-green-500/5 dark:bg-green-500/10"
                                                   : isUnanswered
-                                                    ? "bg-gray-50 opacity-90"
-                                                    : "bg-red-50";
+                                                    ? "bg-muted/30 opacity-90"
+                                                    : "bg-red-500/5 dark:bg-red-500/10";
 
                                                 return (
                                                   <tr key={lIdx} className={rowClass}>
-                                                    <td className="p-2 border-r border-indigo-100 font-medium">
+                                                    <td className="p-3 border-r border-indigo-500/10 font-medium">
                                                       <div className="flex items-center gap-1">
-                                                        <span className="font-bold text-gray-500 shrink-0">{vlLeft}.</span>
+                                                        <span className="font-bold text-muted-foreground shrink-0">{vlLeft}.</span>
                                                         <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                                       </div>
                                                     </td>
-                                                    <td className={`p-2 border-r border-indigo-100 ${isMatchCorrect ? 'text-green-700 font-bold' : isUnanswered ? 'text-gray-400 italic' : 'text-red-600 font-bold'}`}>
+                                                    <td className={`p-3 border-r border-indigo-500/10 ${isMatchCorrect ? 'text-green-600 dark:text-green-400 font-bold' : isUnanswered ? 'text-muted-foreground italic' : 'text-red-600 dark:text-red-400 font-bold'}`}>
                                                       {isUnanswered ? (
                                                         "No selection"
                                                       ) : (
@@ -1785,7 +1791,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                         </div>
                                                       )}
                                                     </td>
-                                                    <td className="p-2 text-green-700 font-medium">
+                                                    <td className="p-3 text-green-600 dark:text-green-400 font-medium">
                                                       <div className="flex items-center gap-1">
                                                         {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
                                                         {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
@@ -1803,18 +1809,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                   {/* Explanation Section - Rendered for ALL types if available */}
                                   {(question.explanation || (question as any).explanationImage) && (
-                                    <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <div className="bg-yellow-100 p-1 rounded-full">
-                                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-700"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                        <div className="bg-yellow-500/20 p-1.5 rounded-full shadow-inner">
+                                          <Star className="text-yellow-600 dark:text-yellow-400 h-4 w-4" />
                                         </div>
-                                        <span className="font-bold text-yellow-800 text-sm">Explanation / ব্যাখ্যা</span>
+                                        <span className="font-bold text-yellow-600 dark:text-yellow-400 text-sm">Explanation / ব্যাখ্যা</span>
                                       </div>
-                                      <div className="text-sm text-gray-700 pl-8">
+                                      <div className="text-sm text-foreground/90 pl-8 leading-relaxed">
                                         <UniversalMathJax inline dynamic>
                                           {cleanupMath(renderDynamicExplanation(
                                             question.explanation,
-                                            question.options,
+                                            (question as any).leftColumn || question.options,
                                             question.type,
                                             (question as any).rightColumn
                                           ))}
@@ -1823,7 +1829,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           <img
                                             src={(question as any).explanationImage}
                                             alt="Explanation"
-                                            className="mt-2 max-h-60 rounded border border-gray-200"
+                                            className="mt-3 max-h-72 rounded-lg border border-border shadow-sm object-contain"
                                           />
                                         )}
                                       </div>

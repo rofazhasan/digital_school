@@ -14,7 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 // @ts-ignore
 // import confetti from "canvas-confetti"; // Dynamic import used instead
 
@@ -43,10 +43,11 @@ interface Question {
     type: 'MCQ' | 'CQ' | 'SQ';
     subject: string;
     topic?: string;
-    options?: any[]; // Array of strings or objects depending on parsing
-    modelAnswer?: string; // Correct option index/value
+    options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
+    modelAnswer?: string;
     images?: string[];
     subQuestions?: any[];
+    rightColumn?: { id: string; text: string; originalIndex?: number }[];
 }
 
 export default function PracPerfectSessionPage() {
@@ -140,9 +141,12 @@ export default function PracPerfectSessionPage() {
                                 };
                             });
 
-                            // 3. Shuffle Options
-                            shuffle(processedOptions);
-                            return { ...q, options: processedOptions };
+                            // 3. Add originalIndex before shuffling
+                            const optionsWithIndex = processedOptions.map((opt: any, idx: number) => ({ ...opt, originalIndex: idx }));
+
+                            // 4. Shuffle Options
+                            shuffle(optionsWithIndex);
+                            return { ...q, options: optionsWithIndex };
                         }
                         return q;
                     });
@@ -313,11 +317,11 @@ export default function PracPerfectSessionPage() {
                                 {/* Question Header */}
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex flex-wrap gap-2">
-                                        <Badge variant="outline" className={`font-fancy font-bold px-3 py-1 ${isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'bg-indigo-50/50 text-indigo-700 border-indigo-100'}`}>
+                                        <Badge variant="outline" className={`font-fancy font-bold px-3 py-1 ${isDark ? 'border-slate-700 bg-slate-800 text-slate-300' : 'bg-primary/10 text-primary border-primary/20'}`}>
                                             {currentQ.subject}
                                         </Badge>
                                         {currentQ.topic && (
-                                            <Badge variant="secondary" className="font-fancy bg-indigo-500/10 text-indigo-700 border-indigo-100/50 px-3 py-1 font-bold">
+                                            <Badge variant="secondary" className="font-fancy bg-primary/10 text-primary border-primary/10 px-3 py-1 font-bold">
                                                 {currentQ.topic}
                                             </Badge>
                                         )}
@@ -345,7 +349,7 @@ export default function PracPerfectSessionPage() {
                                 {currentQ.type === 'CQ' && Array.isArray(currentQ.subQuestions) && (
                                     <div className="space-y-6 mt-4">
                                         {currentQ.subQuestions.map((sub: any, idx: number) => (
-                                            <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
+                                            <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-muted/30 border-border'}`}>
                                                 <div className="flex gap-3 items-start">
                                                     <span className="font-bold text-indigo-600 flex-shrink-0">({String.fromCharCode(97 + idx)})</span>
                                                     <div className="flex-1 text-sm font-medium leading-relaxed">
@@ -397,8 +401,8 @@ export default function PracPerfectSessionPage() {
                                                     stateClass = "opacity-50";
                                                 }
                                             } else {
-                                                if (idx === selectedOption) stateClass = "bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 ring-4 ring-indigo-500/20 shadow-lg -translate-y-0.5";
-                                                else stateClass = "hover:bg-slate-50 dark:hover:bg-slate-800/50 border-slate-200/60 dark:border-slate-700 text-slate-700 dark:text-slate-300";
+                                                if (idx === selectedOption) stateClass = "bg-primary/10 border-primary text-primary ring-4 ring-primary/20 shadow-lg -translate-y-0.5";
+                                                else stateClass = "hover:bg-muted/50 border-border text-foreground";
                                             }
 
                                             return (
@@ -427,7 +431,7 @@ export default function PracPerfectSessionPage() {
                                 <div className="pt-6 flex gap-3">
                                     {!isChecked ? (
                                         <Button
-                                            className="w-full h-12 text-base font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all font-fancy"
+                                            className="w-full h-12 text-base font-bold bg-primary hover:bg-primary/90 text-white rounded-xl shadow-lg shadow-primary/20 transition-all font-fancy"
                                             disabled={currentQ.type === 'MCQ' && selectedOption === null}
                                             onClick={handleCheckAnswer}
                                         >
@@ -474,8 +478,7 @@ export default function PracPerfectSessionPage() {
                                             {(!isCorrect || result === 'unanswered') && currentQ.type === 'MCQ' && (
                                                 <Badge className="bg-green-600 text-white border-white border-2 font-black px-4 py-1.5 shadow-md">
                                                     Correct Answer: {(() => {
-                                                        const correctOpt = currentQ.options?.find((o: any) => o.isCorrect);
-                                                        const correctIdx = currentQ.options?.indexOf(correctOpt) ?? -1;
+                                                        const correctIdx = currentQ.options?.findIndex((o: any) => o.isCorrect) ?? -1;
                                                         return correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : "?";
                                                     })()}
                                                 </Badge>
@@ -493,7 +496,14 @@ export default function PracPerfectSessionPage() {
                                                             <div className="mt-3 pt-4 border-t border-current/10">
                                                                 <div className="font-fancy font-black mb-2 text-xs opacity-70 uppercase tracking-[0.1em]">Explanation Details</div>
                                                                 <div className="leading-relaxed opacity-90 italic decoration-indigo-500/30 underline-offset-4">
-                                                                    <UniversalMathJax dynamic>{correctOpt.explanation}</UniversalMathJax>
+                                                                    <UniversalMathJax dynamic>
+                                                                        {cleanupMath(renderDynamicExplanation(
+                                                                            correctOpt?.explanation,
+                                                                            currentQ.options,
+                                                                            currentQ.type,
+                                                                            currentQ.rightColumn
+                                                                        ))}
+                                                                    </UniversalMathJax>
                                                                 </div>
                                                             </div>
                                                         );

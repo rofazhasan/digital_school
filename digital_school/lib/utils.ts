@@ -121,7 +121,11 @@ export function renderDynamicExplanation(
       );
 
       if (currentIndex !== -1) {
-        // Return visual label (Bengali ক, খ, গ, ঘ)
+        // For MTF, we use numeric labels (1, 2, 3...) to match the table
+        if (type.toLowerCase() === 'mtf') {
+          return (currentIndex + 1).toString();
+        }
+        // Return visual label (Bengali ক, খ, গ, ঘ) for others
         return String.fromCharCode(0x0995 + currentIndex);
       }
       return match; // Fallback if index not found

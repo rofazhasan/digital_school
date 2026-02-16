@@ -130,8 +130,8 @@ export default function TeacherDashboard() {
         <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
             {/* Background Elements */}
             <div className="absolute inset-0 z-0">
-                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+                <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
             </div>
 
             <DashboardSidebar
@@ -190,13 +190,13 @@ export default function TeacherDashboard() {
                             <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
                                 <DropdownMenuTrigger asChild>
                                     <button className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-border transition-all">
-                                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold shadow-sm">
+                                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-sm">
                                             {user?.name?.[0] || 'T'}
                                         </div>
                                         <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors hidden md:block" />
                                     </button>
                                 </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-border backdrop-blur-xl bg-background/90">
+                                <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-border backdrop-blur-xl bg-card/90">
                                     <div className="px-2 py-3 bg-muted/50 rounded-lg mb-2">
                                         <p className="text-sm font-semibold leading-none text-foreground">{user?.name}</p>
                                         <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email}</p>
@@ -260,7 +260,7 @@ export default function TeacherDashboard() {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: i * 0.1 }}
                                                 >
-                                                    <Card className="rounded-2xl border border-border shadow-lg shadow-gray-200/50 dark:shadow-none bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+                                                    <Card className="rounded-2xl border border-border shadow-md bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
                                                         <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
                                                         <CardContent className="p-6">
                                                             <div className="flex items-center justify-between mb-4">
@@ -301,7 +301,7 @@ export default function TeacherDashboard() {
                                                         }}
                                                         className="flex flex-col items-center justify-center p-6 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group"
                                                     >
-                                                        <div className={`p-4 rounded-full bg-muted/50 group-hover:bg-accent transition-colors`}>
+                                                        <div className={`p-4 rounded-full bg-muted/50 group-hover:bg-primary/10 transition-colors`}>
                                                             <action.icon className={`h-6 w-6 ${action.color}`} />
                                                         </div>
                                                         <span className="font-semibold text-sm text-foreground/80 group-hover:text-foreground transition-colors">{action.label}</span>
@@ -354,7 +354,7 @@ export default function TeacherDashboard() {
                                                             { time: "11:00 AM", class: "Class 9 - Section B", subject: "Physics", status: "In Progress" },
                                                             { time: "02:00 PM", class: "Class 11 - Section A", subject: "Further Math", status: "Upcoming" },
                                                         ].map((item, i) => (
-                                                            <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 border border-border hover:border-primary/50 transition-colors">
+                                                            <div key={i} className="flex items-center gap-4 p-3 rounded-xl bg-muted/30 border border-border hover:border-primary transition-colors">
                                                                 <div className="flex flex-col items-center justify-center min-w-[60px] p-2 bg-card rounded-lg shadow-sm border border-border">
                                                                     <Clock className="h-4 w-4 text-primary mb-1" />
                                                                     <span className="text-[10px] font-bold whitespace-nowrap">{item.time}</span>

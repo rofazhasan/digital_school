@@ -291,7 +291,7 @@ export default function StudentDashboardPage() {
               </div>
 
               {/* Desktop Navigation */}
-              <nav className="hidden lg:flex items-center gap-1 bg-gray-100/50 dark:bg-gray-800/50 p-1.5 rounded-full border border-gray-200/50 dark:border-gray-700/50">
+              <nav className="hidden lg:flex items-center gap-1 bg-muted/50 p-1.5 rounded-full border border-border">
                 {[
                   { id: 'dashboard', label: 'Dashboard', icon: Home },
                   { id: 'exams', label: 'Exams', icon: FileText },
@@ -324,7 +324,7 @@ export default function StudentDashboardPage() {
             {/* Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-11 w-auto rounded-full pl-2 pr-4 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors border border-transparent hover:border-gray-200 dark:hover:border-gray-700">
+                <Button variant="ghost" className="relative h-11 w-auto rounded-full pl-2 pr-4 hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-md ring-2 ring-white dark:ring-gray-950">
                       <User className="h-4 w-4" />
@@ -428,14 +428,14 @@ export default function StudentDashboardPage() {
                     >
                       <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-indigo-500/20 to-transparent rounded-bl-full -mr-2 -mt-2 group-hover:scale-110 transition-transform" />
                       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium text-indigo-900 dark:text-indigo-300">Practice</CardTitle>
-                        <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                          <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                        <CardTitle className="text-sm font-medium text-primary">Practice</CardTitle>
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Sparkles className="h-4 w-4 text-primary" />
                         </div>
                       </CardHeader>
                       <CardContent>
-                        <div className="text-xl font-bold text-indigo-700 dark:text-indigo-300 font-mono tracking-tight">PracPerfect</div>
-                        <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70 mt-1">
+                        <div className="text-xl font-bold text-primary font-mono tracking-tight">PracPerfect</div>
+                        <p className="text-xs text-primary/70 mt-1">
                           Start personalized session
                         </p>
                       </CardContent>

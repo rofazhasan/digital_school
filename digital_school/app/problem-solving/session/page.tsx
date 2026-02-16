@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed
+    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed, Star
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +12,7 @@ import { Slider } from "@/components/ui/slider";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 
 
@@ -35,9 +35,11 @@ interface Question {
     topic?: string;
     difficulty: string;
     marks: number;
-    options?: { text: string; isCorrect: boolean; explanation?: string }[];
+    options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
     modelAnswer?: string;
     subQuestions?: any[];
+    rightColumn?: { id: string; text: string; originalIndex?: number }[];
+    matches?: Record<string, string>;
     // Review Mode Fields
     status?: 'correct' | 'wrong' | 'unanswered';
     userAnswer?: number | null; // Index of selected option
@@ -125,9 +127,11 @@ export default function ProblemSolvingSession() {
                         if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
                         sessionQuestions = sessionQuestions.map((q: Question) => {
                             if (q.type === 'MCQ' && q.options && q.options.length > 0) {
+                                // Add originalIndex before shuffling
+                                const optionsWithIndex = q.options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
                                 return {
                                     ...q,
-                                    options: isReview ? q.options : shuffleArray(q.options)
+                                    options: isReview ? optionsWithIndex : shuffleArray(optionsWithIndex)
                                 };
                             }
                             return q;
@@ -534,13 +538,13 @@ export default function ProblemSolvingSession() {
                         <Button
                             variant="secondary" size="sm"
                             onClick={() => router.push('/problem-solving')}
-                            className="bg-white/90 backdrop-blur shadow-sm hover:bg-white border border-gray-100 rounded-full pl-3 pr-4"
+                            className="bg-card/90 backdrop-blur shadow-sm hover:bg-card border border-border rounded-full pl-3 pr-4"
                         >
-                            <LogOut className="w-4 h-4 mr-2 text-gray-500" />
-                            <span className="text-gray-700">Exit</span>
+                            <LogOut className="w-4 h-4 mr-2 text-muted-foreground" />
+                            <span className="text-foreground">Exit</span>
                         </Button>
-                        <div className="bg-white/90 backdrop-blur shadow-sm border border-gray-100 px-4 py-1.5 rounded-full flex items-center gap-3">
-                            <span className="text-sm font-semibold text-gray-800">Q {currentIndex + 1} / {questions.length}</span>
+                        <div className="bg-card/90 backdrop-blur shadow-sm border border-border px-4 py-1.5 rounded-full flex items-center gap-3">
+                            <span className="text-sm font-semibold text-foreground">Q {currentIndex + 1} / {questions.length}</span>
                         </div>
                     </div>
 
@@ -603,17 +607,17 @@ export default function ProblemSolvingSession() {
                             animate={{ x: 0, opacity: 1 }}
                             exit={{ x: -400, opacity: 0 }}
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                            className={`absolute top-24 left-6 w-[480px] pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
+                            className={`absolute top-24 left-0 sm:left-6 w-full sm:w-[500px] px-4 sm:px-0 pointer-events-auto flex flex-col max-h-[calc(100vh-160px)] ${annotationMode ? 'z-20 opacity-90' : 'z-20'}`}
                         >
-                            <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-white/95 border-white/40 ring-1 ring-white/10 text-gray-900 shadow-2xl'}`}>
-                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-gray-50/50 border-b border-gray-100/50'}`}>
+                            <Card className={`shadow-none overflow-hidden flex flex-col rounded-2xl backdrop-blur-none ${isDark ? 'bg-transparent border-none text-white' : 'bg-card/95 border-border ring-1 ring-border shadow-2xl'}`}>
+                                <div className={`px-6 py-4 flex justify-between items-start ${isDark ? 'bg-transparent border-b border-slate-700/50' : 'bg-muted/50 border-b border-border'}`}>
                                     <div className="flex flex-col">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></div>
-                                            <span className="text-xs font-bold text-indigo-500 uppercase tracking-wider">{currentQ.subject}</span>
+                                            <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse"></div>
+                                            <span className="text-xs font-bold text-primary uppercase tracking-wider">{currentQ.subject}</span>
                                         </div>
                                         {currentQ.topic && (
-                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-gray-500'}`}>{currentQ.topic}</span>
+                                            <span className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-400' : 'text-muted-foreground'}`}>{currentQ.topic}</span>
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -647,13 +651,13 @@ export default function ProblemSolvingSession() {
                                                     // Base Style
                                                     let statusClass = isDark
                                                         ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
-                                                        : "border-transparent bg-white shadow-sm hover:shadow-md hover:border-indigo-100";
+                                                        : "border-border bg-card shadow-sm hover:shadow-md hover:border-primary/20";
 
                                                     // Interaction State (Standard)
                                                     if (isSelected) {
                                                         statusClass = isDark
                                                             ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
-                                                            : "bg-indigo-50 border-indigo-200 ring-1 ring-indigo-200";
+                                                            : "bg-primary/10 border-primary/20 ring-1 ring-primary/20";
                                                     }
 
                                                     // REVEAL LOGIC (Standard or Review)
@@ -663,9 +667,9 @@ export default function ProblemSolvingSession() {
                                                     const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
 
                                                     if (shouldReveal) {
-                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-50 border-green-200 ring-1 ring-green-200";
-                                                        else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-50 border-red-200 ring-1 ring-red-200 opacity-60";
-                                                        else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-gray-50 opacity-50";
+                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-500/10 border-green-500/20 ring-1 ring-green-500/20";
+                                                        else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-500/10 border-red-500/20 ring-1 ring-red-500/20 opacity-60";
+                                                        else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-muted/30 opacity-50";
                                                     }
                                                     // Review Mode: WRONG Answer State (Before Reveal)
                                                     // If user got it wrong, show their WRONG selection in RED immediately, but keep Correct hidden.
@@ -693,7 +697,7 @@ export default function ProblemSolvingSession() {
                                                         >
                                                             <div className={`
                                                   shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-indigo-600 text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-gray-100 text-gray-500')}
+                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-primary text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-muted text-muted-foreground')}
                                                   ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
                                                   ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
                                                   ${(!shouldReveal && reviewStatus === 'wrong' && isUserSelected) ? '!bg-red-500 !text-white' : ''}
@@ -752,13 +756,18 @@ export default function ProblemSolvingSession() {
                                     {(isAnswerChecked || currentQ.status === 'correct') && (currentQ.options?.some(o => o.isCorrect && o.explanation) || currentQ.modelAnswer) && (
                                         <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
                                             <h4 className="font-bold text-indigo-500 flex items-center gap-2">
-                                                <CheckCircle className="w-4 h-4" /> {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? 'Model Answer' : 'Explanation'}
+                                                <Star className="w-4 h-4" /> {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? 'Model Answer' : 'Explanation'}
                                             </h4>
                                             <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
                                                 <UniversalMathJax dynamic>
-                                                    {currentQ.type === 'MCQ'
-                                                        ? (currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided.")
-                                                        : (currentQ.modelAnswer || "No model answer provided.")}
+                                                    {cleanupMath(renderDynamicExplanation(
+                                                        currentQ.type === 'MCQ'
+                                                            ? (currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided.")
+                                                            : (currentQ.modelAnswer || "No model answer provided."),
+                                                        currentQ.options,
+                                                        currentQ.type,
+                                                        currentQ.rightColumn
+                                                    ))}
                                                 </UniversalMathJax>
                                             </div>
                                         </div>

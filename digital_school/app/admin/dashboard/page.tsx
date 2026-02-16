@@ -150,8 +150,8 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
       {/* Background Elements */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
       </div>
 
       <DashboardSidebar
@@ -214,7 +214,7 @@ export default function AdminDashboard() {
                 <button
                   className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-border transition-all"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold shadow-sm">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-sm">
                     {user?.name?.[0] || 'A'}
                   </div>
                   <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors hidden md:block" />
@@ -302,7 +302,7 @@ function OverviewTab() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 + 0.2 }}
           >
-            <Card className="rounded-2xl border border-border shadow-lg shadow-gray-200/50 dark:shadow-none bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+            <Card className="rounded-2xl border border-border shadow-md bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
               <div className={`absolute top-0 right-0 w-24 h-24 ${item.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
 
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -340,7 +340,7 @@ function OverviewTab() {
             onClick={() => router.push(action.href)}
             className="flex flex-col items-center justify-center p-6 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group"
           >
-            <div className={`p-4 rounded-full bg-muted mb-3 group-hover:bg-accent transition-colors`}>
+            <div className={`p-4 rounded-full bg-muted/50 mb-3 group-hover:bg-primary/10 transition-colors`}>
               <action.icon className={`h-6 w-6 ${action.color}`} />
             </div>
             <span className="font-semibold text-sm text-foreground/80 group-hover:text-foreground transition-colors">{action.label}</span>
@@ -372,7 +372,7 @@ function OverviewTab() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
+        <Card className="rounded-2xl border border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle>Pending Tasks</CardTitle>
             <CardDescription>Items requiring your attention</CardDescription>
