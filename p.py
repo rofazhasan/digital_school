@@ -1,127 +1,151 @@
 import pandas as pd
 
-# Define the schema
+# Schema definitions based on the provided template
 columns = [
-    "Type", "Class Name", "Subject", "Topic", "Difficulty", "Marks",
-    "Question Text", "Option A", "Option B", "Option C", "Option D", "Option E",
-    "Correct Option", "Correct Answer", "Assertion", "Reason",
-    "Left 1", "Left 2", "Left 3", "Left 4", "Left 5",
-    "Right A", "Right B", "Right C", "Right D", "Right E",
-    "Matches", "Explanation", "Model Answer",
-    "Sub-Question 1 Text", "Sub-Question 1 Marks", "Sub-Question 1 Model Answer",
-    "Sub-Question 2 Text", "Sub-Question 2 Marks", "Sub-Question 2 Model Answer",
-    "Sub-Question 3 Text", "Sub-Question 3 Marks", "Sub-Question 3 Model Answer",
-    "Sub-Question 4 Text", "Sub-Question 4 Marks", "Sub-Question 4 Model Answer"
+    'Type', 'Class Name', 'Subject', 'Topic', 'Difficulty', 'Marks',
+    'Question Text', 'Option A', 'Option B', 'Option C', 'Option D', 'Option E',
+    'Correct Option', 'Correct Answer', 'Assertion', 'Reason',
+    'Left 1', 'Left 2', 'Left 3', 'Left 4', 'Left 5',
+    'Right A', 'Right B', 'Right C', 'Right D', 'Right E',
+    'Matches', 'Explanation', 'Model Answer',
+    'Sub-Question 1 Text', 'Sub-Question 1 Marks', 'Sub-Question 1 Model Answer',
+    'Sub-Question 2 Text', 'Sub-Question 2 Marks', 'Sub-Question 2 Model Answer',
+    'Sub-Question 3 Text', 'Sub-Question 3 Marks', 'Sub-Question 3 Model Answer',
+    'Sub-Question 4 Text', 'Sub-Question 4 Marks', 'Sub-Question 4 Model Answer'
 ]
 
-# Helper function
-def create_row(q_type, topic, q_text, 
-               opt_a="", opt_b="", opt_c="", opt_d="", opt_e="", corr_opt="", 
-               corr_ans="", assert_txt="", reason_txt="", 
-               l1="", l2="", l3="", l4="", l5="", 
-               rA="", rB="", rC="", rD="", rE="", matches="", 
-               expl=""):
-    
-    row = {col: "" for col in columns}
-    row["Type"] = q_type
-    row["Class Name"] = "Admission - A"
-    row["Subject"] = "Higher Math 2nd"
-    row["Topic"] = topic
-    row["Difficulty"] = "HARD"
-    
-    if q_type == "MC": row["Marks"] = 5
-    elif q_type == "MTF": row["Marks"] = 6
-    
-    row["Question Text"] = q_text
-    row["Explanation"] = expl
-    
-    if q_type == "MC":
-        row["Option A"] = opt_a
-        row["Option B"] = opt_b
-        row["Option C"] = opt_c
-        row["Option D"] = opt_d
-        row["Option E"] = opt_e
-        row["Correct Option"] = corr_opt
-        row["Correct Answer"] = corr_ans
-        row["Assertion"] = assert_txt
-        row["Reason"] = reason_txt
-    elif q_type == "MTF":
-        row["Left 1"] = l1; row["Left 2"] = l2; row["Left 3"] = l3; row["Left 4"] = l4; row["Left 5"] = l5
-        row["Right A"] = rA; row["Right B"] = rB; row["Right C"] = rC; row["Right D"] = rD; row["Right E"] = rE
-        row["Matches"] = matches
-
-    return row
+# Constants
+CLASS_NAME = "10A - 1"
+SUBJECT = "Physics"
+TOPIC = "Static Electricity (স্থির তড়িৎ) - Advanced CQs"
+DIFFICULTY = "HARD"
 
 data = []
 
-# --- 5 Tough Multiple Correct (MC) Questions ---
+# Helper function
+def add_row(type_q, marks, question_text, 
+            opt_a=None, opt_b=None, opt_c=None, opt_d=None, opt_e=None,
+            correct_opt=None, assertion=None, reason=None,
+            left1=None, left2=None, left3=None, left4=None, left5=None,
+            righta=None, rightb=None, rightc=None, rightd=None, righte=None,
+            matches=None, explanation=None, model_answer=None,
+            subq1_text=None, subq1_marks=None, subq1_ans=None,
+            subq2_text=None, subq2_marks=None, subq2_ans=None,
+            subq3_text=None, subq3_marks=None, subq3_ans=None,
+            subq4_text=None, subq4_marks=None, subq4_ans=None):
+    
+    row = {col: "" for col in columns}
+    row['Type'] = type_q
+    row['Class Name'] = CLASS_NAME
+    row['Subject'] = SUBJECT
+    row['Topic'] = TOPIC
+    row['Difficulty'] = DIFFICULTY
+    row['Marks'] = marks
+    
+    # Common field
+    if type_q != "AR" and type_q != "MTF": 
+        row['Question Text'] = question_text
 
-data.append(create_row("MC", "Binomial - Coefficients",
-    "$$ (1+x)^{2n} $$ এর বিস্তৃতিতে নিচের কোন উক্তিগুলো সঠিক? (যেখানে $$n \\in \\mathbb{N}$$)",
-    "$$ \\sum_{r=0}^{2n} (-1)^r C_r = 0 $$", "$$ \\sum_{r=0}^{2n} \\frac{C_r}{r+1} = \\frac{2^{2n}-1}{2n+1} $$ (ভুল, সঠিক হবে $$2^{2n+1}-1$$)", "$$ C_0^2 + C_1^2 + \\dots + C_{2n}^2 = ^{4n}C_{2n} $$", "$$ \\sum_{r=0}^{2n} r C_r = 2n 2^{2n-1} $$", "$$ C_n $$ পদটি ক্ষুদ্রতম",
-    "A, D", "$$A$$ সত্য কারণ $$ (1-1)^{2n}=0 $$। $$D$$ সত্য কারণ $$ \\sum rC_r = N 2^{N-1} $$ এখানে $$ N=2n $$। $$C$$ ভুল ($$ ^{2N}C_N $$ হবে)। $$E$$ ভুল (মধ্যপদ বৃহত্তম)।"))
+    if type_q == "CQ":
+        row['Question Text'] = question_text # Stem
+        row['Sub-Question 1 Text'] = subq1_text
+        row['Sub-Question 1 Marks'] = subq1_marks
+        row['Sub-Question 1 Model Answer'] = subq1_ans
+        row['Sub-Question 2 Text'] = subq2_text
+        row['Sub-Question 2 Marks'] = subq2_marks
+        row['Sub-Question 2 Model Answer'] = subq2_ans
+        row['Sub-Question 3 Text'] = subq3_text
+        row['Sub-Question 3 Marks'] = subq3_marks
+        row['Sub-Question 3 Model Answer'] = subq3_ans
+        row['Sub-Question 4 Text'] = subq4_text
+        row['Sub-Question 4 Marks'] = subq4_marks
+        row['Sub-Question 4 Model Answer'] = subq4_ans
 
-data.append(create_row("MC", "Binomial - Greatest Term",
-    "$$ (3 + 2x)^9 $$ এর বিস্তৃতিতে $$ x=1 $$ হলে বৃহত্তম পদ বা পদগুলো সম্পর্কে সঠিক তথ্য কোনটি?",
-    "বৃহত্তম পদটি $$ T_4 $$", "বৃহত্তম পদটি $$ T_5 $$", "বৃহত্তম পদের মান সমান", "$$ T_4 = T_5 $$", "কেবলমাত্র একটি বৃহত্তম পদ আছে",
-    "B, D", "সূত্র: $$ m = \\frac{(n+1)|A|}{|A|+1} = \\frac{10(2/3)}{1+2/3} = \\frac{20/3}{5/3} = 4 $$। $$m$$ পূর্ণসংখ্যা হলে $$T_m$$ ও $$T_{m+1}$$ বৃহত্তম হয়। অর্থাৎ $$T_4$$ এবং $$T_5$$ সমান এবং বৃহত্তম। (Wait, formula gives $$T_m, T_{m+1}$$. Here $$m=4$$, so $$T_4, T_5$$. But usually indices are $$r=m, m-1$$ or $$r=m$$. If $$m$$ integer, terms $$T_m, T_{m+1}$$ are equal. Here $$T_4$$ and $$T_5$$. Let's check calculation. $$T_{r+1}/T_r \\ge 1 \\Rightarrow (n-r+1)/r \\cdot (2x/3) \\ge 1$$. $$20-2r \\ge 3r \\Rightarrow 20 \\ge 5r \\Rightarrow r \\le 4$$. So $$r=4$$ is equality. $$T_5/T_4 = 1$$. So $$T_4=T_5$$. Both are greatest. Options B ($$T_5$$) and D ($$T_4=T_5$$) imply this. Option A says $$T_4$$ (also true as one of them). Let's pick A and B? Or B and D? Usually MCQ implies 'The greatest term is...'. If two are equal, both are answers. Let's select A and B as the specific terms.)",
-    expl="$$T_4$$ এবং $$T_5$$ উভয়ের মান সমান এবং বৃহত্তম।"))
+    row['Explanation'] = explanation
+    data.append(row)
 
-data.append(create_row("MC", "Binomial - Any Index",
-    "$$ (1-x)^{-n} $$ এর বিস্তৃতি সম্পর্কে নিচের কোনগুলো সত্য? ($$n$$ ধনাত্মক পূর্ণসংখ্যা)",
-    "$$ |x| < 1 $$ শর্তে বৈধ", "$$ (r+1) $$-তম পদের সহগ $$ ^{n+r-1}C_r $$", "$$ x^n $$ এর সহগ $$ 2n $$", "বিস্তৃতিটি একটি সসীম ধারা", "$$ n=1 $$ হলে সহগগুলো সব $$ 1 $$",
-    "B, E", "A সত্য নয়? অবশ্যই সত্য। ওহ, প্রশ্নে 'কোনগুলো সত্য' চেয়েছে। A, B, E তিনটিই সত্য। কিন্তু আমাকে ২টি সিলেক্ট করতে হবে। প্রশ্নটি কঠিন করতে অপশনগুলো এমনভাবে দেই: A: $$|x|>1$$ (False). B: coeff formula (True). C: coeff of x^n is $$^{2n-1}C_n$$ (True/False check). E: n=1 coeff is 1 (True). Let's construct options to have exactly 2 corrects. Modified: Option C -> 'Coeff of $$x^n$$ is $$^{2n-1}C_n$$'. Is it? $$^{n+n-1}C_n = ^{2n-1}C_n$$. Yes. So B, C, E are true. Let's change E to 'n=2 limits valid range'. False. Change C to 'Coeff of $$x$$ is $$n$$'. True. Too many trues. Let's fix: Options: A (Valid for all x - False), B (General term correct - True), C (Finite series - False), D (Coeff of x is n - True), E (Coeffs alternate sign - False). Correct: B, D."))
+# ==============================================================================
+# 10 New Hardcore CQs
+# ==============================================================================
 
-data.append(create_row("MC", "Binomial - Basics",
-    "$$ (1+x^2)^5 (1+x)^4 $$ এর বিস্তৃতিতে $$ x^5 $$ এর সহগ নির্ণয়ে কোন পদগুলো গুণ করতে হবে? (দুটি সঠিক জোড়া নির্বাচন কর)",
-    "$$ ^{5}C_1 x^2 $$ এবং $$ ^{4}C_3 x^3 $$", "$$ ^{5}C_2 x^4 $$ এবং $$ ^{4}C_1 x $$", "$$ ^{5}C_0 $$ এবং $$ ^{4}C_5 x^5 $$ (অসম্ভব)", "$$ ^{5}C_3 x^6 $$ এবং $$ ^{4}C_{-1} $$", "$$ ^{5}C_1 (10) $$ এবং $$ ^{4}C_3 (4) $$",
-    "A, B", "$$x^5$$ পাওয়ার জন্য: ১ম অংশ থেকে $$x^0$$ (সম্ভব না, শুধু জোড়), $$x^2$$, $$x^4$$। \n১. $$x^2$$ ($$^5C_1$$) $$\times$$ ২য় অংশের $$x^3$$ ($$^4C_3$$)। \n২. $$x^4$$ ($$^5C_2$$) $$\times$$ ২য় অংশের $$x^1$$ ($$^4C_1$$)। \nসঠিক জোড়া A এবং B।"))
+# CQ 1: Pendulum Dynamics in Electric Field (বল ও গতির ফিউশন)
+add_row("CQ", 10, "2g ভরের একটি পিথ বল (Pith ball) একটি সুতা দিয়ে ঝোলানো আছে। অনুভূমিক তড়িৎ ক্ষেত্র E = 200 N/C প্রয়োগ করায় সুতাটি উলম্বের সাথে 30° কোণ তৈরি করে সাম্যাবস্থায় আসে। (g = 9.8 m/s²)",
+        subq1_text="তড়িৎ প্রাবল্য ভেক্টর রাশি না স্কেলার রাশি?", subq1_marks=1, subq1_ans="ভেক্টর রাশি।",
+        subq2_text="আহিত পরিবাহীর আধান সর্বদা পৃষ্ঠে থাকে কেন?", subq2_marks=2, subq2_ans="সমধর্মী আধানের বিকর্ষণের কারণে তারা পরস্পর থেকে সর্বোচ্চ দূরত্বে (পৃষ্ঠে) অবস্থান নিতে চায়।",
+        subq3_text="বলটিতে আধানের পরিমাণ নির্ণয় করো।", subq3_marks=3, subq3_ans="Tsinθ = qE, Tcosθ = mg ব্যবহার করে q নির্ণয়। q = mg tanθ / E = (0.002*9.8*tan30)/200 C.",
+        subq4_text="যদি তড়িৎ ক্ষেত্রের দিক উলম্ব বরাবর উপরের দিকে করা হয় এবং মান দ্বিগুণ করা হয়, তবে সুতার টান কত হবে?", subq4_marks=4, subq4_ans="তখন mg নিচে এবং qE উপরে কাজ করবে। লব্ধি বল ও সুতার টান বিশ্লেষণ করে মন্তব্য করতে হবে।")
 
-data.append(create_row("MC", "Binomial - Divisibility",
-    "$$ 11^{n+2} + 12^{2n+1} $$ রাশিটি সম্পর্কে সঠিক তথ্য:",
-    "এটি $$ 133 $$ দ্বারা বিভাজ্য", "এটি $$ n=0 $$ এর জন্য $$ 133 $$", "এটি $$ 13 $$ দ্বারা বিভাজ্য", "এটি সর্বদা বিজোড় সংখ্যা", "$$ n=1 $$ হলে মান $$ 3059 $$",
-    "A, B", "$$n=0$$ হলে $$11^2 + 12^1 = 121 + 12 = 133$$ (True). $$n$$ বাড়লে এটি ১৩৩ দ্বারা বিভাজ্য থাকে (গাণিতিক আরহ)।"))
+# CQ 2: Capacitor with Dielectric (ধারক ও পরাবৈদ্যুতিক মাধ্যম)
+add_row("CQ", 10, "একটি সমান্তরাল পাত ধারকের বায়ু মাধ্যমে ধারকত্ব 10μF। ধারকটিকে 100V উৎসের সাথে যুক্ত করে আহিত করা হলো। এরপর উৎস বিচ্ছিন্ন করে পাত দুটির মাঝে কাঁচ (K=6) প্রবেশ করানো হলো।",
+        subq1_text="1 ফ্যারাড কাকে বলে?", subq1_marks=1, subq1_ans="কোনো পরিবাহীর বিভব 1V বাড়াতে যদি 1C আধান লাগে, তবে তার ধারকত্বকে 1F বলে।",
+        subq2_text="ধারকের সঞ্চিত শক্তি আধানের ওপর কীভাবে নির্ভর করে?", subq2_marks=2, subq2_ans="U = Q²/2C, অর্থাৎ আধানের বর্গের সমানুপাতিক।",
+        subq3_text="কাঁচ প্রবেশের পূর্বে ধারকে সঞ্চিত শক্তি নির্ণয় করো।", subq3_marks=3, subq3_ans="U = 0.5 * 10*10^-6 * (100)^2 = 0.05 J.",
+        subq4_text="কাঁচ প্রবেশের পর ধারকের বিভব পার্থক্য এবং সঞ্চিত শক্তির কী পরিবর্তন হবে? গাণিতিকভাবে বিশ্লেষণ করো।", subq4_marks=4, subq4_ans="উৎস বিচ্ছিন্ন তাই Q ধ্রুবক। C' = KC = 60μF। V' = Q/C' (কমে যাবে), U' = Q²/2C' (কমে যাবে)।")
 
-# --- 5 Tough Match the Following (MTF) Questions ---
+# CQ 3: Charge Redistribution (আধান বন্টন ও বিভব)
+add_row("CQ", 10, "দুটি গোলক A ও B এর ব্যাসার্ধ যথাক্রমে 5cm এবং 10cm। এদের যথাক্রমে +50C এবং +100C আধান দেওয়া হলো। এরপর গোলক দুটিকে একটি সরু পরিবাহী তার দ্বারা যুক্ত করা হলো।",
+        subq1_text="আধান ঘনত্ব কী?", subq1_marks=1, subq1_ans="পরিবাহীর একক ক্ষেত্রফল বা আয়তনে যে পরিমাণ আধান থাকে।",
+        subq2_text="বজ্রপাতের সময় দালানের ক্ষতি হয় কেন?", subq2_marks=2, subq2_ans="বিপুল পরিমাণ তড়িৎ শক্তি প্রবাহিত হয়ে তাপ ও যান্ত্রিক কম্পন সৃষ্টি করে।",
+        subq3_text="তার দিয়ে যুক্ত করার পূর্বে গোলক দুটির বিভব পার্থক্য নির্ণয় করো।", subq3_marks=3, subq3_ans="Va = k*50/0.05, Vb = k*100/0.10। পার্থক্য বের করতে হবে।",
+        subq4_text="যুক্ত করার পর আধানের প্রবাহ কোন দিক থেকে কোন দিকে হবে এবং চূড়ান্ত বিভব কত হবে?", subq4_marks=4, subq4_ans="সাধারণ বিভব V = (Q1+Q2)/(C1+C2) বা Q_total / (R1+R2) অনুপাত (যেহেতু C propto R)। প্রবাহ উচ্চ বিভব থেকে নিম্নে যাবে।")
 
-data.append(create_row("MTF", "Binomial - Properties",
-    "রাশি ও তার মানের সঠিক মিল কর।",
-    "", "", "", "", "", "", "", "", "",
-    "$$ C_0 + C_1 + \\dots + C_n $$", "$$ C_0 - C_1 + C_2 - \\dots $$", "$$ C_1 + 2C_2 + 3C_3 + \\dots $$", "$$ C_0 + C_2 + C_4 + \\dots $$", "$$ C_0^2 + C_1^2 + \\dots + C_n^2 $$",
-    "$$ 2^n $$", "$$ 0 $$", "$$ n 2^{n-1} $$", "$$ 2^{n-1} $$", "$$ ^{2n}C_n $$",
-    "1-A, 2-B, 3-C, 4-D, 5-E", ""))
+# CQ 4: Triangle Configuration (ভেক্টর যোজন)
+add_row("CQ", 10, "2m বাহুবিশিষ্ট একটি সমবাহু ত্রিভুজ ABC এর A ও B বিন্দুতে যথাক্রমে +10μC এবং -10μC আধান রাখা হলো।",
+        subq1_text="কুলম্ব বল কী ধরনের বল?", subq1_marks=1, subq1_ans="এটি একটি কেন্দ্রীয় এবং সংরক্ষণশীল বল।",
+        subq2_text="আধান কোয়ান্টায়িত—ব্যাখ্যা করো।", subq2_marks=2, subq2_ans="আধান সবসময় মূল আধান e এর পূর্ণ গুণিতক হয়, ভগ্নাংশ হতে পারে না।",
+        subq3_text="C বিন্দুতে তড়িৎ বিভব নির্ণয় করো।", subq3_marks=3, subq3_ans="V = V_A + V_B = k(10μC)/2 + k(-10μC)/2 = 0V।",
+        subq4_text="C বিন্দুতে লব্ধি প্রাবল্যের মান ও দিক নির্ণয় করো।", subq4_marks=4, subq4_ans="ভেক্টর যোগের সামান্তরিক সূত্র ব্যবহার করে E_A এবং E_B এর লব্ধি বের করতে হবে। কোণ 120° হবে।")
 
-data.append(create_row("MTF", "Binomial - Terms",
-    "বিস্তৃতি ও পদের সংখ্যার মিল কর।",
-    "", "", "", "", "", "", "", "", "",
-    "$$ (x+y+z)^n $$", "$$ (x+a)^{10} + (x-a)^{10} $$", "$$ (x+a)^{10} - (x-a)^{10} $$", "$$ (1+x+x^2)^3 $$", "$$ (a+b+c+d)^2 $$",
-    "$$ (n+1)(n+2)/2 $$", "$$ 6 $$", "$$ 5 $$", "$$ 7 $$", "$$ 10 $$",
-    "1-A, 2-B, 3-C, 4-D, 5-E", "বিঃদ্রঃ $$ (1+x+x^2)^3 $$ এর ঘাত ৬, তাই পদ ৭টি।"))
+# CQ 5: Electron Gun (শক্তি ও গতিবেগ)
+add_row("CQ", 10, "একটি ইলেকট্রন গান (Electron Gun) থেকে নির্গত ইলেকট্রন স্থির অবস্থা থেকে 2000V বিভব পার্থক্যের মধ্য দিয়ে ত্বরান্বিত হয়ে একটি ধাতব পাতে আঘাত করে। (e = 1.6×10⁻¹⁹ C, m = 9.1×10⁻³¹ kg)",
+        subq1_text="eV কিসের একক?", subq1_marks=1, subq1_ans="শক্তির একক।",
+        subq2_text="তড়িৎ প্রাবল্য ও বিভবের মধ্যে সম্পর্ক লেখ এবং ব্যাখ্যা করো।", subq2_marks=2, subq2_ans="E = -dV/dr, অর্থাৎ দূরত্বের সাথে বিভবের পরিবর্তনের হারই প্রাবল্য।",
+        subq3_text="ইলেকট্রনটি ধাতব পাতে আঘাত করার মুহূর্তের বেগ নির্ণয় করো।", subq3_marks=3, subq3_ans="1/2 mv² = qV সূত্র ব্যবহার করে।",
+        subq4_text="যদি বিভব পার্থক্য অর্ধেক করা হয় এবং ইলেকট্রনের পরিবর্তে প্রোটন ব্যবহার করা হয়, তবে গতিশক্তির কী পরিবর্তন হবে?", subq4_marks=4, subq4_ans="K.E = qV। প্রোটন ও ইলেকট্রনের আধান সমান (মান), তাই বিভব অর্ধেক হলে শক্তিও অর্ধেক হবে, ভরের ওপর শক্তি নির্ভর করে না (বেগ করে)।")
 
-data.append(create_row("MTF", "Binomial - Calculus Apps",
-    "রাশি ও ফলাফলের মিল কর।",
-    "", "", "", "", "", "", "", "", "",
-    "$$ \\sum_{r=0}^n \\frac{C_r}{r+1} $$", "$$ \\sum_{r=0}^n (-1)^r \\frac{C_r}{r+1} $$", "$$ \\sum_{r=1}^n r C_r $$", "$$ \\sum_{r=0}^n C_r 2^r $$", "$$ \\sum_{r=0}^n r(r-1) C_r $$",
-    "$$ \\frac{2^{n+1}-1}{n+1} $$", "$$ \\frac{1}{n+1} $$", "$$ n 2^{n-1} $$", "$$ 3^n $$", "$$ n(n-1) 2^{n-2} $$",
-    "1-A, 2-B, 3-C, 4-D, 5-E", ""))
+# CQ 6: Null Point Complex (নাল পয়েন্ট বিশ্লেষণ)
+add_row("CQ", 10, "দুটি বিন্দু আধান +16μC এবং +9μC পরস্পরের থেকে 14cm দূরে অবস্থিত। আধান দুটির মধ্যবর্তী কোনো এক বিন্দুতে একটি তৃতীয় আধান q রাখা হলো।",
+        subq1_text="তড়িৎ বলরেখা কাকে বলে?", subq1_marks=1, subq1_ans="তড়িৎ ক্ষেত্রে একটি মুক্ত ধনাত্মক আধান যে পথে গমন করে।",
+        subq2_text="দুটি চার্জের মধ্যবর্তী বল কি মাধ্যমের ওপর নির্ভর করে?", subq2_marks=2, subq2_ans="হ্যাঁ, F = 1/(4πε) ..., ε মাধ্যমের ভেদনযোগ্যতা।",
+        subq3_text="সংযোগ রেখার কোন বিন্দুতে লব্ধি প্রাবল্য শূন্য হবে?", subq3_marks=3, subq3_ans="x = d / (√(q2/q1) + 1) সূত্র দিয়ে বা E1=E2 করে বের করতে হবে।",
+        subq4_text="q আধানটি সাম্যাবস্থায় থাকার জন্য এর মান ও প্রকৃতি কেমন হওয়া উচিত এবং এটি কোন ধরনের সাম্যাবস্থা (সুস্থির না অস্থির)?", subq4_marks=4, subq4_ans="যেহেতু দুই পাশের আধান ফিক্সড, মাঝের আধানের ওপর নেট বল শূন্য। q এর মান যাই হোক বল শূন্য হবে। কিন্তু সুস্থিরতার জন্য q এর প্রকৃতি বিপরীত হতে হতে পারে (Hardcore analysis)।")
 
-data.append(create_row("MTF", "Binomial - Greatest Term Condition",
-    "বিস্তৃতি $$ (1+x)^n $$ এর বৃহত্তম পদ নির্ণয়ে $$ m = \\frac{(n+1)|x|}{|x|+1} $$ এর মানের উপর ভিত্তি করে সিদ্ধান্ত।",
-    "", "", "", "", "", "", "", "", "",
-    "$$ m $$ পূর্ণসংখ্যা হলে", "$$ m $$ ভগ্নাংশ হলে", "$$ m=5 $$ হলে", "$$ m=5.7 $$ হলে", "$$ |x|=1 $$ হলে",
-    "$$ T_m, T_{m+1} $$ বৃহত্তম", "$$ T_{[m]+1} $$ বৃহত্তম", "$$ T_5, T_6 $$ বৃহত্তম", "$$ T_6 $$ বৃহত্তম", "মধ্যপদ বৃহত্তম",
-    "1-A, 2-B, 3-C, 4-D, 5-E", ""))
+# CQ 7: Square Configuration Force (বর্গক্ষেত্রে বল)
+add_row("CQ", 10, "ABCD বর্গক্ষেত্রের তিন কোণা A, B, C তে যথাক্রমে +q, +q, -q আধান রাখা আছে। বর্গের বাহু a।",
+        subq1_text="বিন্দু আধান কী?", subq1_marks=1, subq1_ans="আহিত বস্তুর আকার দূরত্বের তুলনায় নগণ্য হলে তাকে বিন্দু আধান বলে।",
+        subq2_text="সুষম তড়িৎ ক্ষেত্রে একটি ডাইপোল রাখলে কী ঘটে?", subq2_marks=2, subq2_ans="নেট বল শূন্য হয় কিন্তু টর্ক অনুভব করে, ফলে এটি ঘুরতে চায়।",
+        subq3_text="D বিন্দুতে তড়িৎ বিভব নির্ণয় করো।", subq3_marks=3, subq3_ans="তিনটি আধানের জন্য বিভবের স্কেলার যোগফল।",
+        subq4_text="D বিন্দুতে একটি +q আধান রাখলে সেটি কত বল অনুভব করবে? লব্ধি বলের দিক চিত্রসহ দেখাও।", subq4_marks=4, subq4_ans="তিনটি বলের ভেক্টর যোজন। A ও C এর বল এবং B এর বলের লব্ধি।")
 
-data.append(create_row("MTF", "Binomial - Any Index Series",
-    "অসীম ধারা ও তার দ্বিপদী রূপের মিল কর।",
-    "", "", "", "", "", "", "", "", "",
-    "$$ 1 + x + x^2 + x^3 + \\dots $$", "$$ 1 - x + x^2 - x^3 + \\dots $$", "$$ 1 + 2x + 3x^2 + \\dots $$", "$$ 1 - 2x + 3x^2 - \\dots $$", "$$ 1 + n x + \\frac{n(n-1)}{2} x^2 + \\dots $$",
-    "$$ (1-x)^{-1} $$", "$$ (1+x)^{-1} $$", "$$ (1-x)^{-2} $$", "$$ (1+x)^{-2} $$", "$$ (1+x)^n $$",
-    "1-A, 2-B, 3-C, 4-D, 5-E", ""))
+# CQ 8: Surface Charge Density (তলমাত্রিক ঘনত্ব)
+add_row("CQ", 10, "64টি ছোট পানির ফোঁটা, যার প্রতিটির ব্যাসার্ধ 1mm এবং আধান 10⁻¹⁰C, মিলে একটি বড় ফোঁটা তৈরি করল।",
+        subq1_text="তড়িৎ ফ্লাক্সের একক কী?", subq1_marks=1, subq1_ans="N m² C⁻¹",
+        subq2_text="বজ্রনিরোধক দণ্ড তামার তৈরি হয় কেন?", subq2_marks=2, subq2_ans="তামা সুপরিবাহী, তাই এটি দ্রুত আধান মাটিতে প্রবাহিত করে দালানকে রক্ষা করে।",
+        subq3_text="বড় ফোঁটার বিভব নির্ণয় করো।", subq3_marks=3, subq3_ans="আয়তন সংরক্ষণশীলতা দিয়ে বড় ব্যাসার্ধ R বের করা (R = 4r)। মোট আধান Q = 64q। তারপর V = kQ/R।",
+        subq4_text="ছোট ফোঁটা ও বড় ফোঁটার তলমাত্রিক ঘনত্বের অনুপাত গাণিতিকভাবে বিশ্লেষণ করো।", subq4_marks=4, subq4_ans="σ ∝ Q/R²। অনুপাত বের করে তুলনা করতে হবে।")
+
+# CQ 9: Vertical Electric Field (উলম্ব ক্ষেত্র ও ওজন)
+add_row("CQ", 10, "ভূপৃষ্ঠের কাছাকাছি একটি স্থানে উলম্বভাবে নিম্নমুখী সুষম তড়িৎ ক্ষেত্র E বিদ্যমান। এখানে m ভরের এবং -q আধানের একটি কণা ভাসমান অবস্থায় আছে।",
+        subq1_text="তড়িৎ দ্বিমেরু কী?", subq1_marks=1, subq1_ans="দুটি সমমানের কিন্তু বিপরীতধর্মী আধান অল্প দূরত্বে থাকলে তাকে তড়িৎ দ্বিমেরু বলে।",
+        subq2_text="তড়িৎ বলরেখা পরিবাহীকে লম্বভাবে ছেদ করে কেন?", subq2_marks=2, subq2_ans="কারণ পরিবাহীর পৃষ্ঠ সমবিভব তল, এবং বলরেখা সর্বদা সমবিভব তলের সাথে লম্ব।",
+        subq3_text="তড়িৎ ক্ষেত্র E এর মান কত হলে কণাটি স্থির থাকবে? (রাশিমালা নির্ণয় করো)", subq3_marks=3, subq3_ans="ভারসাম্য শর্ত: mg = qE => E = mg/q।",
+        subq4_text="যদি কণাটিতে আধানের পরিমাণ দ্বিগুণ করা হয়, তবে কণাটির তাৎক্ষণিক ত্বরণ কত হবে?", subq4_marks=4, subq4_ans="উর্ধ্বমুখী বল 2qE = 2mg। লব্ধি বল F = 2mg - mg = mg (উপরে)। ত্বরণ a = F/m = g (উর্ধ্বমুখী)।")
+
+# CQ 10: Work Done in Field (তড়িৎ ক্ষেত্রে কাজ)
+add_row("CQ", 10, "একটি সুষম তড়িৎ ক্ষেত্রে A ও B দুটি বিন্দুর স্থানাঙ্ক যথাক্রমে (0,0) এবং (4,0) মিটার। তড়িৎ প্রাবল্য E = 10 N/C, যা X-অক্ষ বরাবর ক্রিয়াশীল।",
+        subq1_text="পরাবৈদ্যুতিক মাধ্যম কী?", subq1_marks=1, subq1_ans="অপরিবাহী পদার্থ যা তড়িৎ ক্ষেত্রের প্রভাবে পোলারায়িত হয়।",
+        subq2_text="অসীম দূরত্বে বিভব শূন্য ধরা হয় কেন?", subq2_marks=2, subq2_ans="কারণ অসীমে আকর্ষণ বা বিকর্ষণ বলের প্রভাব থাকে না।",
+        subq3_text="একটি 2C আধানকে A থেকে B বিন্দুতে নিতে তড়িৎ বল দ্বারা কৃতকাজ কত?", subq3_marks=3, subq3_ans="W = qEd = 2 * 10 * 4 = 80 J।",
+        subq4_text="যদি আধানটিকে (0,0) থেকে (0,3) বিন্দুতে নেওয়া হতো, তবে কৃতকাজের কোনো পরিবর্তন হতো কি? ব্যাখ্যা করো।", subq4_marks=4, subq4_ans="প্রাবল্য X অক্ষ বরাবর, তাই Y অক্ষ বরাবর সরণে (লম্বভাবে) কোনো কাজ হবে না (W=0)। কারণ বল ও সরণ লম্ব।")
 
 # Create DataFrame
-df = pd.DataFrame(data, columns=columns)
+df = pd.DataFrame(data)
+
+# Reorder columns
+df = df[columns]
 
 # Save to Excel
-output_file = "higher_math_binomial_hard_questions.xlsx"
-df.to_excel(output_file, index=False)
+file_path = "SSC_Physics_Static_Electricity_10_Toughest_CQs.xlsx"
+df.to_excel(file_path, index=False)
+
+print("Excel file generated successfully with 10 Toughest CQs.")
