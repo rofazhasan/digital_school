@@ -538,7 +538,7 @@ export default function ExamsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen bg-background">
       <div className="max-w-7xl 2xl:max-w-[95vw] mx-auto py-8 px-4 sm:px-6 lg:px-8">
         <TooltipProvider>
           {/* Header Section */}
@@ -549,10 +549,10 @@ export default function ExamsPage() {
           >
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
-                <h1 className="text-3xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 via-blue-800 to-indigo-900 dark:from-white dark:to-gray-400 font-fancy">
+                <h1 className="text-3xl md:text-5xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 font-fancy">
                   Exam Hub
                 </h1>
-                <p className="mt-2 text-base md:text-lg text-gray-600 dark:text-gray-400 font-medium">
+                <p className="mt-2 text-base md:text-lg text-muted-foreground font-medium">
                   Simplify your academic evaluations with premium management tools.
                 </p>
               </div>
@@ -561,7 +561,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/dashboard')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <LayoutDashboard className="w-4 h-4" />
                   <span className="hidden sm:inline">Dashboard</span>
@@ -570,7 +570,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/exams/evaluations')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <FileText className="w-4 h-4" />
                   <span className="hidden sm:inline">Evaluations</span>
@@ -579,7 +579,7 @@ export default function ExamsPage() {
                   variant="outline"
                   size="sm"
                   onClick={() => router.push('/question-bank')}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all font-bold text-indigo-600 dark:text-indigo-400"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all font-bold text-primary dark:border-primary/30"
                 >
                   <Library className="w-4 h-4" />
                   <span className="hidden sm:inline">Question Bank</span>
@@ -589,7 +589,7 @@ export default function ExamsPage() {
                   size="sm"
                   onClick={handleRefresh}
                   disabled={refreshing}
-                  className="flex items-center gap-2 rounded-full border-blue-200 hover:bg-blue-50 transition-all"
+                  className="flex items-center gap-2 rounded-full border-primary/20 hover:bg-primary/10 transition-all dark:border-primary/30"
                 >
                   <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
                   <span className="hidden sm:inline">Refresh Sync</span>
@@ -614,11 +614,11 @@ export default function ExamsPage() {
             transition={{ delay: 0.1 }}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8"
           >
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Exams</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Exams</p>
                     <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</p>
                   </div>
                   <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
@@ -628,7 +628,7 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -642,11 +642,11 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
+                    <p className="text-sm font-medium text-muted-foreground">Pending</p>
                     <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.pending}</p>
                   </div>
                   <div className="p-3 bg-yellow-100 dark:bg-yellow-900/30 rounded-full">
@@ -656,11 +656,11 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Online</p>
+                    <p className="text-sm font-medium text-muted-foreground">Online</p>
                     <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.online}</p>
                   </div>
                   <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
@@ -670,11 +670,11 @@ export default function ExamsPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-card/50 dark:bg-card/30 backdrop-blur-sm border-border shadow-lg">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Negative Marking</p>
+                    <p className="text-sm font-medium text-muted-foreground">Negative Marking</p>
                     <p className="text-3xl font-bold text-red-600 dark:text-red-400">
                       {stats.withNegativeMarking}
                     </p>
@@ -697,7 +697,7 @@ export default function ExamsPage() {
             <div className="space-y-6">
               <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-                  <TabsList className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-md border border-gray-200 dark:border-gray-700 p-1 rounded-xl">
+                  <TabsList className="bg-muted/50 backdrop-blur-md border border-border p-1 rounded-xl">
                     <TabsTrigger value="all" className="rounded-lg px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white">All</TabsTrigger>
                     <TabsTrigger value="active" className="rounded-lg px-6 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Active</TabsTrigger>
                     <TabsTrigger value="pending" className="rounded-lg px-6 data-[state=active]:bg-amber-600 data-[state=active]:text-white">Pending</TabsTrigger>
@@ -738,7 +738,7 @@ export default function ExamsPage() {
                       placeholder="Search exam name or subject..."
                       value={filters.search}
                       onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-                      className="pl-10 rounded-xl border-gray-200 focus:ring-blue-500 transition-all bg-white/50 backdrop-blur-sm"
+                      className="pl-10 rounded-xl border-border focus:ring-primary transition-all bg-card/50 backdrop-blur-sm"
                     />
                   </div>
                   <Button
@@ -1210,6 +1210,6 @@ export default function ExamsPage() {
           </DialogContent>
         </Dialog>
       </div>
-    </div>
+    </div >
   );
 }

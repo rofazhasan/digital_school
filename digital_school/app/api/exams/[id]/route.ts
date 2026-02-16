@@ -144,6 +144,11 @@ export async function PUT(
       // 1. Shuffle options for MCQ and MC
       if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
         if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          // Preserve original index before shuffling
+          processedQuestion.options = processedQuestion.options.map((opt: any, idx: number) => {
+            if (typeof opt === 'string') return { text: opt, originalIndex: idx };
+            return { ...opt, originalIndex: idx };
+          });
           processedQuestion.options = shuffleArray(processedQuestion.options);
         }
       }
@@ -151,6 +156,11 @@ export async function PUT(
       // 2. Shuffle right column for MTF
       if (processedQuestion.type === 'MTF') {
         if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          // Preserve original index before shuffling
+          processedQuestion.rightColumn = processedQuestion.rightColumn.map((item: any, idx: number) => ({
+            ...item,
+            originalIndex: idx
+          }));
           processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
         }
 
@@ -238,6 +248,11 @@ export async function POST(
       // 1. Shuffle options for MCQ and MC
       if (processedQuestion.type === 'MCQ' || processedQuestion.type === 'MC') {
         if (processedQuestion.options && Array.isArray(processedQuestion.options)) {
+          // Preserve original index before shuffling
+          processedQuestion.options = processedQuestion.options.map((opt: any, idx: number) => {
+            if (typeof opt === 'string') return { text: opt, originalIndex: idx };
+            return { ...opt, originalIndex: idx };
+          });
           processedQuestion.options = shuffleArray(processedQuestion.options);
         }
       }
@@ -245,6 +260,11 @@ export async function POST(
       // 2. Shuffle right column for MTF
       if (processedQuestion.type === 'MTF') {
         if (processedQuestion.rightColumn && Array.isArray(processedQuestion.rightColumn)) {
+          // Preserve original index before shuffling
+          processedQuestion.rightColumn = processedQuestion.rightColumn.map((item: any, idx: number) => ({
+            ...item,
+            originalIndex: idx
+          }));
           processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
         }
       }

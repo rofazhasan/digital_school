@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Globe } from "lucide-react";
+import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Globe, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
 
 interface InstituteSettings {
     instituteName?: string;
@@ -19,8 +20,11 @@ interface InstituteSettings {
 export function AppFooter() {
     const pathname = usePathname();
     const [settings, setSettings] = useState<InstituteSettings | null>(null);
+    const { theme, setTheme } = useTheme();
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         fetch('/api/settings')
             .then(res => res.json())
             .then(data => {
@@ -124,10 +128,31 @@ export function AppFooter() {
                     <p className="text-xs text-muted-foreground">
                         © {new Date().getFullYear()} {name}. All rights reserved.
                     </p>
-                    <div className="flex items-center gap-6 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-6 text-xs text-muted-foreground uppercase font-bold tracking-widest">
                         <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
                         <a href="#" className="hover:text-foreground transition-colors">Terms</a>
                         <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+
+                        {mounted && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                                className="h-9 px-4 rounded-full border-muted-foreground/20 hover:border-primary hover:bg-primary/5 font-bold flex items-center gap-2 transition-all"
+                            >
+                                {theme === 'dark' ? (
+                                    <>
+                                        <Sun className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                                        <span>Light Mode</span>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Moon className="h-4 w-4 text-slate-700 fill-slate-700" />
+                                        <span>Dark Mode</span>
+                                    </>
+                                )}
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>

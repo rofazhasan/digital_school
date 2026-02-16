@@ -58,7 +58,7 @@ export function DashboardSidebar({
                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30 flex-shrink-0">
                             DS
                         </div>
-                        <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 whitespace-nowrap">
+                        <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 whitespace-nowrap">
                             {instituteName}
                         </span>
                     </div>
@@ -118,8 +118,8 @@ export function DashboardSidebar({
 
             <div className="p-4 border-t border-sidebar-border bg-sidebar/50 backdrop-blur-sm">
                 {!sidebarCollapsed ? (
-                    <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => onTabChange('settings')}>
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-background shadow-sm">
+                    <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted transition-colors cursor-pointer" onClick={() => onTabChange('settings')}>
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border-2 border-background shadow-sm">
                             {user?.name?.[0] || 'U'}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -130,7 +130,7 @@ export function DashboardSidebar({
                     </div>
                 ) : (
                     <div className="flex justify-center">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold border-2 border-background shadow-sm" title={user?.name}>
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border-2 border-background shadow-sm" title={user?.name}>
                             {user?.name?.[0]}
                         </div>
                     </div>
@@ -164,7 +164,7 @@ export function MobileDashboardSidebar({
     return (
         <div className={`fixed inset-0 z-50 bg-black/60 backdrop-blur-sm transition-opacity lg:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={() => setIsOpen(false)}>
             <div className={`absolute inset-y-0 left-0 w-72 bg-background/95 backdrop-blur-xl shadow-2xl transition-transform transform duration-300 ease-out ${isOpen ? 'translate-x-0' : '-translate-x-full'}`} onClick={(e) => e.stopPropagation()}>
-                <div className="h-20 flex items-center justify-between px-6 border-b border-border bg-gradient-to-r from-muted/50 to-background/50">
+                <div className="h-20 flex items-center justify-between px-6 border-b border-border bg-muted/30">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
                             DS

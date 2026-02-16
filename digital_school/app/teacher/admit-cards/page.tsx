@@ -308,10 +308,10 @@ export default function AdmitCardManagementPage() {
     return (
         <div className="container mx-auto p-4 lg:p-8 space-y-6 max-w-[1600px]">
             {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-6 rounded-2xl shadow-sm border border-border">
                 <div>
-                    <h1 className="text-2xl font-bold tracking-tight text-gray-900">Exam Logistics</h1>
-                    <p className="text-gray-500">Admit Cards, Seat Plans & Desk Labels</p>
+                    <h1 className="text-2xl font-bold tracking-tight text-foreground">Exam Logistics</h1>
+                    <p className="text-muted-foreground">Admit Cards, Seat Plans & Desk Labels</p>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" onClick={() => window.location.reload()}>
@@ -326,8 +326,8 @@ export default function AdmitCardManagementPage() {
 
             <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
                 {/* Control Panel */}
-                <Card className="xl:col-span-1 h-fit border-0 shadow-lg shadow-gray-200/50">
-                    <CardHeader className="bg-gray-50/50 border-b border-gray-100 pb-4">
+                <Card className="xl:col-span-1 h-fit border-0 shadow-lg shadow-gray-200/50 dark:shadow-none">
+                    <CardHeader className="bg-muted/50 border-b border-border pb-4">
                         <CardTitle className="text-lg">Control Centre</CardTitle>
                         <CardDescription>Filter & Generate</CardDescription>
                     </CardHeader>
@@ -335,10 +335,10 @@ export default function AdmitCardManagementPage() {
 
                         {/* 1. Exam Selection (Multi-Select) */}
                         <div className="space-y-2">
-                            <label className="text-sm font-semibold text-gray-700">Select Exam(s)</label>
+                            <label className="text-sm font-semibold text-foreground/80">Select Exam(s)</label>
 
                             {/* Simple multi-select implementation using multiple Select triggers or a custom list */}
-                            <div className="flex flex-col gap-2 p-2 bg-gray-50 border rounded-md max-h-40 overflow-y-auto">
+                            <div className="flex flex-col gap-2 p-2 bg-muted/50 border border-border rounded-md max-h-40 overflow-y-auto">
                                 {exams.map(e => (
                                     <div key={e.id} className="flex items-center gap-2">
                                         <input
@@ -369,12 +369,12 @@ export default function AdmitCardManagementPage() {
 
                         {/* 2. Hall Filter (For Viewing/Printing) */}
                         <div className="space-y-2">
-                            <label className="text-sm font-semibold text-gray-700 flex justify-between">
+                            <label className="text-sm font-semibold text-foreground/80 flex justify-between">
                                 <span>Filter Hall</span>
-                                {selectedHallId === 'all' && <span className="text-xs text-amber-600 font-normal">Select a hall to Print</span>}
+                                {selectedHallId === 'all' && <span className="text-xs text-amber-600 dark:text-amber-400 font-normal">Select a hall to Print</span>}
                             </label>
                             <Select value={selectedHallId} onValueChange={setSelectedHallId}>
-                                <SelectTrigger className="w-full bg-gray-50/50 border-gray-200">
+                                <SelectTrigger className="w-full bg-muted/50 border-border">
                                     <SelectValue placeholder="All Halls / Select One" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -386,13 +386,13 @@ export default function AdmitCardManagementPage() {
                             </Select>
                         </div>
 
-                        <div className="h-px bg-gray-100 my-2" />
+                        <div className="h-px bg-border my-2" />
 
                         {/* 3. Generation Config */}
                         <div className="space-y-2">
-                            <label className="text-xs font-bold uppercase text-gray-400">Generation Setup</label>
-                            <div className="text-sm text-gray-500 mb-2">
-                                Generating for: <span className="font-bold text-black">{activeExamIds.length} Exams</span>
+                            <label className="text-xs font-bold uppercase text-muted-foreground">Generation Setup</label>
+                            <div className="text-sm text-muted-foreground mb-2">
+                                Generating for: <span className="font-bold text-foreground">{activeExamIds.length} Exams</span>
                             </div>
                             <HallConfigurator
                                 selectedHalls={activeHalls}
@@ -400,7 +400,7 @@ export default function AdmitCardManagementPage() {
                                 onCapacityChange={() => { }}
                             />
                             <Button
-                                className="w-full mt-4 bg-gray-900 hover:bg-black text-white"
+                                className="w-full mt-4 bg-primary hover:bg-primary/90 text-primary-foreground"
                                 onClick={handleGenerate}
                                 disabled={generating || activeExamIds.length === 0}
                             >
@@ -427,14 +427,14 @@ export default function AdmitCardManagementPage() {
                 {/* Preview Panel */}
                 <div className="xl:col-span-3">
                     <Tabs value={viewMode} onValueChange={(v: any) => setViewMode(v)}>
-                        <TabsList className="bg-white border border-gray-200 p-1 rounded-xl h-auto flex-wrap justify-start gap-2 mb-4 w-full">
-                            <TabsTrigger value="admit" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 rounded-lg px-4 py-2"><FileText className="w-4 h-4 mr-2" />Admit Cards</TabsTrigger>
-                            <TabsTrigger value="seat" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 rounded-lg px-4 py-2"><Users className="w-4 h-4 mr-2" />Seat Plans</TabsTrigger>
-                            <TabsTrigger value="attendance" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 rounded-lg px-4 py-2"><ClipboardCheck className="w-4 h-4 mr-2" />Attendance</TabsTrigger>
-                            <TabsTrigger value="label" className="data-[state=active]:bg-blue-50 data-[state=active]:text-blue-700 rounded-lg px-4 py-2"><LayoutGrid className="w-4 h-4 mr-2" />Desk Labels</TabsTrigger>
+                        <TabsList className="bg-card border border-border p-1 rounded-xl h-auto flex-wrap justify-start gap-2 mb-4 w-full">
+                            <TabsTrigger value="admit" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg px-4 py-2"><FileText className="w-4 h-4 mr-2" />Admit Cards</TabsTrigger>
+                            <TabsTrigger value="seat" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg px-4 py-2"><Users className="w-4 h-4 mr-2" />Seat Plans</TabsTrigger>
+                            <TabsTrigger value="attendance" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg px-4 py-2"><ClipboardCheck className="w-4 h-4 mr-2" />Attendance</TabsTrigger>
+                            <TabsTrigger value="label" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg px-4 py-2"><LayoutGrid className="w-4 h-4 mr-2" />Desk Labels</TabsTrigger>
                         </TabsList>
 
-                        <div className="border border-gray-200 bg-gray-100/50 rounded-2xl p-4 md:p-8 min-h-[60rem] overflow-auto flex justify-center">
+                        <div className="border border-border bg-muted/30 rounded-2xl p-4 md:p-8 min-h-[60rem] overflow-auto flex justify-center">
                             {/* Scaled Preview Wrapper */}
                             <div className="origin-top scale-[0.5] md:scale-[0.6] lg:scale-[0.75] xl:scale-[0.85] transition-transform duration-300">
                                 <div className="bg-white shadow-2xl min-h-[297mm] min-w-[210mm]" ref={printRef}>
@@ -448,11 +448,11 @@ export default function AdmitCardManagementPage() {
 
                                     {!loadingData && allocations.length === 0 && (
                                         <div className="flex flex-col items-center justify-center py-20 h-[297mm] text-center p-8">
-                                            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                                                <Search className="w-8 h-8 text-gray-400" />
+                                            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+                                                <Search className="w-8 h-8 text-muted-foreground" />
                                             </div>
-                                            <h3 className="text-xl font-bold text-gray-900 mb-2">No Allocations Found</h3>
-                                            <p className="text-gray-500 max-w-sm">
+                                            <h3 className="text-xl font-bold text-foreground mb-2">No Allocations Found</h3>
+                                            <p className="text-muted-foreground max-w-sm">
                                                 Select an exam and hall, or click "Generate Allocations" to create new seating arrangements.
                                             </p>
                                         </div>

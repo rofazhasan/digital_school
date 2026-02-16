@@ -36,17 +36,19 @@ import {
   Lock,
   Camera,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Star
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
+import { toBengaliNumerals } from '@/utils/numeralConverter';
 // import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
@@ -631,8 +633,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           animate={{ opacity: 1, scale: 1 }}
           className="text-center"
         >
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-lg text-gray-600">Loading your result...</p>
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-lg text-muted-foreground">Loading your result...</p>
         </motion.div>
       </div>
     );
@@ -825,8 +827,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   Your Result
                 </h1>
               </div>
-              <h2 className="text-2xl font-semibold text-gray-800 mb-2">{result.exam.name}</h2>
-              <p className="text-gray-600 max-w-2xl mx-auto">{result.exam.description}</p>
+              <h2 className="text-2xl font-semibold text-foreground mb-2">{result.exam.name}</h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">{result.exam.description}</p>
             </div>
           </motion.div>
 
@@ -837,7 +839,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             transition={{ delay: 0.2 }}
             className="mb-8"
           >
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
@@ -847,15 +849,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Name</label>
+                    <label className="text-sm font-medium text-muted-foreground">Name</label>
                     <div className="text-lg font-semibold">{result.student.name}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Roll</label>
+                    <label className="text-sm font-medium text-muted-foreground">Roll</label>
                     <div className="text-lg">{result.student.roll}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Class</label>
+                    <label className="text-sm font-medium text-muted-foreground">Class</label>
                     <div className="text-lg">{result.student.class}</div>
                   </div>
                 </div>
@@ -870,7 +872,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             transition={{ delay: 0.3 }}
             className="mb-8"
           >
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <BookOpen className="h-5 w-5" />
@@ -880,7 +882,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <CardContent>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Exam Date</label>
+                    <label className="text-sm font-medium text-muted-foreground">Exam Date</label>
                     <div className="text-lg font-semibold">
                       {new Date(result.exam.startTime).toLocaleDateString('en-US', {
                         year: 'numeric',
@@ -890,11 +892,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Duration</label>
+                    <label className="text-sm font-medium text-muted-foreground">Duration</label>
                     <div className="text-lg">{result.exam.duration} minutes</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Time Taken</label>
+                    <label className="text-sm font-medium text-muted-foreground">Time Taken</label>
                     <div className="text-lg">
                       {result.submission.startedAt ? (() => {
                         const startTime = new Date(result.submission.startedAt);
@@ -907,7 +909,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Submission Time</label>
+                    <label className="text-sm font-medium text-muted-foreground">Submission Time</label>
                     <div className="text-lg">
                       {new Date(result.submission.submittedAt).toLocaleTimeString('en-US', {
                         hour: '2-digit',
@@ -918,11 +920,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Total Marks</label>
+                    <label className="text-sm font-medium text-muted-foreground">Total Marks</label>
                     <div className="text-lg font-semibold">{result.exam.totalMarks}</div>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-gray-600">Time Efficiency</label>
+                    <label className="text-sm font-medium text-muted-foreground">Time Efficiency</label>
                     <div className="text-lg">
                       {result.submission.startedAt ? (() => {
                         const startTime = new Date(result.submission.startedAt);
@@ -937,7 +939,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         return (
                           <div className="flex flex-col">
-                            <span className={Number(efficiency) > 0 ? "text-green-600 font-bold" : "text-gray-600"}>
+                            <span className={Number(efficiency) > 0 ? "text-green-600 dark:text-green-400 font-bold" : "text-muted-foreground"}>
                               {efficiency}% Efficient
                             </span>
                             <span className="text-xs text-gray-500">
@@ -978,7 +980,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </CardTitle>
               </CardHeader>
               {hasUnevaluatedQuestions() && (
-                <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+                <div className="bg-yellow-500/10 border-l-4 border-yellow-500 p-4">
                   <div className="flex items-center gap-2">
                     <Clock className="h-5 w-5 text-yellow-600" />
                     <div>
@@ -1009,7 +1011,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               )}
               {/* Suspended Exam Alert */}
               {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
-                <div className="bg-red-50 border-l-4 border-red-400 p-4">
+                <div className="bg-red-500/10 border-l-4 border-red-500 p-4">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-5 w-5 text-red-600" />
                     <div>
@@ -1047,11 +1049,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     {/* Marks Breakdown */}
                     <div className="space-y-6">
-                      <h3 className="text-xl font-semibold text-gray-800 mb-4">Marks Breakdown</h3>
+                      <h3 className="text-xl font-semibold text-foreground mb-4">Marks Breakdown</h3>
 
                       <div className="space-y-4">
                         {objectiveQuestions.length > 0 && (
-                          <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
+                          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <CheckSquare className="h-5 w-5 text-blue-600" />
                               <span className="font-medium">Objective Marks</span>
@@ -1266,7 +1268,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1283,7 +1285,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1300,7 +1302,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1317,7 +1319,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               whileHover={{ scale: 1.05 }}
               className="group"
             >
-              <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+              <Card className="bg-background/80 backdrop-blur-sm border-0 shadow-lg">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -1500,11 +1502,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       return (
                         <div id="objective-questions-section">
                           <div className="flex items-center gap-3 mb-6">
-                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <CheckSquare className="h-4 w-4 text-blue-600" />
+                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                              <CheckSquare className="h-4 w-4 text-primary" />
                             </div>
-                            <h3 className="text-2xl font-bold text-gray-800">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
-                            <Badge className="bg-blue-100 text-blue-800">
+                            <h3 className="text-2xl font-bold text-foreground">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
+                            <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
                               {filteredQuestions.length} Questions
                             </Badge>
                           </div>
@@ -1521,15 +1523,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   initial={{ opacity: 0, x: -20 }}
                                   animate={{ opacity: 1, x: 0 }}
                                   transition={{ delay: 0.1 * index }}
-                                  className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 ${isCorrect ? 'bg-green-50/20 border-green-100' : hasAnswer ? 'bg-red-50/20 border-red-100' : 'bg-gray-50 border-gray-200'}`}
+                                  className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 
+                                      ${isCorrect
+                                      ? 'bg-green-500/5 border-green-500/20 dark:bg-green-500/10'
+                                      : hasAnswer
+                                        ? 'bg-red-500/5 border-red-500/20 dark:bg-red-500/10'
+                                        : 'bg-muted/30 border-border opacity-90'}`}
                                 >
                                   {/* Question Header */}
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center gap-3">
-                                      <Badge className="bg-blue-100 text-blue-800">
+                                      <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
                                         {type}
                                       </Badge>
-                                      <span className="text-sm text-gray-600 font-bold">Question {globalIndex + 1}</span>
+                                      <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
@@ -1542,15 +1549,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   {type === 'AR' ? (
                                     <div className="mb-4">
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                        <div className="p-3 bg-indigo-50/50 rounded-lg border border-indigo-100">
-                                          <div className="text-[10px] font-bold text-indigo-600 uppercase mb-1">Assertion (A)</div>
-                                          <div className="text-sm">
+                                        <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                                          <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Assertion (A)</div>
+                                          <div className="text-sm text-foreground">
                                             <UniversalMathJax dynamic>{(question as any).assertion || question.questionText}</UniversalMathJax>
                                           </div>
                                         </div>
-                                        <div className="p-3 bg-purple-50/50 rounded-lg border border-purple-100">
-                                          <div className="text-[10px] font-bold text-purple-600 uppercase mb-1">Reason (R)</div>
-                                          <div className="text-sm">
+                                        <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                                          <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase mb-1">Reason (R)</div>
+                                          <div className="text-sm text-foreground">
                                             <UniversalMathJax dynamic>{(question as any).reason || ""}</UniversalMathJax>
                                           </div>
                                         </div>
@@ -1558,12 +1565,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : type === 'MTF' ? (
                                     <div className="mb-4">
-                                      <div className="text-gray-800 mb-4 font-medium">
+                                      <div className="text-foreground mb-4 font-medium">
                                         <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                         {(question as any).pairs?.map((p: any, pidx: number) => (
-                                          <div key={pidx} className="flex items-center justify-between p-2 bg-white rounded text-xs border border-gray-100 shadow-sm">
+                                          <div key={pidx} className="flex items-center justify-between p-2 bg-card rounded text-xs border border-border shadow-sm">
                                             <div className="font-medium"><UniversalMathJax dynamic>{p.left}</UniversalMathJax></div>
                                             <div className="px-2">→</div>
                                             <div className="font-medium text-blue-700"><UniversalMathJax dynamic>{p.right}</UniversalMathJax></div>
@@ -1573,7 +1580,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : (
                                     <div className="mb-4">
-                                      <div className="text-lg font-medium text-gray-800">
+                                      <div className="text-lg font-medium text-foreground">
                                         <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                     </div>
@@ -1613,7 +1620,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             if (correctIndex === undefined && question.options) {
                                               isCorrectOpt = question.options[optIndex]?.isCorrect;
                                             } else {
-                                              isCorrectOpt = Number(correctIndex) === optIndex;
+                                              const originalIdx = question.options?.[optIndex]?.originalIndex;
+                                              if (originalIdx !== undefined) {
+                                                isCorrectOpt = Number(correctIndex) === originalIdx;
+                                              } else {
+                                                isCorrectOpt = Number(correctIndex) === optIndex;
+                                              }
                                             }
                                           } else if (type === 'MC') {
                                             isCorrectOpt = option.isCorrect;
@@ -1625,23 +1637,23 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           if (isSelected && isCorrectOpt) {
                                             // 1. Correct and Selected -> GREEN
-                                            containerStyle = "border-green-500 bg-green-50 text-green-900 shadow-md ring-1 ring-green-200 transform scale-[1.01]";
-                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-100" />;
-                                            labelStyle = "bg-green-200 text-green-800";
+                                            containerStyle = "border-green-500 bg-green-500/10 text-foreground shadow-md ring-1 ring-green-500/20 transform scale-[1.01]";
+                                            icon = <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 fill-green-500/10" />;
+                                            labelStyle = "bg-green-500 text-white";
                                           } else if (isSelected && !isCorrectOpt) {
                                             // 2. Wrong and Selected -> RED
-                                            containerStyle = "border-red-500 bg-red-50 text-red-900 shadow-md ring-1 ring-red-200";
-                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-100" />;
-                                            labelStyle = "bg-red-200 text-red-800";
+                                            containerStyle = "border-red-500 bg-red-500/10 text-foreground shadow-md ring-1 ring-red-500/20";
+                                            icon = <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 fill-red-500/10" />;
+                                            labelStyle = "bg-red-500 text-white";
                                           } else if (!isSelected && isCorrectOpt) {
                                             // 3. Correct but NOT Selected -> BLUE/TEAL (Distinct)
-                                            containerStyle = "border-teal-400 bg-teal-50 text-teal-900 border-dashed ring-1 ring-teal-100";
+                                            containerStyle = "border-teal-500/50 bg-teal-500/5 text-foreground border-dashed ring-1 ring-teal-500/10";
                                             icon = <CheckCircle className="h-5 w-5 text-teal-600 flex-shrink-0" />;
-                                            labelStyle = "bg-teal-200 text-teal-800";
+                                            labelStyle = "bg-teal-500 text-white";
                                           } else {
                                             // 4. Wrong and NOT Selected -> GRAY (Faded)
-                                            containerStyle = "border-gray-100 bg-white text-gray-400 opacity-60 hover:opacity-100 transition-opacity";
-                                            labelStyle = "bg-gray-100 text-gray-500";
+                                            containerStyle = "border-border bg-card text-muted-foreground opacity-60 hover:opacity-100 transition-opacity";
+                                            labelStyle = "bg-muted text-muted-foreground";
                                           }
 
                                           return (
@@ -1670,7 +1682,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       })()}
                                     </div>
                                   ) : (type === 'INT' || type === 'NUMERIC') ? (
-                                    <div className="p-4 bg-white rounded-lg border-2 border-indigo-100 flex flex-col gap-4">
+                                    <div className="p-4 bg-card rounded-lg border-2 border-primary/20 flex flex-col gap-4">
                                       <div className="flex items-center justify-between gap-4">
                                         <div className="flex items-center gap-4">
                                           <div className="text-sm font-bold text-gray-600">
@@ -1693,47 +1705,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                   ) : type === 'MTF' ? (
                                     <div className="space-y-4">
-                                      <div className="grid grid-cols-2 gap-4">
+                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase">Column A</div>
+                                          <div className="text-xs font-bold text-muted-foreground uppercase">Column A</div>
                                           {(question as any).leftColumn?.map((item: any, i: number) => (
-                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2">{i + 1}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2 text-muted-foreground">{i + 1}.</span>
+                                              <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                             </div>
                                           ))}
                                         </div>
                                         <div className="space-y-2">
-                                          <div className="text-xs font-bold text-gray-400 uppercase">Column B</div>
+                                          <div className="text-xs font-bold text-muted-foreground uppercase">Column B</div>
                                           {(question as any).rightColumn?.map((item: any, i: number) => (
-                                            <div key={i} className="p-2 bg-white border rounded text-sm min-h-[40px] flex items-center">
-                                              <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                                              <UniversalMathJax inline>{cleanupMath(item.text)}</UniversalMathJax>
+                                            <div key={i} className="p-2 bg-card border border-border rounded text-sm min-h-[40px] flex items-center">
+                                              <span className="font-bold mr-2 text-muted-foreground">{String.fromCharCode(65 + i)}.</span>
+                                              <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
                                             </div>
                                           ))}
                                         </div>
                                       </div>
-                                      <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-100">
-                                        <div className="text-xs font-bold text-indigo-700 uppercase mb-3 text-center">Match Analysis</div>
-                                        <div className="overflow-hidden rounded-lg border border-indigo-200">
-                                          <table className="w-full text-sm">
-                                            <thead className="bg-indigo-100 text-indigo-800">
+                                      <div className="p-4 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
+                                        <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-3 text-center">Match Analysis</div>
+                                        <div className="overflow-x-auto rounded-lg border border-indigo-500/20 shadow-sm">
+                                          <table className="w-full text-sm min-w-[500px]">
+                                            <thead className="bg-indigo-500/20 text-indigo-600 dark:text-indigo-400">
                                               <tr>
-                                                <th className="p-2 text-left w-1/3">Question (Left)</th>
-                                                <th className="p-2 text-left w-1/3">Your Match</th>
-                                                <th className="p-2 text-left w-1/3">Correct Match</th>
+                                                <th className="p-3 text-left w-1/3">Question (Left)</th>
+                                                <th className="p-3 text-left w-1/3">Your Match</th>
+                                                <th className="p-3 text-left w-1/3">Correct Match</th>
                                               </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-indigo-100 bg-white">
-                                              {(question as any).leftColumn?.map((item: any, i: number) => {
+                                            <tbody className="divide-y divide-indigo-500/10 bg-card">
+                                              {(question as any).leftColumn?.map((item: any, lIdx: number) => {
                                                 const correctMatches = (question as any).matches || {};
                                                 const studentMatches = (question.studentAnswer as any)?.matches || (question.studentAnswer as any) || {};
 
                                                 // Normalize student answer
                                                 let studentRightId = null;
                                                 if (Array.isArray(studentMatches)) {
-                                                  const match = studentMatches.find((m: any) => m.leftIndex === i || m.leftId === item.id);
-                                                  if (match) studentRightId = match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
+                                                  const match = studentMatches.find((m: any) => m.leftIndex === lIdx || m.leftId === item.id);
+                                                  if (match) studentRightId = match.studentRightId || match.rightId || (question as any).rightColumn?.[match.rightIndex]?.id;
                                                 } else {
                                                   studentRightId = studentMatches[item.id];
                                                 }
@@ -1743,33 +1755,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 const isUnanswered = !studentRightId;
 
                                                 const rightItem = (question as any).rightColumn?.find((r: any) => r.id === studentRightId);
+                                                const studentRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === studentRightId);
+
                                                 const correctRightItem = (question as any).rightColumn?.find((r: any) => r.id === correctRightId);
+                                                const correctRightIdx = (question as any).rightColumn?.findIndex((r: any) => r.id === correctRightId);
+
+                                                // Visual labels
+                                                const vlLeft = toBengaliNumerals(lIdx + 1);
+                                                const vStudentRight = studentRightIdx !== -1 ? String.fromCharCode(65 + studentRightIdx) : null;
+                                                const vCorrectRight = correctRightIdx !== -1 ? String.fromCharCode(65 + correctRightIdx) : null;
 
                                                 // Row styling
                                                 const rowClass = isMatchCorrect
-                                                  ? "bg-green-50"
+                                                  ? "bg-green-500/5 dark:bg-green-500/10"
                                                   : isUnanswered
-                                                    ? "bg-gray-50 opacity-90"
-                                                    : "bg-red-50";
+                                                    ? "bg-muted/30 opacity-90"
+                                                    : "bg-red-500/5 dark:bg-red-500/10";
 
                                                 return (
-                                                  <tr key={i} className={rowClass}>
-                                                    <td className="p-2 border-r border-indigo-100 font-medium">
-                                                      <span className="font-bold mr-1">{i + 1}.</span>
-                                                      <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                  <tr key={lIdx} className={rowClass}>
+                                                    <td className="p-3 border-r border-indigo-500/10 font-medium">
+                                                      <div className="flex items-center gap-1">
+                                                        <span className="font-bold text-muted-foreground shrink-0">{vlLeft}.</span>
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax>
+                                                      </div>
                                                     </td>
-                                                    <td className={`p-2 border-r border-indigo-100 ${isMatchCorrect ? 'text-green-700 font-bold' : isUnanswered ? 'text-gray-400 italic' : 'text-red-600 font-bold'}`}>
+                                                    <td className={`p-3 border-r border-indigo-500/10 ${isMatchCorrect ? 'text-green-600 dark:text-green-400 font-bold' : isUnanswered ? 'text-muted-foreground italic' : 'text-red-600 dark:text-red-400 font-bold'}`}>
                                                       {isUnanswered ? (
                                                         "No selection"
                                                       ) : (
-                                                        <>
+                                                        <div className="flex items-center gap-1">
+                                                          {vStudentRight && <span className="font-bold shrink-0">{vStudentRight}.</span>}
                                                           {rightItem ? <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax> : "Unknown"}
                                                           {isMatchCorrect ? <CheckCircle className="inline h-4 w-4 ml-1" /> : <XCircle className="inline h-4 w-4 ml-1" />}
-                                                        </>
+                                                        </div>
                                                       )}
                                                     </td>
-                                                    <td className="p-2 text-green-700 font-medium">
-                                                      {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                    <td className="p-3 text-green-600 dark:text-green-400 font-medium">
+                                                      <div className="flex items-center gap-1">
+                                                        {vCorrectRight && <span className="font-bold shrink-0">{vCorrectRight}.</span>}
+                                                        {correctRightItem ? <UniversalMathJax inline dynamic>{cleanupMath(correctRightItem.text)}</UniversalMathJax> : "N/A"}
+                                                      </div>
                                                     </td>
                                                   </tr>
                                                 );
@@ -1783,20 +1809,27 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                   {/* Explanation Section - Rendered for ALL types if available */}
                                   {(question.explanation || (question as any).explanationImage) && (
-                                    <div className="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                                    <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
                                       <div className="flex items-center gap-2 mb-2">
-                                        <div className="bg-yellow-100 p-1 rounded-full">
-                                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-yellow-700"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                                        <div className="bg-yellow-500/20 p-1.5 rounded-full shadow-inner">
+                                          <Star className="text-yellow-600 dark:text-yellow-400 h-4 w-4" />
                                         </div>
-                                        <span className="font-bold text-yellow-800 text-sm">Explanation / ব্যাখ্যা</span>
+                                        <span className="font-bold text-yellow-600 dark:text-yellow-400 text-sm">Explanation / ব্যাখ্যা</span>
                                       </div>
-                                      <div className="text-sm text-gray-700 pl-8">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                      <div className="text-sm text-foreground/90 pl-8 leading-relaxed">
+                                        <UniversalMathJax inline dynamic>
+                                          {cleanupMath(renderDynamicExplanation(
+                                            question.explanation,
+                                            (question as any).leftColumn || question.options,
+                                            question.type,
+                                            (question as any).rightColumn
+                                          ))}
+                                        </UniversalMathJax>
                                         {(question as any).explanationImage && (
                                           <img
                                             src={(question as any).explanationImage}
                                             alt="Explanation"
-                                            className="mt-2 max-h-60 rounded border border-gray-200"
+                                            className="mt-3 max-h-72 rounded-lg border border-border shadow-sm object-contain"
                                           />
                                         )}
                                       </div>
@@ -1810,7 +1843,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                           {/* Pagination Controls */}
                           {totalPages > 1 && (
-                            <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
+                            <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1966,7 +1999,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 src={imageUrl}
                                                 alt={`Your answer image ${index + 1}`}
                                                 crossOrigin="anonymous"
-                                                className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                 onLoad={() => {
                                                   console.log('Student answer image loaded successfully:', imageUrl);
                                                 }}
@@ -2025,7 +2058,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 src={drawing.imageData}
                                                 alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
                                                 crossOrigin="anonymous"
-                                                className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                 onError={(e) => {
                                                   console.error('Annotated image failed to load:', drawing.imageData);
                                                   // Show error placeholder
@@ -2072,7 +2105,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
                                       <div className="space-y-2">
                                         {question.subQuestions.map((subQ, subIndex) => (
-                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                          <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
                                             <div className="mb-2">
                                               <p className="text-gray-700 font-medium">
                                                 {subQ.questionText || subQ.text || subQ.question || ''}
@@ -2182,7 +2215,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     <div className="space-y-8 mt-6">
                                       <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
                                       {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
-                                        <div key={idx} className="relative rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                        <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
                                           {/* Sub-question Header */}
                                           <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
                                             <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
@@ -2322,7 +2355,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   <img
                                                     src={imageUrl}
                                                     alt={`Your answer image ${index + 1}`}
-                                                    className="w-full h-32 object-contain rounded-lg border-2 border-green-300 bg-white transition-transform group-hover:scale-105"
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                     onError={(e) => {
                                                       console.error('Student answer image failed to load:', imageUrl);
                                                       e.currentTarget.style.display = 'none';
@@ -2375,7 +2408,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   <img
                                                     src={drawing.imageData}
                                                     alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                                    className="w-full h-32 object-contain rounded-lg border-2 border-orange-300 bg-white transition-transform group-hover:scale-105"
+                                                    className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
                                                     onError={(e) => {
                                                       console.error('Annotated image failed to load:', drawing.imageData);
                                                       e.currentTarget.style.display = 'none';
@@ -2423,7 +2456,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
                                       <div className="space-y-2">
                                         {question.subQuestions.map((subQ, subIndex) => (
-                                          <div key={subIndex} className="p-3 rounded-lg border border-gray-200 bg-white">
+                                          <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
                                             <div className="mb-2">
                                               <p className="text-gray-700 font-medium">
                                                 {subQ.questionText || subQ.text || subQ.question || ''}
@@ -2582,7 +2615,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <img
                       src={annotatedImageFailed ? originalImageFallback : zoomedImage}
                       alt={annotatedImageFailed ? `${zoomedImageTitle} (Original Image)` : zoomedImageTitle}
-                      className="max-w-full max-h-full object-contain rounded-lg bg-white shadow-lg"
+                      className="max-w-full max-h-full object-contain rounded-lg bg-card shadow-lg"
                       onError={(e) => {
                         console.error('Modal image failed to load:', zoomedImage);
 

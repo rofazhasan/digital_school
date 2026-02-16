@@ -150,8 +150,8 @@ export default function AdminDashboard() {
     <div className="flex h-screen bg-background text-foreground overflow-hidden relative">
       {/* Background Elements */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-500/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-indigo-500/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px] translate-y-1/2 -translate-x-1/3 pointer-events-none" />
       </div>
 
       <DashboardSidebar
@@ -181,13 +181,13 @@ export default function AdminDashboard() {
         <header className="h-20 py-4 bg-background/80 backdrop-blur-xl sticky top-0 z-40 border-b border-border flex items-center justify-between px-4 md:px-8">
           <button
             onClick={() => setMobileSidebarOpen(true)}
-            className="lg:hidden p-2 rounded-xl hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors text-gray-600 dark:text-gray-300"
+            className="lg:hidden p-2 rounded-xl hover:bg-muted transition-colors text-muted-foreground"
           >
             <Menu className="w-6 h-6" />
           </button>
 
           <div className="flex-1 lg:hidden text-center pl-2">
-            <h1 className="font-bold text-lg text-gray-800 dark:text-gray-200">
+            <h1 className="font-bold text-lg text-foreground">
               {sidebarItems.find(i => i.id === activeTab)?.label || 'Dashboard'}
             </h1>
           </div>
@@ -202,36 +202,36 @@ export default function AdminDashboard() {
               >
                 {theme === 'dark' ? <Sun className="h-5 w-5 text-yellow-500" /> : <Moon className="h-5 w-5 text-muted-foreground" />}
               </Button>
-              <Button variant="ghost" size="icon" className="text-gray-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-full relative">
+              <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full relative">
                 <Bell className="w-5 h-5" />
-                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-950"></span>
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-destructive rounded-full border-2 border-background"></span>
               </Button>
             </div>
-            <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-800 hidden md:block"></div>
+            <div className="h-8 w-[1px] bg-border hidden md:block"></div>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-gray-200 dark:hover:border-gray-800 transition-all"
+                  className="flex items-center gap-2 focus:outline-none group p-1 rounded-full border-2 border-transparent hover:border-border transition-all"
                 >
-                  <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900 dark:to-indigo-900 flex items-center justify-center text-blue-700 dark:text-blue-300 font-bold shadow-sm">
+                  <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-sm">
                     {user?.name?.[0] || 'A'}
                   </div>
-                  <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors hidden md:block" />
+                  <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors hidden md:block" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56 p-2 rounded-xl shadow-xl border-gray-100 dark:border-gray-800 backdrop-blur-xl bg-white/90 dark:bg-gray-950/90" align="end" forceMount>
-                <div className="px-2 py-3 bg-gray-50/50 dark:bg-gray-900/50 rounded-lg mb-2">
+              <DropdownMenuContent className="w-56 p-2 rounded-xl shadow-xl border-border backdrop-blur-xl bg-card/90" align="end" forceMount>
+                <div className="px-2 py-3 bg-muted/50 rounded-lg mb-2">
                   <p className="text-sm font-semibold leading-none text-foreground">{user?.name || 'Admin'}</p>
                   <p className="text-xs leading-none text-muted-foreground mt-1">{user?.email || 'admin@school.com'}</p>
                 </div>
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
+                <DropdownMenuSeparator className="bg-border" />
                 <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5">
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-gray-100 dark:bg-gray-800" />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50 dark:focus:bg-red-900/20 rounded-lg cursor-pointer py-2.5">
+                <DropdownMenuSeparator className="bg-border" />
+                <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10 rounded-lg cursor-pointer py-2.5">
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -302,7 +302,7 @@ function OverviewTab() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 + 0.2 }}
           >
-            <Card className="rounded-2xl border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 overflow-hidden relative group hover:shadow-xl transition-all duration-300">
+            <Card className="rounded-2xl border border-border shadow-md bg-card overflow-hidden relative group hover:shadow-xl transition-all duration-300">
               <div className={`absolute top-0 right-0 w-24 h-24 ${item.bg} opacity-[0.08] rounded-bl-full -mr-4 -mt-4 transition-all group-hover:scale-110`} />
 
               <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -312,7 +312,7 @@ function OverviewTab() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-gray-900 dark:text-white mb-1">{item.value !== undefined ? item.value : '...'}</div>
+                <div className="text-3xl font-bold text-foreground mb-1">{item.value !== undefined ? item.value : '...'}</div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1">
                   <span className={`text-${item.color}-600 font-medium`}>{item.label}</span>
                 </p>
@@ -338,19 +338,19 @@ function OverviewTab() {
             whileHover={{ scale: 1.02, y: -2 }}
             whileTap={{ scale: 0.98 }}
             onClick={() => router.push(action.href)}
-            className="flex flex-col items-center justify-center p-6 bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-all group"
+            className="flex flex-col items-center justify-center p-6 bg-card rounded-2xl border border-border shadow-sm hover:shadow-md transition-all group"
           >
-            <div className={`p-4 rounded-full bg-gray-50 dark:bg-gray-800 mb-3 group-hover:bg-gray-100 dark:group-hover:bg-gray-700 transition-colors`}>
+            <div className={`p-4 rounded-full bg-muted/50 mb-3 group-hover:bg-primary/10 transition-colors`}>
               <action.icon className={`h-6 w-6 ${action.color}`} />
             </div>
-            <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">{action.label}</span>
+            <span className="font-semibold text-sm text-foreground/80 group-hover:text-foreground transition-colors">{action.label}</span>
           </motion.button>
         ))}
       </div>
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
+        <Card className="rounded-2xl border border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>Latest logs from the system</CardDescription>
@@ -358,12 +358,12 @@ function OverviewTab() {
           <CardContent>
             <div className="space-y-4">
               {[1, 2, 3].map((_, i) => (
-                <div key={i} className="flex items-start gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-0 last:pb-0">
-                  <div className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center mt-0.5">
+                <div key={i} className="flex items-start gap-3 pb-3 border-b border-border last:border-0 last:pb-0">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
                     <Activity className="w-4 h-4 text-blue-500" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">System Backup Completed</p>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">System Backup Completed</p>
                     <p className="text-xs text-muted-foreground">Today, 10:23 AM</p>
                   </div>
                 </div>
@@ -372,26 +372,26 @@ function OverviewTab() {
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border-0 shadow-sm bg-white dark:bg-gray-900">
+        <Card className="rounded-2xl border border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle>Pending Tasks</CardTitle>
             <CardDescription>Items requiring your attention</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              <div className="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/10 rounded-xl border border-red-100 dark:border-red-900/20">
+              <div className="flex items-center justify-between p-3 bg-destructive/10 rounded-xl border border-destructive/20">
                 <div className="flex items-center gap-3">
-                  <CheckCircle className="w-5 h-5 text-red-500" />
-                  <span className="text-sm font-medium text-red-900 dark:text-red-200">Review Exam Results</span>
+                  <CheckCircle className="w-5 h-5 text-destructive" />
+                  <span className="text-sm font-medium text-destructive dark:text-red-300">Review Exam Results</span>
                 </div>
-                <Badge variant="outline" className="bg-white dark:bg-gray-950 text-red-600 border-red-200">Urgent</Badge>
+                <Badge variant="outline" className="bg-background text-destructive border-destructive/20">Urgent</Badge>
               </div>
-              <div className="flex items-center justify-between p-3 bg-amber-50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-900/20">
+              <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-xl border border-amber-500/20">
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-amber-500" />
                   <span className="text-sm font-medium text-amber-900 dark:text-amber-200">Approve Teacher Leave</span>
                 </div>
-                <Badge variant="outline" className="bg-white dark:bg-gray-950 text-amber-600 border-amber-200">Pending</Badge>
+                <Badge variant="outline" className="bg-background text-amber-600 border-amber-500/20">Pending</Badge>
               </div>
             </div>
           </CardContent>
@@ -439,13 +439,13 @@ function ClassesTab() {
           placeholder="Search classes..."
           value={searchTerm}
           onChange={e => setSearchTerm(e.target.value)}
-          className="max-w-md pl-10 h-10 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-800 rounded-xl"
+          className="max-w-md pl-10 h-10 bg-card border-border rounded-xl"
         />
       </div>
 
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1, 2, 3].map(i => <div key={i} className="h-40 bg-gray-100 dark:bg-gray-800 animate-pulse rounded-xl"></div>)}
+          {[1, 2, 3].map(i => <div key={i} className="h-40 bg-muted animate-pulse rounded-xl"></div>)}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -457,17 +457,17 @@ function ClassesTab() {
               whileHover={{ y: -4 }}
               transition={{ duration: 0.2 }}
             >
-              <Card className="overflow-hidden border-0 shadow-lg shadow-gray-200/50 dark:shadow-none bg-white dark:bg-gray-900 rounded-2xl group cursor-pointer hover:ring-2 hover:ring-blue-500/20 transition-all">
-                <div className="h-2 w-full bg-gradient-to-r from-blue-500 to-indigo-500" />
+              <Card className="overflow-hidden border border-border bg-card rounded-2xl group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all">
+                <div className="h-2 w-full bg-gradient-to-r from-primary to-indigo-500" />
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-xl">{cls.name}</CardTitle>
-                      <CardDescription className="font-mono text-xs mt-1 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded inline-block">
+                      <CardDescription className="font-mono text-xs mt-1 bg-muted px-2 py-0.5 rounded inline-block">
                         {cls.section ? `SEC-${cls.section}` : 'NO SECTION'}
                       </CardDescription>
                     </div>
-                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 text-blue-600">
+                    <div className="p-2 rounded-lg bg-primary/10 text-primary">
                       <GraduationCap className="w-5 h-5" />
                     </div>
                   </div>
@@ -480,13 +480,13 @@ function ClassesTab() {
                     </div>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground flex items-center gap-2"><Users className="w-3.5 h-3.5" /> Students</span>
-                      <span className="font-medium bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-full text-xs">
+                      <span className="font-medium bg-muted px-2 py-0.5 rounded-full text-xs">
                         {cls.students?.length || 0}
                       </span>
                     </div>
                   </div>
-                  <div className="mt-6 flex gap-2 pt-4 border-t border-gray-100 dark:border-gray-800">
-                    <Button variant="ghost" size="sm" className="w-full hover:text-blue-600 hover:bg-blue-50">View Details</Button>
+                  <div className="mt-6 flex gap-2 pt-4 border-t border-border">
+                    <Button variant="ghost" size="sm" className="w-full hover:text-primary hover:bg-primary/10">View Details</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -494,10 +494,10 @@ function ClassesTab() {
           ))}
           {filtered.length === 0 && (
             <div className="col-span-full py-12 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
+              <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
+                <Search className="w-8 h-8 text-muted-foreground" />
               </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white">No classes found</h3>
+              <h3 className="text-lg font-medium text-foreground">No classes found</h3>
               <p className="text-muted-foreground">Try adjusting your search query.</p>
             </div>
           )}
