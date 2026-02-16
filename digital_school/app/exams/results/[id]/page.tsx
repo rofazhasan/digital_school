@@ -43,7 +43,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -1614,7 +1614,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             if (correctIndex === undefined && question.options) {
                                               isCorrectOpt = question.options[optIndex]?.isCorrect;
                                             } else {
-                                              isCorrectOpt = Number(correctIndex) === optIndex;
+                                              const originalIdx = question.options?.[optIndex]?.originalIndex;
+                                              if (originalIdx !== undefined) {
+                                                isCorrectOpt = Number(correctIndex) === originalIdx;
+                                              } else {
+                                                isCorrectOpt = Number(correctIndex) === optIndex;
+                                              }
                                             }
                                           } else if (type === 'MC') {
                                             isCorrectOpt = option.isCorrect;
@@ -1806,7 +1811,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         <span className="font-bold text-yellow-800 text-sm">Explanation / ব্যাখ্যা</span>
                                       </div>
                                       <div className="text-sm text-gray-700 pl-8">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
+                                        <UniversalMathJax inline dynamic>
+                                          {cleanupMath(renderDynamicExplanation(
+                                            question.explanation,
+                                            question.options,
+                                            question.type,
+                                            (question as any).rightColumn
+                                          ))}
+                                        </UniversalMathJax>
                                         {(question as any).explanationImage && (
                                           <img
                                             src={(question as any).explanationImage}

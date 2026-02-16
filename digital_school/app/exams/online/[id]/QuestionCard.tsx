@@ -626,7 +626,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
               <div className="grid grid-cols-1 gap-3">
                 {(question.options || []).map((opt: any, i: number) => {
                   const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-                  const isCorrect = question.correct === i || String(question.correct) === String(i);
+                  const isCorrect = opt.originalIndex !== undefined
+                    ? Number(question.correct) === opt.originalIndex
+                    : (question.correct === i || String(question.correct) === String(i));
                   const isSelected = String(userAnswer).trim() === label.trim();
                   return (
                     <MCQOption

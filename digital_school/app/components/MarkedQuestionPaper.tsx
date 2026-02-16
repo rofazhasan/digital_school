@@ -4,7 +4,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
-import { cleanupMath } from '@/lib/utils';
+import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from "@/utils/numeralConverter";
 
 // --- TYPES ---
@@ -423,7 +423,13 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
                                                             </div>
                                                             <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
-                                                                <Text>{(q as any).explanation}</Text>
+                                                                <Text>
+                                                                    {renderDynamicExplanation(
+                                                                        (q as any).explanation,
+                                                                        q.options,
+                                                                        q.type
+                                                                    )}
+                                                                </Text>
                                                             </div>
                                                         </div>
                                                     )}
@@ -501,7 +507,13 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
                                                             </div>
                                                             <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
-                                                                <Text>{(q as any).explanation}</Text>
+                                                                <Text>
+                                                                    {renderDynamicExplanation(
+                                                                        (q as any).explanation,
+                                                                        null,
+                                                                        q.type
+                                                                    )}
+                                                                </Text>
                                                             </div>
                                                         </div>
                                                     )}
@@ -637,7 +649,14 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
                                                             </div>
                                                             <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
-                                                                <Text>{(q as any).explanation}</Text>
+                                                                <Text>
+                                                                    {renderDynamicExplanation(
+                                                                        (q as any).explanation,
+                                                                        null,
+                                                                        q.type,
+                                                                        q.rightColumn
+                                                                    )}
+                                                                </Text>
                                                             </div>
                                                         </div>
                                                     )}

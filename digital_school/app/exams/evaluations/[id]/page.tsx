@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
-import { cleanupMath } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
@@ -2799,7 +2799,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </h5>
                                     <div className="text-blue-900 text-xs md:text-sm" style={{ whiteSpace: 'pre-wrap' }}>
                                       <UniversalMathJax key={currentQuestion.id} dynamic>
-                                        {cleanupMath(currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''))}
+                                        {cleanupMath(renderDynamicExplanation(
+                                          currentQuestion.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                          currentQuestion.options,
+                                          currentQuestion.type,
+                                          currentQuestion.rightColumn
+                                        ))}
                                       </UniversalMathJax>
                                     </div>
                                   </div>

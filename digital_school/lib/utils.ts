@@ -92,3 +92,59 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+/**
+ * Renders a dynamic explanation by replacing placeholders with current visual labels.
+ * @param text - The explanation text (may contain [[opt:0]], [[right:1]], etc.)
+ * @param options - Shuffled options for MCQ/MC/AR
+ * @param type - Question type
+ * @param rightColumn - Shuffled right column for MTF
+ * @returns Refined explanation text
+ */
+export function renderDynamicExplanation(
+  text: string | null | undefined,
+  options: any[] | null | undefined,
+  type: string,
+  rightColumn?: any[] | null | undefined
+): string {
+  if (!text) return "";
+
+  let processed = text;
+
+  // Handle MCQ/MC/AR options: [[opt:index]]
+  if (options && Array.isArray(options)) {
+    const optRegex = /\[\[opt:(\d+)\]\]/g;
+    processed = processed.replace(optRegex, (match, originalIndexStr) => {
+      const originalIndex = parseInt(originalIndexStr);
+      // Find where this original option is now
+      const currentIndex = options.findIndex((opt: any) =>
+        (opt.originalIndex !== undefined ? opt.originalIndex === originalIndex : false)
+      );
+
+      if (currentIndex !== -1) {
+        // Return visual label (Bengali ক, খ, গ, ঘ)
+        return String.fromCharCode(0x0995 + currentIndex);
+      }
+      return match; // Fallback if index not found
+    });
+  }
+
+  // Handle MTF right column: [[right:index]]
+  if (rightColumn && Array.isArray(rightColumn)) {
+    const rightRegex = /\[\[right:(\d+)\]\]/g;
+    processed = processed.replace(rightRegex, (match, originalIndexStr) => {
+      const originalIndex = parseInt(originalIndexStr);
+      // Find where this original right item is now
+      const currentIndex = rightColumn.findIndex((item: any) =>
+        (item.originalIndex !== undefined ? item.originalIndex === originalIndex : false)
+      );
+
+      if (currentIndex !== -1) {
+        // Return visual label (English A, B, C...)
+        return String.fromCharCode(65 + currentIndex);
+      }
+      return match; // Fallback if index not found
+    });
+  }
+
+  return processed;
+}

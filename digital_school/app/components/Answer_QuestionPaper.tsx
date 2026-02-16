@@ -2,7 +2,7 @@ import React, { forwardRef } from "react";
 import QRCode from "react-qr-code";
 import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { cleanupMath } from '@/lib/utils';
+import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
 
 // --- TYPES ---
@@ -229,7 +229,14 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             </div>
                             {q.explanation && (
                               <div className="mt-1 text-black text-xs bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                <span className="font-bold text-gray-800">ব্যাখ্যা:</span> <Text>{q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, '')}</Text>
+                                <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
+                                <UniversalMathJax inline dynamic>
+                                  {cleanupMath(renderDynamicExplanation(
+                                    q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                    q.options,
+                                    q.type
+                                  ))}
+                                </UniversalMathJax>
                               </div>
                             )}
                           </div>
@@ -258,7 +265,13 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
                             <p className="text-xs font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
                             <div className="text-sm text-blue-900">
-                              <UniversalMathJax>{q.explanation}</UniversalMathJax>
+                              <UniversalMathJax inline dynamic>
+                                {cleanupMath(renderDynamicExplanation(
+                                  q.explanation,
+                                  null,
+                                  q.type
+                                ))}
+                              </UniversalMathJax>
                             </div>
                           </div>
                         )}
@@ -294,7 +307,13 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
                             <p className="text-xs font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
                             <div className="text-sm text-blue-900">
-                              <UniversalMathJax>{q.explanation}</UniversalMathJax>
+                              <UniversalMathJax inline dynamic>
+                                {cleanupMath(renderDynamicExplanation(
+                                  q.explanation,
+                                  null,
+                                  q.type
+                                ))}
+                              </UniversalMathJax>
                             </div>
                           </div>
                         )}
@@ -333,7 +352,15 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         </div>
                         {q.explanation && (
                           <div className="mt-2 ml-6 p-2 bg-blue-50 border border-blue-100 rounded text-sm">
-                            <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax>{q.explanation}</UniversalMathJax>
+                            <span className="font-bold text-blue-700">ব্যাখ্যা:</span>{" "}
+                            <UniversalMathJax inline dynamic>
+                              {cleanupMath(renderDynamicExplanation(
+                                q.explanation,
+                                null,
+                                q.type,
+                                q.rightColumn
+                              ))}
+                            </UniversalMathJax>
                           </div>
                         )}
                       </div>
