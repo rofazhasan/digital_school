@@ -126,12 +126,19 @@ const Text = ({ children }: { children: React.ReactNode }) => (
 
 const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>(
     ({ examInfo, questions, submission, rank, totalStudents, qrData }, ref) => {
+        // Calculate totals for all objective types
         const mcqs = questions.mcq || [];
+        const mcs = questions.mc || [];
+        const ars = questions.ar || [];
+        const ints = questions.int || [];
+        const mtfs = questions.mtf || [];
+
+        const objectiveTotal = [
+            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs
+        ].reduce((sum, q) => sum + (q.marks || 1), 0);
+
         const cqs = questions.cq || [];
         const sqs = questions.sq || [];
-
-        // Calculate totals
-        const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
         const cqRequired = examInfo.cqRequiredQuestions || 0;
         const sqRequired = examInfo.sqRequiredQuestions || 0;
 
@@ -197,7 +204,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         const getINTMark = (q: INT, userAnswer: any) => {
             const val = userAnswer?.answer !== undefined ? userAnswer.answer : userAnswer;
             if (val === undefined || val === null || val === '') return 0;
-            const isCorrect = String(val) === String(q.answer);
+            const correctAns = q.correctAnswer !== undefined ? q.correctAnswer : q.answer;
+            const isCorrect = String(val).trim() === String(correctAns).trim();
             if (isCorrect) return q.marks || 1;
             return -((q.marks || 1) * negativeRate);
         };
@@ -264,13 +272,15 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
         // Calculate total deducted marks for header display
         let totalDeducted = 0;
-        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || [])].forEach(q => {
+        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || [])].forEach(q => {
             const ans = submission.answers[q.id || ''];
             let m = 0;
-            if ((q as any).type === 'MCQ') m = getMCQMark(q as MCQ, ans);
-            else if ((q as any).type === 'MC') m = getMCMark(q as MCQ, ans);
-            else if ((q as any).type === 'AR') m = getARMark(q as AR, ans);
-            else if ((q as any).type === 'INT') m = getINTMark(q as INT, ans);
+            const type = (q as any).type?.toUpperCase();
+            if (type === 'MCQ') m = getMCQMark(q as MCQ, ans);
+            else if (type === 'MC') m = getMCMark(q as MCQ, ans);
+            else if (type === 'AR') m = getARMark(q as AR, ans);
+            else if (type === 'INT') m = getINTMark(q as INT, ans);
+            else if (type === 'MTF') m = getMTFMark(q as MTF, ans);
 
             if (m < 0) totalDeducted += Math.abs(m);
         });
@@ -287,40 +297,75 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
 
         return (
-            <div ref={ref} className="question-paper-container bg-white p-8 rounded-lg shadow-lg" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+            <div ref={ref} className="question-paper-container bg-white text-slate-900 p-4 md:p-8 rounded-lg shadow-lg dark:bg-white dark:text-slate-900 print:shadow-none print:p-0" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
                 {/* Header */}
-                <header className="text-center mb-6 relative border-b-2 border-black pb-4">
-                    <div className="absolute top-0 right-0 hidden print:block">
-                        <QRCode value={JSON.stringify(qrData)} size={64} />
+                <header className="text-center mb-10 relative border-b-4 border-slate-900 pb-6">
+                    <div className="absolute top-0 right-0 hidden print:block bg-white p-1">
+                        <QRCode value={JSON.stringify(qrData)} size={80} />
                     </div>
                     {/* Logo if available */}
                     {examInfo.logoUrl && (
-                        <div className="flex justify-center mb-2">
-                            <img src={examInfo.logoUrl} alt="Logo" className="h-16 w-auto object-contain" />
+                        <div className="flex justify-center mb-4">
+                            <img src={examInfo.logoUrl} alt="Logo" className="h-20 w-auto object-contain" />
                         </div>
                     )}
-                    <h1 className="text-2xl font-bold">{examInfo.schoolName}</h1>
-                    <p className="text-sm">{examInfo.schoolAddress}</p>
-                    <h2 className="mt-2 text-xl font-bold">{examInfo.title}</h2>
+                    <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">{examInfo.schoolName}</h1>
+                    <p className="text-sm font-medium text-slate-600 uppercase tracking-widest mt-1">{examInfo.schoolAddress}</p>
 
-                    <div className="mt-4 border-2 border-gray-800 p-3 rounded-md bg-gray-50 print:bg-white flex flex-col md:flex-row justify-between items-center gap-4">
-                        <div className="text-left space-y-1">
-                            <p><strong>Name:</strong> {submission.student.name}</p>
-                            <p><strong>ID/Roll:</strong> {submission.student.roll}</p>
-                        </div>
-                        <div className="text-center">
-                            <div className="text-3xl font-bold border-2 border-black rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-1">
-                                {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}
+                    <div className="mt-6 inline-block bg-slate-900 text-white px-6 py-1 rounded-full text-sm font-bold uppercase tracking-tighter">
+                        {examInfo.title}
+                    </div>
+
+                    <div className="mt-8 grid grid-cols-1 md:grid-cols-3 items-center gap-6 border-2 border-slate-200 p-6 rounded-2xl bg-slate-50/50 print:bg-white relative overflow-hidden">
+                        {/* Decorative background element for print */}
+                        <div className="absolute top-0 left-0 w-2 h-full bg-slate-900"></div>
+
+                        <div className="text-left space-y-2">
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Candidate Name</label>
+                                <p className="text-lg font-bold text-slate-900">{submission.student.name}</p>
                             </div>
-                            <p className="text-sm font-bold">Total Score</p>
+                            <div>
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">ID / Roll Number</label>
+                                <p className="text-sm font-bold text-slate-600">{submission.student.roll}</p>
+                            </div>
                         </div>
-                        <div className="text-right space-y-1">
-                            <p>
-                                <strong>Score:</strong> {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')} / {examInfo.totalMarks}
-                                {totalDeducted > 0 && <span className="text-red-600 font-bold ml-1">(Deducted: -{totalDeducted.toFixed(2).replace(/\.00$/, '')})</span>}
-                            </p>
-                            <p><strong>Highest:</strong> {examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
-                            <p><strong>Rank:</strong> {rank ? `${rank}${getOrdinal(rank)}` : 'N/A'}</p>
+
+                        <div className="flex flex-col items-center">
+                            <div className="relative">
+                                <div className="text-4xl font-black border-[6px] border-slate-900 rounded-full w-28 h-28 flex items-center justify-center bg-white shadow-xl z-10 relative">
+                                    {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}
+                                </div>
+                                <div className="absolute -bottom-2 bg-slate-900 text-white px-4 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest z-20">
+                                    Total Score
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="text-right space-y-3">
+                            <div className="flex flex-col items-end">
+                                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Performance Summary</label>
+                                <div className="flex items-baseline gap-1 mt-1">
+                                    <span className="text-2xl font-black text-slate-900">{Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}</span>
+                                    <span className="text-slate-400 font-bold">/</span>
+                                    <span className="text-lg font-bold text-slate-500">{examInfo.totalMarks}</span>
+                                </div>
+                                {totalDeducted > 0 && (
+                                    <span className="text-rose-600 font-black text-xs uppercase tracking-tight bg-rose-50 px-2 py-0.5 rounded mt-1 border border-rose-100">
+                                        -{totalDeducted.toFixed(2).replace(/\.00$/, '')} Deducted
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex justify-end gap-4">
+                                <div className="text-right">
+                                    <label className="text-[8px] font-bold uppercase tracking-widest text-slate-400 block">Ranking</label>
+                                    <p className="font-black text-slate-900">{rank ? `${rank}${getOrdinal(rank)}` : 'N/A'}</p>
+                                </div>
+                                <div className="text-right">
+                                    <label className="text-[8px] font-bold uppercase tracking-widest text-slate-400 block">Class Highest</label>
+                                    <p className="font-black text-slate-900">{examInfo.highestMark ? Number(examInfo.highestMark).toFixed(2).replace(/\.00$/, '') : 'N/A'}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -351,7 +396,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-6">
                                     <h3>বহুনির্বাচনি/অবজেক্টিভ প্রশ্ন (Objective Questions)</h3>
                                     <div className="text-right">
-                                        <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {mcqTotal}</span>
+                                        <span>Marks: {Number(submission.result?.mcqMarks || 0).toFixed(2).replace(/\.00$/, '')} / {objectiveTotal}</span>
                                     </div>
                                 </div>
 

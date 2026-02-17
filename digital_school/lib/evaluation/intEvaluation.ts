@@ -28,8 +28,10 @@ export function evaluateINTQuestion(
     question: INTQuestion,
     studentAnswer: INTAnswer
 ): INTEvaluationResult {
-    const correctAnswer = parseInt(question.modelAnswer || '0');
-    const studentAns = studentAnswer.answer;
+    // Check multiple possible fields for correct answer due to schema inconsistencies
+    const correctVal = question.modelAnswer || (question as any).correctAnswer || (question as any).answer;
+    const correctAnswer = parseInt(String(correctVal || '0'));
+    const studentAns = parseInt(String(studentAnswer.answer || '0'));
     const marks = question.marks;
 
     // Check if answer is correct (exact match)

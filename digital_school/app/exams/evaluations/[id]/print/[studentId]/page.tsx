@@ -198,7 +198,7 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
 
     return (
         <MathJaxContext config={mathJaxConfig}>
-            <div className="min-h-screen bg-gray-100 p-8 print:p-0 print:bg-white">
+            <div className="min-h-screen bg-slate-50 p-4 md:p-8 dark:bg-slate-950 print:p-0 print:bg-white text-slate-900 dark:text-slate-100">
                 {/* Controls - Hidden in Print */}
                 <div className="mb-6 flex justify-between items-center max-w-5xl mx-auto print:hidden">
                     <Button variant="outline" onClick={() => router.back()}>

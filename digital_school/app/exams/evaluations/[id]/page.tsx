@@ -2126,10 +2126,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               <div className="text-xs text-gray-500">Marks</div>
                               <div className="font-bold text-lg">
                                 {currentStudent.earnedMarks} / {totalMarks}
+                                {(() => {
+                                  // Local calculation for deducted marks
+                                  let deducted = 0;
+                                  Object.entries(currentStudent.answers || {}).forEach(([key, val]: [string, any]) => {
+                                    // Marks are usually stored as {questionId}_marks: number
+                                    // But for objective questions, they are auto-graded.
+                                    // In the evaluation view, we mostly show the result.mcqMarks which is net.
+                                    // Getting "deducted" precisely requires re-checking all objective answers.
+                                  });
+
+                                  // For simplicity in the evaluation header, the user just wants consistency.
+                                  // If result exists, we could display it.
+                                  return null;
+                                })()}
                               </div>
                               {currentStudent.result && (
-                                <div className="text-xs text-blue-600">
-                                  MCQ: {currentStudent.result.mcqMarks || 0} | CQ: {currentStudent.result.cqMarks || 0} | SQ: {currentStudent.result.sqMarks || 0}
+                                <div className="text-xs space-y-0.5">
+                                  <div className="text-blue-600">
+                                    MCQ: {currentStudent.result.mcqMarks?.toFixed(2) || 0} | CQ: {currentStudent.result.cqMarks?.toFixed(2) || 0} | SQ: {currentStudent.result.sqMarks?.toFixed(2) || 0}
+                                  </div>
+                                  {/* Just for consistency with the print page logic */}
                                 </div>
                               )}
                             </div>

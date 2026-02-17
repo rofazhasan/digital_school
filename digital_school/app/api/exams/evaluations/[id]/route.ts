@@ -268,150 +268,70 @@ export async function GET(
       studentResultMap.set(res.studentId, res);
     });
 
-    // Process submissions using in-memory lookups
-    const processedSubmissions = (exam as any).examSubmissions.map((submission: any) => {
-      // Get questions for this specific student based on their exam set
-      let studentQuestions = allQuestions;
+    // Process submissions using the centralized logic
+    const { evaluateSubmission } = await import("@/lib/exam-logic");
+    const processedSubmissions = [];
 
-      // Efficient Lookup
-      const examSetId = studentExamSetMap.get(submission.studentId);
-      if (examSetId && studentQuestionsMap.has(examSetId)) {
-        studentQuestions = studentQuestionsMap.get(examSetId);
-      }
+    for (const submission of (exam as any).examSubmissions) {
+      try {
+        const evaluation = await evaluateSubmission(submission, exam, (exam as any).examSets);
 
-      // Calculate total marks and earned marks
-      let totalMarks = 0;
-      let earnedMarks = 0;
+        // Get evaluation status
+        let evaluationStatus = 'PENDING';
+        const hasManualGrading = Object.keys(submission.answers).some(key =>
+          key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
+        );
 
-      // Use submission answers directly as Cloudinary URLs are now authoritative
-      const fixedAnswers = { ...submission.answers };
-
-      for (const question of studentQuestions) {
-        totalMarks += question.marks;
-
-        const answer = fixedAnswers[question.id];
-        const type = (question.type || "").toUpperCase();
-        if (type === 'MCQ') {
-          // Auto-grade MCQ
-          if (answer) {
-            const normalize = (s: string) => String(s).trim().toLowerCase();
-            const userAns = normalize(answer);
-            let isCorrect = false;
-
-            // Enhanced MCQ answer comparison logic
-            if (question.options && Array.isArray(question.options)) {
-              const correctOption = question.options.find((opt: any) => opt.isCorrect);
-              if (correctOption) {
-                const correctOptionText = normalize(correctOption.text || String(correctOption));
-                isCorrect = userAns === correctOptionText;
-              }
-            }
-
-            if (!isCorrect && question.correctAnswer) {
-              const correctAnswer = question.correctAnswer;
-              if (typeof correctAnswer === 'number') {
-                isCorrect = userAns === normalize(String(correctAnswer));
-              } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-                isCorrect = userAns === normalize(correctAnswer.text || String(correctAnswer));
-              } else if (Array.isArray(correctAnswer)) {
-                isCorrect = correctAnswer.some(ans => normalize(String(ans)) === userAns);
-              } else {
-                isCorrect = userAns === normalize(String(correctAnswer));
-              }
-            }
-
-            if (!isCorrect && (question.correct !== undefined)) {
-              const correctAns = normalize(String(question.correct));
-              isCorrect = userAns === correctAns;
-            }
-
-            if (isCorrect) {
-              earnedMarks += question.marks;
-            } else if ((exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-              const negativeMarks = (question.marks * (exam as any).mcqNegativeMarking) / 100;
-              earnedMarks -= negativeMarks;
-            }
-          }
-        } else if (type === 'MC') {
-          // Auto-grade Multiple Correct
-          if (answer && answer.selectedOptions) {
-            const score = evaluateMCQuestion(
-              question,
-              answer,
-              {
-                partialMarking: true, // Defaulting to true for now
-                negativeMarking: (exam as any).mcqNegativeMarking || 0
-              }
-            );
-            earnedMarks += score;
-          }
-        } else if (type === 'AR') {
-          // Auto-grade Assertion-Reason
-          if (answer && answer.selectedOption) {
-            const isCorrect = Number(answer.selectedOption) === Number(question.correct || question.correctOption);
-            if (isCorrect) earnedMarks += question.marks;
-          }
-        } else if (type === 'MTF') {
-          // Auto-grade Match the Following (Partial marking only, no negative)
-          if (answer) {
-            const result = evaluateMTFQuestion(question, answer);
-            earnedMarks += Math.max(0, result.score);
-          }
-        } else if (type === 'INT' || type === 'NUMERIC') {
-          // Auto-grade Integer
-          if (answer && answer.answer !== undefined) {
-            const isCorrect = Number(answer.answer) === Number(question.correct || question.answer);
-            if (isCorrect) earnedMarks += question.marks;
-          }
-        } else {
-          // For CQ/SQ, get manually assigned marks
-          const manualMarks = submission.answers[`${question.id}_marks`] || 0;
-          earnedMarks += manualMarks;
+        if (submission.evaluatedAt) {
+          evaluationStatus = 'COMPLETED';
+        } else if (hasManualGrading || submission.evaluatorNotes) {
+          evaluationStatus = 'IN_PROGRESS';
         }
+
+        // Get total marks for the questions assigned to this student
+        let totalMarks = 0;
+        const examSetId = studentExamSetMap.get(submission.studentId);
+        const studentQuestions = (examSetId && studentQuestionsMap.has(examSetId))
+          ? studentQuestionsMap.get(examSetId)
+          : allQuestions;
+
+        studentQuestions.forEach((q: any) => totalMarks += (q.marks || 0));
+
+        processedSubmissions.push({
+          id: submission.id,
+          student: {
+            id: submission.student.id,
+            name: submission.student.user.name,
+            roll: submission.student.roll,
+            registrationNo: submission.student.registrationNo
+          },
+          answers: { ...submission.answers },
+          submittedAt: submission.submittedAt.toISOString(),
+          totalMarks,
+          earnedMarks: evaluation.totalScore,
+          status: evaluationStatus,
+          evaluatorNotes: submission.evaluatorNotes || null,
+          result: {
+            mcqMarks: evaluation.mcqMarks,
+            cqMarks: evaluation.cqMarks,
+            sqMarks: evaluation.sqMarks,
+            total: evaluation.totalScore
+          },
+          submissionStatus: submission.status
+        });
+      } catch (error) {
+        console.error(`Error processing submission for ${submission.studentId}:`, error);
+        // Fallback for failed processing
+        processedSubmissions.push({
+          id: submission.id,
+          student: { id: submission.student.id, name: submission.student.user.name },
+          answers: submission.answers,
+          submittedAt: submission.submittedAt.toISOString(),
+          earnedMarks: 0,
+          status: 'ERROR'
+        });
       }
-
-      // Get evaluation status - check if submission has evaluation data
-      let evaluationStatus = 'PENDING';
-
-      // Check if any questions have been manually graded
-      const hasManualGrading = Object.keys(submission.answers).some(key =>
-        key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
-      );
-
-      if (submission.evaluatedAt) {
-        evaluationStatus = 'COMPLETED';
-      } else if (hasManualGrading || submission.evaluatorNotes) {
-        evaluationStatus = 'IN_PROGRESS';
-      }
-
-      // Efficient Result Lookup
-      const result = studentResultMap.get(submission.studentId);
-
-      const submissionData = {
-        id: submission.id,
-        student: {
-          id: submission.student.id,
-          name: submission.student.user.name,
-          roll: submission.student.roll,
-          registrationNo: submission.student.registrationNo
-        },
-        answers: fixedAnswers,
-        submittedAt: submission.submittedAt.toISOString(),
-        totalMarks,
-        earnedMarks: result ? result.total : earnedMarks, // Use result total if available
-        status: evaluationStatus,
-        evaluatorNotes: submission.evaluatorNotes || null,
-        result: result ? {
-          mcqMarks: result.mcqMarks,
-          cqMarks: result.cqMarks,
-          sqMarks: result.sqMarks,
-          total: result.total
-        } : null,
-        submissionStatus: submission.status // Expose raw submission status (IN_PROGRESS/SUBMITTED)
-      };
-
-      return submissionData;
-    });
+    }
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
@@ -446,6 +366,14 @@ export async function GET(
       if (studentMap?.examSetId && studentQuestionsMap.has(studentMap.examSetId)) {
         baseQuestions = studentQuestionsMap.get(studentMap.examSetId);
       }
+    }
+
+    // Final fallback: Use all unique questions collected from all sets
+    if (baseQuestions.length === 0 && allQuestions.length > 0) {
+      // Remove duplicates by ID for the base questions view
+      const uniqueMap = new Map();
+      allQuestions.forEach(q => uniqueMap.set(q.id, q));
+      baseQuestions = Array.from(uniqueMap.values());
     }
 
 

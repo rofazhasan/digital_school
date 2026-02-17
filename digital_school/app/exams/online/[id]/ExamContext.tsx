@@ -62,11 +62,15 @@ export function ExamContextProvider({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Load answers
-    const savedAnswers = localStorage.getItem(localKey);
-    if (savedAnswers) {
+    // Load answers and merge with server-saved ones
+    const localAnswersStr = localStorage.getItem(localKey);
+    if (localAnswersStr) {
       try {
-        setAnswers(JSON.parse(savedAnswers));
+        const localAnswers = JSON.parse(localAnswersStr);
+        setAnswers((prev: any) => ({
+          ...prev,
+          ...localAnswers
+        }));
       } catch { }
     }
 

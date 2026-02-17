@@ -44,10 +44,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // const examSetId = examStudentMap?.examSetId || null;
 
     // Create or update submission with startedAt timestamp
+    const now = new Date();
     const submission = await prisma.examSubmission.upsert({
       where: { studentId_examId: { studentId, examId } },
       update: {
-        // startedAt: new Date(), // Don't reset time on re-entry
+        // Only set startedAt if it's currently null to prevent resetting time on re-entry
+        // Also ensure status is IN_PROGRESS
+        status: 'IN_PROGRESS',
         examSetId: examStudentMap?.examSetId || null
       },
       create: {
@@ -55,8 +58,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         examId,
         examSetId: examStudentMap?.examSetId || null,
         answers: {}, // Initialize with empty answers
+        startedAt: now,
+        status: 'IN_PROGRESS',
       },
     });
+
+    // If it was an update and startedAt was null, update it now
+    if (submission && !submission.startedAt) {
+      await prisma.examSubmission.update({
+        where: { id: submission.id },
+        data: { startedAt: now, status: 'IN_PROGRESS' }
+      });
+    }
 
     console.log(`[Exam Start] Student ${studentId} started exam ${examId} successfully`);
 

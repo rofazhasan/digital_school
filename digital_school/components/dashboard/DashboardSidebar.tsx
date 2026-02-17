@@ -6,7 +6,6 @@ import {
     LogOut,
     Menu,
     Settings,
-    Sparkles,
     X,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -27,7 +26,7 @@ interface DashboardSidebarProps {
     onTabChange: (id: string) => void;
     sidebarCollapsed: boolean;
     setSidebarCollapsed: (collapsed: boolean) => void;
-    user: any;
+    user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     instituteName: string;
     onLogout: () => void;
     className?: string;
@@ -41,7 +40,7 @@ export function DashboardSidebar({
     setSidebarCollapsed,
     user,
     instituteName,
-    onLogout,
+    onLogout: _onLogout, // eslint-disable-line @typescript-eslint/no-unused-vars
     className
 }: DashboardSidebarProps) {
     const router = useRouter();
@@ -49,22 +48,35 @@ export function DashboardSidebar({
     return (
         <motion.div
             initial={false}
-            animate={{ width: sidebarCollapsed ? 80 : 280 }}
-            className={`fixed inset-y-0 left-0 z-50 hidden lg:flex flex-col bg-sidebar/80 backdrop-blur-xl border-r border-sidebar-border shadow-2xl shadow-black/5 dark:shadow-none transition-all duration-300 ${className}`}
+            animate={{
+                width: sidebarCollapsed ? 80 : 300,
+                x: 0
+            }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            className={`fixed inset-y-0 left-0 z-50 hidden lg:flex flex-col bg-background/60 backdrop-blur-2xl border-r border-border/50 shadow-[0_0_40px_rgba(0,0,0,0.03)] dark:shadow-none transition-all duration-300 ${className}`}
         >
-            <div className={`h-20 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-6'} border-b border-sidebar-border`}>
+            <div className={`h-24 flex items-center ${sidebarCollapsed ? 'justify-center' : 'justify-between px-8'} border-b border-border/40`}>
                 {!sidebarCollapsed && (
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30 flex-shrink-0">
+                    <motion.div
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        className="flex items-center gap-4 overflow-hidden"
+                    >
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary via-primary/80 to-indigo-500 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-primary/25 border border-white/10 flex-shrink-0">
                             DS
                         </div>
-                        <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 whitespace-nowrap">
-                            {instituteName}
-                        </span>
-                    </div>
+                        <div className="flex flex-col">
+                            <span className="font-black text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70 whitespace-nowrap leading-tight">
+                                {instituteName}
+                            </span>
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground/60 leading-tight">
+                                Administration
+                            </span>
+                        </div>
+                    </motion.div>
                 )}
                 {sidebarCollapsed && (
-                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/30">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-primary via-primary/80 to-indigo-500 flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-primary/25 border border-white/10 group cursor-pointer transition-transform hover:scale-105 active:scale-95" onClick={() => setSidebarCollapsed(false)}>
                         DS
                     </div>
                 )}
@@ -72,13 +84,13 @@ export function DashboardSidebar({
                     variant="ghost"
                     size="icon"
                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                    className={`hidden lg:flex text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-full ${sidebarCollapsed ? 'mt-4 rotate-180' : ''}`}
+                    className={`hidden lg:flex text-muted-foreground/50 hover:text-primary hover:bg-primary/5 rounded-full transition-all duration-300 ${sidebarCollapsed ? 'mt-4 rotate-180 opacity-0 group-hover:opacity-100' : ''}`}
                 >
                     {sidebarCollapsed ? <ChevronDown className="h-5 w-5 rotate-90" /> : <Menu className="h-5 w-5" />}
                 </Button>
             </div>
 
-            <div className="flex-1 overflow-y-auto py-6 space-y-1 px-3 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto py-8 space-y-1.5 px-4 custom-scrollbar">
                 {items.map((item) => (
                     <button
                         key={item.id}
@@ -89,48 +101,64 @@ export function DashboardSidebar({
                                 onTabChange(item.id);
                             }
                         }}
-                        className={`w-full flex items-center px-3 py-3 rounded-xl transition-all duration-200 group relative overflow-hidden ${activeTab === item.id
-                            ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
-                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        className={`w-full flex items-center px-4 py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${activeTab === item.id
+                            ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/25 border border-white/10'
+                            : 'text-muted-foreground/70 hover:bg-muted/60 hover:text-foreground border border-transparent'
                             }`}
                     >
-                        <div className={`p-1 rounded-lg transition-all duration-300 flex-shrink-0 ${activeTab === item.id ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground'}`}>
-                            <item.icon className="w-5 h-5" />
+                        <div className={`transition-all duration-300 flex-shrink-0 ${activeTab === item.id ? 'text-primary-foreground scale-110' : 'text-muted-foreground group-hover:text-primary group-hover:scale-110'}`}>
+                            <item.icon className="w-5 h-5 stroke-[2.5px]" />
                         </div>
                         {!sidebarCollapsed && (
                             <motion.span
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 0.2 }}
-                                className="ml-3 font-medium text-sm flex-1 text-left truncate"
+                                initial={{ opacity: 0, x: -5 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ duration: 0.3 }}
+                                className={`ml-4 text-sm font-semibold flex-1 text-left truncate tracking-tight`}
                             >
                                 {item.label}
                             </motion.span>
                         )}
                         {!sidebarCollapsed && item.badge && (
-                            <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-0">
+                            <Badge variant="secondary" className={`bg-primary-foreground/15 text-primary-foreground hover:bg-primary-foreground/20 border-0 rounded-lg px-2 py-0.5 text-[10px] font-bold`}>
                                 {item.badge}
                             </Badge>
+                        )}
+
+                        {activeTab === item.id && (
+                            <motion.div
+                                layoutId="activeHighlight"
+                                className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full"
+                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                            />
                         )}
                     </button>
                 ))}
             </div>
 
-            <div className="p-4 border-t border-sidebar-border bg-sidebar/50 backdrop-blur-sm">
+            <div className="p-6 border-t border-border/40 bg-muted/20 backdrop-blur-sm">
                 {!sidebarCollapsed ? (
-                    <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-muted transition-colors cursor-pointer" onClick={() => onTabChange('settings')}>
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border-2 border-background shadow-sm">
-                            {user?.name?.[0] || 'U'}
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-4 p-3 rounded-2xl bg-background/40 border border-border/40 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
+                        onClick={() => onTabChange('settings')}
+                    >
+                        <div className="relative">
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-muted to-muted/50 flex items-center justify-center text-primary font-black border-2 border-background shadow-md overflow-hidden transition-transform group-hover:scale-105">
+                                {user?.name?.[0] || 'U'}
+                            </div>
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-background rounded-full" />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-foreground truncate">{user?.name || 'User'}</p>
-                            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                            <p className="text-sm font-bold text-foreground truncate">{user?.name || 'Administrator'}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground/60 truncate uppercase tracking-wider">Super Admin</p>
                         </div>
-                        <Settings className="w-4 h-4 text-muted-foreground" />
-                    </div>
+                        <Settings className="w-4 h-4 text-muted-foreground opacity-30 group-hover:opacity-100 group-hover:rotate-90 transition-all duration-500" />
+                    </motion.div>
                 ) : (
                     <div className="flex justify-center">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border-2 border-background shadow-sm" title={user?.name}>
+                        <div className="w-14 h-14 rounded-2xl bg-background/40 border border-border/40 flex items-center justify-center text-primary font-black border-2 border-background shadow-md group cursor-pointer hover:border-primary/30 transition-all" title={user?.name}>
                             {user?.name?.[0]}
                         </div>
                     </div>
@@ -146,7 +174,7 @@ interface MobileSidebarProps {
     onTabChange: (id: string) => void;
     isOpen: boolean;
     setIsOpen: (open: boolean) => void;
-    user: any;
+    user?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     onLogout: () => void;
 }
 
@@ -156,7 +184,6 @@ export function MobileDashboardSidebar({
     onTabChange,
     isOpen,
     setIsOpen,
-    user,
     onLogout
 }: MobileSidebarProps) {
     const router = useRouter();
