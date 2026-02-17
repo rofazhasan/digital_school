@@ -77,7 +77,7 @@ const processFrame = (imageData, template) => {
     let binary = new cv.Mat();
     cv.adaptiveThreshold(rectified, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 25, 10);
 
-    // 4. Bubble Analysis
+    // 4. Advanced Bubble Analysis (Contour-based)
     let results = {
         markers: markerPoints,
         answers: {},
@@ -88,59 +88,105 @@ const processFrame = (imageData, template) => {
     };
 
     if (template && template.bubbles) {
-        template.bubbles.forEach(bubble => {
-            const bx = bubble.x * outWidth;
-            const by = bubble.y * outHeight;
-            const br = bubble.r * outWidth; // Radius normalized to width
+        // Find all candidates for bubbles in the binary image
+        let contours = new cv.MatVector();
+        let hierarchy = new cv.Mat();
+        cv.findContours(binary, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
-            // Ensure ROI stays within bounds
-            const rect = new cv.Rect(
-                Math.max(0, Math.floor(bx - br)),
-                Math.max(0, Math.floor(by - br)),
-                Math.min(outWidth - Math.max(0, Math.floor(bx - br)), Math.floor(br * 2)),
-                Math.min(outHeight - Math.max(0, Math.floor(by - br)), Math.floor(br * 2))
-            );
+        let detectedBubbles = [];
+        const EXPECTED_RADIUS = (template.bubbles[0].r * outWidth);
+        const TOLERANCE = 1.4; // Tolerance on radius
 
-            let roi = binary.roi(rect);
-            let nonZero = cv.countNonZero(roi);
-            let fillRatio = nonZero / (Math.PI * br * br);
-            roi.delete();
+        for (let i = 0; i < contours.size(); ++i) {
+            let cnt = contours.get(i);
+            let area = cv.contourArea(cnt);
+            let rect = cv.boundingRect(cnt);
+            let radius = (rect.width + rect.height) / 4;
+            let circularity = (4 * Math.PI * area) / (Math.pow(cv.arcLength(cnt, true), 2));
 
-            // Track strongest match per question/column
-            const section = results.sections[bubble.type];
-            if (!section[bubble.qId] || fillRatio > section[bubble.qId].fillRatio) {
-                section[bubble.qId] = { option: bubble.option, fillRatio };
+            // Filter for bubbles using circularity and size
+            if (circularity > 0.60 && radius > EXPECTED_RADIUS / TOLERANCE && radius < EXPECTED_RADIUS * TOLERANCE) {
+                // Calculate fill intensity (non-zero pixels / area)
+                let roi = binary.roi(rect);
+                let nonZero = cv.countNonZero(roi);
+                let fillRatio = nonZero / (rect.width * rect.height);
+                roi.delete();
+
+                detectedBubbles.push({
+                    center: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
+                    fillRatio: fillRatio
+                });
             }
+        }
+
+        // Map template bubbles to the nearest physically detected bubble
+        template.bubbles.forEach(logicalBubble => {
+            const lx = logicalBubble.x * outWidth;
+            const ly = logicalBubble.y * outHeight;
+            const maxDist = EXPECTED_RADIUS * 1.5;
+
+            // Find nearest physical bubble
+            let bestMatch = null;
+            let minDist = maxDist;
+
+            detectedBubbles.forEach(physBubble => {
+                let dist = Math.sqrt(Math.pow(lx - physBubble.center.x, 2) + Math.pow(ly - physBubble.center.y, 2));
+                if (dist < minDist) {
+                    minDist = dist;
+                    bestMatch = physBubble;
+                }
+            });
+
+            const section = results.sections[logicalBubble.type];
+            if (!section[logicalBubble.qId]) section[logicalBubble.qId] = [];
+
+            section[logicalBubble.qId].push({
+                option: logicalBubble.option,
+                fillRatio: bestMatch ? bestMatch.fillRatio : 0
+            });
         });
+
+        // 5. Group-based Differential Analysis
+        const resolveGroup = (options) => {
+            if (!options || options.length === 0) return null;
+
+            // Sort by fill ratio descending
+            options.sort((a, b) => b.fillRatio - a.fillRatio);
+
+            const strongest = options[0];
+            const secondStrongest = options[1] || { fillRatio: 0 };
+
+            // A bubble is "marked" if it's both dark enough AND significantly darker than other options
+            const ABSOLUTE_MIN_FILL = 0.20;
+            const RELATIVE_FILL_FACTOR = 1.45; // 45% darker than second best
+
+            if (strongest.fillRatio > ABSOLUTE_MIN_FILL && strongest.fillRatio > secondStrongest.fillRatio * RELATIVE_FILL_FACTOR) {
+                return strongest.option;
+            }
+            return null;
+        };
 
         // Post-process sections
-        const ROLL_THRESHOLD = 0.25; // Adjusted for better sensitivity
-
-        // ROLL logic (6 columns)
         for (let i = 0; i < 6; i++) {
-            const match = results.sections.ROLL[i];
-            results.roll += (match && match.fillRatio > ROLL_THRESHOLD) ? match.option : "?";
+            const rollDigit = resolveGroup(results.sections.ROLL[i]);
+            results.roll += rollDigit !== null ? rollDigit : "?";
+
+            const regDigit = resolveGroup(results.sections.REG[i]);
+            results.registration += regDigit !== null ? regDigit : "?";
         }
 
-        // REG logic (6 columns)
-        for (let i = 0; i < 6; i++) {
-            const match = results.sections.REG[i];
-            results.registration += (match && match.fillRatio > ROLL_THRESHOLD) ? match.option : "?";
-        }
+        const setCode = resolveGroup(results.sections.SET['set']);
+        results.set = setCode !== null ? setCode : "?";
 
-        // SET logic
-        const setMatch = results.sections.SET['set'];
-        results.set = (setMatch && setMatch.fillRatio > ROLL_THRESHOLD) ? setMatch.option : "?";
-
-        // MCQ logic
         Object.keys(results.sections.MCQ).forEach(qId => {
-            const match = results.sections.MCQ[qId];
-            if (match && match.fillRatio > ROLL_THRESHOLD) {
-                // Map Choice Index back to Bengali
+            const opt = resolveGroup(results.sections.MCQ[qId]);
+            if (opt !== null) {
                 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
-                results.answers[qId] = MCQ_LABELS[parseInt(match.option)] || match.option;
+                results.answers[qId] = MCQ_LABELS[parseInt(opt)] || opt;
             }
         });
+
+        contours.delete(); hierarchy.delete();
     }
 
     // Cleanup
