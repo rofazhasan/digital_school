@@ -80,10 +80,13 @@ export const generateOMRTemplate = (examId: string, setId: string, questions: an
     }
 
     // 4. MCQ GRID (4 Columns of 25)
-    // Shifted UP by approx 0.01 to fix the 1-row offset observed in 3.jpg
-    const startY = 0.540;
+    // Precisely calibrated based on 4.jpg (Natural: 998x1620)
+    // Marker 0 Y: 65, Q1 Y: 926, Q75 Y: 1352, Marker 3 Y: 1413
+    // startY = (926-65)/(1413-65) = 0.6387
+    // rowSpacing = ((1352-926)/24)/1348 = 0.01317
+    const startY = 0.6387;
     const colSpacing = 0.237;
-    const rowSpacing = 0.0166;
+    const rowSpacing = 0.01317;
     const optSpacing = 0.033;
 
     for (let col = 0; col < 4; col++) {
