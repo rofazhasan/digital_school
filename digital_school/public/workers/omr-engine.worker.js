@@ -163,16 +163,19 @@ const processFrame = (imageData, template) => {
             const strongest = options[0];
             const secondStrongest = options[1] || { fillRatio: 0 };
 
-            // MULTIPLE MARKS DETECTION
-            if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.7) {
+            // WORLD CLASS CONFLICT DETECTION
+            // A bubble is "marked" if it's notably dark (> dynamicThreshold)
+            // Flag MULTIPLE_MARKS only if both are convincingly intentional marks
+            if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.85) {
                 results.conflicts.push({ qId, type, issue: 'MULTIPLE_MARKS' });
-                results.confidence *= 0.8;
+                results.confidence *= 0.75; // Heavy hit to confidence for intentional double-marks
                 return strongest.option;
             }
 
             if (strongest.fillRatio > dynamicThreshold) {
                 const gap = strongest.fillRatio / Math.max(0.01, secondStrongest.fillRatio);
-                if (gap < 2.0) results.confidence *= 0.95;
+                // Boost confidence if gap is very large (> 2.5x)
+                if (gap < 2.2) results.confidence *= 0.98;
                 return strongest.option;
             }
             return null;
