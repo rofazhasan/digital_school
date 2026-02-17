@@ -78,25 +78,68 @@ const processFrame = (imageData, template) => {
     cv.adaptiveThreshold(rectified, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 25, 10);
 
     // 4. Bubble Analysis
-    let results = { markers: markerPoints, answers: {}, scores: {} };
+    let results = {
+        markers: markerPoints,
+        answers: {},
+        roll: "",
+        registration: "",
+        set: "",
+        sections: { ROLL: {}, REG: {}, SET: {}, MCQ: {} }
+    };
 
-    // Example: Iterate through template questions
-    // This part depends on the Template JSON structure
     if (template && template.bubbles) {
         template.bubbles.forEach(bubble => {
-            // Map normalized coordinates from template to outWidth/outHeight
             const bx = bubble.x * outWidth;
             const by = bubble.y * outHeight;
-            const br = bubble.r * (outWidth / template.width); // Scale radius
+            const br = bubble.r * outWidth; // Radius normalized to width
 
-            let roi = binary.roi(new cv.Rect(bx - br, by - br, br * 2, br * 2));
+            // Ensure ROI stays within bounds
+            const rect = new cv.Rect(
+                Math.max(0, Math.floor(bx - br)),
+                Math.max(0, Math.floor(by - br)),
+                Math.min(outWidth - Math.max(0, Math.floor(bx - br)), Math.floor(br * 2)),
+                Math.min(outHeight - Math.max(0, Math.floor(by - br)), Math.floor(br * 2))
+            );
+
+            let roi = binary.roi(rect);
             let nonZero = cv.countNonZero(roi);
             let fillRatio = nonZero / (Math.PI * br * br);
-
-            if (fillRatio > 0.5) { // Threshold for fill
-                results.answers[bubble.qId] = bubble.option;
-            }
             roi.delete();
+
+            // Track strongest match per question/column
+            const section = results.sections[bubble.type];
+            if (!section[bubble.qId] || fillRatio > section[bubble.qId].fillRatio) {
+                section[bubble.qId] = { option: bubble.option, fillRatio };
+            }
+        });
+
+        // Post-process sections
+        const ROLL_THRESHOLD = 0.25; // Adjusted for better sensitivity
+
+        // ROLL logic (6 columns)
+        for (let i = 0; i < 6; i++) {
+            const match = results.sections.ROLL[i];
+            results.roll += (match && match.fillRatio > ROLL_THRESHOLD) ? match.option : "?";
+        }
+
+        // REG logic (6 columns)
+        for (let i = 0; i < 6; i++) {
+            const match = results.sections.REG[i];
+            results.registration += (match && match.fillRatio > ROLL_THRESHOLD) ? match.option : "?";
+        }
+
+        // SET logic
+        const setMatch = results.sections.SET['set'];
+        results.set = (setMatch && setMatch.fillRatio > ROLL_THRESHOLD) ? setMatch.option : "?";
+
+        // MCQ logic
+        Object.keys(results.sections.MCQ).forEach(qId => {
+            const match = results.sections.MCQ[qId];
+            if (match && match.fillRatio > ROLL_THRESHOLD) {
+                // Map Choice Index back to Bengali
+                const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
+                results.answers[qId] = MCQ_LABELS[parseInt(match.option)] || match.option;
+            }
         });
     }
 

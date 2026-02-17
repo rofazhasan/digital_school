@@ -164,7 +164,9 @@ export default function OMRScannerPage() {
                 const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
                 if (imageData) {
                     setIsProcessing(true);
-                    workerRef.current?.postMessage({ type: 'process', imageData, template: null });
+                    const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
+                    const template = selectedExam?.templateJson || null;
+                    workerRef.current?.postMessage({ type: 'process', imageData, template });
                 }
             };
         }
@@ -319,18 +321,22 @@ export default function OMRScannerPage() {
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1">Roll No</p>
-                                            <p className="text-xl font-mono font-bold truncate">{scanResult.roll || "?"}</p>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Roll No</p>
+                                            <p className="text-2xl font-mono font-black text-primary">{scanResult.roll || "??????"}</p>
                                         </div>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1">Set Code</p>
-                                            <p className="text-xl font-mono font-bold">{scanResult.set || "?"}</p>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Set Code</p>
+                                            <p className="text-2xl font-mono font-black text-primary">{scanResult.set || "?"}</p>
                                         </div>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1">Answers</p>
-                                            <p className="text-xl font-mono font-bold">{Object.keys(scanResult.answers || {}).length}</p>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Registration</p>
+                                            <p className="text-lg font-mono font-bold">{scanResult.registration || "??????"}</p>
+                                        </div>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Answers Found</p>
+                                            <p className="text-lg font-mono font-bold">{Object.keys(scanResult.answers || {}).length} / 100</p>
                                         </div>
                                     </div>
 

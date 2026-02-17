@@ -1,65 +1,105 @@
 /**
- * OMR Mapper Utility
+ * OMR Mapper Utility (Refined)
  * 
- * Generates a "Digital Twin" of the OMR sheet by mapping bubble coordinates
- * relative to the ArUco fiducial markers.
+ * Maps bubbles to normalized coordinates (0.0 to 1.0) relative to ArUco markers.
+ * Markers define the coordinate system corners:
+ * Marker 0: (0,0) - Top Left
+ * Marker 1: (1,0) - Top Right
+ * Marker 2: (1,1) - Bottom Right
+ * Marker 3: (0,1) - Bottom Left
  */
+
+export type SectionType = 'MCQ' | 'ROLL' | 'REG' | 'SET';
+
+export interface OMRBubble {
+    type: SectionType;
+    qId: string | number; // Question number or Digit column index
+    option: string;       // A-E for MCQ, 0-9 for ROLL/REG
+    x: number;            // Normalized 0-1
+    y: number;            // Normalized 0-1
+    r: number;            // Normalized radius
+}
 
 export interface OMRTemplate {
     examId: string;
     setId: string;
-    width: number; // reference width (e.g. 800)
-    height: number; // reference height (e.g. 1131)
     bubbles: OMRBubble[];
 }
 
-export interface OMRBubble {
-    qId: string | number;
-    option: string;
-    x: number; // normalized 0-1
-    y: number; // normalized 0-1
-    r: number; // normalized radius
-}
-
 export const generateOMRTemplate = (examId: string, setId: string, questions: any): OMRTemplate => {
-    const template: OMRTemplate = {
-        examId,
-        setId,
-        width: 800,
-        height: 1131,
-        bubbles: []
-    };
+    const bubbles: OMRBubble[] = [];
 
-    // The logic here must match OMRSheet.tsx geometry perfectly.
-    // Normalized coordinates (assuming markers are exactly at corners)
+    /**
+     * GEOMETRY CONSTANTS (Normalized to ArUco Marker Boundaries)
+     * Markers are at: TL(32,32), TR(W-72, 32), BR(W-52, H-52), BL(52, H-52) approx
+     * We normalize so Marker center to Marker center is 1.0
+     */
 
-    // Header section occupies roughly 30%
-    // Info band roughly 20%
-    // Question grid starts at y ≈ 0.5
+    // 1. ROLL NUMBER SECTION (Ref: Section 1 in OMRSheet.tsx)
+    // x: approx 0.1 to 0.4
+    // y: approx 0.3 to 0.5
+    for (let col = 0; col < 6; col++) {
+        const xBase = 0.12 + (col * 0.04);
+        for (let digit = 0; digit < 10; digit++) {
+            bubbles.push({
+                type: 'ROLL',
+                qId: col,
+                option: digit.toString(),
+                x: xBase,
+                y: 0.32 + (digit * 0.022),
+                r: 0.008
+            });
+        }
+    }
 
-    const startY = 0.52;
-    const colWidth = 0.23; // 4 columns with gaps
-    const rowHeight = 0.018; // approx row height for 25 questions
+    // 2. REGISTRATION NUMBER SECTION
+    for (let col = 0; col < 6; col++) {
+        const xBase = 0.45 + (col * 0.04);
+        for (let digit = 0; digit < 10; digit++) {
+            bubbles.push({
+                type: 'REG',
+                qId: col,
+                option: digit.toString(),
+                x: xBase,
+                y: 0.32 + (digit * 0.022),
+                r: 0.008
+            });
+        }
+    }
 
-    // Questions Grid (matching OMRSheet.tsx 4-column layout)
+    // 3. SET CODE SECTION
+    const setLabels = ['ক', 'খ', 'গ', 'ঘ'];
+    for (let i = 0; i < 4; i++) {
+        bubbles.push({
+            type: 'SET',
+            qId: 'set',
+            option: setLabels[i],
+            x: 0.45 + (i * 0.035),
+            y: 0.12,
+            r: 0.01
+        });
+    }
+
+    // 4. MCQ GRID (4 Columns of 25)
+    // Starts at y ≈ 0.55
+    const startY = 0.56;
+    const colSpacing = 0.235;
+    const rowSpacing = 0.0165;
+    const optSpacing = 0.032;
+
     for (let col = 0; col < 4; col++) {
-        const startIdx = col * 25;
         for (let row = 0; row < 25; row++) {
-            const qIdx = startIdx + row;
-            const qId = qIdx + 1;
+            const qNum = (col * 25) + row + 1;
+            const xBase = 0.06 + (col * colSpacing) + 0.065; // Label offset
+            const yPos = startY + (row * rowSpacing);
 
-            // X position: col * colWidth + padding
-            const xBase = 0.06 + col * 0.235;
-            // Y position: startY + row * rowHeight
-            const yPos = startY + row * 0.0165;
-
-            // Bubbles (4 options typically)
-            for (let opt = 0; opt < 4; opt++) {
-                const optLabel = ['A', 'B', 'C', 'D'][opt];
-                template.bubbles.push({
-                    qId: qId.toString(),
-                    option: optLabel,
-                    x: xBase + 0.06 + (opt * 0.035), // Bubble spacing
+            // 5 Options: ক, খ, গ, ঘ, ঙ
+            for (let opt = 0; opt < 5; opt++) {
+                bubbles.push({
+                    type: 'MCQ',
+                    qId: qNum,
+                    option: (opt).toString(), // Index 0-4
+                    x: xBase + (opt * optSpacing),
                     y: yPos,
                     r: 0.01
                 });
@@ -67,5 +107,5 @@ export const generateOMRTemplate = (examId: string, setId: string, questions: an
         }
     }
 
-    return template;
+    return { examId, setId, bubbles };
 };
