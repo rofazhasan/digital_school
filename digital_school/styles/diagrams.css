@@ -94,12 +94,10 @@
     }
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    .fbd-diagram-container {
-        background: #1f2937;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-    }
+/* Dark mode support - Now strictly follows app theme class */
+.dark .fbd-diagram-container {
+    background: #1f2937;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 /* Inline diagrams (within text) */

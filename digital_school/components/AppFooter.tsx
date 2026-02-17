@@ -63,7 +63,7 @@ export function AppFooter() {
                         <div className="flex items-center space-x-3">
                             <div className="h-10 w-10 bg-gradient-to-br from-primary to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
                                 {logo ? (
-                                    <img src={logo} alt="L" className="h-6 w-6 object-contain invert grayscale brightness-200" />
+                                    <img src={logo} alt="L" className="h-6 w-6 object-contain dark:invert dark:grayscale dark:brightness-200 transition-all" />
                                 ) : "DS"}
                             </div>
                             <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">

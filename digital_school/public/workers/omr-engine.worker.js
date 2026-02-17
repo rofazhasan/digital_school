@@ -73,9 +73,24 @@ const processFrame = (imageData, template) => {
     let rectified = new cv.Mat();
     cv.warpPerspective(gray, rectified, M, new cv.Size(outWidth, outHeight));
 
-    // 3. Adaptive Thresholding
+    // 3. Quality Metrics & Adaptive Thresholding
     let binary = new cv.Mat();
     cv.adaptiveThreshold(rectified, binary, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 25, 10);
+
+    // AI Quality Metrics
+    const calculateQuality = (mat) => {
+        let laplacian = new cv.Mat();
+        cv.Laplacian(mat, laplacian, cv.CV_64F);
+        let mean = new cv.Mat(), stddev = new cv.Mat();
+        cv.meanStdDev(laplacian, mean, stddev);
+        const sharpness = stddev.data64F[0] * stddev.data64F[0];
+
+        let brightnessMean = cv.mean(mat)[0];
+
+        laplacian.delete(); mean.delete(); stddev.delete();
+        return { sharpness, brightness: brightnessMean };
+    };
+    const quality = calculateQuality(rectified);
 
     // 4. Advanced Bubble Analysis (Contour-based)
     let results = {
@@ -85,7 +100,8 @@ const processFrame = (imageData, template) => {
         registration: "",
         set: "",
         confidence: 1.0,
-        conflicts: [], // List of qIds with issues
+        quality,
+        conflicts: [],
         sections: { ROLL: {}, REG: {}, SET: {}, MCQ: {} }
     };
 
@@ -108,27 +124,29 @@ const processFrame = (imageData, template) => {
 
             // Filter for bubbles using circularity and size
             if (circularity > 0.60 && radius > EXPECTED_RADIUS / TOLERANCE && radius < EXPECTED_RADIUS * TOLERANCE) {
-                // Calculate fill intensity (non-zero pixels / area)
+                // Calculate fill intensity and variance
                 let roi = binary.roi(rect);
-                let nonZero = cv.countNonZero(roi);
-                let fillRatio = nonZero / (rect.width * rect.height);
-                roi.delete();
+                let mean = new cv.Mat(), stddev = new cv.Mat();
+                cv.meanStdDev(roi, mean, stddev);
+                let fillRatio = mean.data64F[0] / 255;
+                let variance = stddev.data64F[0] * stddev.data64F[0];
+                roi.delete(); mean.delete(); stddev.delete();
 
                 detectedBubbles.push({
                     center: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
-                    fillRatio: fillRatio
+                    fillRatio,
+                    variance
                 });
             }
         }
 
         // --- GLOBAL NORMALIZATION ---
-        // Find the darkest bubbles to establish a "Blackpoint" baseline
         let sortedFills = detectedBubbles.map(b => b.fillRatio).sort((a, b) => b - a);
         const blackPoint = sortedFills.length > 5 ? (sortedFills[0] + sortedFills[4]) / 2 : 0.8;
         const whitePoint = 0.05;
         const dynamicThreshold = (blackPoint - whitePoint) * 0.45 + whitePoint;
 
-        // Map template bubbles to the nearest physically detected bubble
+        // Map template bubbles...
         template.bubbles.forEach(logicalBubble => {
             const lx = logicalBubble.x * outWidth;
             const ly = logicalBubble.y * outHeight;
@@ -150,31 +168,39 @@ const processFrame = (imageData, template) => {
 
             section[logicalBubble.qId].push({
                 option: logicalBubble.option,
-                fillRatio: bestMatch ? bestMatch.fillRatio : 0
+                fillRatio: bestMatch ? bestMatch.fillRatio : 0,
+                variance: bestMatch ? bestMatch.variance : 0
             });
         });
 
-        // 5. Differential Analysis with CONFLICT DETECTION
+        // 5. Differential Analysis with ML-STYLE LOGIC
         const resolveGroup = (options, qId, type) => {
             if (!options || options.length === 0) return null;
 
             options.sort((a, b) => b.fillRatio - a.fillRatio);
 
             const strongest = options[0];
-            const secondStrongest = options[1] || { fillRatio: 0 };
+            const secondStrongest = options[1] || { fillRatio: 0, variance: 0 };
+
+            // AI/ML RULE 1: Detect Erasures via Variance
+            // Solid marks have lower variance in the binary ROI compared to incomplete erasures
+            const isStrongSolid = strongest.fillRatio > dynamicThreshold && strongest.variance < 2500;
+            const isErasure = strongest.fillRatio > dynamicThreshold * 0.6 && strongest.variance > 3500;
+
+            if (isErasure && !isStrongSolid) {
+                results.confidence *= 0.95; // Faint hit to confidence for ambiguity
+                return null; // Treat as unmarked if it looks like an erasure
+            }
 
             // WORLD CLASS CONFLICT DETECTION
-            // A bubble is "marked" if it's notably dark (> dynamicThreshold)
-            // Flag MULTIPLE_MARKS only if both are convincingly intentional marks
             if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.85) {
                 results.conflicts.push({ qId, type, issue: 'MULTIPLE_MARKS' });
-                results.confidence *= 0.75; // Heavy hit to confidence for intentional double-marks
+                results.confidence *= 0.75;
                 return strongest.option;
             }
 
             if (strongest.fillRatio > dynamicThreshold) {
                 const gap = strongest.fillRatio / Math.max(0.01, secondStrongest.fillRatio);
-                // Boost confidence if gap is very large (> 2.5x)
                 if (gap < 2.2) results.confidence *= 0.98;
                 return strongest.option;
             }

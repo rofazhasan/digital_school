@@ -464,42 +464,38 @@ export async function GET(
 
       // Recalculate marks from processed questions to ensure data consistency
       // This acts as a "lazy fix" for any corrupted negative marking data in the DB
-      console.log('🔄 Verifying/Recalculating marks from processed questions...');
+      // Optimization: Only recalculate if result is missing or explicitly needed
+      const hasStoredResult = !!result && result.total !== null && result.total !== undefined && !isNaN(result.total);
 
-      const allCqScores: number[] = [];
-      const allSqScores: number[] = [];
+      if (!hasStoredResult) {
+        console.log('🔄 Re/calculating marks from processed questions (Missing or Initial)...');
+        const allCqScores: number[] = [];
+        const allSqScores: number[] = [];
 
-      let calculatedMcqMarks = 0;
-      let calculatedCqMarks = 0;
-      let calculatedSqMarks = 0;
+        let calculatedMcqMarks = 0;
+        let calculatedCqMarks = 0;
+        let calculatedSqMarks = 0;
 
-      processedQuestions.forEach((question: any) => {
-        const type = (question.type || '').toUpperCase();
-        if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
-          calculatedMcqMarks += question.awardedMarks || 0;
-        } else if (type === 'CQ') {
-          allCqScores.push(question.awardedMarks || 0);
-        } else if (type === 'SQ') {
-          allSqScores.push(question.awardedMarks || 0);
-        }
-      });
+        processedQuestions.forEach((question: any) => {
+          const type = (question.type || '').toUpperCase();
+          if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
+            calculatedMcqMarks += question.awardedMarks || 0;
+          } else if (type === 'CQ') {
+            allCqScores.push(question.awardedMarks || 0);
+          } else if (type === 'SQ') {
+            allSqScores.push(question.awardedMarks || 0);
+          }
+        });
 
-      // Pick best scores based on limits
-      const cqReq = exam.cqRequiredQuestions || allCqScores.length;
-      const sqReq = exam.sqRequiredQuestions || allSqScores.length;
+        // Pick best scores based on limits
+        const cqReq = exam.cqRequiredQuestions || allCqScores.length;
+        const sqReq = exam.sqRequiredQuestions || allSqScores.length;
 
-      calculatedCqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((sum, s) => sum + s, 0);
-      calculatedSqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((sum, s) => sum + s, 0);
+        calculatedCqMarks = allCqScores.sort((a, b) => b - a).slice(0, cqReq).reduce((sum, s) => sum + s, 0);
+        calculatedSqMarks = allSqScores.sort((a, b) => b - a).slice(0, sqReq).reduce((sum, s) => sum + s, 0);
 
-      let calculatedTotalMarks = calculatedMcqMarks + calculatedCqMarks + calculatedSqMarks;
-      calculatedTotalMarks = Math.max(0, calculatedTotalMarks);
-
-      // Check if we need to update stored result
-      // We update if result is missing, total is 0, OR if there's a significant mismatch (e.g. due to negative marking fix)
-      const needsUpdate = !result || result.total === 0 || Math.abs(calculatedTotalMarks - (result.total || 0)) > 0.01;
-
-      if (needsUpdate) {
-        console.log(`⚠️ Mark Mismatch Detected (Stored: ${result?.total}, Calc: ${calculatedTotalMarks}) - Triggering Auto-Repair`);
+        let calculatedTotalMarks = calculatedMcqMarks + calculatedCqMarks + calculatedSqMarks;
+        calculatedTotalMarks = Math.max(0, calculatedTotalMarks);
 
         mcqMarks = calculatedMcqMarks;
         cqMarks = calculatedCqMarks;
@@ -510,7 +506,7 @@ export async function GET(
         percentage = calculatePercentage(totalMarks, exam.totalMarks);
         grade = calculateGrade(percentage);
 
-        // Update result with calculated marks if it exists
+        // Update result if it exists but was empty/invalid
         if (result) {
           await db.result.update({
             where: { id: result.id },
@@ -525,9 +521,15 @@ export async function GET(
             }
           });
         }
+      } else {
+        // Use stored values if they look correct
+        mcqMarks = result.mcqMarks ?? 0;
+        cqMarks = result.cqMarks ?? 0;
+        sqMarks = result.sqMarks ?? 0;
+        totalMarks = result.total ?? 0;
+        percentage = result.percentage ?? 0;
+        grade = result.grade ?? 'F';
       }
-
-      // Removed the old strict if (!result || result.total === 0) block as it's subsumed by the logic above
     }
 
     // -------------------------------------------------------------------------

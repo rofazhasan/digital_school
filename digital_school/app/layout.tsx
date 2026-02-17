@@ -44,11 +44,12 @@ const hindSiliguri = Hind_Siliguri({
   display: 'swap',
 });
 
-const balooDa2 = Baloo_Da_2({
-  subsets: ['bengali'],
-  variable: '--font-baloo',
-  display: 'swap',
-});
+// const balooDa2 = Baloo_Da_2({
+//   subsets: ['bengali'],
+//   variable: '--font-baloo',
+//   display: 'swap',
+// });
+const balooDa2 = { variable: '' };
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
@@ -80,10 +81,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 5, // Allow zooming for accessibility
   userScalable: true,
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#000000" },
-  ],
+  themeColor: "#ffffff",
 };
 
 import { ThemeProvider } from "@/components/theme-provider";

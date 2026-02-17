@@ -196,37 +196,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return q;
     });
 
-    // Check if really submitted
-    // It is submitted if answers DOES NOT have _status: 'in_progress'
-    const answers = existingSubmission?.answers as Record<string, any>;
-    const isInProgress = answers && answers._status === 'in_progress';
-    const isExplicitlySubmitted = answers && answers._status === 'submitted';
+    // STRICT ACCESS CONTROL
+    // If retake is allowed, we permit access (handled by shouldCreateNew logic above).
+    // If retake is NOT allowed, we only permit access if NO submission exists OR if the submission is IN_PROGRESS.
+    const isRetakeAllowed = !!exam.allowRetake;
+    const submissionExists = !!existingSubmission;
 
-    // UPDATE: We prioritize `isInProgress` check. If it is in progress, it is NOT submitted.
-    // If it is explicitly submitted, it IS submitted.
-    // We only fall back to `submittedAt` check if the status is NOT 'in_progress' (handling legacy cases).
-
-    let isActuallySubmitted = false;
-
-    // Safety check: if explicitly submitted status exists, force it to be submitted regardless of other flags
-    // Also respect DB status if it is explicitly IN_PROGRESS indicating an active session
     // @ts-ignore
-    const dbStatus = existingSubmission?.status;
+    const isCurrentlyInProgress = existingSubmission && (existingSubmission.status === IN_PROGRESS || (existingSubmission.answers && (existingSubmission.answers as any)._status === 'in_progress'));
 
-    if (dbStatus === SUBMITTED) {
-      isActuallySubmitted = true;
-    } else if (isExplicitlySubmitted) {
-      isActuallySubmitted = true;
-    } else if (isInProgress || dbStatus === IN_PROGRESS) {
-      isActuallySubmitted = false;
-    } else {
-      isActuallySubmitted = isExplicitlySubmitted || !!existingSubmission?.submittedAt;
-    }
+    const shouldBlockAccess = !isRetakeAllowed && submissionExists && !isCurrentlyInProgress;
 
-    const hasSubmitted = isActuallySubmitted && !exam.allowRetake;
-
-    // STRICT BLOCKING: If submitted and no retake, do NOT return questions
-    if (hasSubmitted) {
+    if (shouldBlockAccess) {
+      console.log(`🚫 Access blocked for student ${studentId} to exam ${examId} (No retake allowed and already submitted)`);
       return NextResponse.json({
         id: exam.id,
         name: exam.name,
@@ -238,6 +220,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         status: 'SUBMITTED'
       });
     }
+
+    const hasSubmitted = !isCurrentlyInProgress && submissionExists && !isRetakeAllowed;
 
     return NextResponse.json({
       id: exam.id,

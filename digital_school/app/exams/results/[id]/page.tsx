@@ -696,7 +696,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   return (
     <MathJaxContext config={mathJaxConfig}>
-      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors duration-500 overflow-x-hidden p-0 sm:p-4 md:p-8">
+      <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors duration-500 overflow-x-hidden p-2 sm:p-4 md:p-8">
         {/* Animated Background Elements */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none">
           <motion.div
@@ -797,18 +797,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </motion.div>
 
               <div className="max-w-4xl mx-auto space-y-4">
-                <h1 className="text-5xl md:text-6xl lg:text-7xl font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-200 dark:to-white bg-clip-text text-transparent tracking-tighter">
+                <h1 className="text-4xl md:text-5xl lg:text-7xl font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-200 dark:to-white bg-clip-text text-transparent tracking-tighter break-words">
                   Performance Report
                 </h1>
-                <h2 className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400 drop-shadow-sm">
+                <h2 className="text-xl md:text-3xl font-bold text-blue-600 dark:text-blue-400 drop-shadow-sm break-words">
                   {result.exam.name}
                 </h2>
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1">
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 max-w-full">
+                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1 text-[10px] sm:text-xs">
                     {new Date(result.exam.startTime).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
                   </Badge>
                   <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></div>
-                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1 text-slate-600 dark:text-slate-400 font-medium">
+                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1 text-slate-600 dark:text-slate-400 font-medium text-[10px] sm:text-xs">
                     {result.exam.duration} Minutes Duration
                   </Badge>
                 </div>
@@ -835,18 +835,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </CardHeader>
                 <CardContent className="p-8 pt-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    <div className="space-y-2 p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white shadow-inner dark:border-slate-700/30">
+                    <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white shadow-inner dark:border-slate-700/30 overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Student Name</label>
-                      <div className="text-2xl font-black text-slate-900 dark:text-white truncate lg:whitespace-normal xl:truncate">{result.student.name}</div>
+                      <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white break-words">{result.student.name}</div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2 p-6 rounded-[2rem] bg-indigo-50/80 dark:bg-indigo-950/30 border border-white dark:border-indigo-900/30 text-center shadow-inner">
+                      <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-indigo-50/80 dark:bg-indigo-950/30 border border-white dark:border-indigo-900/30 text-center shadow-inner overflow-hidden">
                         <label className="text-[10px] uppercase tracking-widest font-black text-indigo-400 dark:text-indigo-600">Roll</label>
-                        <div className="text-2xl font-black text-indigo-900 dark:text-indigo-400">{result.student.roll}</div>
+                        <div className="text-xl sm:text-2xl font-black text-indigo-900 dark:text-indigo-400 break-words">{result.student.roll}</div>
                       </div>
-                      <div className="space-y-2 p-6 rounded-[2rem] bg-purple-50/80 dark:bg-purple-950/30 border border-white dark:border-purple-900/30 text-center shadow-inner">
+                      <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-purple-50/80 dark:bg-purple-950/30 border border-white dark:border-purple-900/30 text-center shadow-inner overflow-hidden">
                         <label className="text-[10px] uppercase tracking-widest font-black text-purple-400 dark:text-purple-600">Class</label>
-                        <div className="text-2xl font-black text-purple-900 dark:text-purple-400">{result.student.class}</div>
+                        <div className="text-xl sm:text-2xl font-black text-purple-900 dark:text-purple-400 break-words">{result.student.class}</div>
                       </div>
                     </div>
                   </div>
@@ -871,20 +871,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </CardHeader>
                 <CardContent className="p-8 pt-2">
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white dark:border-slate-700/30 flex flex-col items-center justify-center text-center shadow-inner">
+                    <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white dark:border-slate-700/30 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500 mb-1">Time Used</label>
-                      <div className="text-2xl font-black text-slate-900 dark:text-white">
+                      <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
                         {result.submission.startedAt ? (() => {
                           const startTime = new Date(result.submission.startedAt);
                           const submitTime = new Date(result.submission.submittedAt);
                           const timeDiff = submitTime.getTime() - startTime.getTime();
                           const minutes = Math.floor(timeDiff / (1000 * 60));
                           const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
-                          return <span className="flex items-baseline"><span className="text-3xl">{minutes}</span><span className="text-xs ml-1 uppercase opacity-60">m</span> <span className="text-3xl ml-2">{seconds}</span><span className="text-xs ml-1 uppercase opacity-60">s</span></span>;
+                          return <span className="flex items-baseline flex-wrap justify-center"><span className="text-xl sm:text-3xl">{minutes}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">m</span> <span className="text-xl sm:text-3xl ml-1">{seconds}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">s</span></span>;
                         })() : 'N/A'}
                       </div>
                     </div>
-                    <div className="p-6 rounded-[2rem] bg-emerald-50/80 dark:bg-emerald-950/30 border border-white dark:border-emerald-900/30 flex flex-col items-center justify-center text-center shadow-inner">
+                    <div className="p-4 sm:p-6 rounded-[2rem] bg-emerald-50/80 dark:bg-emerald-950/30 border border-white dark:border-emerald-900/30 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-emerald-500 dark:text-emerald-700 mb-1">Efficiency Ratio</label>
                       {result.submission.startedAt ? (() => {
                         const startTime = new Date(result.submission.startedAt);
@@ -892,21 +892,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const timeTakenMs = submitTime.getTime() - startTime.getTime();
                         const durationMs = result.exam.duration * 60 * 1000;
 
-                        // Efficiency based on time saved vs total duration
-                        // If they took more time than duration (late), efficiency is 0
                         const efficiency = Math.max(0, Math.min(100, ((durationMs - timeTakenMs) / durationMs) * 100)).toFixed(0);
 
                         return (
-                          <div className="text-4xl font-black text-emerald-600 dark:text-emerald-400">
-                            {efficiency}<span className="text-lg opacity-60">%</span>
+                          <div className="text-2xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400">
+                            {efficiency}<span className="text-sm sm:text-lg opacity-60">%</span>
                           </div>
                         );
                       })() : <div className="text-lg font-bold text-muted-foreground italic">N/A</div>}
                     </div>
-                    <div className="col-span-2 p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-500/20 flex items-center justify-between">
-                      <div className="space-y-0.5">
+                    <div className="col-span-2 p-4 sm:p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-500/20 flex items-center justify-between gap-4 overflow-hidden">
+                      <div className="space-y-0.5 min-w-0">
                         <label className="text-[10px] uppercase tracking-widest font-black text-blue-200/80">Submission Deadline Status</label>
-                        <div className="text-lg md:text-xl font-bold">
+                        <div className="text-base md:text-xl font-bold break-words">
                           {(() => {
                             if (!result.submission.startedAt) return "Status Unknown";
                             const startTime = new Date(result.submission.startedAt);
@@ -915,12 +913,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             return timeTaken <= result.exam.duration ? "Submitted on Time" : "Submitted Late";
                           })()}
                         </div>
-                        <div className="text-xs text-blue-200/60 font-medium lowercase">
+                        <div className="text-[10px] text-blue-200/60 font-medium lowercase truncate">
                           at {new Date(result.submission.submittedAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </div>
                       </div>
-                      <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 rotate-3">
-                        <CheckCircle className="h-8 w-8 text-white" />
+                      <div className="h-10 w-10 sm:h-14 sm:w-14 rounded-xl sm:rounded-2xl bg-white/20 backdrop-blur-md flex-shrink-0 flex items-center justify-center border border-white/30 rotate-3">
+                        <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                       </div>
                     </div>
                   </div>
@@ -1001,68 +999,68 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {objectiveQuestions.length > 0 && (
-                        <div className="p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300">
+                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
                           <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 rounded-2xl bg-blue-500/10 text-blue-600">
-                              <Target className="h-6 w-6" />
+                            <div className="p-2 sm:p-3 rounded-2xl bg-blue-500/10 text-blue-600">
+                              <Target className="h-5 w-5 sm:h-6 sm:w-6" />
                             </div>
-                            <Badge variant="outline" className="rounded-full border-blue-200 text-blue-600 bg-blue-50/50">Objective</Badge>
+                            <Badge variant="outline" className="rounded-full border-blue-200 text-blue-600 bg-blue-50/50 text-[10px] px-2">Objective</Badge>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-4xl font-black text-slate-900 dark:text-white flex items-baseline">
+                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
                               {result.result?.mcqMarks}
-                              <span className="text-lg font-bold text-slate-400 ml-1">/{totalObjectiveMarks}</span>
+                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalObjectiveMarks}</span>
                             </div>
                             {result.result?.mcqMarks! < 0 && (
-                              <p className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full inline-block mt-1">Negative Marking Applied</p>
+                              <p className="text-[8px] sm:text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full inline-block mt-1">Negative Marking Applied</p>
                             )}
                           </div>
                         </div>
                       )}
 
                       {cqQuestions.length > 0 && (
-                        <div className="p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300">
+                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
                           <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600">
-                              <FileText className="h-6 w-6" />
+                            <div className="p-2 sm:p-3 rounded-2xl bg-emerald-500/10 text-emerald-600">
+                              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
                             </div>
-                            <Badge variant="outline" className="rounded-full border-emerald-200 text-emerald-600 bg-emerald-50/50">Creative</Badge>
+                            <Badge variant="outline" className="rounded-full border-emerald-200 text-emerald-600 bg-emerald-50/50 text-[10px] px-2">Creative</Badge>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-4xl font-black text-slate-900 dark:text-white flex items-baseline">
+                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
                               {result.result?.cqMarks}
-                              <span className="text-lg font-bold text-slate-400 ml-1">/{totalCqMarks}</span>
+                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalCqMarks}</span>
                             </div>
                           </div>
                         </div>
                       )}
 
                       {sqQuestions.length > 0 && (
-                        <div className="p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300">
+                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
                           <div className="flex items-center justify-between mb-4">
-                            <div className="p-3 rounded-2xl bg-amber-500/10 text-amber-600">
-                              <GraduationCap className="h-6 w-6" />
+                            <div className="p-2 sm:p-3 rounded-2xl bg-amber-500/10 text-amber-600">
+                              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
                             </div>
-                            <Badge variant="outline" className="rounded-full border-amber-200 text-amber-600 bg-amber-50/50">Short Questions</Badge>
+                            <Badge variant="outline" className="rounded-full border-amber-200 text-amber-600 bg-amber-50/50 text-[10px] px-2">Short Questions</Badge>
                           </div>
                           <div className="space-y-1">
                             <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-4xl font-black text-slate-900 dark:text-white flex items-baseline">
+                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
                               {result.result?.sqMarks}
-                              <span className="text-lg font-bold text-slate-400 ml-1">/{totalSqMarks}</span>
+                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalSqMarks}</span>
                             </div>
                           </div>
                         </div>
                       )}
 
-                      <div className="sm:col-span-1 p-6 rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/20 border-b-4 border-indigo-800 text-white flex flex-col justify-between">
+                      <div className="sm:col-span-1 p-4 sm:p-6 rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/20 border-b-4 border-indigo-800 text-white flex flex-col justify-between overflow-hidden">
                         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Total Aggregate</p>
-                        <div className="mt-2">
-                          <div className="text-5xl font-black flex items-baseline leading-none">
+                        <div className="mt-2 text-center sm:text-left">
+                          <div className="text-3xl sm:text-5xl font-black flex items-baseline justify-center sm:justify-start flex-wrap leading-none">
                             {result.result?.total}
-                            <span className="text-xl text-indigo-300 ml-2">/{result.exam.totalMarks}</span>
+                            <span className="text-lg sm:text-xl text-indigo-300 ml-1 sm:ml-2">/{result.exam.totalMarks}</span>
                           </div>
                           {(() => {
                             const negativeTotal = (result.questions || []).reduce((sum, q: any) => {
@@ -1095,7 +1093,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <div className="relative z-10 flex flex-col items-center text-center space-y-6">
                         <div className="relative">
                           <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-40 animate-pulse"></div>
-                          <div className={`text-7xl font-black drop-shadow-2xl ${result.result?.grade === 'A+' ? 'text-yellow-400' :
+                          <div className={`text-5xl sm:text-7xl font-black drop-shadow-2xl ${result.result?.grade === 'A+' ? 'text-yellow-400' :
                             result.result?.grade.startsWith('A') ? 'text-blue-400' :
                               'text-white'
                             }`}>
@@ -1134,7 +1132,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           </div>
                           <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
                             <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Status</p>
-                            <p className="text-lg font-black text-emerald-400">PASSED</p>
+                            <p className={`text-lg font-black ${result.result?.grade === 'F' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                              {result.result?.grade === 'F' ? 'FAILED' : 'PASSED'}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1430,7 +1430,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </div>
                                       </div>
                                     ) : (
-                                      <div className="mb-4">
+                                      <div className="mb-4 overflow-x-auto max-w-full scrollbar-thin">
                                         <div className="text-lg font-medium text-foreground">
                                           <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                         </div>
@@ -1515,7 +1515,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 <span className={`w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold ${labelStyle}`}>
                                                   {String.fromCharCode(0x0995 + optIndex)}
                                                 </span>
-                                                <span className="flex-1 font-medium text-base leading-relaxed break-words">
+                                                <span className="flex-1 font-medium text-base leading-relaxed break-words overflow-x-auto max-w-full scrollbar-thin">
                                                   <UniversalMathJax inline dynamic>
                                                     {type === 'AR' ? [
                                                       "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা",
@@ -1660,7 +1660,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                     {/* Explanation Section - Rendered for ALL types if available */}
                                     {(question.explanation || (question as any).explanationImage) && (
-                                      <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                                      <div className="mt-4 p-4 bg-yellow-500/10 dark:bg-yellow-500/5 rounded-lg border border-yellow-500/20 dark:border-yellow-500/10">
                                         <div className="flex items-center gap-2 mb-2">
                                           <div className="bg-yellow-500/20 p-1.5 rounded-full shadow-inner">
                                             <Star className="text-yellow-600 dark:text-yellow-400 h-4 w-4" />
@@ -1755,11 +1755,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       }).length > 0 && (
                           <div>
                             <div className="flex items-center gap-3 mb-6">
-                              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                <FileText className="h-4 w-4 text-green-600" />
+                              <div className="w-8 h-8 bg-green-500/10 dark:bg-green-500/20 rounded-full flex items-center justify-center">
+                                <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
                               </div>
-                              <h3 className="text-2xl font-bold text-gray-800">Creative Questions (CQ)</h3>
-                              <Badge className="bg-green-100 text-green-800">
+                              <h3 className="text-xl sm:text-2xl font-bold text-foreground">Creative Questions (CQ)</h3>
+                              <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none text-[10px] sm:text-xs">
                                 {result.questions.filter(q => q.type?.toUpperCase() === 'CQ').length} Questions
                               </Badge>
                             </div>
@@ -1784,7 +1784,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: 0.1 * index }}
-                                    className="border rounded-lg p-6 bg-green-50/50"
+                                    className="border rounded-lg p-6 bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20"
                                   >
                                     {/* Question Header */}
                                     <div className="flex items-center justify-between mb-4">
@@ -1827,8 +1827,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* Student Answer Images */}
                                     {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
                                       <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
+                                        <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
+                                        <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
                                           <div className="flex items-center gap-2 mb-2">
                                             <Camera className="h-4 w-4 text-green-600" />
                                             <span className="text-sm font-medium text-green-800">
@@ -2007,11 +2007,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       }).length > 0 && (
                           <div>
                             <div className="flex items-center gap-3 mb-6">
-                              <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
-                                <MessageSquare className="h-4 w-4 text-yellow-600" />
+                              <div className="w-8 h-8 bg-amber-500/10 dark:bg-amber-500/20 rounded-full flex items-center justify-center">
+                                <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                               </div>
-                              <h3 className="text-2xl font-bold text-gray-800">Short Questions (SQ)</h3>
-                              <Badge className="bg-yellow-100 text-yellow-800">
+                              <h3 className="text-xl sm:text-2xl font-bold text-foreground">Short Questions (SQ)</h3>
+                              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none text-[10px] sm:text-xs">
                                 {result.questions.filter(q => q.type?.toUpperCase() === 'SQ').length} Questions
                               </Badge>
                             </div>
@@ -2036,7 +2036,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: 0.1 * index }}
-                                    className="border rounded-lg p-6 bg-yellow-50/50"
+                                    className="border rounded-lg p-6 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20"
                                   >
                                     {/* Question Header */}
                                     <div className="flex items-center justify-between mb-4">
@@ -2068,17 +2068,17 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
                                           <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
                                             {/* Sub-question Header */}
-                                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-100 flex items-start gap-3">
-                                              <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm">
+                                            <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-start gap-3">
+                                              <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
                                                 {idx + 1}
                                               </span>
                                               <div className="flex-grow pt-1">
                                                 {subQ.text ? (
-                                                  <div className="text-gray-800 font-medium leading-relaxed">
+                                                  <div className="text-foreground font-medium leading-relaxed">
                                                     <UniversalMathJax inline dynamic>{cleanupMath(subQ.text)}</UniversalMathJax>
                                                   </div>
                                                 ) : (
-                                                  <span className="text-gray-500 italic">Sub-question {idx + 1}</span>
+                                                  <span className="text-muted-foreground italic">Sub-question {idx + 1}</span>
                                                 )}
                                               </div>
                                             </div>
@@ -2086,28 +2086,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="p-4 space-y-4">
                                               {/* Model Answer (Prominent) */}
                                               {(subQ.modelAnswer || subQ.answer) && (
-                                                <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-                                                  <div className="flex items-center gap-2 mb-2 text-green-800 font-semibold text-sm uppercase tracking-wide">
+                                                <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
+                                                  <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm uppercase tracking-wide">
                                                     <CheckCircle className="w-4 h-4" />
                                                     Model Answer
                                                   </div>
-                                                  <div className="text-gray-800 leading-relaxed font-sans">
+                                                  <div className="text-foreground/90 leading-relaxed font-sans">
                                                     <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
                                                   </div>
                                                 </div>
                                               )}
 
                                               {/* Student Answer */}
-                                              <div className="bg-blue-50/50 rounded-lg p-4 border border-blue-100">
-                                                <div className="text-blue-800 font-semibold text-sm uppercase tracking-wide mb-2">
+                                              <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/10">
+                                                <div className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide mb-2">
                                                   Your Answer
                                                 </div>
                                                 {subQ.studentAnswer ? (
-                                                  <div className="text-gray-800 leading-relaxed font-sans">
+                                                  <div className="text-foreground/90 leading-relaxed font-sans">
                                                     <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
                                                   </div>
                                                 ) : (
-                                                  <p className="text-gray-400 italic text-sm">No text answer provided</p>
+                                                  <p className="text-muted-foreground italic text-sm">No text answer provided</p>
                                                 )}
                                               </div>
 
@@ -2292,9 +2292,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* Model Answer */}
                                     {question.modelAnswer && (
                                       <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                          <div className="text-gray-700">
+                                        <h4 className="font-medium text-foreground mb-2">Model Answer:</h4>
+                                        <div className="p-3 rounded-lg border-2 border-blue-500/20 bg-blue-500/5">
+                                          <div className="text-foreground/90">
                                             <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
                                           </div>
                                         </div>
@@ -2304,19 +2304,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* Sub Questions */}
                                     {question.subQuestions && question.subQuestions.length > 0 && (
                                       <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
+                                        <h4 className="font-medium text-foreground mb-2">Sub Questions:</h4>
                                         <div className="space-y-2">
                                           {question.subQuestions.map((subQ, subIndex) => (
                                             <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
                                               <div className="mb-2">
-                                                <p className="text-gray-700 font-medium">
+                                                <div className="text-foreground font-medium">
                                                   {subQ.questionText || subQ.text || subQ.question || ''}
-                                                </p>
+                                                </div>
                                               </div>
                                               {subQ.modelAnswer && (
                                                 <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
                                                   <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
-                                                  <p className="text-gray-700">
+                                                  <p className="text-foreground/90">
                                                     <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
                                                   </p>
                                                 </div>
@@ -2330,9 +2330,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* Feedback */}
                                     {question.feedback && (
                                       <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                          <p className="text-gray-700">{question.feedback}</p>
+                                        <h4 className="font-medium text-foreground mb-2">Feedback:</h4>
+                                        <div className="p-3 rounded-lg border-2 border-yellow-500/20 bg-yellow-500/5">
+                                          <p className="text-foreground/90">{question.feedback}</p>
                                         </div>
                                       </div>
                                     )}
@@ -2398,7 +2398,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </DialogHeader>
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                  <label className="text-sm font-medium text-foreground mb-2 block">
                     Explain why you think your marks should be reviewed:
                   </label>
                   <Textarea
@@ -2409,9 +2409,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     className="w-full"
                   />
                 </div>
-                <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-                  <div className="font-medium mb-1">Review Process:</div>
-                  <ul className="list-disc list-inside space-y-1">
+                <div className="text-sm text-blue-800 dark:text-blue-200 bg-blue-500/10 dark:bg-blue-500/20 p-3 rounded-lg border border-blue-500/20">
+                  <div className="font-bold mb-1">Review Process:</div>
+                  <ul className="list-disc list-inside space-y-1 opacity-90">
                     <li>Your request will be sent to the teacher/evaluator</li>
                     <li>They will review your submission and comment</li>
                     <li>You&apos;ll be notified when the review is complete</li>
@@ -2445,7 +2445,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </DialogHeader>
               <div className="relative w-full h-full flex flex-col">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-gray-700 truncate">
+                  <h3 className="text-sm font-medium text-foreground truncate max-w-[70%]">
                     {annotatedImageFailed ? `${zoomedImageTitle} (Original Image - Annotations Failed)` : zoomedImageTitle}
                   </h3>
                   <button
