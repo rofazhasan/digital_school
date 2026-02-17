@@ -74,30 +74,9 @@ export default function LandingPage() {
                 <CtaSection />
                 <DeveloperTrademarkSection />
             </main>
-            <Footer />
         </div>
     );
 }
-
-
-
-// --- Theme Toggle ---
-const ThemeToggle = () => {
-    const { theme, setTheme } = useTheme();
-    return (
-        <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="fixed top-4 right-4 z-50 rounded-full shadow-lg bg-background/80 backdrop-blur-md"
-            aria-label="Toggle theme"
-        >
-            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-            <Moon className="absolute h-5 w-5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            <span className="sr-only">Toggle theme</span>
-        </Button>
-    );
-};
 
 // --- Hero Section ---
 const HeroSection = () => {
@@ -116,7 +95,6 @@ const HeroSection = () => {
 
     return (
         <header className="relative flex flex-col items-center justify-center min-h-screen p-4 text-center overflow-hidden">
-            <ThemeToggle />
             <HeroCanvas />
             <motion.div
                 onMouseMove={handleMouseMove}
@@ -494,40 +472,4 @@ const DeveloperTrademarkSection = () => (
             </Card>
         </div>
     </section>
-);
-
-// --- Footer ---
-const Footer = () => (
-    <footer className="bg-card/30 text-foreground py-12 px-4 border-t border-border/20">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
-            <div className="md:col-span-1 flex flex-col items-center md:items-start">
-                <div className="flex items-center gap-2 mb-2">
-                    <img src="/logo.png" alt="Digital School Logo" className="h-8 w-auto" />
-                    <h4 className="font-bold text-lg">Elite Exam System</h4>
-                </div>
-                <p className="text-muted-foreground text-sm max-w-xs">The future of assessment technology for Bangladesh.</p>
-            </div>
-            <div>
-                <h4 className="font-bold mb-4">Quick Links</h4>
-                <ul className="space-y-2 text-muted-foreground">
-                    <li><a href="/login" className="hover:text-primary transition-colors">Login</a></li>
-                    <li><a href="/signup" className="hover:text-primary transition-colors">Create Account</a></li>
-                    <li><a href="#features" className="hover:text-primary transition-colors">Features</a></li>
-                    <li><a href="#pricing" className="hover:text-primary transition-colors">Pricing</a></li>
-                </ul>
-            </div>
-            <div>
-                <h4 className="font-bold mb-4">Contact</h4>
-                <ul className="space-y-2 text-muted-foreground">
-                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">School Inquiries</a></li>
-                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Technical Support</a></li>
-                    <li><a href="mailto:mdrofazhasanrafiu@gmail.com" className="hover:text-primary transition-colors">Developer Contact</a></li>
-                </ul>
-            </div>
-
-        </div>
-        <div className="text-center text-muted-foreground/50 mt-12 pt-8 border-t border-border/20">
-            <p>&copy; {new Date().getFullYear()} Elite Exam System. All Rights Reserved.</p>
-        </div>
-    </footer>
 );

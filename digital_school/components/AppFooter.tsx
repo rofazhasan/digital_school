@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Linkedin, Globe, Sun, Moon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
+import DarkModeToggle from "@/components/ui/DarkModeToggle";
 
 interface InstituteSettings {
     instituteName?: string;
@@ -36,47 +37,53 @@ export function AppFooter() {
     }, []);
 
     // Hide Footer on Dashboard routes to prevent "Double Footer" issue
-    if (pathname?.startsWith('/teacher') || pathname?.startsWith('/admin') || pathname?.startsWith('/student') || pathname?.startsWith('/exams/online')) {
+    // Also hide on online exam page for immersive experience
+    const hideOnRoutes = ['/teacher', '/admin', '/student', '/exams/online'];
+    if (hideOnRoutes.some(route => pathname?.startsWith(route))) {
         return null;
     }
 
-    const name = settings?.instituteName || "Digital School";
+    const name = settings?.instituteName || "Elite Exam System";
     const address = settings?.address || "123 Education Street, Dhaka, Bangladesh";
     const phone = settings?.phone || "+880 1234-567890";
     const email = settings?.email || "info@digitalschool.edu";
     const logo = settings?.logoUrl || "/logo.png";
 
     return (
-        <footer className="relative border-t bg-white/80 dark:bg-gray-950/80 backdrop-blur-md mt-auto">
+        <footer className="relative border-t bg-white/80 dark:bg-gray-950/80 backdrop-blur-md mt-auto overflow-hidden">
+            {/* Background Decorations */}
             <div className="absolute inset-0 bg-gradient-to-b from-transparent to-gray-50/50 dark:to-gray-900/50 pointer-events-none" />
+            <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -top-24 -right-24 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
 
             <div className="container relative mx-auto px-4 py-12 md:py-16">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 lg:gap-16">
                     {/* Brand Section */}
-                    <div className="space-y-4">
-                        <div className="flex items-center space-x-2">
-                            {/* Use a fallback div if logo fails or for visual placeholder */}
-                            <div className="h-10 w-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-500/20">
-                                DS
+                    <div className="space-y-6">
+                        <div className="flex items-center space-x-3">
+                            <div className="h-10 w-10 bg-gradient-to-br from-primary to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold shadow-lg shadow-primary/20">
+                                {logo ? (
+                                    <img src={logo} alt="L" className="h-6 w-6 object-contain invert grayscale brightness-200" />
+                                ) : "DS"}
                             </div>
-                            <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300">
+                            <span className="font-bold text-xl tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
                                 {name}
                             </span>
                         </div>
                         <p className="text-sm text-muted-foreground leading-relaxed max-w-xs">
-                            Empowering the next generation of learners with cutting-edge technology and comprehensive digital solutions.
+                            The future of assessment technology for Bangladesh. Empowering educators with high-precision OMR and AI-powered solutions.
                         </p>
-                        <div className="flex items-center gap-2 pt-2">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-blue-50 hover:text-blue-600 dark:hover:bg-blue-900/20 dark:hover:text-blue-400">
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
                                 <Facebook className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-sky-50 hover:text-sky-500 dark:hover:bg-sky-900/20 dark:hover:text-sky-400">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
                                 <Twitter className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-pink-50 hover:text-pink-600 dark:hover:bg-pink-900/20 dark:hover:text-pink-400">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
                                 <Instagram className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-indigo-50 hover:text-indigo-600 dark:hover:bg-indigo-900/20 dark:hover:text-indigo-400">
+                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-primary/10 hover:text-primary transition-colors">
                                 <Linkedin className="h-4 w-4" />
                             </Button>
                         </div>
@@ -84,75 +91,71 @@ export function AppFooter() {
 
                     {/* Quick Link Section 1 */}
                     <div>
-                        <h3 className="font-semibold text-foreground mb-4">Platform</h3>
-                        <ul className="space-y-2.5 text-sm">
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">About Us</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Features</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Careers</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">News & Press</a></li>
+                        <h3 className="font-bold text-foreground mb-6 uppercase tracking-wider text-xs">Platform</h3>
+                        <ul className="space-y-4 text-sm">
+                            <li><a href="/login" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Login</a></li>
+                            <li><a href="/signup" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Create Account</a></li>
+                            <li><a href="/#features" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Features</a></li>
+                            <li><a href="/#pricing" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Pricing</a></li>
                         </ul>
                     </div>
 
                     {/* Quick Link Section 2 */}
                     <div>
-                        <h3 className="font-semibold text-foreground mb-4">Resources</h3>
-                        <ul className="space-y-2.5 text-sm">
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Support Center</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Documentation</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Privacy Policy</a></li>
-                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors hover:translate-x-1 inline-block duration-200">Terms of Service</a></li>
+                        <h3 className="font-bold text-foreground mb-6 uppercase tracking-wider text-xs">Support</h3>
+                        <ul className="space-y-4 text-sm">
+                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Help Center</a></li>
+                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Documentation</a></li>
+                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Terms of Service</a></li>
+                            <li><a href="#" className="text-muted-foreground hover:text-primary transition-colors flex items-center gap-2 group"><span className="w-1.5 h-1.5 rounded-full bg-primary/20 group-hover:bg-primary group-hover:scale-125 transition-all" /> Privacy Policy</a></li>
                         </ul>
                     </div>
 
                     {/* Contact Info */}
                     <div>
-                        <h3 className="font-semibold text-foreground mb-4">Contact</h3>
-                        <ul className="space-y-3 text-sm">
+                        <h3 className="font-bold text-foreground mb-6 uppercase tracking-wider text-xs">Contact Us</h3>
+                        <ul className="space-y-4 text-sm">
                             <li className="flex items-start gap-3 text-muted-foreground">
-                                <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                                <span>{address}</span>
+                                <div className="p-2 bg-primary/5 rounded-lg text-primary">
+                                    <MapPin className="h-4 w-4" />
+                                </div>
+                                <span className="leading-relaxed">{address}</span>
                             </li>
                             <li className="flex items-center gap-3 text-muted-foreground">
-                                <Phone className="h-4 w-4 text-primary shrink-0" />
+                                <div className="p-2 bg-primary/5 rounded-lg text-primary">
+                                    <Phone className="h-4 w-4" />
+                                </div>
                                 <span>{phone}</span>
                             </li>
                             <li className="flex items-center gap-3 text-muted-foreground">
-                                <Mail className="h-4 w-4 text-primary shrink-0" />
+                                <div className="p-2 bg-primary/5 rounded-lg text-primary">
+                                    <Mail className="h-4 w-4" />
+                                </div>
                                 <span>{email}</span>
                             </li>
                         </ul>
                     </div>
                 </div>
 
-                <div className="border-t border-gray-100 dark:border-gray-800 mt-12 pt-8 flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
-                    <p className="text-xs text-muted-foreground">
-                        © {new Date().getFullYear()} {name}. All rights reserved.
-                    </p>
-                    <div className="flex items-center gap-6 text-xs text-muted-foreground uppercase font-bold tracking-widest">
-                        <a href="#" className="hover:text-foreground transition-colors">Privacy</a>
-                        <a href="#" className="hover:text-foreground transition-colors">Terms</a>
-                        <a href="#" className="hover:text-foreground transition-colors">Cookies</a>
+                {/* Bottom Bar */}
+                <div className="border-t border-gray-100 dark:border-gray-800 mt-16 pt-8 flex flex-col md:flex-row justify-between items-center gap-6">
+                    <div className="flex flex-col md:flex-row items-center gap-6">
+                        <p className="text-xs text-muted-foreground font-medium">
+                            © {new Date().getFullYear()} {name}. All rights reserved.
+                        </p>
+                        <div className="flex items-center gap-1.5">
+                            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                            <span className="text-[10px] uppercase font-bold tracking-widest text-muted-foreground/70">System Operational</span>
+                        </div>
+                    </div>
 
-                        {mounted && (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                                className="h-9 px-4 rounded-full border-muted-foreground/20 hover:border-primary hover:bg-primary/5 font-bold flex items-center gap-2 transition-all"
-                            >
-                                {theme === 'dark' ? (
-                                    <>
-                                        <Sun className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                                        <span>Light Mode</span>
-                                    </>
-                                ) : (
-                                    <>
-                                        <Moon className="h-4 w-4 text-slate-700 fill-slate-700" />
-                                        <span>Dark Mode</span>
-                                    </>
-                                )}
-                            </Button>
-                        )}
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-6 text-[10px] text-muted-foreground uppercase font-bold tracking-widest mr-4">
+                            <a href="#" className="hover:text-primary transition-colors">Status</a>
+                            <a href="#" className="hover:text-primary transition-colors">API</a>
+                            <a href="#" className="hover:text-primary transition-colors">Security</a>
+                        </div>
+                        <DarkModeToggle />
                     </div>
                 </div>
             </div>

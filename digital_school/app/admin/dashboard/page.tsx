@@ -35,7 +35,6 @@ import {
 import { useTheme } from "next-themes";
 
 import { useRouter } from 'next/navigation';
-import { AppFooter } from '@/components/AppFooter';
 import {
   AdminAnalyticsTab,
   AttendanceTab,
@@ -253,9 +252,6 @@ export default function AdminDashboard() {
                 {renderContent()}
               </motion.div>
             </AnimatePresence>
-          </div>
-          <div className="mt-8">
-            <AppFooter />
           </div>
         </div>
       </div>

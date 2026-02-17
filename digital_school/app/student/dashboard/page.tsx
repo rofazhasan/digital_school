@@ -42,7 +42,6 @@ import {
   CheckCircle
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AppFooter } from "@/components/AppFooter";
 import { StudentAnalyticsTab } from "@/components/dashboard/student-tabs";
 
 interface User {
@@ -839,10 +838,6 @@ export default function StudentDashboardPage() {
           </motion.div>
         </AnimatePresence>
       </main>
-
-      <div className="relative z-10 mt-12 bg-background">
-        <AppFooter />
-      </div>
     </div>
   );
 }

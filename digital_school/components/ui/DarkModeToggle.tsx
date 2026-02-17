@@ -1,23 +1,40 @@
+"use client";
+
+import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
+import { Sun, Moon } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function DarkModeToggle() {
-  const [dark, setDark] = useState(false);
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
+  // Avoid hydration mismatch
   useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
-  }, [dark]);
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return (
+      <Button variant="outline" size="icon" className="rounded-full w-9 h-9 opacity-0">
+        <Sun className="h-4 w-4" />
+      </Button>
+    );
+  }
 
   return (
-    <button
-      className="px-3 py-1 rounded border bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100"
-      onClick={() => setDark((d) => !d)}
+    <Button
+      variant="outline"
+      size="icon"
+      onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      className="rounded-full w-9 h-9 border-muted-foreground/20 hover:border-primary hover:bg-primary/5 transition-all"
       aria-label="Toggle dark mode"
     >
-      {dark ? "🌙 Dark" : "☀️ Light"}
-    </button>
+      {theme === "dark" ? (
+        <Sun className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+      ) : (
+        <Moon className="h-4 w-4 text-slate-700 fill-slate-700" />
+      )}
+    </Button>
   );
-} 
+}
