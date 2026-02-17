@@ -322,21 +322,35 @@ export default function OMRScannerPage() {
                                     )}
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Roll No</p>
+                                        <div className={`p-3 rounded-lg text-center border transition-colors ${scanResult.conflicts?.some((c: any) => c.type === 'ROLL') ? "bg-red-50 border-red-500 text-red-900 animate-pulse" : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"}`}>
+                                            <div className="flex justify-center items-center gap-1 mb-1">
+                                                <p className="text-xs uppercase font-bold opacity-70">Roll No</p>
+                                                {scanResult.conflicts?.some((c: any) => c.type === 'ROLL') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                                            </div>
                                             <p className="text-2xl font-mono font-black text-primary">{scanResult.roll || "??????"}</p>
                                         </div>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
+                                        <div className={`p-3 rounded-lg text-center border transition-colors ${scanResult.conflicts?.some((c: any) => c.type === 'SET') ? "bg-red-50 border-red-500 text-red-900" : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"}`}>
                                             <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Set Code</p>
                                             <p className="text-2xl font-mono font-black text-primary">{scanResult.set || "?"}</p>
                                         </div>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Registration</p>
+                                        <div className={`p-3 rounded-lg text-center border transition-colors ${scanResult.conflicts?.some((c: any) => c.type === 'REG') ? "bg-red-50 border-red-500 text-red-900 animate-pulse" : "bg-gray-100 dark:bg-gray-800 border-gray-200 dark:border-gray-700"}`}>
+                                            <div className="flex justify-center items-center gap-1 mb-1">
+                                                <p className="text-xs uppercase font-bold opacity-70">Registration</p>
+                                                {scanResult.conflicts?.some((c: any) => c.type === 'REG') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                                            </div>
                                             <p className="text-lg font-mono font-bold">{scanResult.registration || "??????"}</p>
                                         </div>
-                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700">
-                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Answers Found</p>
-                                            <p className="text-lg font-mono font-bold">{Object.keys(scanResult.answers || {}).length} / 100</p>
+                                        <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg text-center border border-gray-200 dark:border-gray-700 flex flex-col justify-center">
+                                            <p className="text-xs text-muted-foreground uppercase mb-1 font-bold">Confidence</p>
+                                            <div className="flex items-center justify-center gap-2">
+                                                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 max-w-[80px]">
+                                                    <div
+                                                        className={`h-1.5 rounded-full ${scanResult.confidence > 0.95 ? "bg-emerald-500" : scanResult.confidence > 0.85 ? "bg-yellow-500" : "bg-red-500"}`}
+                                                        style={{ width: `${scanResult.confidence * 100}%` }}
+                                                    />
+                                                </div>
+                                                <p className="text-sm font-bold font-mono">{(scanResult.confidence * 100).toFixed(1)}%</p>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -349,18 +363,23 @@ export default function OMRScannerPage() {
                                                 const qNum = i + 1;
                                                 const ans = scanResult.answers[qNum];
                                                 const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
+                                                const conflict = scanResult.conflicts?.find((c: any) => c.qId == qNum && c.type === 'MCQ');
 
                                                 let bgClass = "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700";
-                                                if (grade) {
+                                                if (conflict) bgClass = "bg-red-50 dark:bg-red-900/20 border-red-500 text-red-900 dark:text-red-400 animate-pulse";
+                                                else if (grade) {
                                                     if (grade.status === 'correct') bgClass = "bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300";
                                                     if (grade.status === 'wrong') bgClass = "bg-red-100 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-700 dark:text-red-300";
                                                 }
 
                                                 return (
-                                                    <div key={qNum} className={`flex justify-between p-2 rounded border ${bgClass}`}>
+                                                    <div key={qNum} className={`flex justify-between items-center p-2 rounded border ${bgClass}`}>
                                                         <span className="opacity-70">{qNum}</span>
-                                                        <span className="font-bold">{ans || "-"}</span>
-                                                        {grade && grade.status === 'wrong' && <span className="text-xs opacity-50 ml-1">({grade.expected})</span>}
+                                                        <div className="flex flex-col items-end">
+                                                            <span className="font-bold">{ans || "-"}</span>
+                                                            {conflict && <span className="text-[8px] font-bold uppercase">Multimark</span>}
+                                                            {grade && grade.status === 'wrong' && <span className="text-[10px] opacity-50">({grade.expected})</span>}
+                                                        </div>
                                                     </div>
                                                 );
                                             })}

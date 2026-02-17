@@ -84,6 +84,8 @@ const processFrame = (imageData, template) => {
         roll: "",
         registration: "",
         set: "",
+        confidence: 1.0,
+        conflicts: [], // List of qIds with issues
         sections: { ROLL: {}, REG: {}, SET: {}, MCQ: {} }
     };
 
@@ -119,13 +121,19 @@ const processFrame = (imageData, template) => {
             }
         }
 
+        // --- GLOBAL NORMALIZATION ---
+        // Find the darkest bubbles to establish a "Blackpoint" baseline
+        let sortedFills = detectedBubbles.map(b => b.fillRatio).sort((a, b) => b - a);
+        const blackPoint = sortedFills.length > 5 ? (sortedFills[0] + sortedFills[4]) / 2 : 0.8;
+        const whitePoint = 0.05;
+        const dynamicThreshold = (blackPoint - whitePoint) * 0.45 + whitePoint;
+
         // Map template bubbles to the nearest physically detected bubble
         template.bubbles.forEach(logicalBubble => {
             const lx = logicalBubble.x * outWidth;
             const ly = logicalBubble.y * outHeight;
             const maxDist = EXPECTED_RADIUS * 1.5;
 
-            // Find nearest physical bubble
             let bestMatch = null;
             let minDist = maxDist;
 
@@ -146,21 +154,25 @@ const processFrame = (imageData, template) => {
             });
         });
 
-        // 5. Group-based Differential Analysis
-        const resolveGroup = (options) => {
+        // 5. Differential Analysis with CONFLICT DETECTION
+        const resolveGroup = (options, qId, type) => {
             if (!options || options.length === 0) return null;
 
-            // Sort by fill ratio descending
             options.sort((a, b) => b.fillRatio - a.fillRatio);
 
             const strongest = options[0];
             const secondStrongest = options[1] || { fillRatio: 0 };
 
-            // A bubble is "marked" if it's both dark enough AND significantly darker than other options
-            const ABSOLUTE_MIN_FILL = 0.20;
-            const RELATIVE_FILL_FACTOR = 1.45; // 45% darker than second best
+            // MULTIPLE MARKS DETECTION
+            if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.7) {
+                results.conflicts.push({ qId, type, issue: 'MULTIPLE_MARKS' });
+                results.confidence *= 0.8;
+                return strongest.option;
+            }
 
-            if (strongest.fillRatio > ABSOLUTE_MIN_FILL && strongest.fillRatio > secondStrongest.fillRatio * RELATIVE_FILL_FACTOR) {
+            if (strongest.fillRatio > dynamicThreshold) {
+                const gap = strongest.fillRatio / Math.max(0.01, secondStrongest.fillRatio);
+                if (gap < 2.0) results.confidence *= 0.95;
                 return strongest.option;
             }
             return null;
@@ -168,18 +180,18 @@ const processFrame = (imageData, template) => {
 
         // Post-process sections
         for (let i = 0; i < 6; i++) {
-            const rollDigit = resolveGroup(results.sections.ROLL[i]);
+            const rollDigit = resolveGroup(results.sections.ROLL[i], i, 'ROLL');
             results.roll += rollDigit !== null ? rollDigit : "?";
 
-            const regDigit = resolveGroup(results.sections.REG[i]);
+            const regDigit = resolveGroup(results.sections.REG[i], i, 'REG');
             results.registration += regDigit !== null ? regDigit : "?";
         }
 
-        const setCode = resolveGroup(results.sections.SET['set']);
+        const setCode = resolveGroup(results.sections.SET['set'], 'set', 'SET');
         results.set = setCode !== null ? setCode : "?";
 
         Object.keys(results.sections.MCQ).forEach(qId => {
-            const opt = resolveGroup(results.sections.MCQ[qId]);
+            const opt = resolveGroup(results.sections.MCQ[qId], qId, 'MCQ');
             if (opt !== null) {
                 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
                 results.answers[qId] = MCQ_LABELS[parseInt(opt)] || opt;
