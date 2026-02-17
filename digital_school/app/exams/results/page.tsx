@@ -597,32 +597,32 @@ export default function ExamResultsPage() {
                   {/* Summary Cards */}
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                      <div className="text-center p-4 bg-blue-50 rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">
+                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
+                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {studentResult.total || 0}
                         </div>
-                        <div className="text-sm text-blue-600">Your Score</div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400">Your Score</div>
                         <div className="text-xs text-muted-foreground">
                           out of {examResult.exam?.totalMarks || 0}
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-green-50 rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">
+                      <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
+                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
                           {studentResult.percentage?.toFixed(1) || 0}%
                         </div>
-                        <div className="text-sm text-green-600">Percentage</div>
+                        <div className="text-sm text-green-600 dark:text-green-400">Percentage</div>
                       </div>
-                      <div className="text-center p-4 bg-purple-50 rounded-lg">
-                        <div className="text-2xl font-bold text-purple-600">
+                      <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
+                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
                           {studentResult.grade || 'N/A'}
                         </div>
-                        <div className="text-sm text-purple-600">Grade</div>
+                        <div className="text-sm text-purple-600 dark:text-purple-400">Grade</div>
                       </div>
-                      <div className="text-center p-4 bg-orange-50 rounded-lg">
-                        <div className="text-2xl font-bold text-orange-600">
+                      <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-100/50 dark:border-orange-800/20">
+                        <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
                           {studentResult.rank || 'N/A'}
                         </div>
-                        <div className="text-sm text-orange-600">Rank</div>
+                        <div className="text-sm text-orange-600 dark:text-orange-400">Rank</div>
                       </div>
                     </div>
 
@@ -675,29 +675,29 @@ export default function ExamResultsPage() {
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             {performanceAnalysis.strength && (
-                              <div className="p-4 bg-green-50 rounded-lg">
+                              <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <CheckCircle className="w-4 h-4 text-green-600" />
-                                  <span className="font-medium text-green-800">Strengths</span>
+                                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                  <span className="font-medium text-green-800 dark:text-green-200">Strengths</span>
                                 </div>
-                                <p className="text-sm text-green-700">{performanceAnalysis.strength}</p>
+                                <p className="text-sm text-green-700 dark:text-green-300">{performanceAnalysis.strength}</p>
                               </div>
                             )}
                             {performanceAnalysis.weakness && (
-                              <div className="p-4 bg-red-50 rounded-lg">
+                              <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-100/50 dark:border-red-800/20">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <XCircle className="w-4 h-4 text-red-600" />
-                                  <span className="font-medium text-red-800">Areas for Improvement</span>
+                                  <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
+                                  <span className="font-medium text-red-800 dark:text-red-200">Areas for Improvement</span>
                                 </div>
-                                <p className="text-sm text-red-700">{performanceAnalysis.weakness}</p>
+                                <p className="text-sm text-red-700 dark:text-red-300">{performanceAnalysis.weakness}</p>
                               </div>
                             )}
-                            <div className="p-4 bg-blue-50 rounded-lg">
+                            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
                               <div className="flex items-center gap-2 mb-2">
-                                <Star className="w-4 h-4 text-blue-600" />
-                                <span className="font-medium text-blue-800">Recommendation</span>
+                                <Star className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                <span className="font-medium text-blue-800 dark:text-blue-200">Recommendation</span>
                               </div>
-                              <p className="text-sm text-blue-700">{performanceAnalysis.recommendation}</p>
+                              <p className="text-sm text-blue-700 dark:text-blue-300">{performanceAnalysis.recommendation}</p>
                             </div>
                           </div>
                         </div>
@@ -709,21 +709,21 @@ export default function ExamResultsPage() {
                             Class Performance
                           </h4>
                           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <div className="text-center p-4 bg-muted/30 rounded-lg border border-border/50">
                               <div className="text-lg font-semibold">{examResult.averageScore?.toFixed(1) || 0}</div>
                               <div className="text-sm text-muted-foreground">Class Average</div>
                             </div>
-                            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                              <div className="text-lg font-semibold">{examResult.highestScore || 0}</div>
-                              <div className="text-sm text-muted-foreground">Highest Score</div>
+                            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-100/50 dark:border-yellow-800/20">
+                              <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-400">{examResult.highestScore || 0}</div>
+                              <div className="text-sm text-yellow-600 dark:text-yellow-400">Highest Score</div>
                             </div>
-                            <div className="text-center p-4 bg-green-50 rounded-lg">
-                              <div className="text-lg font-semibold">{examResult.passRate?.toFixed(1) || 0}%</div>
-                              <div className="text-sm text-muted-foreground">Pass Rate</div>
+                            <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
+                              <div className="text-lg font-semibold text-green-700 dark:text-green-400">{examResult.passRate?.toFixed(1) || 0}%</div>
+                              <div className="text-sm text-green-600 dark:text-green-400">Pass Rate</div>
                             </div>
-                            <div className="text-center p-4 bg-purple-50 rounded-lg">
-                              <div className="text-lg font-semibold">{examResult.totalStudents || 0}</div>
-                              <div className="text-sm text-muted-foreground">Total Students</div>
+                            <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
+                              <div className="text-lg font-semibold text-purple-700 dark:text-purple-400">{examResult.totalStudents || 0}</div>
+                              <div className="text-sm text-purple-600 dark:text-purple-400">Total Students</div>
                             </div>
                           </div>
                         </div>

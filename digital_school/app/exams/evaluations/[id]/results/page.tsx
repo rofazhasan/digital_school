@@ -155,7 +155,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     if (loading) {
         return (
             <div className="container mx-auto p-6 flex justify-center items-center h-64">
-                <div className="text-lg text-gray-500">Loading results...</div>
+                <div className="text-lg text-muted-foreground animate-pulse">Loading results...</div>
             </div>
         );
     }
@@ -168,10 +168,10 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                     Back to Evaluations
                 </Button>
 
-                <div className="flex justify-between items-start">
+                <div className="flex flex-col md:flex-row justify-between items-start gap-4">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900 mb-2">{examName} Results</h1>
-                        <p className="text-gray-600">Comprehensive results for all students.</p>
+                        <h1 className="text-3xl font-bold text-foreground mb-2 tracking-tight">{examName} Results</h1>
+                        <p className="text-muted-foreground leading-relaxed">Comprehensive results for all students in this assessment.</p>
                     </div>
                     {/* Future Export Button */}
                     {/* <Button variant="outline">
@@ -224,13 +224,13 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                                                             <div className="text-xs text-gray-500">Roll: {result.roll}</div>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell className="text-center text-gray-600">{result.mcqMarks}</TableCell>
-                                                    <TableCell className="text-center text-gray-600">{result.cqMarks}</TableCell>
-                                                    <TableCell className="text-center text-gray-600">{result.sqMarks}</TableCell>
-                                                    <TableCell className="text-right font-bold">
-                                                        {result.totalObtained} <span className="text-gray-400 text-xs font-normal">/ {result.totalMarks}</span>
+                                                    <TableCell className="text-center text-muted-foreground font-medium">{result.mcqMarks}</TableCell>
+                                                    <TableCell className="text-center text-muted-foreground font-medium">{result.cqMarks}</TableCell>
+                                                    <TableCell className="text-center text-muted-foreground font-medium">{result.sqMarks}</TableCell>
+                                                    <TableCell className="text-right font-bold text-foreground">
+                                                        {result.totalObtained} <span className="text-muted-foreground/60 text-xs font-normal">/ {result.totalMarks}</span>
                                                     </TableCell>
-                                                    <TableCell className="text-right text-gray-600">{result.percentage}%</TableCell>
+                                                    <TableCell className="text-right text-muted-foreground font-semibold">{result.percentage}%</TableCell>
                                                     <TableCell className="text-center">
                                                         {result.submissionStatus === 'IN_PROGRESS' ? (
                                                             <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 border-amber-200 animate-pulse">
@@ -258,8 +258,8 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
 
                                 {/* Pagination Controls */}
                                 {totalPages > 1 && (
-                                    <div className="flex items-center justify-between mt-6 pt-4 border-t">
-                                        <div className="text-sm text-gray-500">
+                                    <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
+                                        <div className="text-sm text-muted-foreground">
                                             Showing {(currentPage - 1) * itemsPerPage + 1} to {Math.min(currentPage * itemsPerPage, results.length)} of {results.length} students
                                         </div>
                                         <div className="flex gap-2">

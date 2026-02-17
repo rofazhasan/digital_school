@@ -6,6 +6,11 @@
 @source "../components";
 @source "../lib";
 
+/* Force class-based dark mode in Tailwind v4 */
+@variant dark (&:where(.dark, .dark *));
+
+
+
 /* -------------------------------------------------------------------------- */
 /*                                 Typography                                 */
 /* -------------------------------------------------------------------------- */
@@ -408,8 +413,15 @@ mjx-container {
 }
 
 @keyframes scanning {
-  0%, 100% { top: 0% }
-  50% { top: 100% }
+
+  0%,
+  100% {
+    top: 0%
+  }
+
+  50% {
+    top: 100%
+  }
 }
 
 .animate-float {
@@ -417,6 +429,13 @@ mjx-container {
 }
 
 @keyframes float {
-  0%, 100% { transform: translateY(0) }
-  50% { transform: translateY(-10px) }
+
+  0%,
+  100% {
+    transform: translateY(0)
+  }
+
+  50% {
+    transform: translateY(-10px)
+  }
 }

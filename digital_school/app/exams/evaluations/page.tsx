@@ -240,13 +240,13 @@ export default function EvaluationsPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "PENDING": return "bg-yellow-100 text-yellow-800";
-      case "IN_PROGRESS": return "bg-blue-100 text-blue-800";
-      case "COMPLETED": return "bg-green-100 text-green-800";
-      case "APPROVED": return "bg-green-100 text-green-800";
-      case "REJECTED": return "bg-red-100 text-red-800";
-      case "UNASSIGNED": return "bg-gray-100 text-gray-800";
-      default: return "bg-gray-100 text-gray-800";
+      case "PENDING": return "bg-yellow-100 text-yellow-800 dark:bg-yellow-950/50 dark:text-yellow-400";
+      case "IN_PROGRESS": return "bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-400";
+      case "COMPLETED": return "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-400";
+      case "APPROVED": return "bg-green-100 text-green-800 dark:bg-green-950/50 dark:text-green-400";
+      case "REJECTED": return "bg-red-100 text-red-800 dark:bg-red-950/50 dark:text-red-400";
+      case "UNASSIGNED": return "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400";
+      default: return "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400";
     }
   };
 
@@ -339,7 +339,9 @@ export default function EvaluationsPage() {
                     </div>
                   </Badge>
                   {isSuperUser && (
-                    <Badge className={exam.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                    <Badge className={exam.isActive
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400 border-green-200/50 dark:border-green-800/50"
+                      : "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400 border-gray-200/50 dark:border-slate-700/50"}>
                       {exam.isActive ? "Active" : "Inactive"}
                     </Badge>
                   )}
@@ -433,7 +435,7 @@ export default function EvaluationsPage() {
                 {(isSuperUser || isAdmin) && (
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                    className="w-full sm:w-auto text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
                     onClick={() => {
                       setSelectedExam(exam);
                       setAssignDialogOpen(true);
@@ -449,7 +451,7 @@ export default function EvaluationsPage() {
                 {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
                   <Button
                     variant="outline"
-                    className="w-full sm:w-auto text-green-600 border-green-200 hover:bg-green-50"
+                    className="w-full sm:w-auto text-green-600 dark:text-green-400 border-green-200 dark:border-green-800/50 hover:bg-green-50 dark:hover:bg-green-900/20"
                     onClick={() => releaseResults(exam.id)}
                   >
                     <CheckCircle className="h-4 w-4 mr-2" />

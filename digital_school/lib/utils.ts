@@ -110,43 +110,70 @@ export function renderDynamicExplanation(
 
   let processed = text;
 
-  // Handle MCQ/MC/AR options: [[opt:index]]
+  // 1. Handle explicit placeholders: [[opt:index]] or [[right:index]]
+  // These are safe and reliable as they explicitly use original indices.
   if (options && Array.isArray(options)) {
     const optRegex = /\[\[opt:(\d+)\]\]/g;
     processed = processed.replace(optRegex, (match, originalIndexStr) => {
       const originalIndex = parseInt(originalIndexStr);
+      const currentIndex = options.findIndex((opt: any) =>
+        (opt.originalIndex !== undefined ? opt.originalIndex === originalIndex : (opt.id && options.findIndex(o => o.id === opt.id) === originalIndex))
+      );
+
+      if (currentIndex !== -1) {
+        if (type.toLowerCase() === 'mtf') return (currentIndex + 1).toString();
+        return String.fromCharCode(0x0995 + currentIndex);
+      }
+      return match;
+    });
+  }
+
+  // 2. Handle hardcoded labels: A/a/ক, B/b/খ, etc.
+  // This is used for static explanations that haven't been migrated to placeholders.
+  if (options && Array.isArray(options) && type.toLowerCase() !== 'mtf' && type.toLowerCase() !== 'cq' && type.toLowerCase() !== 'sq') {
+    const labelMapping: Record<string, number> = {
+      'ক': 0, 'খ': 1, 'গ': 2, 'ঘ': 3, 'ঙ': 4, 'চ': 5,
+      'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5,
+      'a': 0, 'b': 1, 'c': 2, 'd': 3, 'e': 4, 'f': 5
+    };
+
+    // Regex to find standalone labels, potentially followed by punctuation or inside parentheses.
+    // We look for: (Start or space/punctuation) + (Label) + (End or space/punctuation)
+    // We specifically want to avoid matching labels inside math (e.g., $a^2$) or as part of words.
+    // Positive lookbehind (?<=...) and lookahead (?=...) are useful but not supported in all older environments, 
+    // so we use a more compatible approach.
+
+    const labels = Object.keys(labelMapping).join('');
+    const hardcodedRegex = new RegExp(`(^|\\s|\\(|\\（)([${labels}])(\\.|\\:|\\)|\\-|\\s|\\）|$)`, 'g');
+
+    processed = processed.replace(hardcodedRegex, (match, prefix, label, suffix) => {
+      const originalIndex = labelMapping[label];
       // Find where this original option is now
       const currentIndex = options.findIndex((opt: any) =>
         (opt.originalIndex !== undefined ? opt.originalIndex === originalIndex : false)
       );
 
       if (currentIndex !== -1) {
-        // For MTF, we use numeric labels (1, 2, 3...) to match the table
-        if (type.toLowerCase() === 'mtf') {
-          return (currentIndex + 1).toString();
-        }
-        // Return visual label (Bengali ক, খ, গ, ঘ) for others
-        return String.fromCharCode(0x0995 + currentIndex);
+        const newLabel = String.fromCharCode(0x0995 + currentIndex);
+        return `${prefix}${newLabel}${suffix}`;
       }
-      return match; // Fallback if index not found
+      return match;
     });
   }
 
-  // Handle MTF right column: [[right:index]]
+  // 3. Handle MTF right column placeholders: [[right:index]]
   if (rightColumn && Array.isArray(rightColumn)) {
     const rightRegex = /\[\[right:(\d+)\]\]/g;
     processed = processed.replace(rightRegex, (match, originalIndexStr) => {
       const originalIndex = parseInt(originalIndexStr);
-      // Find where this original right item is now
       const currentIndex = rightColumn.findIndex((item: any) =>
         (item.originalIndex !== undefined ? item.originalIndex === originalIndex : false)
       );
 
       if (currentIndex !== -1) {
-        // Return visual label (English A, B, C...)
         return String.fromCharCode(65 + currentIndex);
       }
-      return match; // Fallback if index not found
+      return match;
     });
   }
 

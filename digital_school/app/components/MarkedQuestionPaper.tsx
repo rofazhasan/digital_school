@@ -749,7 +749,13 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <span className="bg-yellow-100 px-1 rounded text-[10px]">Explanation</span>
                                                             </div>
                                                             <div className="text-gray-700 pl-2 border-l-2 border-yellow-200">
-                                                                <Text>{(q as any).explanation}</Text>
+                                                                <Text>
+                                                                    {renderDynamicExplanation(
+                                                                        (q as any).explanation,
+                                                                        null,
+                                                                        q.type
+                                                                    )}
+                                                                </Text>
                                                             </div>
                                                         </div>
                                                     )}
