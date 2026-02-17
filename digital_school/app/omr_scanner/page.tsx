@@ -1,108 +1,170 @@
-"use client";
-
-import React, { useState, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, ScanLine, FileText } from "lucide-react";
+import { Loader2, Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, ScanLine, FileText, Info } from "lucide-react";
 import { toast } from "sonner";
+import { db } from "@/lib/dexie-db";
+import { useLiveQuery } from "dexie-react-hooks";
 
 export default function OMRScannerPage() {
     const [activeTab, setActiveTab] = useState("camera");
     const [isProcessing, setIsProcessing] = useState(false);
     const [scanResult, setScanResult] = useState<any>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isEngineReady, setIsEngineReady] = useState(false);
+    const [markersFound, setMarkersFound] = useState(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
 
     const videoRef = useRef<HTMLVideoElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const overlayRef = useRef<HTMLCanvasElement>(null);
+    const workerRef = useRef<Worker | null>(null);
     const [cameraActive, setCameraActive] = useState(false);
 
-    // --- Camera Control ---
+    const pendingExams = useLiveQuery(() => db.exams.toArray());
+
+    // --- Engine Initialization ---
+    useEffect(() => {
+        const worker = new Worker('/workers/omr-engine.worker.js');
+        worker.onmessage = (e) => {
+            if (e.data.type === 'ready') {
+                setIsEngineReady(true);
+                toast.success("OMR Engine Ready (Offline)");
+            } else if (e.data.type === 'result') {
+                handleWorkerResult(e.data.result);
+            }
+        };
+        workerRef.current = worker;
+        return () => worker.terminate();
+    }, []);
+
+    const handleWorkerResult = (result: any) => {
+        setIsProcessing(false);
+        if (result.type === 'searching') {
+            setMarkersFound(result.markersFound);
+            drawOverlay(null);
+        } else if (result.type === 'success') {
+            setScanResult(result.data);
+            setMarkersFound(4);
+            drawOverlay(result.data.markers);
+            toast.success("Sheet Scanned Successfully!");
+            // Haptic feedback
+            if (window.navigator.vibrate) window.navigator.vibrate(200);
+        }
+    };
+
+    // --- Camera & Processing Loop ---
     const startCamera = async () => {
         try {
-            setCameraActive(true);
             const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
+                video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
             });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                videoRef.current.play();
+                setCameraActive(true);
+                requestAnimationFrame(processLoop);
             }
         } catch (err) {
-            toast.error("Could not access camera.");
-            setCameraActive(false);
+            toast.error("Camera access denied.");
         }
+    };
+
+    const processLoop = () => {
+        if (!cameraActive || !videoRef.current || !canvasRef.current || !workerRef.current || !isEngineReady) return;
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = video.videoWidth / 2; // Downscale for performance
+            canvas.height = video.videoHeight / 2;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+            // Get selected template
+            const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
+            const template = selectedExam?.templateJson || null;
+
+            workerRef.current.postMessage({
+                type: 'process',
+                imageData: imageData,
+                template: template
+            }, [imageData.data.buffer]);
+        }
+
+        setTimeout(() => requestAnimationFrame(processLoop), 100); // Target ~10fps for scanner
+    };
+
+    const drawOverlay = (markers: any) => {
+        if (!overlayRef.current || !videoRef.current) return;
+        const canvas = overlayRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!markers) return;
+
+        // Draw quad over detected markers
+        ctx.strokeStyle = '#10b981'; // Emerald 500
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(markers[0].x * 2, markers[0].y * 2);
+        ctx.lineTo(markers[1].x * 2, markers[1].y * 2);
+        ctx.lineTo(markers[2].x * 2, markers[2].y * 2);
+        ctx.lineTo(markers[3].x * 2, markers[3].y * 2);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(16, 185, 129, 0.2)';
+        ctx.fill();
     };
 
     const stopCamera = () => {
         if (videoRef.current && videoRef.current.srcObject) {
-            const stream = videoRef.current.srcObject as MediaStream;
-            stream.getTracks().forEach(track => track.stop());
+            (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
             videoRef.current.srcObject = null;
         }
         setCameraActive(false);
     };
 
-    const capturePhoto = () => {
-        if (videoRef.current) {
-            const canvas = document.createElement("canvas");
-            canvas.width = videoRef.current.videoWidth;
-            canvas.height = videoRef.current.videoHeight;
-            const ctx = canvas.getContext("2d");
-            if (ctx) {
-                ctx.drawImage(videoRef.current, 0, 0);
-                canvas.toBlob((blob) => {
-                    if (blob) {
-                        const file = new File([blob], "camera-capture.jpg", { type: "image/jpeg" });
-                        setPreviewUrl(URL.createObjectURL(blob));
-                        processFile(file);
-                        stopCamera(); // Stop after capture
-                    }
-                }, "image/jpeg", 0.9);
-            }
-        }
-    };
-
-    // --- Processing ---
-    const processFile = async (file: File) => {
-        setIsProcessing(true);
-        setScanResult(null);
-
-        const formData = new FormData();
-        formData.append("file", file);
-
+    const syncOfflineData = async () => {
+        setIsSyncing(true);
         try {
-            const res = await fetch("/api/omr/process", {
-                method: "POST",
-                body: formData
-            });
-
+            const res = await fetch('/api/omr/sync');
             const data = await res.json();
-
-            if (!res.ok) {
-                throw new Error(data.message || "Scan failed");
-            }
-
-            setScanResult(data.data);
-            if (data.data.grading) {
-                toast.success(`Graded! Score: ${data.data.grading.score}/${data.data.grading.total}`);
-            } else {
-                toast.success("OMR Scanned");
-            }
-
-        } catch (error: any) {
-            toast.error(error.message);
+            await db.exams.clear();
+            await db.exams.bulkAdd(data);
+            toast.success("Offline Exams Synced!");
+        } catch (error) {
+            toast.error("Sync failed");
         } finally {
-            setIsProcessing(false);
+            setIsSyncing(false);
         }
     };
 
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0] && workerRef.current) {
             const file = e.target.files[0];
-            setPreviewUrl(URL.createObjectURL(file));
-            processFile(file);
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0);
+                const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+                if (imageData) {
+                    setIsProcessing(true);
+                    workerRef.current?.postMessage({ type: 'process', imageData, template: null });
+                }
+            };
         }
     };
 
@@ -111,11 +173,47 @@ export default function OMRScannerPage() {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">OMR Scanner</h1>
-                    <p className="text-muted-foreground">Server-side processing for high accuracy.</p>
+                    <p className="text-muted-foreground">Offline-first high accuracy scanning.</p>
                 </div>
-                <Button variant="outline" className="w-full sm:w-auto" onClick={() => { setScanResult(null); setPreviewUrl(null); if (activeTab === 'camera') startCamera(); }}>
-                    <RefreshCw className="w-4 h-4 mr-2" /> Reset
-                </Button>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button variant="outline" onClick={syncOfflineData} disabled={isSyncing}>
+                        {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        Sync Offline Data
+                    </Button>
+                    <Button variant="outline" onClick={() => { setScanResult(null); setPreviewUrl(null); if (activeTab === 'camera') startCamera(); }}>
+                        Reset
+                    </Button>
+                </div>
+            </div>
+
+            {/* Offline Status / Engine Info */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-4 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-xs font-medium border border-blue-100 dark:border-blue-800">
+                    <Info className="w-4 h-4 text-blue-500" />
+                    <div className="flex-1">
+                        <span className="opacity-70 uppercase tracking-wider mr-2">Engine:</span>
+                        {isEngineReady ? <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-200">READY (WEBWASM)</Badge> : <Badge variant="outline" className="animate-pulse">INITIALIZING...</Badge>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <span className="opacity-70 uppercase tracking-wider">Markers:</span>
+                        <Badge variant={markersFound === 4 ? "default" : "outline"} className={markersFound === 4 ? "bg-green-500" : ""}>
+                            {markersFound} / 4
+                        </Badge>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2 p-1 bg-gray-50 dark:bg-gray-900/30 rounded-lg border border-gray-200 dark:border-gray-800">
+                    <select
+                        className="flex-1 bg-transparent border-none text-xs font-bold p-2 focus:ring-0"
+                        value={selectedExamId || ''}
+                        onChange={(e) => setSelectedExamId(e.target.value)}
+                    >
+                        <option value="">Select Exam Template...</option>
+                        {pendingExams?.map(exam => (
+                            <option key={exam.id} value={exam.id}>{exam.title}</option>
+                        ))}
+                    </select>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -136,12 +234,31 @@ export default function OMRScannerPage() {
                             )}
 
                             {activeTab === 'camera' && cameraActive && (
-                                <div className="relative w-full h-full">
-                                    <video ref={videoRef} className="w-full h-full object-cover max-h-[400px]" autoPlay playsInline muted />
-                                    <div className="absolute bottom-4 left-0 right-0 flex justify-center">
-                                        <Button size="lg" onClick={capturePhoto} className="rounded-full w-16 h-16 p-0 border-4 border-white">
-                                            <div className="w-12 h-12 bg-red-500 rounded-full"></div>
-                                        </Button>
+                                <div className="relative w-full h-[500px] bg-black rounded-lg overflow-hidden shadow-2xl">
+                                    <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-50" autoPlay playsInline muted />
+                                    <canvas ref={overlayRef} className="absolute inset-0 w-full h-full object-cover z-20" width={1280} height={720} />
+
+                                    {/* Secret processing canvas (hidden) */}
+                                    <canvas ref={canvasRef} className="hidden" />
+
+                                    {/* Scan Guidelines Overlay */}
+                                    <div className="absolute inset-0 pointer-events-none z-10 border-[40px] border-black/20 flex items-center justify-center">
+                                        <div className="w-[80%] h-[80%] border-2 border-dashed border-white/30 rounded-lg flex items-center justify-center">
+                                            {markersFound < 4 && (
+                                                <div className="bg-black/60 backdrop-blur-md px-6 py-3 rounded-full text-white font-bold text-sm animate-pulse border border-white/20">
+                                                    ALIGN ALL 4 CORNER MARKERS
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Floating Stats */}
+                                    <div className="absolute top-4 left-4 z-30 flex flex-col gap-2">
+                                        {isProcessing && (
+                                            <div className="bg-emerald-500 text-white px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest animate-pulse flex items-center gap-2">
+                                                <RefreshCw className="w-3 h-3 animate-spin" /> Processing
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             )}

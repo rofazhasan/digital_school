@@ -7,6 +7,7 @@
 import React from "react";
 import QRCode from "react-qr-code";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
+import FiducialMarker from "@/components/omr/FiducialMarker";
 
 interface OMRSheetProps {
   questions: {
@@ -267,19 +268,14 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
         position: 'relative'
       }}>
 
-      {/* --- CORNER MARKERS - MOVED INWARD FOR SAFETY (World Class Safe Zone) --- */}
-      <div className="absolute top-10 left-10 w-8 h-1 bg-black"></div>
-      <div className="absolute top-10 left-10 w-1 h-8 bg-black"></div>
-      <div className="absolute top-10 right-10 w-8 h-1 bg-black"></div>
-      <div className="absolute top-10 right-10 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-10 left-10 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-10 left-10 w-1 h-8 bg-black"></div>
-      <div className="absolute bottom-10 right-10 w-8 h-1 bg-black"></div>
-      <div className="absolute bottom-10 right-10 w-1 h-8 bg-black"></div>
+      {/* --- ARUCO FIDUCIAL MARKERS - FOR HIGH ACCURACY ALIGNMENT --- */}
+      <FiducialMarker id={0} size={40} className="absolute top-8 left-8" />
+      <FiducialMarker id={1} size={40} className="absolute top-8 right-8" />
+      <FiducialMarker id={2} size={40} className="absolute bottom-12 right-12" />
+      <FiducialMarker id={3} size={40} className="absolute bottom-12 left-12" />
 
       {/* --- CONTENT CONTAINER --- */}
-      {/* Adjusted margins to sit inside the new corner markers */}
-      <div className="flex flex-col h-full mx-6 my-4 mb-16 border-[2px] border-black rounded-sm overflow-visible z-10 relative">
+      <div className="flex flex-col h-full mx-10 my-10 mb-20 border-[2px] border-black rounded-sm overflow-visible z-10 relative bg-white/50">
 
         {/* HEADER - Top Down 1/3 */}
         <header className="flex flex-col border-b-[2px] border-black bg-white">
