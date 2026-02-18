@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -17,14 +17,15 @@ model User {
   name              String
   avatar            String?
   isActive          Boolean                    @default(true)
-  activeSessionId   String?
-  lastSessionInfo   Json?
   lastLoginAt       DateTime?
   createdAt         DateTime                   @default(now())
   updatedAt         DateTime                   @updatedAt
   deletedAt         DateTime?
   instituteId       String?
+  activeSessionId   String?
+  lastSessionInfo   Json?
   activityAudits    ActivityAudit[]
+  admissionReviews  AdmissionApplication[]     @relation("AdmissionReviewer")
   aiActivities      AIActivity[]
   attendanceRecords Attendance[]               @relation("AttendanceTeacher")
   badges            Badge[]                    @relation("UserBadges")
@@ -38,26 +39,25 @@ model User {
   createdExams      Exam[]                     @relation("ExamCreator")
   exportJobs        ExportJob[]
   managedInstitute  Institute?                 @relation("InstituteSuperUser")
+  createdInvoices   Invoice[]                  @relation("InvoiceCreator")
   logs              Log[]
   notices           Notice[]
   notifications     Notification[]
+  collectedPayments Payment[]                  @relation("PaymentCollector")
   questionBanks     QuestionBank[]
   questions         Question[]
   editedQuestions   Question[]                 @relation("EditedQuestions")
   resultReviews     ResultReview[]             @relation("ResultReviewer")
   studentProfile    StudentProfile?
   teacherProfile    TeacherProfile?
-  admissionReviews  AdmissionApplication[] @relation("AdmissionReviewer")
-  createdInvoices   Invoice[]              @relation("InvoiceCreator")
-  collectedPayments Payment[]              @relation("PaymentCollector")
-  institute         Institute?             @relation("InstituteUsers", fields: [instituteId], references: [id])
+  institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
 
-  @@index([role]) // Optimized for User Admin List
+  @@index([role])
   @@map("users")
 }
 
 model Institute {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   name         String
   address      String?
   phone        String?
@@ -66,14 +66,14 @@ model Institute {
   logoUrl      String?
   signatureUrl String?
   colorTheme   Json?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  superUserId  String?   @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  superUserId  String?    @unique
   classes      Class[]
-  superUser    User?     @relation("InstituteSuperUser", fields: [superUserId], references: [id])
-  settings     Settings?
-  users        User[]    @relation("InstituteUsers")
   examHalls    ExamHall[]
+  superUser    User?      @relation("InstituteSuperUser", fields: [superUserId], references: [id])
+  settings     Settings?
+  users        User[]     @relation("InstituteUsers")
 
   @@map("institutes")
 }
@@ -94,18 +94,18 @@ model StudentProfile {
   userId           String                  @unique
   classId          String
   examSubmissions  ExamSubmission[]
+  admissionApp     AdmissionApplication?
   admitCards       AdmitCard[]
   badges           Badge[]                 @relation("StudentBadges")
   examStudentMaps  ExamStudentMap[]
   drawings         ExamSubmissionDrawing[]
+  invoices         Invoice[]
   omrSheets        OMRSheet[]
   resultReviews    ResultReview[]
   results          Result[]
+  seatAllocations  SeatAllocation[]
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  seatAllocations  SeatAllocation[]
-  admissionApp     AdmissionApplication?
-  invoices         Invoice[]
 
   @@map("student_profiles")
 }
@@ -128,24 +128,24 @@ model TeacherProfile {
 }
 
 model Class {
-  id           String           @id @default(cuid())
-  name         String
-  section      String
-  shift        String?
-  subjectGroup String?
-  capacity     Int              @default(40)
-  isActive     Boolean          @default(true)
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
-  instituteId  String
-  attendance   Attendance[]
-  institute    Institute        @relation(fields: [instituteId], references: [id])
-  exams        Exam[]
-  questions    Question[]       @relation("ClassQuestions")
-  students     StudentProfile[]
-  notices      Notice[]         @relation("NoticeToClasses")
+  id                    String                 @id @default(cuid())
+  name                  String
+  section               String
+  shift                 String?
+  subjectGroup          String?
+  capacity              Int                    @default(40)
+  isActive              Boolean                @default(true)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  instituteId           String
   admissionApplications AdmissionApplication[]
-  feeStructures FeeStructure[]
+  attendance            Attendance[]
+  institute             Institute              @relation(fields: [instituteId], references: [id])
+  exams                 Exam[]
+  feeStructures         FeeStructure[]
+  questions             Question[]             @relation("ClassQuestions")
+  students              StudentProfile[]
+  notices               Notice[]               @relation("NoticeToClasses")
 
   @@unique([name, section, instituteId])
   @@map("classes")
@@ -165,25 +165,20 @@ model Exam {
   isActive              Boolean                    @default(false)
   allowRetake           Boolean                    @default(false)
   instructions          String?
-  // Negative marking for MCQs (percentage)
-  mcqNegativeMarking    Float?                    @default(0)
-  // Negative marking for Multiple Correct (percentage)
-  mcNegativeMarking     Float?                    @default(0)
-  // Partial marking for Multiple Correct
-  mcPartialMarking      Boolean?                  @default(true)
-  // Question selection settings
-  cqTotalQuestions      Int?                      @default(8)
-  cqRequiredQuestions   Int?                      @default(5)
-  sqTotalQuestions      Int?                      @default(15)
-  sqRequiredQuestions   Int?                      @default(5)
-  // CQ Subsection settings for math exams
-  cqSubsections         Json?                     // Array of subsection objects with name, startIndex, endIndex
   createdAt             DateTime                   @default(now())
   updatedAt             DateTime                   @updatedAt
   createdById           String
   assignedById          String?
   classId               String
   generatedSet          Json?
+  cqRequiredQuestions   Int?                       @default(5)
+  cqTotalQuestions      Int?                       @default(8)
+  mcqNegativeMarking    Float?                     @default(0)
+  sqRequiredQuestions   Int?                       @default(5)
+  sqTotalQuestions      Int?                       @default(15)
+  cqSubsections         Json?
+  mcNegativeMarking     Float?                     @default(0)
+  mcPartialMarking      Boolean?                   @default(true)
   examSubmissions       ExamSubmission[]
   admitCards            AdmitCard[]
   evaluationAssignments ExamEvaluationAssignment[]
@@ -198,8 +193,8 @@ model Exam {
   results               Result[]
   seatAllocations       SeatAllocation[]
 
-  @@index([createdAt]) // Optimized for Exam List sorting
-  @@index([classId])   // Optimized for Class filtering
+  @@index([createdAt])
+  @@index([classId])
   @@map("exams")
 }
 
@@ -228,18 +223,18 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
-  assertion              String?  // AR: Statement A
-  reason                 String?  // AR: Statement R
-  correctOption          Int?     // AR: Correct option (1-5)
-  leftColumn             Json?    // MTF: Left items
-  rightColumn            Json?    // MTF: Right items
-  matches                Json?    // MTF: Correct matches
-  explanation            String?  // General explanation for non-MCQ types
+  assertion              String?
+  correctOption          Int?
+  explanation            String?
   isForPractice          Boolean                  @default(false)
+  leftColumn             Json?
+  matches                Json?
+  reason                 String?
+  rightColumn            Json?
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
   class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])
-  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onDelete: SetNull, onUpdate: NoAction)
+  clonedFrom             Question?                @relation("ClonedQuestion", fields: [clonedFromId], references: [id], onUpdate: NoAction)
   clones                 Question[]               @relation("ClonedQuestion")
   createdBy              User                     @relation(fields: [createdById], references: [id])
   editedBy               User?                    @relation("EditedQuestions", fields: [editedById], references: [id])
@@ -251,9 +246,9 @@ model Question {
   @@index([difficulty])
   @@index([topic])
   @@index([hasMath])
-  @@index([createdAt])   // Optimized for Dashboard Date Filters
-  @@index([createdById]) // Optimized for "My Questions"
-  @@index([classId])     // Optimized for Class Filter
+  @@index([createdAt])
+  @@index([createdById])
+  @@index([classId])
   @@map("questions")
 }
 
@@ -378,7 +373,6 @@ model Result {
   id               String          @id @default(cuid())
   mcqMarks         Float           @default(0)
   cqMarks          Float           @default(0)
-  sqMarks          Float           @default(0)
   total            Float           @default(0)
   rank             Int?
   grade            String?
@@ -388,15 +382,16 @@ model Result {
   publishedAt      DateTime?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
-  studentId        String
-  examId           String
   examSubmissionId String?         @unique
+  sqMarks          Float           @default(0)
+  examId           String
+  studentId        String
   exam             Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSubmission   ExamSubmission? @relation(fields: [examSubmissionId], references: [id], onDelete: Cascade)
   student          StudentProfile  @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
-  @@index([examId]) // Optimized for Leaderboard
+  @@index([examId])
   @@map("results")
 }
 
@@ -469,19 +464,19 @@ model Log {
 }
 
 model Settings {
-  id            String    @id @default(cuid())
-  instituteName String
-  logoUrl       String?
-  signatureUrl  String?
-  colorTheme    Json?
-  contactInfo   Json?
-  features      Json?
-  limits        Json?
+  id              String    @id @default(cuid())
+  instituteName   String
+  logoUrl         String?
+  signatureUrl    String?
+  colorTheme      Json?
+  contactInfo     Json?
+  features        Json?
+  limits          Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  instituteId     String    @unique
   maintenanceMode Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  instituteId   String    @unique
-  institute     Institute @relation(fields: [instituteId], references: [id])
+  institute       Institute @relation(fields: [instituteId], references: [id])
 
   @@map("settings")
 }
@@ -623,31 +618,30 @@ model QuestionToQuestionBank {
 }
 
 model ExamSubmission {
-  id             String                  @id @default(cuid())
-  studentId      String
-  examId         String
-  examSetId      String?
-  answers        Json
-  status         SubmissionStatus        @default(IN_PROGRESS)
-  startedAt      DateTime?
-  submittedAt    DateTime                @default(now())
-  score          Float?
-  evaluatorNotes String?
-  evaluatedAt    DateTime?
-  // Track if student answered more questions than required (results in suspension and zero marks)
-  exceededQuestionLimit Boolean          @default(false)
-  exam           Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
-  examSet        ExamSet?                @relation(fields: [examSetId], references: [id])
-  student        StudentProfile          @relation(fields: [studentId], references: [id])
-  drawings       ExamSubmissionDrawing[]
-  resultReviews  ResultReview[]
-  result         Result?
+  id                    String                  @id @default(cuid())
+  studentId             String
+  examId                String
+  answers               Json
+  submittedAt           DateTime                @default(now())
+  score                 Float?
+  evaluatedAt           DateTime?
+  evaluatorNotes        String?
+  examSetId             String?
+  startedAt             DateTime?
+  exceededQuestionLimit Boolean                 @default(false)
+  status                SubmissionStatus        @default(IN_PROGRESS)
+  exam                  Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examSet               ExamSet?                @relation(fields: [examSetId], references: [id])
+  student               StudentProfile          @relation(fields: [studentId], references: [id])
+  drawings              ExamSubmissionDrawing[]
+  resultReviews         ResultReview[]
+  result                Result?
 
   @@unique([studentId, examId])
   @@index([status])
   @@index([score])
   @@index([submittedAt])
-  @@index([examId]) // Optimized for Evaluation List
+  @@index([examId])
 }
 
 model ExamSubmissionDrawing {
@@ -655,12 +649,12 @@ model ExamSubmissionDrawing {
   studentId         String
   questionId        String
   examId            String
-  imageIndex        Int            @default(0)
   imageData         String
   originalImagePath String
   evaluatorId       String
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
+  imageIndex        Int            @default(0)
   evaluator         User           @relation(fields: [evaluatorId], references: [id])
   exam              Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
   submission        ExamSubmission @relation(fields: [studentId, examId], references: [studentId, examId], onDelete: Cascade)
@@ -693,7 +687,6 @@ model ResultReview {
   id               String         @id @default(cuid())
   examId           String
   studentId        String
-  examSubmissionId String
   studentComment   String
   evaluatorComment String?
   status           ReviewStatus   @default(PENDING)
@@ -702,6 +695,7 @@ model ResultReview {
   reviewedById     String?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
+  examSubmissionId String
   exam             Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSubmission   ExamSubmission @relation(fields: [examSubmissionId], references: [id], onDelete: Cascade)
   reviewer         User?          @relation("ResultReviewer", fields: [reviewedById], references: [id])
@@ -712,32 +706,32 @@ model ResultReview {
 }
 
 model ExamHall {
-  id            String          @id @default(cuid())
+  id            String           @id @default(cuid())
   name          String
   roomNo        String?
   capacity      Int
-  rows          Int             @default(5)
-  columns       Int             @default(4)
-  seatsPerBench Int             @default(2) 
+  rows          Int              @default(5)
+  columns       Int              @default(4)
+  seatsPerBench Int              @default(2)
   instituteId   String
+  institute     Institute        @relation(fields: [instituteId], references: [id])
   allocations   SeatAllocation[]
-  institute     Institute       @relation(fields: [instituteId], references: [id])
 
   @@map("exam_halls")
 }
 
 model SeatAllocation {
-  id          String         @id @default(cuid())
-  examId      String
-  studentId   String
-  hallId      String
-  seatLabel   String
-  exam        Exam           @relation(fields: [examId], references: [id])
-  student     StudentProfile @relation(fields: [studentId], references: [id])
-  hall        ExamHall       @relation(fields: [hallId], references: [id])
+  id        String         @id @default(cuid())
+  examId    String
+  studentId String
+  hallId    String
+  seatLabel String
+  exam      Exam           @relation(fields: [examId], references: [id])
+  hall      ExamHall       @relation(fields: [hallId], references: [id])
+  student   StudentProfile @relation(fields: [studentId], references: [id])
 
   @@unique([examId, studentId])
-  @@index([examId, hallId]) // Performance optimization for Hall filtering
+  @@index([examId, hallId])
   @@map("seat_allocations")
 }
 
@@ -758,6 +752,149 @@ model Notification {
   @@map("notifications")
 }
 
+model AdmissionApplication {
+  id                  String          @id @default(cuid())
+  applicationNo       String          @unique
+  studentName         String
+  dateOfBirth         DateTime
+  gender              String
+  bloodGroup          String?
+  photo               String?
+  fatherName          String
+  motherName          String
+  guardianPhone       String
+  guardianEmail       String?
+  address             String
+  previousSchool      String?
+  previousClass       String?
+  previousGPA         Float?
+  applyingForClass    String
+  applyingForClassId  String?
+  birthCertificate    String?
+  previousMarksheet   String?
+  transferCertificate String?
+  status              AdmissionStatus @default(PENDING)
+  appliedAt           DateTime        @default(now())
+  reviewedAt          DateTime?
+  reviewedBy          String?
+  testScore           Float?
+  testDate            DateTime?
+  admittedAt          DateTime?
+  studentId           String?         @unique
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  class               Class?          @relation(fields: [applyingForClassId], references: [id])
+  reviewer            User?           @relation("AdmissionReviewer", fields: [reviewedBy], references: [id])
+  student             StudentProfile? @relation(fields: [studentId], references: [id])
+
+  @@index([status])
+  @@index([appliedAt])
+  @@map("admission_applications")
+}
+
+model FeeStructure {
+  id              String       @id @default(cuid())
+  name            String
+  classId         String
+  tuitionFee      Float        @default(0)
+  admissionFee    Float        @default(0)
+  examFee         Float        @default(0)
+  libraryFee      Float        @default(0)
+  labFee          Float        @default(0)
+  sportsFee       Float        @default(0)
+  transportFee    Float        @default(0)
+  otherFees       Float        @default(0)
+  totalAmount     Float
+  frequency       FeeFrequency @default(ANNUAL)
+  dueDay          Int?
+  siblingDiscount Float        @default(0)
+  meritDiscount   Float        @default(0)
+  active          Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  class           Class        @relation(fields: [classId], references: [id])
+  invoices        Invoice[]
+
+  @@map("fee_structures")
+}
+
+model Invoice {
+  id              String         @id @default(cuid())
+  invoiceNumber   String         @unique
+  studentId       String
+  feeStructureId  String
+  subtotal        Float
+  discount        Float          @default(0)
+  lateFee         Float          @default(0)
+  totalAmount     Float
+  paidAmount      Float          @default(0)
+  balanceAmount   Float
+  issueDate       DateTime       @default(now())
+  dueDate         DateTime
+  status          InvoiceStatus  @default(PENDING)
+  qrCode          String         @unique
+  verificationUrl String
+  notes           String?
+  createdBy       String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  creator         User?          @relation("InvoiceCreator", fields: [createdBy], references: [id])
+  feeStructure    FeeStructure   @relation(fields: [feeStructureId], references: [id])
+  student         StudentProfile @relation(fields: [studentId], references: [id])
+  payments        Payment[]
+
+  @@index([status])
+  @@index([studentId])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  receiptNumber   String        @unique
+  invoiceId       String
+  amount          Float
+  paymentMethod   PaymentMethod
+  paymentDate     DateTime      @default(now())
+  transactionId   String?
+  bankReference   String?
+  status          PaymentStatus @default(COMPLETED)
+  qrCode          String        @unique
+  verificationUrl String
+  notes           String?
+  collectedBy     String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  collector       User?         @relation("PaymentCollector", fields: [collectedBy], references: [id])
+  invoice         Invoice       @relation(fields: [invoiceId], references: [id])
+
+  @@index([paymentDate])
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+model VerifiableDocument {
+  id              String       @id @default(cuid())
+  documentType    DocumentType
+  documentNumber  String       @unique
+  referenceId     String
+  referenceType   String
+  qrHash          String       @unique
+  verificationUrl String
+  issuedDate      DateTime     @default(now())
+  expiryDate      DateTime?
+  isValid         Boolean      @default(true)
+  revokedAt       DateTime?
+  revokedBy       String?
+  metadata        Json?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([qrHash])
+  @@index([documentNumber])
+  @@map("verifiable_documents")
+}
+
 enum Role {
   ADMIN
   TEACHER
@@ -767,12 +904,12 @@ enum Role {
 
 enum QuestionType {
   MCQ
-  MC   // Multiple Correct
+  CQ
+  SQ
+  MC
   INT
   AR
   MTF
-  CQ
-  SQ
 }
 
 enum Difficulty {
@@ -868,7 +1005,6 @@ enum NotificationType {
   REVIEW_RESPONSE
 }
 
-
 enum SubmissionStatus {
   IN_PROGRESS
   SUBMITTED
@@ -879,222 +1015,6 @@ enum QuestionStatus {
   NEEDS_REVIEW
   DRAFT
 }
-
-
-// ============================================
-// SCHOOL MANAGEMENT SYSTEM MODELS
-// ============================================
-
-model AdmissionApplication {
-  id                String   @id @default(cuid())
-  applicationNo     String   @unique // AUTO-2026-0001
-  
-  // Student Info
-  studentName       String
-  dateOfBirth       DateTime
-  gender            String
-  bloodGroup        String?
-  photo             String?
-  
-  // Parent Info
-  fatherName        String
-  motherName        String
-  guardianPhone     String
-  guardianEmail     String?
-  address           String
-  
-  // Academic Info
-  previousSchool    String?
-  previousClass     String?
-  previousGPA       Float?
-  
-  // Application Details
-  applyingForClass  String
-  applyingForClassId String?
-  class             Class?   @relation(fields: [applyingForClassId], references: [id])
-  
-  // Documents
-  birthCertificate  String?
-  previousMarksheet String?
-  transferCertificate String?
-  
-  // Status
-  status            AdmissionStatus @default(PENDING)
-  appliedAt         DateTime @default(now())
-  reviewedAt        DateTime?
-  reviewedBy        String?
-  reviewer          User?    @relation("AdmissionReviewer", fields: [reviewedBy], references: [id])
-  
-  // Test Score (if entrance exam)
-  testScore         Float?
-  testDate          DateTime?
-  
-  // Admission
-  admittedAt        DateTime?
-  studentId         String?  @unique
-  student           StudentProfile? @relation(fields: [studentId], references: [id])
-  
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@index([status])
-  @@index([appliedAt])
-  @@map("admission_applications")
-}
-
-model FeeStructure {
-  id          String   @id @default(cuid())
-  name        String   // "Class 10 - Annual Fee"
-  classId     String
-  class       Class    @relation(fields: [classId], references: [id])
-  
-  // Fee Components
-  tuitionFee  Float    @default(0)
-  admissionFee Float   @default(0)
-  examFee     Float    @default(0)
-  libraryFee  Float    @default(0)
-  labFee      Float    @default(0)
-  sportsFee   Float    @default(0)
-  transportFee Float   @default(0)
-  otherFees   Float    @default(0)
-  
-  totalAmount Float    // Auto-calculated
-  
-  // Payment Schedule
-  frequency   FeeFrequency @default(ANNUAL)
-  dueDay      Int?     // Day of month for payment
-  
-  // Discounts
-  siblingDiscount Float @default(0) // Percentage
-  meritDiscount   Float @default(0) // Percentage
-  
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
-  invoices    Invoice[]
-
-  @@map("fee_structures")
-}
-
-model Invoice {
-  id              String   @id @default(cuid())
-  invoiceNumber   String   @unique // INV-2026-00001
-  
-  // Student Reference
-  studentId       String
-  student         StudentProfile @relation(fields: [studentId], references: [id])
-  
-  // Fee Details
-  feeStructureId  String
-  feeStructure    FeeStructure @relation(fields: [feeStructureId], references: [id])
-  
-  // Amounts
-  subtotal        Float
-  discount        Float    @default(0)
-  lateFee         Float    @default(0)
-  totalAmount     Float
-  paidAmount      Float    @default(0)
-  balanceAmount   Float    // totalAmount - paidAmount
-  
-  // Dates
-  issueDate       DateTime @default(now())
-  dueDate         DateTime
-  
-  // Status
-  status          InvoiceStatus @default(PENDING)
-  
-  // Verification
-  qrCode          String   @unique // Unique hash for QR verification
-  verificationUrl String   // Public URL to verify
-  
-  // Metadata
-  notes           String?
-  createdBy       String?
-  creator         User?    @relation("InvoiceCreator", fields: [createdBy], references: [id])
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  payments        Payment[]
-
-  @@index([status])
-  @@index([studentId])
-  @@index([dueDate])
-  @@map("invoices")
-}
-
-model Payment {
-  id              String   @id @default(cuid())
-  receiptNumber   String   @unique // RCP-2026-00001
-  
-  // Invoice Reference
-  invoiceId       String
-  invoice         Invoice  @relation(fields: [invoiceId], references: [id])
-  
-  // Payment Details
-  amount          Float
-  paymentMethod   PaymentMethod
-  paymentDate     DateTime @default(now())
-  
-  // Transaction Details
-  transactionId   String?  // For online payments
-  bankReference   String?
-  
-  // Status
-  status          PaymentStatus @default(COMPLETED)
-  
-  // Verification
-  qrCode          String   @unique // Receipt QR code
-  verificationUrl String
-  
-  // Metadata
-  notes           String?
-  collectedBy     String?
-  collector       User?    @relation("PaymentCollector", fields: [collectedBy], references: [id])
-  
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  @@index([paymentDate])
-  @@index([invoiceId])
-  @@map("payments")
-}
-
-model VerifiableDocument {
-  id            String   @id @default(cuid())
-  documentType  DocumentType
-  documentNumber String  @unique
-  
-  // Reference (polymorphic)
-  referenceId   String   // Invoice ID, Certificate ID, etc.
-  referenceType String   // "INVOICE", "CERTIFICATE", "ADMIT_CARD"
-  
-  // Verification Data
-  qrHash        String   @unique
-  verificationUrl String
-  issuedDate    DateTime @default(now())
-  expiryDate    DateTime?
-  
-  // Status
-  isValid       Boolean  @default(true)
-  revokedAt     DateTime?
-  revokedBy     String?
-  
-  // Metadata
-  metadata      Json?    // Additional data
-  
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  @@index([qrHash])
-  @@index([documentNumber])
-  @@map("verifiable_documents")
-}
-
-// ============================================
-// ENUMS FOR SCHOOL MANAGEMENT
-// ============================================
 
 enum AdmissionStatus {
   PENDING
