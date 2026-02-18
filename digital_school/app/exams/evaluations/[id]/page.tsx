@@ -40,7 +40,8 @@ import {
   Maximize2,
   Printer,
   Menu,
-  Loader2
+  Loader2,
+  FileSearch
 } from "lucide-react";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
@@ -990,6 +991,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const currentStudent = exam?.submissions[currentStudentIndex];
   const currentQuestion = filteredQuestions[currentQuestionIndex];
 
+  // Ensure currentQuestionIndex is always valid when filteredQuestions changes
+  useEffect(() => {
+    if (filteredQuestions.length > 0 && currentQuestionIndex >= filteredQuestions.length) {
+      setCurrentQuestionIndex(filteredQuestions.length - 1);
+    }
+  }, [filteredQuestions.length, currentQuestionIndex]);
+
   // Fetch annotations when student changes
   useEffect(() => {
     if (currentStudent?.student.id) {
@@ -1703,6 +1711,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       onClick={() => {
                         const newIndex = Math.max(0, currentStudentIndex - 1);
                         setCurrentStudentIndex(newIndex);
+                        setCurrentQuestionIndex(0); // Reset to first question when switching student
                         // Refetch exam data with the new student's questions
                         if (exam?.submissions[newIndex]) {
                           fetchExamData(exam.submissions[newIndex].student.id);
@@ -1729,6 +1738,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       onClick={() => {
                         const newIndex = Math.min(exam.submissions.length - 1, currentStudentIndex + 1);
                         setCurrentStudentIndex(newIndex);
+                        setCurrentQuestionIndex(0); // Reset to first question when switching student
                         // Refetch exam data with the new student's questions
                         if (exam?.submissions[newIndex]) {
                           fetchExamData(exam.submissions[newIndex].student.id);
@@ -2037,13 +2047,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                     </Button>
 
                     <div className="text-sm font-medium text-muted-foreground whitespace-nowrap">
-                      Q {currentQuestionIndex + 1} / {filteredQuestions.length}
+                      Q {filteredQuestions.length > 0 ? currentQuestionIndex + 1 : 0} / {filteredQuestions.length}
                     </div>
 
                     <Button
                       variant="outline"
                       onClick={() => setCurrentQuestionIndex(Math.min(filteredQuestions.length - 1, currentQuestionIndex + 1))}
-                      disabled={currentQuestionIndex === filteredQuestions.length - 1}
+                      disabled={filteredQuestions.length === 0 || currentQuestionIndex >= filteredQuestions.length - 1}
                       className="flex-1 sm:flex-none"
                     >
                       Next
@@ -2196,7 +2206,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           <CardTitle className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <FileText className="h-5 w-5" />
-                              Question {currentQuestionIndex + 1} of {filteredQuestions.length}
+                              Question {filteredQuestions.length > 0 ? currentQuestionIndex + 1 : 0} of {filteredQuestions.length}
                             </div>
                             <div className="flex gap-2">
                               <Button
@@ -2211,7 +2221,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 variant="outline"
                                 size="sm"
                                 onClick={() => setCurrentQuestionIndex(Math.min(filteredQuestions.length - 1, currentQuestionIndex + 1))}
-                                disabled={currentQuestionIndex === filteredQuestions.length - 1}
+                                disabled={filteredQuestions.length === 0 || currentQuestionIndex >= filteredQuestions.length - 1}
                               >
                                 <ArrowRight className="h-4 w-4" />
                               </Button>
@@ -2219,7 +2229,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="flex-1 flex flex-col">
-                          {currentQuestion && (
+                          {currentQuestion ? (
                             <div className="space-y-6">
                               {/* Question */}
                               <div>
@@ -2955,6 +2965,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   return null;
                                 })()}
                               </div>
+                            </div>
+                          ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-muted/20 rounded-lg border border-dashed border-border opacity-60">
+                              <FileSearch className="h-12 w-12 text-muted-foreground mb-4 opacity-20" />
+                              <h3 className="text-lg font-semibold text-foreground/70">Question data unavailable</h3>
+                              <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                                The question content could not be loaded for the current selection. Try refreshing or selecting a different filter.
+                              </p>
                             </div>
                           )}
                         </CardContent>
