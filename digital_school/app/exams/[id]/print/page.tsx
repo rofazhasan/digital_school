@@ -36,6 +36,9 @@ export default function PrintExamPage() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [isMathJaxReady, setIsMathJaxReady] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
+  const [objectiveFontSize, setObjectiveFontSize] = useState(100);
+  const [cqSqFontSize, setCqSqFontSize] = useState(100);
+  const [forcePageBreak, setForcePageBreak] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
   // --- Data Fetching ---
@@ -146,15 +149,15 @@ export default function PrintExamPage() {
       set.ar?.length ||
       set.cq?.length ||
       set.sq?.length ||
-      set.mtf?.length
+      set.mtf?.length ||
+      set.descriptive?.length
     )
   );
 
   return (
     <MathJaxContext config={mathJaxConfig}>
-      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: 'SolaimanLipi, Times New Roman, serif' }}>
+      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: "'SutonnyMJ', 'Bookman Old Style', 'Book Antiqua', 'Noto Serif Bengali', Georgia, serif" }}>
         <Head>
-          <link href="https://fonts.googleapis.com/css2?family=SolaimanLipi:wght@400;700&display=swap" rel="stylesheet" />
           <title>প্রিন্ট প্রশ্নপত্র ও OMR</title>
         </Head>
 
@@ -166,21 +169,27 @@ export default function PrintExamPage() {
           isMathJaxReady={isMathJaxReady}
           showAnswers={showAnswers}
           setShowAnswers={setShowAnswers}
+          objectiveFontSize={objectiveFontSize}
+          setObjectiveFontSize={setObjectiveFontSize}
+          cqSqFontSize={cqSqFontSize}
+          setCqSqFontSize={setCqSqFontSize}
+          forcePageBreak={forcePageBreak}
+          setForcePageBreak={setForcePageBreak}
           t={t}
         />
 
-        {/* MathJax Ready Indicator */}
+        {/* Status Indicators */}
         <div className="flex justify-center mt-2 gap-4">
           {isMathJaxReady ? (
-            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">MathJax Ready</span>
+            <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-[10px] font-bold">MathJax Ready</span>
           ) : (
-            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-sm font-semibold">Waiting for MathJax...</span>
+            <span className="bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full text-[10px] font-bold animate-pulse">Waiting for MathJax...</span>
           )}
-          <span className={`px-3 py-1 rounded-full text-sm font-semibold ${showAnswers
-            ? 'bg-orange-100 text-orange-800'
-            : 'bg-blue-100 text-blue-800'
-            }`}>
-            {showAnswers ? 'উত্তরপত্র মোড' : 'প্রশ্নপত্র মোড'}
+          <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${showAnswers ? 'bg-orange-100 text-orange-800' : 'bg-blue-100 text-blue-800'}`}>
+            {showAnswers ? 'উত্তরপত্র' : 'প্রশ্নপত্র'}
+          </span>
+          <span className="bg-purple-100 text-purple-800 px-3 py-1 rounded-full text-[10px] font-bold">
+            OBJ: {objectiveFontSize}% | CQ/SQ: {cqSqFontSize}%
           </span>
         </div>
 
@@ -200,9 +209,13 @@ export default function PrintExamPage() {
                       ar: set.ar || [],
                       cq: set.cq || [],
                       sq: set.sq || [],
-                      mtf: set.mtf || []
+                      mtf: set.mtf || [],
+                      descriptive: set.descriptive || []
                     }}
                     qrData={set.qrData}
+                    fontSize={objectiveFontSize}
+                    cqSqFontSize={cqSqFontSize}
+                    forcePageBreak={forcePageBreak}
                   />
                 </div>
               ))}
@@ -225,9 +238,13 @@ export default function PrintExamPage() {
                     ar: set.ar || [],
                     cq: set.cq || [],
                     sq: set.sq || [],
-                    mtf: set.mtf || []
+                    mtf: set.mtf || [],
+                    descriptive: set.descriptive || []
                   }}
                   qrData={set.qrData}
+                  fontSize={objectiveFontSize}
+                  cqSqFontSize={cqSqFontSize}
+                  forcePageBreak={forcePageBreak}
                 />
               </div>
             ))
@@ -262,11 +279,15 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
         mcqOptionsCount={mcqOptionsCount}
         setName={set.setName}
         bubbleSize={16}
+        logoUrl={examInfo.schoolLogo}
         instituteName={examInfo.schoolName}
+        schoolAddress={examInfo.schoolAddress}
         examTitle={examInfo.title}
         examDate={examInfo.date}
         subjectName={examInfo.subject}
         uniqueCode={uniqueCode}
+        objectiveTime={examInfo.objectiveTime}
+        cqSqTime={examInfo.cqSqTime}
       />
     </div>
   );
@@ -275,39 +296,90 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
 // You would move these into a separate file e.g. `app/print/exam/[id]/PrintPageComponents.tsx`
 // For demonstration, they are included here.
 
-const PrintControls = ({ language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers, t }: any) => (
-  <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2 print:hidden">
-    <div className="flex gap-2">
-      <button
-        onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
-        className="bg-gray-200 text-gray-800 px-3 py-2 rounded shadow hover:bg-gray-300 transition border border-gray-300"
-      >
-        {language === 'bn' ? 'English' : 'বাংলা'}
-      </button>
-      <button
-        onClick={() => setShowAnswers(!showAnswers)}
-        className={`px-4 py-2 rounded shadow-lg transition ${showAnswers
-          ? 'bg-green-600 text-white hover:bg-green-700'
-          : 'bg-orange-600 text-white hover:bg-orange-700'
-          }`}
-      >
-        {showAnswers ? 'প্রশ্নপত্র দেখুন' : 'উত্তরপত্র দেখুন'}
-      </button>
-      <button
-        onClick={onPrint}
-        disabled={isPrinting || !isMathJaxReady}
-        className="bg-blue-600 text-white px-4 py-2 rounded shadow-lg hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-wait"
-      >
-        {isPrinting ? t.preparing : t.print}
-      </button>
-    </div>
-    {isPrinting && !isMathJaxReady && (
-      <div className="text-sm text-blue-800 bg-blue-100 p-2 rounded-md shadow">
-        {t.waiting}
+const PrintControls = ({
+  language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers,
+  objectiveFontSize, setObjectiveFontSize, cqSqFontSize, setCqSqFontSize,
+  forcePageBreak, setForcePageBreak, t
+}: any) => {
+  // If page break is off, keep font sizes in sync
+  const updateGlobalFontSize = (delta: number) => {
+    setObjectiveFontSize((prev: number) => Math.min(200, Math.max(50, prev + delta)));
+    setCqSqFontSize((prev: number) => Math.min(200, Math.max(50, prev + delta)));
+  };
+
+  return (
+    <div className="fixed top-4 right-4 z-50 flex flex-col items-end gap-2 print:hidden">
+      <div className="flex flex-col gap-2 bg-white/90 p-3 rounded-lg shadow-xl border border-gray-200 w-56">
+        <div className="flex gap-2">
+          <button
+            onClick={() => setLanguage(language === 'bn' ? 'en' : 'bn')}
+            className="flex-1 bg-gray-100 text-gray-800 px-2 py-2 rounded shadow hover:bg-gray-200 transition border border-gray-300 text-[10px] font-bold"
+          >
+            {language === 'bn' ? 'English' : 'বাংলা'}
+          </button>
+          <button
+            onClick={() => setShowAnswers(!showAnswers)}
+            className={`flex-1 px-2 py-2 rounded shadow transition text-[10px] font-bold ${showAnswers ? 'bg-orange-600 text-white' : 'bg-blue-600 text-white'}`}
+          >
+            {showAnswers ? 'প্রশ্নপত্র' : 'উত্তরপত্র'}
+          </button>
+        </div>
+
+        <div className="border-t border-gray-200 mt-1 pt-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-gray-600">পেজ ব্রেক (CQ):</span>
+            <button
+              onClick={() => setForcePageBreak(!forcePageBreak)}
+              className={`px-3 py-1 rounded text-[10px] font-bold transition ${forcePageBreak ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              {forcePageBreak ? 'চালু' : 'বন্ধ'}
+            </button>
+          </div>
+
+          {!forcePageBreak ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-gray-600 underline">গ্লোবাল ফন্ট:</span>
+              <div className="flex gap-1">
+                <button onClick={() => updateGlobalFontSize(-1)} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
+                <button onClick={() => updateGlobalFontSize(1)} className="w-8 h-8 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-gray-600">Objective ফন্ট:</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setObjectiveFontSize((p: number) => Math.max(50, p - 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
+                  <button onClick={() => setObjectiveFontSize((p: number) => Math.min(200, p + 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-gray-600">CQ/SQ ফন্ট:</span>
+                <div className="flex gap-1">
+                  <button onClick={() => setCqSqFontSize((p: number) => Math.max(50, p - 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">-</button>
+                  <button onClick={() => setCqSqFontSize((p: number) => Math.min(200, p + 1))} className="w-7 h-7 flex items-center justify-center bg-gray-200 rounded hover:bg-gray-300 font-bold">+</button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={onPrint}
+          disabled={isPrinting || !isMathJaxReady}
+          className="w-full mt-2 bg-blue-600 text-white px-4 py-2 rounded shadow-lg hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-wait font-bold"
+        >
+          {isPrinting ? t.preparing : t.print}
+        </button>
       </div>
-    )}
-  </div>
-);
+      {isPrinting && !isMathJaxReady && (
+        <div className="text-[10px] text-blue-800 bg-blue-100 p-2 rounded-md shadow border border-blue-200 w-56">
+          {t.waiting}
+        </div>
+      )}
+    </div>
+  );
+};
 
 
 

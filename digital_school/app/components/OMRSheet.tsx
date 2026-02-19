@@ -6,7 +6,7 @@
 
 import React from "react";
 import QRCode from "react-qr-code";
-import { toBengaliNumerals } from "@/utils/numeralConverter";
+import { toBengaliNumerals, formatBengaliDuration } from "@/utils/numeralConverter";
 import FiducialMarker from "@/components/omr/FiducialMarker";
 
 interface OMRSheetProps {
@@ -29,10 +29,13 @@ interface OMRSheetProps {
   setName?: string;
   logoUrl?: string;
   instituteName?: string;
+  schoolAddress?: string;
   examTitle?: string;
   examDate?: string;
   subjectName?: string;
   uniqueCode?: string;
+  objectiveTime?: number;
+  cqSqTime?: number;
 }
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
@@ -50,10 +53,13 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
   setName,
   logoUrl,
   instituteName = 'শিক্ষা প্রতিষ্ঠান',
+  schoolAddress = '',
   examTitle = 'পরীক্ষার নাম',
   examDate = 'তারিখ',
   subjectName = 'বিষয়',
   uniqueCode,
+  objectiveTime,
+  cqSqTime,
 }) => {
   const totalQuestions = 100;
   // Large bubbles enabled by full width
@@ -279,21 +285,37 @@ const OMRSheet: React.FC<OMRSheetProps> = ({
 
         {/* HEADER - Top Down 1/3 */}
         <header className="flex flex-col border-b-[2px] border-black bg-white">
-          <div className="flex justify-between items-center p-3 pb-1">
-            <div className="flex items-center gap-3">
-              {logoUrl ? (
-                <img src={logoUrl} alt="Logo" className="h-14 w-14 object-contain" />
-              ) : (
-                <div className="h-14 w-14 border border-black rounded-full flex items-center justify-center bg-gray-50 font-bold text-2xl">DS</div>
-              )}
-              <div>
-                <h1 className="text-xl font-black uppercase tracking-wide leading-none">{instituteName}</h1>
-                <h2 className="text-xs font-bold text-gray-600 uppercase tracking-[0.2em] mt-0.5">OMR ANSWER SHEET</h2>
+          <div className="flex justify-between items-center p-4 pb-2">
+            {/* Balance the exam info on the right */}
+            <div className="w-[180px]" />
+
+            <div className="flex-1 flex flex-col items-center">
+              <div className="text-center">
+                <h1 className="text-2xl font-black uppercase tracking-tight leading-none text-black">{instituteName}</h1>
+                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-widest mt-1">{schoolAddress}</p>
+                <div className="inline-block bg-black text-white px-2 py-0.5 mt-2 rounded-sm">
+                  <h2 className="text-[10px] font-black uppercase tracking-[0.2em] leading-none">OMR ANSWER SHEET</h2>
+                </div>
               </div>
             </div>
-            <div className="flex flex-col items-end">
-              <div className="text-xl font-black uppercase">{examTitle}</div>
-              <span className="px-2 py-0.5 border border-black font-bold text-xs uppercase mt-1">{toBengaliNumerals(examDate)}</span>
+
+            <div className="w-[180px] flex flex-col items-end">
+              <div className="text-xl font-black uppercase text-black mb-1">{examTitle}</div>
+              <div className="flex items-center gap-2">
+                <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+                  তারিখ: {toBengaliNumerals(examDate)}
+                </span>
+                {subjectName && (
+                  <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+                    বিষয়: {subjectName}
+                  </span>
+                )}
+                {objectiveTime && objectiveTime > 0 && (
+                  <span className="px-2 py-0.5 border border-black font-bold text-[10px] uppercase bg-white">
+                    সময়: {formatBengaliDuration(objectiveTime)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 

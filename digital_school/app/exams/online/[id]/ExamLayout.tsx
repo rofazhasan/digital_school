@@ -59,6 +59,69 @@ const MobileNavigator = memo(({
 
 MobileNavigator.displayName = 'MobileNavigator';
 
+// Premium Section Transition Overlay
+const SectionTransitionOverlay = memo(({
+  type,
+  onAction,
+  stats
+}: {
+  type: 'objective_submitted' | 'cqsq_starting',
+  onAction: () => void,
+  stats?: { answered: number, total: number }
+}) => {
+  return (
+    <div className="fixed inset-0 z-[120] bg-background/95 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in duration-500">
+      <div className="max-w-md w-full text-center space-y-8">
+        <div className="relative inline-block">
+          <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/5">
+            {type === 'objective_submitted' ? (
+              <CheckCircle className="w-12 h-12 text-emerald-500 animate-in bounce-in" />
+            ) : (
+              <Eye className="w-12 h-12 text-primary animate-pulse" />
+            )}
+          </div>
+          <div className="absolute -top-2 -right-2 w-8 h-8 bg-background border-4 border-primary/20 rounded-full animate-spin-slow shadow-xl" />
+        </div>
+
+        <div className="space-y-3">
+          <h2 className="text-3xl font-black text-foreground tracking-tight">
+            {type === 'objective_submitted' ? "Objective Section Completed" : "Preparing Next Section"}
+          </h2>
+          <p className="text-muted-foreground font-medium">
+            {type === 'objective_submitted'
+              ? "Your objective answers have been securely saved."
+              : "Synchronizing questions and resetting proctoring safe-guards..."}
+          </p>
+        </div>
+
+        {stats && (
+          <div className="grid grid-cols-2 gap-4 p-6 bg-muted/30 rounded-[2rem] border border-border/50">
+            <div className="text-center">
+              <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">Attempted</p>
+              <p className="text-2xl font-black text-foreground">{stats.answered} / {stats.total}</p>
+            </div>
+            <div className="text-center border-l">
+              <p className="text-[10px] uppercase tracking-widest font-black text-muted-foreground mb-1">Status</p>
+              <p className="text-sm font-bold text-emerald-500 uppercase">Synchronized</p>
+            </div>
+          </div>
+        )}
+
+        <Button
+          onClick={onAction}
+          size="lg"
+          className="w-full bg-primary hover:bg-primary/90 text-primary-foreground h-16 rounded-2xl text-xl font-bold shadow-2xl shadow-primary/20 transition-all active:scale-95"
+        >
+          {type === 'objective_submitted' ? "Continue to Subjective Section" : "Proceed to Final Section"}
+          <ChevronRight className="w-6 h-6 ml-2" />
+        </Button>
+      </div>
+    </div>
+  );
+});
+
+SectionTransitionOverlay.displayName = 'SectionTransitionOverlay';
+
 export default function ExamLayout() {
   const {
     exam,
@@ -71,11 +134,17 @@ export default function ExamLayout() {
     setWarnings: setContextWarnings,
     sortedQuestions,
     fontSize,
-    setFontSize
+    setFontSize,
+    activeSection,
+    setActiveSection,
+    hasObjective,
+    hasCqSq,
+    fullSortedQuestions
   } = useExamContext();
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [transitionState, setTransitionState] = useState<'objective_submitted' | 'cqsq_starting' | null>(null);
   // Initialize instructions visibility based on whether exam has started
   const [showInstructions, setShowInstructions] = useState(!exam.startedAt);
   const [isStarting, setIsStarting] = useState(false);
@@ -101,39 +170,46 @@ export default function ExamLayout() {
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
   const handleSubmit = useCallback(async (forced: boolean = false) => {
-    // ... (submit logic remains same)
     if (showSubmitConfirm || forced) {
       setIsSubmitting(true);
       if (forced) {
-        toast.error("Exam auto-submitted due to security violations or time limit.");
+        toast.error(`${activeSection === 'objective' ? 'Objective' : 'Exam'} auto-submitted due to time limit.`);
       }
       try {
         const response = await fetch(`/api/exams/${exam.id}/submit`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ answers: answers }), // Use live answers
+          body: JSON.stringify({
+            answers: answers,
+            section: activeSection
+          }),
         });
 
         if (response.ok) {
-          window.location.href = `/exams/results/${exam.id}`;
+          const resData = await response.json();
+
+          if (activeSection === 'objective' && hasCqSq) {
+            // Objective submitted, now show transition overlay
+            setTransitionState('objective_submitted');
+            toast.success("Objective answers saved. Proceed to Subjective section.");
+          } else {
+            window.location.href = `/exams/results/${exam.id}`;
+          }
         } else {
           const errorData = await response.json();
           throw new Error(errorData.error || 'Submission failed');
         }
       } catch (error) {
         console.error('Submit error:', error);
-
         const errorMessage = (error as Error).message;
 
-        // If forced (auto-submit) and error is time limit, treat as success (or at least redirect)
-        // because likely the backend saved it effectively or we can't do anything else.
-        // However, if backend rejected it (403), we can't show results.
-        // But with the backend buffer fix, this shouldn't happen often.
-        // If it DOES happen, keeping the user on the exam screen is bad.
-
         if (forced || errorMessage.includes('time limit') || errorMessage.includes('submitted')) {
-          toast.warning("Time limit processed. Redirecting to results...");
-          window.location.href = `/exams/results/${exam.id}`;
+          toast.warning("Time limit processed. Redirecting...");
+          if (activeSection === 'objective' && hasCqSq) {
+            window.location.reload();
+          } else {
+            window.location.href = `/exams/results/${exam.id}`;
+          }
           return;
         }
 
@@ -145,7 +221,7 @@ export default function ExamLayout() {
     } else {
       setShowSubmitConfirm(true);
     }
-  }, [showSubmitConfirm, exam.id, answers]);
+  }, [showSubmitConfirm, exam, answers, activeSection]);
 
   // Combined Violation Handler
   const onViolation = useCallback((count: number) => {
@@ -203,7 +279,8 @@ export default function ExamLayout() {
       // 2. Call API to start exam on server
       const res = await fetch(`/api/exams/${exam.id}/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section: activeSection })
       });
 
       if (!res.ok) throw new Error("Failed to start exam session");
@@ -211,6 +288,7 @@ export default function ExamLayout() {
       // 3. Update local state to show exam
       setIsExamActive(true);
       setShowInstructions(false);
+      setTransitionState(null); // Clear any transition overlays
 
       toast.success("Exam Started Successfully", { position: "top-center" });
 
@@ -250,7 +328,7 @@ export default function ExamLayout() {
   // --------------- BLOCKING MODAL FOR PROCTORING (Overlay) ---------------
   // Moved up to be available for keyboard navigation useEffect
   // Added gracePeriod check to prevent instant block on start
-  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive);
+  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive) && !transitionState;
 
   // Keyboard Navigation
   useEffect(() => {
@@ -273,16 +351,30 @@ export default function ExamLayout() {
 
 
   if (showInstructions) {
-    const mcqQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'mcq' || q.questionType?.toLowerCase() === 'mcq');
-    const creativeQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'cq' || q.questionType?.toLowerCase() === 'cq');
-    const shortQuestions = questions.filter((q: any) => q.type?.toLowerCase() === 'sq' || q.questionType?.toLowerCase() === 'sq');
-    const otherQuestions = questions.filter((q: any) => {
+    const questionsForDist = fullSortedQuestions || [];
+    const mcqQuestions = questionsForDist.filter((q: any) => q.type?.toLowerCase() === 'mcq' || q.questionType?.toLowerCase() === 'mcq');
+    const creativeQuestions = questionsForDist.filter((q: any) => q.type?.toLowerCase() === 'cq' || q.questionType?.toLowerCase() === 'cq');
+    const shortQuestions = questionsForDist.filter((q: any) => q.type?.toLowerCase() === 'sq' || q.questionType?.toLowerCase() === 'sq');
+    const otherQuestions = questionsForDist.filter((q: any) => {
       const t = (q.type || q.questionType || '').toLowerCase();
       return !['mcq', 'cq', 'sq'].includes(t);
     });
 
     const mcqMarks = mcqQuestions.reduce((sum: number, q: any) => sum + (q.marks || 1), 0);
-    const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + creativeQuestions.length * 10)) * 0.33);
+
+    // Dynamic Marks Calculation
+    const cqMarkPerQuestion = creativeQuestions[0]?.marks || 10;
+    const sqMarkPerQuestion = shortQuestions[0]?.marks || 2; // Keep default 2 if not found, but user says 10 in their case
+
+    const cqRequired = exam.cqRequiredQuestions || creativeQuestions.length;
+    const sqRequired = exam.sqRequiredQuestions || shortQuestions.length;
+
+    const creativeMarks = cqRequired * cqMarkPerQuestion;
+    const shortMarks = sqRequired * sqMarkPerQuestion;
+
+    const passMark = exam.passMarks || Math.ceil((exam.totalMarks || (mcqMarks + creativeMarks + shortMarks)) * 0.33);
+
+    const requiredTotalQuestions = mcqQuestions.length + cqRequired + sqRequired + otherQuestions.length;
 
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans animate-in fade-in duration-500">
@@ -293,26 +385,39 @@ export default function ExamLayout() {
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
             <h1 className="text-xl md:text-3xl font-bold text-foreground mb-1 tracking-tight">{exam.title || exam.name || 'Assessment'}</h1>
-            <p className="text-sm md:text-lg text-muted-foreground">Class: {exam.className || 'N/A'}</p>
+            <p className="text-sm md:text-lg text-muted-foreground">শ্রেণি (Class): {exam.className || 'N/A'}</p>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
             <div className="bg-blue-50/50 dark:bg-blue-950/20 p-4 rounded-xl text-center border border-blue-100/50 dark:border-blue-900/30">
               <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase tracking-wider mb-1">Time (সময়)</div>
               <p className="text-xl font-bold text-blue-700 dark:text-blue-300">
-                {Math.floor(exam.duration / 60) > 0 ? `${Math.floor(exam.duration / 60)}h ` : ''}{exam.duration % 60}m
+                {exam.objectiveTime && exam.cqSqTime ? (
+                  <div className="text-left">
+                    <div className="flex justify-between gap-4">
+                      <span>Objective:</span>
+                      <span>{exam.objectiveTime}m</span>
+                    </div>
+                    <div className="flex justify-between gap-4 border-t border-blue-200 mt-1 pt-1">
+                      <span>CQ/SQ:</span>
+                      <span>{exam.cqSqTime}m</span>
+                    </div>
+                  </div>
+                ) : (
+                  <span>{Math.floor(exam.duration / 60) > 0 ? `${Math.floor(exam.duration / 60)}h ` : ''}{exam.duration % 60}m</span>
+                )}
               </p>
             </div>
             <div className="bg-purple-50/50 dark:bg-purple-950/20 p-4 rounded-xl text-center border border-purple-100/50 dark:border-purple-900/30">
-              <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-1">Total Questions</div>
-              <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{totalQuestions}</p>
+              <div className="text-[10px] text-purple-600 dark:text-purple-400 font-bold uppercase tracking-wider mb-1">মোট প্রশ্ন (Total Questions)</div>
+              <p className="text-xl font-bold text-purple-700 dark:text-purple-300">{requiredTotalQuestions}</p>
             </div>
             <div className="bg-emerald-50/50 dark:bg-emerald-950/20 p-4 rounded-xl text-center border border-emerald-100/50 dark:border-emerald-900/30">
-              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">Total Marks</div>
+              <div className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider mb-1">মোট নম্বর (Total Marks)</div>
               <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">{exam.totalMarks}</p>
             </div>
             <div className="bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-xl text-center border border-rose-100/50 dark:border-rose-900/30">
-              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">Pass Mark</div>
+              <div className="text-[10px] text-rose-600 dark:text-rose-400 font-bold uppercase tracking-wider mb-1">পাস নম্বর (Pass Mark)</div>
               <p className="text-xl font-bold text-rose-700 dark:text-rose-300">{passMark}</p>
             </div>
           </div>
@@ -321,36 +426,36 @@ export default function ExamLayout() {
             {/* Question Breakdown */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <Menu className="w-4 h-4 text-primary" /> Question Distribution
+                <Menu className="w-4 h-4 text-primary" /> প্রশ্নের ধরন ও বণ্টন (Question Distribution)
               </h3>
               <div className="space-y-2">
                 {mcqQuestions.length > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <span className="text-sm font-medium">MCQ Questions</span>
+                    <span className="text-sm font-medium">MCQ (বহুনির্বাচনী)</span>
                     <Badge variant="secondary" className="font-bold">{mcqQuestions.length} ({mcqMarks} Marks)</Badge>
                   </div>
                 )}
                 {creativeQuestions.length > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium">Creative (CQ)</span>
-                      <span className="text-[10px] text-muted-foreground">Answer {exam.cqRequiredQuestions || creativeQuestions.length} out of {creativeQuestions.length}</span>
+                      <span className="text-sm font-medium">Creative (সৃজনশীল)</span>
+                      <span className="text-[10px] text-muted-foreground">{creativeQuestions.length} টি প্রশ্নের মধ্যে {cqRequired} টির উত্তর দাও</span>
                     </div>
-                    <Badge variant="secondary" className="font-bold">Total {creativeQuestions.length}</Badge>
+                    <Badge variant="secondary" className="font-bold">CQ: {cqRequired}/{creativeQuestions.length} ({cqRequired}*{cqMarkPerQuestion}={creativeMarks} Marks)</Badge>
                   </div>
                 )}
                 {shortQuestions.length > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium">Short (SQ)</span>
-                      <span className="text-[10px] text-muted-foreground">Answer {exam.sqRequiredQuestions || shortQuestions.length} out of {shortQuestions.length}</span>
+                      <span className="text-sm font-medium">Short (সংক্ষিপ্ত)</span>
+                      <span className="text-[10px] text-muted-foreground">{shortQuestions.length} টি প্রশ্নের মধ্যে {sqRequired} টির উত্তর দাও</span>
                     </div>
-                    <Badge variant="secondary" className="font-bold">Total {shortQuestions.length}</Badge>
+                    <Badge variant="secondary" className="font-bold">SQ: {sqRequired}/{shortQuestions.length} ({sqRequired}*{sqMarkPerQuestion}={shortMarks} Marks)</Badge>
                   </div>
                 )}
                 {otherQuestions.length > 0 && (
                   <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border/50">
-                    <span className="text-sm font-medium">Other Types</span>
+                    <span className="text-sm font-medium">অন্যান্য (Others)</span>
                     <Badge variant="secondary" className="font-bold">{otherQuestions.length}</Badge>
                   </div>
                 )}
@@ -360,49 +465,67 @@ export default function ExamLayout() {
             {/* General Instructions */}
             <div className="space-y-3">
               <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
-                <AlertCircle className="w-4 h-4 text-amber-500" /> Key Guidelines
+                <AlertCircle className="w-4 h-4 text-amber-500" /> পরীক্ষার্থীদের জন্য নির্দেশাবলি (Instructions)
               </h3>
               <ul className="space-y-2 text-xs font-medium text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>Maintain fullscreen mode. Exiting or switching tabs will record a violation.</span>
+                  <span>ফুলস্ক্রিন মোড বজায় রাখো। ট্যাব পরিবর্তন করলে বা অন্য উইন্ডোতে গেলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>Exam will auto-submit after 4 security warnings.</span>
+                  <span>৪ বার সিকিউরিটি ওয়ার্নিং দিলে পরীক্ষা অটো-সাবমিট হয়ে যাবে।</span>
                 </li>
-                {exam.mcqNegativeMarking > 0 && (
-                  <li className="flex items-start gap-2">
-                    <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
-                    <span className="text-red-600 dark:text-red-400 font-bold">Negative Marking: {exam.mcqNegativeMarking}% for wrong MCQs.</span>
-                  </li>
-                )}
+                <li className="flex items-start gap-2">
+                  {exam.mcqNegativeMarking > 0 ? (
+                    <>
+                      <X className="w-3 h-3 text-red-500 mt-0.5 shrink-0" />
+                      <span className="text-red-600 dark:text-red-400 font-bold">ভুল উত্তরের জন্য নেগেটিভ মার্কিং: {exam.mcqNegativeMarking}% কাটা হবে।</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
+                      <span>ভুল উত্তরের জন্য কোনো নেগেটিভ মার্কিং নেই। (No negative marking)</span>
+                    </>
+                  )}
+                </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>Ensure a stable internet connection for auto-saving.</span>
+                  <span>অটো-সেভ সফল হওয়ার জন্য স্থিতিশীল ইন্টারনেট সংযোগ নিশ্চিত করো।</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <Button
-            onClick={handleStartExam}
-            disabled={isStarting}
-            className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98] group"
-          >
-            {isStarting ? (
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Preparing environment...</span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center gap-2">
-                <span>Start Assessment Now</span>
-                <ChevronRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
-              </div>
-            )}
-          </Button>
-          <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-widest font-bold opacity-50">Authorized by {instituteName}</p>
+          {activeSection === 'objective' && hasObjective && exam.objectiveStatus !== 'SUBMITTED' && (
+            <Button
+              onClick={handleStartExam}
+              disabled={isStarting}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98] group mb-4"
+            >
+              {isStarting ? "প্রস্তুত করা হচ্ছে..." : "বহুনির্বাচনী অংশ শুরু করো (Start MCQ)"}
+            </Button>
+          )}
+
+          {hasObjective && exam.objectiveStatus === 'SUBMITTED' && activeSection === 'objective' && (
+            <Button
+              onClick={() => setActiveSection('cqsq')}
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
+            >
+              সৃজনশীল/সংক্ষিপ্ত অংশ শুরু করো (Start CQ/SQ)
+            </Button>
+          )}
+
+          {(activeSection === 'cqsq' || !hasObjective) && hasCqSq && exam.cqSqStatus !== 'SUBMITTED' && (
+            <Button
+              onClick={handleStartExam}
+              disabled={isStarting}
+              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
+            >
+              {isStarting ? "প্রস্তুত করা হচ্ছে..." : "সৃজনশীল/সংক্ষিপ্ত অংশ শুরু করো (Start CQ/SQ)"}
+            </Button>
+          )}
+          <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-widest font-bold opacity-50">কর্তৃক অনুমোদিত {instituteName}</p>
         </Card>
       </div>
     );
@@ -446,7 +569,15 @@ export default function ExamLayout() {
 
               <div className="flex items-center gap-3">
                 <img src={instituteLogo} alt="Logo" className="h-8 w-auto hidden sm:block rounded" />
-                <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
+                <div className="flex flex-col">
+                  <h1 className="font-bold text-sm md:text-base hidden sm:block truncate max-w-[200px]">{exam.title}</h1>
+                  <Badge variant="outline" className={cn(
+                    "text-[10px] h-4 py-0 px-1 border-primary/30 w-fit",
+                    activeSection === 'objective' ? "text-indigo-600 border-indigo-200 bg-indigo-50/50" : "text-emerald-600 border-emerald-200 bg-emerald-50/50"
+                  )}>
+                    {activeSection === 'objective' ? 'Objective Section' : 'Subjective Section'}
+                  </Badge>
+                </div>
               </div>
             </div>
 
@@ -655,21 +786,43 @@ export default function ExamLayout() {
           </div>
         )}
 
-        {isBlocked && !isSubmitting && (
-          <div className="fixed inset-0 z-[100] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300">
-            <div className="w-24 h-24 bg-destructive/10 rounded-full flex items-center justify-center mb-6 animate-pulse">
-              <ShieldAlert className="w-12 h-12 text-destructive" />
+        {isBlocked && !isSubmitting && !transitionState && (
+          <div className="fixed inset-0 z-[140] bg-background/90 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500 select-none">
+            <div className="relative mb-8">
+              <div className="w-32 h-32 bg-destructive/10 rounded-full flex items-center justify-center animate-pulse">
+                <ShieldAlert className="w-16 h-16 text-destructive" />
+              </div>
+              <div className="absolute inset-0 border-4 border-destructive/20 rounded-full animate-ping opacity-25" />
             </div>
-            <h1 className="text-xl md:text-3xl font-bold text-red-600 mb-4">Security Violation Detected</h1>
-            <p className="text-base md:text-lg text-muted-foreground max-w-md mb-8">
-              Please return to fullscreen mode immediately.
-              <br />
-              <span className="font-bold text-red-500 mt-2 block">Warning Level: {warnings}/4</span>
-            </p>
-            <Button size="lg" onClick={enterFullscreen} className="bg-red-600 hover:bg-red-700 text-white text-lg px-8 py-6 rounded-full shadow-xl">
-              <Maximize2 className="w-6 h-6 mr-2" /> Return to Fullscreen
-            </Button>
+
+            <div className="space-y-4 max-w-lg">
+              <h1 className="text-4xl font-black text-foreground tracking-tight">Access Suspended</h1>
+              <p className="text-xl font-medium text-muted-foreground">
+                Proctoring shields detected a security violation (Tab switch or Window resize).
+              </p>
+
+              <div className="p-4 bg-destructive/5 rounded-2xl border border-destructive/20 inline-block">
+                <span className="text-destructive font-black text-2xl">WARNING LEVEL: {warnings}/4</span>
+              </div>
+
+              <div className="pt-8 w-full flex flex-col items-center gap-4">
+                <Button size="lg" onClick={enterFullscreen} className="bg-destructive hover:bg-destructive/90 text-white text-xl px-12 py-8 rounded-3xl shadow-2xl shadow-destructive/20 group w-full">
+                  <Maximize2 className="w-6 h-6 mr-3 group-hover:scale-110 transition-transform" />
+                  Restore Fullscreen Protocol
+                </Button>
+                <p className="text-sm font-bold text-muted-foreground opacity-50 uppercase tracking-widest underline underline-offset-4">Auto-Submit at level 4</p>
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Transition Overlay */}
+        {transitionState === 'objective_submitted' && (
+          <SectionTransitionOverlay
+            type="objective_submitted"
+            stats={{ answered: answeredCount, total: totalQuestions }}
+            onAction={() => window.location.reload()} // Still reload for now to cleanly switch context, but with better UI first
+          />
         )}
       </div>
     </div>

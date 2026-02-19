@@ -50,6 +50,30 @@ export function ExamContextProvider({
   const [questionCounts, setQuestionCounts] = useState({ cq: 0, sq: 0 });
   const [isUploading, setIsUploading] = useState(false); // New Internal State
   const [warnings, setWarnings] = useState(0); // Lifted state
+
+  // --- Section Detection Logic ---
+  const { hasObjective, hasCqSq } = useMemo(() => {
+    if (!exam.questions) return { hasObjective: false, hasCqSq: false };
+    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'];
+    const questions = exam.questions || [];
+
+    const obj = questions.some((q: any) => {
+      const type = (q.type || q.questionType || '').toLowerCase();
+      // DESCRIPTIVE is now part of CQ/SQ section
+      return objectiveTypes.includes(type) || !['cq', 'sq', 'descriptive'].includes(type);
+    });
+
+    const sub = questions.some((q: any) => {
+      const type = (q.type || q.questionType || '').toLowerCase();
+      return ['cq', 'sq', 'descriptive'].includes(type);
+    });
+
+    return { hasObjective: obj, hasCqSq: sub };
+  }, [exam.questions]);
+
+  const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(
+    exam.objectiveStatus === 'SUBMITTED' || !hasObjective ? 'cqsq' : 'objective'
+  );
   const isOnline = useOnlineStatus();
 
   // Scope to specific submission to prevent retake bleed-over
@@ -90,13 +114,16 @@ export function ExamContextProvider({
     }
   }, [localKey, navigationKey, warningsKey]);
 
-  // Save answers to localStorage on every change
+  // Save answers to localStorage (debounced to avoid blocking the main thread during typing)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem(localKey, JSON.stringify(answers));
+    const handler = setTimeout(() => {
+      localStorage.setItem(localKey, JSON.stringify(answers));
+    }, 1000); // 1s debounce for local storage
+    return () => clearTimeout(handler);
   }, [answers, localKey]);
 
-  // Save navigation state to localStorage on every change
+  // Save navigation state to localStorage
   useEffect(() => {
     if (typeof window === "undefined") return;
     localStorage.setItem(navigationKey, JSON.stringify(navigation));
@@ -108,12 +135,12 @@ export function ExamContextProvider({
     localStorage.setItem(warningsKey, warnings.toString());
   }, [warnings, warningsKey]);
 
-  // CONSISTENT QUESTION SORTING (Groups MCQ -> MC -> AR -> MTF -> CQ -> SQ -> Numeric)
-  const sortedQuestions = useMemo(() => {
+  // CONSISTENT QUESTION SORTING
+  const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
@@ -130,24 +157,35 @@ export function ExamContextProvider({
       ...grouped.sq,
       ...grouped.int,
       ...grouped.numeric,
+      ...grouped.descriptive,
       ...grouped.other
     ];
   }, [exam.questions]);
 
-  // Simple autosave with Appwrite image handling
+  const sortedQuestions = useMemo(() => {
+    if (activeSection === 'objective') {
+      return fullSortedQuestions.filter((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+      });
+    } else {
+      return fullSortedQuestions.filter((q: any) => {
+        const type = (q.type || q.questionType || '').toLowerCase();
+        return ['cq', 'sq', 'descriptive'].includes(type);
+      });
+    }
+  }, [fullSortedQuestions, activeSection]);
+
+  // Server perspective: only sync periodically
   const saveAnswers = useCallback(async (answersToSave: any) => {
+    if (Object.keys(answersToSave).length === 0) return;
+
     try {
       setSaveStatus("saving");
-
-      // Process answers to include Appwrite image information
-      const processedAnswers = { ...answersToSave };
-
-      // Process answers
-
       const response = await fetch(`/api/exams/${exam.id}/responses`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: processedAnswers }),
+        body: JSON.stringify({ answers: answersToSave }),
       });
 
       if (!response.ok) throw new Error("Failed to save");
@@ -161,18 +199,19 @@ export function ExamContextProvider({
     }
   }, [exam.id]);
 
-  // Autosave answers (debounced)
+  // Autosave answers to API (debounced)
   useDebouncedEffect(() => {
-    if (Object.keys(answers).length > 0) {
-      saveAnswers(answers);
-    }
-  }, [answers, saveAnswers], 5000); // Increased to 5 second debounce for 1000+ parallel users
+    saveAnswers(answers);
+  }, [answers, saveAnswers], 10000); // 10s debounce for API to handle scale
 
-  // Enhanced navigation with performance optimizations
+  // Stable navigation handler
   const navigateToQuestion = useCallback((index: number) => {
-    if (index >= 0 && index < (sortedQuestions.length || 0)) {
-      setNavigation((prev: any) => ({ ...prev, current: index }));
-    }
+    setNavigation((prev: any) => {
+      if (index >= 0 && index < (sortedQuestions.length || 0)) {
+        return { ...prev, current: index };
+      }
+      return prev;
+    });
   }, [sortedQuestions.length]);
 
   const markQuestion = useCallback((questionId: string, marked: boolean) => {
@@ -185,7 +224,6 @@ export function ExamContextProvider({
     }));
   }, []);
 
-  // Performance-optimized question filtering
   const getQuestionsByType = useCallback((type: string) => {
     if (!exam.questions) return [];
     return exam.questions.filter((q: any) =>
@@ -204,7 +242,23 @@ export function ExamContextProvider({
     }
   }, [exam.questions, getQuestionsByType]);
 
-  const contextValue = {
+  const groupedQuestions = useMemo(() => {
+    if (!exam.questions) return {};
+    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], descriptive: [], other: [] };
+    exam.questions.forEach((q: any) => {
+      const type = (q.type || q.questionType || '').toLowerCase();
+      if (g[type]) g[type].push(q);
+      else g.other.push(q);
+    });
+    return {
+      creative: [...g.cq, ...g.descriptive],
+      short: [...g.sq],
+      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
+    };
+  }, [exam.questions]);
+
+  // Optimized Context Value to prevent unnecessary re-renders in consumers
+  const contextValue = useMemo(() => ({
     exam,
     answers,
     setAnswers,
@@ -225,23 +279,35 @@ export function ExamContextProvider({
     setIsUploading,
     warnings,
     setWarnings,
+    activeSection,
+    setActiveSection,
+    hasObjective,
+    hasCqSq,
     sortedQuestions,
-    groupedQuestions: useMemo(() => {
-      if (!exam.questions) return {};
-      const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], other: [] };
-      exam.questions.forEach((q: any) => {
-        const type = (q.type || q.questionType || '').toLowerCase();
-        if (g[type]) g[type].push(q);
-        else g.other.push(q);
-      });
-      // Return structured groups for UI
-      return {
-        creative: [...g.cq],
-        short: [...g.sq],
-        objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
-      };
-    }, [exam.questions])
-  };
+    fullSortedQuestions,
+    groupedQuestions
+  }), [
+    exam,
+    answers,
+    navigation,
+    saveStatus,
+    fontSize,
+    highContrast,
+    questionCounts,
+    navigateToQuestion,
+    markQuestion,
+    getQuestionsByType,
+    saveAnswers,
+    isOnline,
+    isUploading,
+    warnings,
+    activeSection,
+    hasObjective,
+    hasCqSq,
+    sortedQuestions,
+    fullSortedQuestions,
+    groupedQuestions
+  ]);
 
   return (
     <ExamContext.Provider value={contextValue}>

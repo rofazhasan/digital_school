@@ -103,6 +103,48 @@
 
   --shadow-premium: 0 10px 40px -10px rgba(0, 0, 0, 0.08);
   --shadow-glow: 0 0 20px -5px var(--primary);
+
+  /* World Class Animations */
+  --animate-bounce-subtle: bounce-subtle 3s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 8s linear infinite;
+  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
+
+  @keyframes bounce-subtle {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-4px);
+    }
+  }
+
+  @keyframes spin-slow {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes pulse-glow {
+
+    0%,
+    100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+
+    50% {
+      opacity: 0.8;
+      filter: brightness(1.2);
+      box-shadow: 0 0 20px rgba(244, 63, 94, 0.4);
+    }
+  }
 }
 
 :root {

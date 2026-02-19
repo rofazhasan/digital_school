@@ -405,7 +405,12 @@ export async function GET(
         options: question.options || [],
         modelAnswer: modelAnswer,
         explanation: explanation,
-        subQuestions: question.subQuestions,
+        subQuestions: question.subQuestions ? question.subQuestions.map((subQ: any, idx: number) => ({
+          ...subQ,
+          studentAnswer: studentAnswers[`${questionId}_sub_${idx}`] || "",
+          studentImages: studentAnswers[`${questionId}_sub_${idx}_images`] || (studentAnswers[`${questionId}_sub_${idx}_image`] ? [studentAnswers[`${questionId}_sub_${idx}_image`]] : []),
+          awardedMarks: studentAnswers[`${questionId}_sub_${idx}_marks`] || 0
+        })) : [],
         feedback,
         images: question.images || [],
         // AR Specific Fields
@@ -603,7 +608,13 @@ export async function GET(
         evaluatorNotes: submission.evaluatorNotes,
         evaluatedAt: submission.evaluatedAt,
         exceededQuestionLimit: submission.exceededQuestionLimit,
-        status: isSuspended ? 'SUSPENDED' : submission.status
+        status: isSuspended ? 'SUSPENDED' : submission.status,
+        objectiveStatus: submission.objectiveStatus,
+        objectiveStartedAt: submission.objectiveStartedAt,
+        objectiveSubmittedAt: submission.objectiveSubmittedAt,
+        cqSqStatus: submission.cqSqStatus,
+        cqSqStartedAt: submission.cqSqStartedAt,
+        cqSqSubmittedAt: submission.cqSqSubmittedAt,
       },
       result: result ? {
         id: result.id,

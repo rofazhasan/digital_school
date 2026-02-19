@@ -149,20 +149,26 @@ export async function GET(
                     }
                 }
 
+                // NOTE: On the Evaluation page, all students have submission.status === 'SUBMITTED'
+                // (only submitted students are shown here). So we use evaluation state instead:
+                // - 'IN_PROGRESS' = submitted but not yet evaluated
+                // - 'COMPLETED'   = teacher has evaluated this student
+                const evaluationStatus = submission.evaluatedAt ? 'COMPLETED' : 'IN_PROGRESS';
+
                 return {
                     id: submission.id,
                     studentName: submission.student.user.name,
                     roll: submission.student.roll,
                     className: submission.student.class.name,
                     section: submission.student.class.section,
-                    status: submission.status, // IN_PROGRESS | SUBMITTED
+                    status: evaluationStatus,
                     progress: Math.round((answeredQuestions / totalQuestions) * 100) || 0,
                     answered: answeredQuestions,
                     totalQuestions: totalQuestions,
-                    score: Math.max(0, parseFloat(score.toFixed(2))), // Ensure no negative total shown? or allow it.
+                    score: Math.max(0, parseFloat(score.toFixed(2))),
                     maxScore,
-                    lastActive: (submission as any).updatedAt, // Use this for "Online" inference (e.g., < 2 mins ago)
-                    answers: answers // Return answers for detailed view
+                    lastActive: (submission as any).updatedAt,
+                    answers: answers
                 };
             })
         );
@@ -182,9 +188,9 @@ export async function GET(
             examName: exam.name,
             totalStudents: liveData.length,
             activeStudents: liveData.filter(s => s.status === 'IN_PROGRESS').length,
-            submittedStudents: liveData.filter(s => s.status === 'SUBMITTED').length,
+            submittedStudents: liveData.filter(s => s.status === 'COMPLETED').length,
             liveData,
-            questionsBySet, // For detailed view lookup
+            questionsBySet,
             defaultQuestions
         });
 

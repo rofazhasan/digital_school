@@ -48,7 +48,7 @@ import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
-import { toBengaliNumerals } from '@/utils/numeralConverter';
+import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
 // import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
@@ -103,6 +103,12 @@ interface SubmissionInfo {
   evaluatedAt?: string;
   status?: string;
   suspensionReason?: string;
+  objectiveStatus?: string;
+  objectiveStartedAt?: string;
+  objectiveSubmittedAt?: string;
+  cqSqStatus?: string;
+  cqSqStartedAt?: string;
+  cqSqSubmittedAt?: string;
 }
 
 interface Question {
@@ -658,19 +664,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     });
   });
 
-  // Calculate marks breakdown
-  const mcqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MCQ') || [];
-  const mcQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mc') || [];
-  const arQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'ar') || [];
-  const mtfQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
-  const intQuestions = result?.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
-  const cqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ') || [];
-  const sqQuestions = result?.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
-
-  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions];
-  const totalObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
-  const totalCqMarks = cqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
-  const totalSqMarks = sqQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
 
   if (!result) {
     return (
@@ -693,6 +686,24 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       </div>
     );
   }
+
+  // Calculate marks breakdown
+  const mcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MCQ') || [];
+  const mcQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mc') || [];
+  const arQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'ar') || [];
+  const mtfQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
+  const intQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
+  const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ') || [];
+  const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
+  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions];
+
+  /* Fix: Use required counts for marks breakdown if available */
+  const cqMarkPerQuestion = cqQuestions[0]?.marks || 10;
+  const sqMarkPerQuestion = sqQuestions[0]?.marks || 10;
+
+  const totalObjectiveMarks = objectiveQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0);
+  const totalCqMarks = (result.exam.cqRequiredQuestions ? result.exam.cqRequiredQuestions : cqQuestions.length) * cqMarkPerQuestion;
+  const totalSqMarks = (result.exam.sqRequiredQuestions ? result.exam.sqRequiredQuestions : sqQuestions.length) * sqMarkPerQuestion;
 
   return (
     <MathJaxContext config={mathJaxConfig}>
@@ -866,10 +877,42 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="p-3 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-inner group-hover:scale-110 transition-transform duration-500">
                       <Clock className="h-6 w-6" />
                     </div>
-                    Time Metrics
+                    Time Metrics & Sections
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 pt-2">
+                  {/* Split Section Timings */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    {result.submission.objectiveStatus && (
+                      <div className="p-4 rounded-2xl bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-indigo-500">Objective</span>
+                          <Badge variant="outline" className="text-[9px] h-4 px-1 border-indigo-200 text-indigo-600 bg-white dark:bg-slate-900">{result.submission.objectiveStatus}</Badge>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {result.submission.objectiveStartedAt ? new Date(result.submission.objectiveStartedAt).toLocaleTimeString() : '--'} -
+                            {result.submission.objectiveSubmittedAt ? new Date(result.submission.objectiveSubmittedAt).toLocaleTimeString() : '--'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {result.submission.cqSqStatus && (
+                      <div className="p-4 rounded-2xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-900/30">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-emerald-500">Subjective</span>
+                          <Badge variant="outline" className="text-[9px] h-4 px-1 border-emerald-200 text-emerald-600 bg-white dark:bg-slate-900">{result.submission.cqSqStatus}</Badge>
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                            {result.submission.cqSqStartedAt ? new Date(result.submission.cqSqStartedAt).toLocaleTimeString() : '--'} -
+                            {result.submission.cqSqSubmittedAt ? new Date(result.submission.cqSqSubmittedAt).toLocaleTimeString() : '--'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white dark:border-slate-700/30 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500 mb-1">Time Used</label>
@@ -963,7 +1006,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <CardContent className="p-8 md:p-12">
                 {/* Status Alerts */}
                 <div className="space-y-4 mb-10">
-                  {hasUnevaluatedQuestions() && (
+                  {/* Fix: Hide evaluation banner if results are published */}
+                  {!result.result?.isPublished && hasUnevaluatedQuestions() && (
                     <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="flex items-center gap-4 p-5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
                       <div className="p-2 rounded-xl bg-amber-500/20">
                         <Clock className="h-5 w-5 animate-pulse" />
@@ -1950,29 +1994,123 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     )}
 
-                                    {/* Sub Questions */}
-                                    {question.subQuestions && question.subQuestions.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Sub Questions:</h4>
-                                        <div className="space-y-2">
-                                          {question.subQuestions.map((subQ, subIndex) => (
-                                            <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
-                                              <div className="mb-2">
-                                                <p className="text-gray-700 font-medium">
-                                                  {subQ.questionText || subQ.text || subQ.question || ''}
-                                                </p>
+                                    {/* Sub Questions Breakdown - CQ */}
+                                    {(question.subQuestions || question.sub_questions) && (question.subQuestions || question.sub_questions || []).length > 0 && (
+                                      <div className="space-y-6 mt-6">
+                                        <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
+                                        {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
+                                          <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
+                                            {/* Sub-question Header */}
+                                            <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-start gap-3">
+                                              <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
+                                                {toBengaliAlphabets(idx)}
+                                              </span>
+                                              <div className="flex-grow pt-1">
+                                                {subQ.text || subQ.questionText || subQ.question ? (
+                                                  <div className="text-foreground font-medium leading-relaxed">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question)}</UniversalMathJax>
+                                                  </div>
+                                                ) : (
+                                                  <span className="text-muted-foreground italic">Sub-question {toBengaliAlphabets(idx)}</span>
+                                                )}
                                               </div>
-                                              {subQ.modelAnswer && (
-                                                <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
-                                                  <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
-                                                  <p className="text-gray-700">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
-                                                  </p>
+                                              {subQ.marks && (
+                                                <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase tracking-tighter">
+                                                  {subQ.marks} Point{Number(subQ.marks) !== 1 && 's'}
+                                                </Badge>
+                                              )}
+                                            </div>
+
+                                            <div className="p-4 space-y-4">
+                                              {/* Model Answer */}
+                                              {(subQ.modelAnswer || subQ.answer) && (
+                                                <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
+                                                  <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm uppercase tracking-wide">
+                                                    <CheckCircle className="w-4 h-4" />
+                                                    Model Answer
+                                                  </div>
+                                                  <div className="text-foreground/90 leading-relaxed font-sans">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Student Answer */}
+                                              <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/10">
+                                                <div className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide mb-2">
+                                                  Your Answer
+                                                </div>
+                                                {subQ.studentAnswer ? (
+                                                  <div className="text-foreground/90 leading-relaxed font-sans">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
+                                                  </div>
+                                                ) : (
+                                                  <p className="text-muted-foreground italic text-sm">No text answer provided</p>
+                                                )}
+                                              </div>
+
+                                              {/* Attachments & Feedback */}
+                                              {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
+                                                <div className="mt-4 pt-4 border-t border-gray-100">
+                                                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                                    <Camera className="w-4 h-4" />
+                                                    Attachments & Feedback
+                                                  </div>
+                                                  <div className="flex flex-wrap gap-4">
+                                                    {(() => {
+                                                      const images = subQ.studentImages || [];
+                                                      return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
+                                                        const globalIdx = idx * 100 + imgK;
+                                                        const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
+                                                        const displayUrl = drawing ? drawing.imageData : imgUrl;
+                                                        const isAnnotated = !!drawing;
+
+                                                        return (
+                                                          <div
+                                                            key={imgK}
+                                                            className="relative group cursor-pointer perspective-1000"
+                                                            onClick={() => {
+                                                              setZoomedImage(displayUrl);
+                                                              setZoomedImageTitle(`Sub-question ${toBengaliAlphabets(idx)} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
+                                                              setShowZoomModal(true);
+                                                            }}
+                                                          >
+                                                            <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
+                                                              <img
+                                                                src={displayUrl}
+                                                                alt={`Sub ${toBengaliAlphabets(idx)} Img ${imgK + 1}`}
+                                                                className="w-32 h-32 object-cover bg-gray-50"
+                                                                loading="lazy"
+                                                              />
+                                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                                                <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
+                                                              </div>
+                                                              {isAnnotated && (
+                                                                <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
+                                                                  <MessageSquare className="w-3 h-3" />
+                                                                  Feedback
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          </div>
+                                                        );
+                                                      }) : null;
+                                                    })()}
+                                                  </div>
+                                                </div>
+                                              )}
+
+                                              {/* Manual Marks for Sub-question */}
+                                              {subQ.awardedMarks !== undefined && (
+                                                <div className="mt-2 flex justify-end">
+                                                  <Badge variant="outline" className="text-xs font-bold">
+                                                    Marks: {subQ.awardedMarks}/{subQ.marks || '?'}
+                                                  </Badge>
                                                 </div>
                                               )}
                                             </div>
-                                          ))}
-                                        </div>
+                                          </div>
+                                        ))}
                                       </div>
                                     )}
 
@@ -2070,7 +2208,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             {/* Sub-question Header */}
                                             <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-start gap-3">
                                               <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                                                {idx + 1}
+                                                {toBengaliAlphabets(idx)}
                                               </span>
                                               <div className="flex-grow pt-1">
                                                 {subQ.text ? (
@@ -2078,7 +2216,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     <UniversalMathJax inline dynamic>{cleanupMath(subQ.text)}</UniversalMathJax>
                                                   </div>
                                                 ) : (
-                                                  <span className="text-muted-foreground italic">Sub-question {idx + 1}</span>
+                                                  <span className="text-muted-foreground italic">Sub-question {toBengaliAlphabets(idx)}</span>
                                                 )}
                                               </div>
                                             </div>
@@ -2133,14 +2271,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                             className="relative group cursor-pointer perspective-1000"
                                                             onClick={() => {
                                                               setZoomedImage(displayUrl);
-                                                              setZoomedImageTitle(`Sub-question ${idx + 1} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
+                                                              setZoomedImageTitle(`Sub-question ${toBengaliAlphabets(idx)} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
                                                               setShowZoomModal(true);
                                                             }}
                                                           >
                                                             <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
                                                               <img
                                                                 src={displayUrl}
-                                                                alt={`Sub ${idx + 1} Img ${imgK + 1}`}
+                                                                alt={`Sub ${toBengaliAlphabets(idx)} Img ${imgK + 1}`}
                                                                 className="w-32 h-32 object-cover bg-gray-50"
                                                                 loading="lazy"
                                                               />

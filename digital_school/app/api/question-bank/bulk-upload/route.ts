@@ -5,7 +5,7 @@ import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 // Helper to separate validation logic
@@ -33,7 +33,7 @@ const getValue = (row: any, keys: string[]) => {
 async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
-    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
+    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'DESCRIPTIVE'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
     const diffRaw = s(getValue(row, ["Difficulty", "Level", "Diff"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';
@@ -61,7 +61,7 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     };
 
     try {
-        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ'].includes(typeRaw)) {
+        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'DESCRIPTIVE'].includes(typeRaw)) {
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);

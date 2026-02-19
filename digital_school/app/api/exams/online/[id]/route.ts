@@ -45,29 +45,31 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let existingSubmission = submissions[0];
 
     // Check if the latest submission is finished
-    const isFinished = existingSubmission && (() => {
-      // It is finished if status is SUBMITTED
-      // Fallback to legacy check if status is missing (though default is IN_PROGRESS now)
-      // @ts-ignore
-      return existingSubmission.status === SUBMITTED || !!existingSubmission.submittedAt;
-    })();
+    // @ts-ignore
+    const isFinished = existingSubmission && (existingSubmission.status === SUBMITTED);
 
-    // Check for 'start' action
+    // Check for 'action' param
     const searchParams = req.nextUrl.searchParams;
     const action = searchParams.get('action');
 
-    // Decision: Should we create a new submission?
-    // Yes if: 
-    // 1. No submission exists AND action is 'start'
-    // 2. Latest is finished AND retake is allowed AND action is 'start'
+    // 1. REDIRECTION LOGIC: If submitted and no retake allowed, redirect to results
+    if (existingSubmission && isFinished && !exam.allowRetake) {
+      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId}`);
+      return NextResponse.json({
+        id: exam.id,
+        name: exam.name,
+        hasSubmitted: true,
+        redirect: `/exams/results/${exam.id}`,
+        status: 'SUBMITTED'
+      });
+    }
+
+    // 2. RETAKE LOGIC: If retake is allowed and user clicks start, delete old data
     const shouldCreateNew = (!existingSubmission || (isFinished && exam.allowRetake)) && action === 'start';
 
-    // If no submission exists or we are retaking, create one ONLY if action is 'start'
     if (shouldCreateNew) {
-      // Logic to assign exam set first (moved from below)
+      // Logic to assign exam set first
       if (exam.examSets.length > 0) {
-        // ... (existing logic for random assignment if not exists)
-        // Check existing map first
         let examStudentMap = await prisma.examStudentMap.findUnique({
           where: { studentId_examId: { studentId, examId } },
           include: { examSet: true }
@@ -88,34 +90,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       }
 
-      // DELETE PREVIOUS SUBMISSION BEFORE STARTING NEW ONE (RETAKE LOGIC)
+      // DELETE PREVIOUS SUBMISSION BEFORE STARTING NEW ONE (RETAKE CLEANUP)
       if (existingSubmission) {
-        console.log(`♻️ Retake initiated: Deleting previous submission ${existingSubmission.id} for student ${studentId}`);
+        console.log(`♻️ Retake cleanup: Wiping previous records for student ${studentId} (Exam: ${examId})`);
 
-        // Delete related records first
-        await prisma.examSubmissionDrawing.deleteMany({
-          where: {
-            examId: examId,
-            studentId: studentId
-          }
-        });
+        await prisma.$transaction([
+          prisma.examSubmissionDrawing.deleteMany({ where: { examId, studentId } }),
+          prisma.result.deleteMany({ where: { examId, studentId } }),
+          prisma.examSubmission.deleteMany({ where: { examId, studentId } })
+        ]);
 
-        await prisma.result.deleteMany({
-          where: {
-            examId: examId,
-            studentId: studentId
-          }
-        });
-
-        // Then delete the submission
-        await prisma.examSubmission.deleteMany({
-          where: {
-            examId: examId,
-            studentId: studentId
-          }
-        });
-
-        console.log(`✅ Retake cleanup complete: Deleted submission, results, and drawings for student ${studentId}`);
+        console.log("✅ Cleanup complete");
       }
 
       existingSubmission = await prisma.examSubmission.create({
@@ -130,14 +115,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         }
       });
     } else if (existingSubmission && !existingSubmission.startedAt && action === 'start') {
-      // If for some reason startedAt is missing on an existing active record, set it now if action is start
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
         // @ts-ignore
         data: { startedAt: new Date(), status: IN_PROGRESS }
       });
     } else if (existingSubmission) {
-      // Load assigned set if submission exists and we are continuing it
       assignedExamSetId = existingSubmission.examSetId;
     }
 
@@ -196,32 +179,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       return q;
     });
 
-    // STRICT ACCESS CONTROL
-    // If retake is allowed, we permit access (handled by shouldCreateNew logic above).
-    // If retake is NOT allowed, we only permit access if NO submission exists OR if the submission is IN_PROGRESS.
-    const isRetakeAllowed = !!exam.allowRetake;
-    const submissionExists = !!existingSubmission;
-
-    // @ts-ignore
-    const isCurrentlyInProgress = existingSubmission && (existingSubmission.status === IN_PROGRESS || (existingSubmission.answers && (existingSubmission.answers as any)._status === 'in_progress'));
-
-    const shouldBlockAccess = !isRetakeAllowed && submissionExists && !isCurrentlyInProgress;
-
-    if (shouldBlockAccess) {
-      console.log(`🚫 Access blocked for student ${studentId} to exam ${examId} (No retake allowed and already submitted)`);
-      return NextResponse.json({
-        id: exam.id,
-        name: exam.name,
-        hasSubmitted: true,
-        redirect: `/exams/results/${exam.id}`,
-        // Return minimal data
-        allowRetake: false,
-        questions: [],
-        status: 'SUBMITTED'
-      });
-    }
-
-    const hasSubmitted = !isCurrentlyInProgress && submissionExists && !isRetakeAllowed;
+    const hasSubmitted = isFinished && !exam.allowRetake;
 
     return NextResponse.json({
       id: exam.id,
@@ -236,9 +194,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
       // Only return startedAt if the submission is actually active/in-progress.
-      // We check the FRESH existingSubmission status here, not the stale 'isFinished' variable which refers to the PREVIOUS submission.
       // @ts-ignore
-      startedAt: (existingSubmission && (existingSubmission.status === 'IN_PROGRESS' || !existingSubmission.submittedAt)) ? existingSubmission.startedAt : null,
+      startedAt: (existingSubmission && existingSubmission.status === IN_PROGRESS) ? existingSubmission.startedAt : null,
       passMarks: exam.passMarks,
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
@@ -247,6 +204,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       sqRequiredQuestions: exam.sqRequiredQuestions,
       mcqNegativeMarking: exam.mcqNegativeMarking,
       savedAnswers: existingSubmission?.answers || {},
+      objectiveTime: (exam as any).objectiveTime,
+      cqSqTime: (exam as any).cqSqTime,
+      objectiveStatus: (existingSubmission as any)?.objectiveStatus || 'IN_PROGRESS',
+      objectiveStartedAt: (existingSubmission as any)?.objectiveStartedAt || null,
+      cqSqStatus: (existingSubmission as any)?.cqSqStatus || 'IN_PROGRESS',
+      cqSqStartedAt: (existingSubmission as any)?.cqSqStartedAt || null,
     });
   } catch (_) {
     return NextResponse.json({ error: "Server error" }, { status: 500 });

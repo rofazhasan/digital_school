@@ -12,6 +12,7 @@ import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { ZoomIn, ShieldAlert } from "lucide-react";
+import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
 import { cn } from "@/lib/utils";
 
 // Image Zoom Component
@@ -503,7 +504,90 @@ const MTFGrid = ({
   );
 };
 
-export default function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
+// Debounced Textarea for Subjective Answers
+const DebouncedTextarea = memo(({
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  rows,
+  className,
+}: {
+  value: string,
+  onChange: (val: string) => void,
+  disabled: boolean,
+  placeholder: string,
+  rows?: number,
+  className?: string,
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  // Sync local state if global state changes externally
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newVal = e.target.value;
+    setLocalValue(newVal);
+    // Debounce the global update
+    const timeout = setTimeout(() => onChange(newVal), 1000);
+    return () => clearTimeout(timeout);
+  };
+
+  return (
+    <textarea
+      value={localValue || ""}
+      onChange={handleChange}
+      disabled={disabled}
+      rows={rows}
+      className={className ?? "w-full min-h-[200px] p-4 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-y text-base transition-all"}
+      placeholder={placeholder}
+    />
+  );
+});
+
+DebouncedTextarea.displayName = 'DebouncedTextarea';
+
+// Debounced Input for CQ Sub-questions
+const DebouncedInput = memo(({
+  value,
+  onChange,
+  disabled,
+  placeholder
+}: {
+  value: string,
+  onChange: (val: string) => void,
+  disabled: boolean,
+  placeholder: string
+}) => {
+  const [localValue, setLocalValue] = useState(value);
+
+  useEffect(() => {
+    setLocalValue(value);
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newVal = e.target.value;
+    setLocalValue(newVal);
+    const timeout = setTimeout(() => onChange(newVal), 1000);
+    return () => clearTimeout(timeout);
+  };
+
+  return (
+    <Input
+      value={localValue || ""}
+      onChange={handleChange}
+      disabled={disabled}
+      className="bg-gray-50/50 h-12 rounded-xl border-border focus:ring-primary/20"
+      placeholder={placeholder}
+    />
+  );
+});
+
+DebouncedInput.displayName = 'DebouncedInput';
+
+function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
   const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading, fontSize } = useExamContext();
   const questions = exam.questions || [];
 
@@ -521,19 +605,22 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
   const type = (question?.type || "").toLowerCase();
   const subQuestions = question?.subQuestions || question?.sub_questions || [];
 
-  const handleAnswerChange = useCallback(async (value: any) => {
+  // Stable handleAnswerChange - no longer depends on answers object
+  const handleAnswerChange = useCallback((value: any) => {
     if (disabled || !question) return;
-    const updated = { ...answers, [question.id]: value };
-    setAnswers(updated);
+    setAnswers((prev: any) => ({
+      ...prev,
+      [question.id]: value
+    }));
+  }, [disabled, question?.id, setAnswers]);
 
-    try {
-      await fetch(`/api/exams/${exam.id}/responses`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ answers: updated }),
-      });
-    } catch (e) { console.error("Autosave failed", e); }
-  }, [disabled, answers, question?.id, setAnswers, exam.id]);
+  const handleSubAnswerChange = useCallback((idx: number, value: any) => {
+    if (disabled || !question) return;
+    setAnswers((prev: any) => ({
+      ...prev,
+      [`${question.id}_sub_${idx}`]: value
+    }));
+  }, [disabled, question?.id, setAnswers]);
 
   // Keyboard Shortcuts for MCQ (A-D / 1-4)
   useEffect(() => {
@@ -545,11 +632,9 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
       const options = question.options || [];
       let selectedIndex = -1;
 
-      // Map 1-4 to 0-3
       if (['1', '2', '3', '4', '5', '6', '7', '8'].includes(key)) {
         selectedIndex = parseInt(key) - 1;
       }
-      // Map A-H to 0-7
       else if (['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'].includes(key)) {
         selectedIndex = key.charCodeAt(0) - 65;
       }
@@ -558,8 +643,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
         const opt = options[selectedIndex];
         const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
         handleAnswerChange(label);
-
-        // Optional: Visual feedback or toast could go here
       }
     };
 
@@ -569,15 +652,8 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
   const handleMarkQuestion = useCallback(() => {
     if (!question) return;
-    if (markQuestion) {
-      markQuestion(question.id, !navigation.marked[question.id]);
-    } else {
-      const newMarked = { ...navigation.marked };
-      if (newMarked[question.id]) delete newMarked[question.id];
-      else newMarked[question.id] = true;
-      setNavigation({ ...navigation, marked: newMarked });
-    }
-  }, [question?.id, navigation.marked, markQuestion, setNavigation, navigation]);
+    markQuestion(question.id, !navigation.marked[question.id]);
+  }, [question?.id, navigation.marked, markQuestion]);
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
@@ -753,23 +829,21 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
               <div className="space-y-4">
                 {type === "sq" && (
                   <div className="space-y-2">
-                    <textarea
+                    <DebouncedTextarea
                       value={userAnswer || ""}
-                      onChange={(e) => setAnswers({ ...answers, [question.id]: e.target.value })}
-                      disabled={disabled || submitted}
-                      className="w-full min-h-[200px] p-4 rounded-xl border border-border bg-card focus:border-primary focus:ring-1 focus:ring-primary outline-none resize-y text-base"
+                      onChange={handleAnswerChange}
+                      disabled={!!(disabled || submitted)}
                       placeholder="Type your answer here..."
                     />
                     <div className="space-y-2">
                       {/* Image Gallery */}
                       {(() => {
-                        // Support both old single image and new multiple images format
                         const singleImage = answers[`${question.id}_image`];
                         const multipleImages = answers[`${question.id}_images`] || [];
                         const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
 
                         return allImages.length > 0 ? (
-                          <div>
+                          <div className="pt-2">
                             <div className="text-xs font-semibold text-muted-foreground mb-2">Uploaded Images ({allImages.length}/5)</div>
                             <div className="flex flex-wrap gap-2">
                               {allImages.map((imgUrl: string, idx: number) => (
@@ -777,22 +851,24 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                                   <ZoomableImage
                                     src={imgUrl}
                                     alt={`Answer ${idx + 1}`}
-                                    className="h-20 w-20 object-cover rounded border border-border"
+                                    className="h-20 w-20 object-cover rounded-xl border border-border shadow-sm overflow-hidden"
                                   />
                                   {!disabled && !submitted && (
                                     <button
                                       onClick={() => {
-                                        const newAnswers = { ...answers };
-                                        const updatedImages = allImages.filter((_: string, i: number) => i !== idx);
-                                        if (updatedImages.length > 0) {
-                                          newAnswers[`${question.id}_images`] = updatedImages;
-                                        } else {
-                                          delete newAnswers[`${question.id}_images`];
-                                        }
-                                        delete newAnswers[`${question.id}_image`]; // Remove old format
-                                        setAnswers(newAnswers);
+                                        setAnswers((prev: any) => {
+                                          const newAnswers = { ...prev };
+                                          const updatedImages = allImages.filter((_: string, i: number) => i !== idx);
+                                          if (updatedImages.length > 0) {
+                                            newAnswers[`${question.id}_images`] = updatedImages;
+                                          } else {
+                                            delete newAnswers[`${question.id}_images`];
+                                          }
+                                          delete newAnswers[`${question.id}_image`];
+                                          return newAnswers;
+                                        });
                                       }}
-                                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                      className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity shadow-md hover:bg-rose-600"
                                     >
                                       <X className="w-3 h-3" />
                                     </button>
@@ -804,17 +880,16 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                         ) : null;
                       })()}
 
-                      {/* Upload Button - Show if less than 5 images */}
-                      {/* Upload Button - Show if less than 5 images */}
+                      {/* Upload Button */}
                       {!disabled && !submitted && (
                         ((answers[`${question.id}_image`] ? 1 : 0) + (answers[`${question.id}_images`]?.length || 0)) < 5
                       ) ? (
-                        <div className="relative">
+                        <div className="relative pt-2">
                           <input
                             type="file"
                             accept="image/*"
                             multiple
-                            onClick={() => setIsUploading && setIsUploading(true)}
+                            onClick={() => setIsUploading?.(true)}
                             onChange={async (e) => {
                               const files = Array.from(e.target.files || []);
                               if (files.length === 0) {
@@ -844,22 +919,17 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
 
                                   if (res.ok) {
                                     uploadedUrls.push(data.url);
-                                    toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
                                   } else {
                                     console.error('Upload failed:', data);
-                                    toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
                                   }
-                                } catch (err) {
-                                  console.error('Upload error:', err);
-                                  toast.error('Failed to upload image. Please try again.');
-                                }
+                                } catch (err) { console.error('Upload error:', err); }
                               }
 
                               if (uploadedUrls.length > 0) {
-                                const newAnswers = { ...answers };
-                                delete newAnswers[`${question.id}_image`]; // Remove old single image format
-                                newAnswers[`${question.id}_images`] = [...currentImages, ...uploadedUrls];
-                                setAnswers(newAnswers);
+                                setAnswers((prev: any) => ({
+                                  ...prev,
+                                  [`${question.id}_images`]: [...currentImages, ...uploadedUrls]
+                                }));
                               }
 
                               setIsUploading?.(false);
@@ -868,8 +938,8 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                             className="hidden"
                             id={`q-img-${question.id}`}
                           />
-                          <label htmlFor={`q-img-${question.id}`} className="flex items-center gap-2 cursor-pointer text-sm text-indigo-600 hover:text-indigo-800">
-                            <Upload className="w-4 h-4" /> Upload Image Answer (Max 5)
+                          <label htmlFor={`q-img-${question.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-xl cursor-pointer text-sm font-medium transition-colors shadow-sm">
+                            <Upload className="w-4 h-4 text-primary" /> Upload Images (Max 5)
                           </label>
                         </div>
                       ) : null}
@@ -880,143 +950,124 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                 {type === "cq" && (
                   <div className="space-y-6">
                     {subQuestions.map((subQ: any, idx: number) => (
-                      <div key={idx} className="pl-4 border-l-2 border-gray-100 ml-1">
-                        <div className="text-sm md:text-base font-medium text-gray-700 mb-2 flex justify-between items-start gap-4">
+                      <div key={idx} className="p-4 bg-muted/20 rounded-2xl border border-border/50">
+                        <div className="text-base font-bold text-foreground mb-4 flex justify-between items-start gap-4">
                           <span>
-                            {idx + 1}. <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
+                            {toBengaliAlphabets(idx)}. <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.question || subQ || "")}</UniversalMathJax>
                           </span>
                           {subQ.marks && (
-                            <Badge variant="outline" className="shrink-0 text-[10px] sm:text-xs">
-                              {subQ.marks} Mark{Number(subQ.marks) !== 1 && 's'}
+                            <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase tracking-tighter">
+                              {subQ.marks} Point{Number(subQ.marks) !== 1 && 's'}
                             </Badge>
                           )}
                         </div>
                         {subQ.image && (
-                          <div className="mt-2">
-                            <ZoomableImage src={subQ.image} alt="Sub-question" className="max-h-32 w-full rounded border bg-white object-contain" />
+                          <div className="mb-4">
+                            <ZoomableImage src={subQ.image} alt="Sub-question" className="max-h-48 w-full rounded-xl border bg-card p-1" />
                           </div>
                         )}
 
-                        <div className="space-y-2">
-                          <Input
+                        <div className="space-y-4">
+                          <DebouncedInput
                             value={answers[`${question.id}_sub_${idx}`] || ""}
-                            onChange={(e) => setAnswers({ ...answers, [`${question.id}_sub_${idx}`]: e.target.value })}
-                            className="bg-gray-50/50"
-                            disabled={disabled || submitted}
-                            placeholder="Type answer..."
+                            onChange={(val) => handleSubAnswerChange(idx, val)}
+                            disabled={!!(disabled || submitted)}
+                            placeholder="Type your answer here..."
                           />
-                          <div className="space-y-2">
-                            {/* Image Gallery for Sub-question */}
-                            {(() => {
-                              const singleImage = answers[`${question.id}_sub_${idx}_image`];
-                              const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
-                              const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
 
-                              return allImages.length > 0 ? (
-                                <div>
-                                  <div className="text-xs font-semibold text-gray-600 mb-2">Uploaded Images ({allImages.length}/5)</div>
-                                  <div className="flex flex-wrap gap-2">
-                                    {allImages.map((imgUrl: string, imgIdx: number) => (
-                                      <div key={imgIdx} className="relative group">
-                                        <ZoomableImage
-                                          src={imgUrl}
-                                          alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
-                                          className="h-20 w-20 object-cover rounded border border-gray-300"
-                                        />
-                                        {!disabled && !submitted && (
-                                          <button
-                                            onClick={() => {
-                                              const newAnswers = { ...answers };
-                                              const updatedImages = allImages.filter((_: string, i: number) => i !== imgIdx);
-                                              if (updatedImages.length > 0) {
-                                                newAnswers[`${question.id}_sub_${idx}_images`] = updatedImages;
-                                              } else {
-                                                delete newAnswers[`${question.id}_sub_${idx}_images`];
-                                              }
-                                              delete newAnswers[`${question.id}_sub_${idx}_image`];
-                                              setAnswers(newAnswers);
-                                            }}
-                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </button>
-                                        )}
-                                      </div>
-                                    ))}
+                          {/* Image Gallery for Sub-question */}
+                          {(() => {
+                            const singleImage = answers[`${question.id}_sub_${idx}_image`];
+                            const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
+                            const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                            return allImages.length > 0 ? (
+                              <div className="flex flex-wrap gap-2">
+                                {allImages.map((imgUrl: string, imgIdx: number) => (
+                                  <div key={imgIdx} className="relative group">
+                                    <ZoomableImage
+                                      src={imgUrl}
+                                      alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
+                                      className="h-16 w-16 object-cover rounded-lg border border-border"
+                                    />
+                                    {!disabled && !submitted && (
+                                      <button
+                                        onClick={() => {
+                                          setAnswers((prev: any) => {
+                                            const newAnswers = { ...prev };
+                                            const updatedImages = allImages.filter((_: string, i: number) => i !== imgIdx);
+                                            if (updatedImages.length > 0) {
+                                              newAnswers[`${question.id}_sub_${idx}_images`] = updatedImages;
+                                            } else {
+                                              delete newAnswers[`${question.id}_sub_${idx}_images`];
+                                            }
+                                            delete newAnswers[`${question.id}_sub_${idx}_image`];
+                                            return newAnswers;
+                                          });
+                                        }}
+                                        className="absolute -top-1 -right-1 bg-rose-500 text-white rounded-full p-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+                                      >
+                                        <X className="w-2.5 h-2.5" />
+                                      </button>
+                                    )}
                                   </div>
-                                </div>
-                              ) : null;
-                            })()}
-
-                            {/* Upload Button */}
-                            {!disabled && !submitted && (
-                              ((answers[`${question.id}_sub_${idx}_image`] ? 1 : 0) + (answers[`${question.id}_sub_${idx}_images`]?.length || 0)) < 5
-                            ) ? (
-                              <div className="relative">
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  multiple
-                                  onClick={() => setIsUploading?.(true)}
-                                  onChange={async (e) => {
-                                    const files = Array.from(e.target.files || []);
-                                    if (files.length === 0) {
-                                      setIsUploading?.(false);
-                                      return;
-                                    }
-
-                                    const singleImage = answers[`${question.id}_sub_${idx}_image`];
-                                    const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
-                                    const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
-
-                                    const remainingSlots = 5 - currentImages.length;
-                                    const filesToUpload = files.slice(0, remainingSlots);
-
-                                    if (files.length > remainingSlots) {
-                                      toast.warning(`Only uploading ${remainingSlots} image(s). Maximum 5 images per sub-question.`);
-                                    }
-
-                                    const uploadedUrls: string[] = [];
-
-                                    for (const file of filesToUpload) {
-                                      const formData = new FormData();
-                                      formData.append('file', file);
-                                      try {
-                                        const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                        const data = await res.json();
-
-                                        if (res.ok) {
-                                          uploadedUrls.push(data.url);
-                                          toast.success(`Image ${uploadedUrls.length}/${filesToUpload.length} uploaded!`);
-                                        } else {
-                                          console.error('Upload failed:', data);
-                                          toast.error(`Upload failed: ${data.error || 'Unknown error'}`);
-                                        }
-                                      } catch (err) {
-                                        console.error('Upload error:', err);
-                                        toast.error('Failed to upload image. Please try again.');
-                                      }
-                                    }
-
-                                    if (uploadedUrls.length > 0) {
-                                      const newAnswers = { ...answers };
-                                      delete newAnswers[`${question.id}_sub_${idx}_image`];
-                                      newAnswers[`${question.id}_sub_${idx}_images`] = [...currentImages, ...uploadedUrls];
-                                      setAnswers(newAnswers);
-                                    }
-
-                                    setIsUploading?.(false);
-                                    e.target.value = '';
-                                  }}
-                                  className="hidden"
-                                  id={`q-img-${question.id}-${idx}`}
-                                />
-                                <label htmlFor={`q-img-${question.id}-${idx}`} className="flex items-center gap-2 cursor-pointer text-xs text-indigo-600 hover:text-indigo-800">
-                                  <Upload className="w-3 h-3" /> Upload Image (Max 5)
-                                </label>
+                                ))}
                               </div>
-                            ) : null}
-                          </div>
+                            ) : null;
+                          })()}
+
+                          {/* Upload Button */}
+                          {!disabled && !submitted && (
+                            ((answers[`${question.id}_sub_${idx}_image`] ? 1 : 0) + (answers[`${question.id}_sub_${idx}_images`]?.length || 0)) < 5
+                          ) ? (
+                            <div className="relative">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                multiple
+                                onClick={() => setIsUploading?.(true)}
+                                onChange={async (e) => {
+                                  const files = Array.from(e.target.files || []);
+                                  if (files.length === 0) {
+                                    setIsUploading?.(false);
+                                    return;
+                                  }
+
+                                  const singleImage = answers[`${question.id}_sub_${idx}_image`];
+                                  const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
+                                  const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                                  const remainingSlots = 5 - currentImages.length;
+                                  const filesToUpload = files.slice(0, remainingSlots);
+
+                                  const uploadedUrls: string[] = [];
+                                  for (const file of filesToUpload) {
+                                    const formData = new FormData();
+                                    formData.append('file', file);
+                                    try {
+                                      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                      const data = await res.json();
+                                      if (res.ok) uploadedUrls.push(data.url);
+                                    } catch (err) { console.error('Upload error:', err); }
+                                  }
+
+                                  if (uploadedUrls.length > 0) {
+                                    setAnswers((prev: any) => ({
+                                      ...prev,
+                                      [`${question.id}_sub_${idx}_images`]: [...currentImages, ...uploadedUrls]
+                                    }));
+                                  }
+                                  setIsUploading?.(false);
+                                  e.target.value = '';
+                                }}
+                                className="hidden"
+                                id={`q-img-${question.id}-${idx}`}
+                              />
+                              <label htmlFor={`q-img-${question.id}-${idx}`} className="inline-flex items-center gap-1.5 cursor-pointer text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/70 bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
+                                <Upload className="w-3 h-3" /> Upload Photo (Max 5)
+                              </label>
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                     ))}
@@ -1031,19 +1082,249 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
                 value={userAnswer?.answer || ""}
                 onChange={(e) => handleAnswerChange({ answer: parseInt(e.target.value) || 0 })}
                 disabled={disabled || submitted}
-                className="w-full max-w-xs text-lg p-6 border-2 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                placeholder="Enter integer answer..."
+                className="w-full max-w-xs text-xl font-bold p-8 border-2 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
+                placeholder="Type Number..."
               />
             )}
+
+            {type === "descriptive" && (() => {
+              const parts: any[] = question.subQuestions || [];
+              return (
+                <div className="space-y-8">
+                  {parts.map((part: any, pIdx: number) => {
+                    const ansKey = (sub: string | number) => `${question.id}_desc_${pIdx}_${sub}`;
+                    const getAns = (sub: string | number) => userAnswer?.[ansKey(sub)] ?? '';
+                    const setAns = (sub: string | number, val: string) =>
+                      handleAnswerChange({ ...userAnswer, [ansKey(sub)]: val });
+
+                    return (
+                      <div key={pIdx} className="space-y-3 border rounded-xl p-4 bg-amber-50/40 dark:bg-amber-900/10">
+                        {/* Part header */}
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${pIdx + 1}`}</span>
+                          <span className="text-xs text-muted-foreground">[{part.marks} marks]</span>
+                        </div>
+
+                        {/* Instructions */}
+                        {part.instructions && (
+                          <p className="text-sm text-gray-700 dark:text-gray-300 italic">{part.instructions}</p>
+                        )}
+
+                        {/* ── WRITING ── */}
+                        {part.subType === 'writing' && (
+                          <div className="space-y-2">
+                            {/* Source text for translation / summary */}
+                            {part.sourceText && (
+                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm whitespace-pre-wrap">
+                                {part.sourceText}
+                              </div>
+                            )}
+                            <DebouncedTextarea
+                              value={getAns('ans') as string}
+                              onChange={(val) => setAns('ans', val)}
+                              disabled={!!(disabled || submitted)}
+                              rows={8}
+                              placeholder={
+                                part.writingType === 'translation' ? 'Write your Bangla translation here…' :
+                                  part.writingType === 'summary' ? 'Write your summary / সারাংশ here…' :
+                                    part.writingType === 'story' ? 'Continue the story here…' :
+                                      part.writingType === 'dialogue' ? 'Write the dialogue here…' :
+                                        'Write your answer here…'
+                              }
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+
+                        {/* ── FILL_IN ── */}
+                        {part.subType === 'fill_in' && (
+                          <div className="space-y-3">
+                            {/* Word/Verb Box */}
+                            {part.wordBox && part.wordBox.length > 0 && (
+                              <div className="flex flex-wrap gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                                <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 w-full mb-1">Word Box:</span>
+                                {part.wordBox.map((w: string, wi: number) => (
+                                  <span key={wi} className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-800/50 text-indigo-800 dark:text-indigo-200 rounded text-xs font-mono">{w}</span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Gap passage with inline inputs */}
+                            {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (() => {
+                              const segments = part.passage.split('___');
+                              return (
+                                <div className="text-sm leading-relaxed p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                                  {segments.map((seg: string, si: number) => (
+                                    <span key={si}>
+                                      <span>{seg}</span>
+                                      {si < segments.length - 1 && (
+                                        <input
+                                          type="text"
+                                          value={getAns(si) as string}
+                                          onChange={(e) => setAns(si, e.target.value)}
+                                          disabled={disabled || submitted}
+                                          className="inline-block w-24 border-b-2 border-amber-400 bg-transparent text-center text-sm focus:outline-none focus:border-primary mx-1"
+                                          placeholder={`(${si + 1})`}
+                                        />
+                                      )}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })()}
+
+                            {/* Item-based fill types */}
+                            {part.fillType && part.fillType !== 'gap_passage' && (
+                              <div className="space-y-2">
+                                {(part.items || []).map((item: string, ii: number) => (
+                                  <div key={ii} className="flex gap-3 items-start">
+                                    <span className="text-sm font-semibold text-gray-500 w-6 pt-2 flex-shrink-0">{ii + 1}.</span>
+                                    <div className="flex-1 space-y-1">
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">{item}</p>
+                                      <input
+                                        type="text"
+                                        value={getAns(ii) as string}
+                                        onChange={(e) => setAns(ii, e.target.value)}
+                                        disabled={disabled || submitted}
+                                        className="w-full border-b-2 border-amber-400 bg-transparent text-sm focus:outline-none focus:border-primary py-1"
+                                        placeholder={
+                                          part.fillType === 'punctuation' ? 'Rewrite with punctuation…' :
+                                            part.fillType === 'sentence_change' ? 'Write the changed sentence…' :
+                                              part.fillType === 'tag_question' ? 'Write the tag…' :
+                                                'Your answer…'
+                                        }
+                                      />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── COMPREHENSION ── */}
+                        {part.subType === 'comprehension' && (
+                          <div className="space-y-4">
+                            {/* Stem passage */}
+                            {part.stemPassage && (
+                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm whitespace-pre-wrap">
+                                {part.stemPassage}
+                              </div>
+                            )}
+
+                            {/* Q&A mode */}
+                            {(!part.answerType || part.answerType === 'qa') && (
+                              <div className="space-y-4">
+                                {part.requiredCount && (
+                                  <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold">
+                                    Answer any {part.requiredCount} out of {(part.questions || []).length} questions.
+                                  </p>
+                                )}
+                                {(part.questions || []).map((q: string, qi: number) => (
+                                  <div key={qi} className="space-y-1">
+                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{qi + 1}. {q}</p>
+                                    <DebouncedTextarea
+                                      value={getAns(qi) as string}
+                                      onChange={(val) => setAns(qi, val)}
+                                      disabled={!!(disabled || submitted)}
+                                      rows={3}
+                                      placeholder="Write your answer here…"
+                                      className="w-full"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Stem MCQ mode */}
+                            {part.answerType === 'stem_mcq' && (
+                              <div className="space-y-4">
+                                {(part.stemQuestions || []).map((sq: any, sqi: number) => {
+                                  const chosen = getAns(sqi);
+                                  return (
+                                    <div key={sqi} className="space-y-2">
+                                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{sqi + 1}. {sq.question}</p>
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4">
+                                        {(sq.options || []).map((opt: string, oi: number) => (
+                                          <button
+                                            key={oi}
+                                            type="button"
+                                            disabled={disabled || submitted}
+                                            onClick={() => setAns(sqi, String(oi))}
+                                            className={`flex items-center gap-2 p-2 rounded-lg border text-sm text-left transition-all ${String(chosen) === String(oi)
+                                              ? 'border-primary bg-primary/10 text-primary font-semibold'
+                                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'}`}
+                                          >
+                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${String(chosen) === String(oi) ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}>
+                                              {String.fromCharCode(65 + oi)}
+                                            </span>
+                                            {opt}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* ── TABLE ── */}
+                        {part.subType === 'table' && (
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse text-sm">
+                              <thead>
+                                <tr>
+                                  {(part.tableHeaders || []).map((h: string, hi: number) => (
+                                    <th key={hi} className="border border-gray-300 dark:border-gray-700 p-2 bg-amber-100 dark:bg-amber-900/30 font-semibold text-left">{h}</th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {(part.tableRows || []).map((row: string[], ri: number) => (
+                                  <tr key={ri}>
+                                    {(part.tableHeaders || []).map((_: string, ci: number) => {
+                                      const isBlank = !row[ci] || row[ci] === '___';
+                                      return (
+                                        <td key={ci} className="border border-gray-300 dark:border-gray-700 p-2">
+                                          {isBlank ? (
+                                            <input
+                                              type="text"
+                                              value={getAns(`${ri}_${ci}`) as string}
+                                              onChange={(e) => setAns(`${ri}_${ci}`, e.target.value)}
+                                              disabled={disabled || submitted}
+                                              className="w-full border-b-2 border-amber-400 bg-transparent focus:outline-none focus:border-primary py-0.5"
+                                              placeholder="Fill in…"
+                                            />
+                                          ) : (
+                                            <span className="text-gray-700 dark:text-gray-300">{row[ci]}</span>
+                                          )}
+                                        </td>
+                                      );
+                                    })}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+
           </div>
 
           {/* Status Bar */}
-          <div className="mt-8 flex items-center justify-between text-xs text-gray-400 border-t pt-4">
-            <div>Question ID: {question.id.slice(-6)}</div>
-            <div className="flex items-center gap-2">
-              {saveStatus === 'saving' && <span className="text-indigo-500">Running autosave...</span>}
-              {saveStatus === 'saved' && <span className="text-green-500">Changes saved</span>}
-              {saveStatus === 'error' && <span className="text-red-500">Save failed (working offline)</span>}
+          <div className="mt-10 flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/50 pt-5 uppercase tracking-widest font-black">
+            <div className="opacity-40">Q-REF: {question.id.slice(-8)}</div>
+            <div className="flex items-center gap-3">
+              {saveStatus === 'saving' && <span className="text-primary flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" /> Synchronizing...</span>}
+              {saveStatus === 'saved' && <span className="text-emerald-500">Cloud Sync Verified</span>}
+              {saveStatus === 'error' && <span className="text-rose-500">Sync Offline (Local Only)</span>}
             </div>
           </div>
 
@@ -1051,4 +1332,6 @@ export default function QuestionCard({ disabled, result, submitted, isMCQOnly, q
       </Card>
     </MathJaxContext >
   );
-} 
+}
+
+export default memo(QuestionCard);

@@ -30,6 +30,8 @@ const examSchema = z.object({
     cqRequiredQuestions: z.coerce.number().optional(),
     sqTotalQuestions: z.coerce.number().optional(),
     sqRequiredQuestions: z.coerce.number().optional(),
+    objectiveTime: z.coerce.number().optional(),
+    cqSqTime: z.coerce.number().optional(),
     cqSubsections: z.array(cqSubsectionSchema).optional(),
 });
 

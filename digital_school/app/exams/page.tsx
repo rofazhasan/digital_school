@@ -60,6 +60,8 @@ type Exam = {
   cqRequiredQuestions?: number;
   sqTotalQuestions?: number;
   sqRequiredQuestions?: number;
+  objectiveTime?: number;
+  cqSqTime?: number;
 };
 
 type FilterState = {
@@ -104,7 +106,9 @@ export default function ExamsPage() {
     startTime: '',
     endTime: '',
     duration: 0,
-    allowRetake: false
+    allowRetake: false,
+    objectiveTime: 0,
+    cqSqTime: 0
   });
 
   const { toast } = useToast();
@@ -209,7 +213,9 @@ export default function ExamsPage() {
       startTime: formatDateTime(startDate),
       endTime: formatDateTime(endDate),
       duration: exam.duration || 0,
-      allowRetake: exam.allowRetake || false
+      allowRetake: exam.allowRetake || false,
+      objectiveTime: exam.objectiveTime || 0,
+      cqSqTime: exam.cqSqTime || 0
     });
 
     setIsEditOpen(true);
@@ -243,7 +249,9 @@ export default function ExamsPage() {
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           duration: duration,
-          allowRetake: editForm.allowRetake
+          allowRetake: editForm.allowRetake,
+          objectiveTime: Number(editForm.objectiveTime) || 0,
+          cqSqTime: Number(editForm.cqSqTime) || 0
         }),
       });
 
@@ -1175,8 +1183,32 @@ export default function ExamsPage() {
                 />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="objectiveTime" className="text-right">
+                  Objective Time (m)
+                </Label>
+                <Input
+                  id="objectiveTime"
+                  type="number"
+                  value={editForm.objectiveTime}
+                  onChange={(e) => setEditForm({ ...editForm, objectiveTime: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="cqSqTime" className="text-right">
+                  CQ/SQ Time (m)
+                </Label>
+                <Input
+                  id="cqSqTime"
+                  type="number"
+                  value={editForm.cqSqTime}
+                  onChange={(e) => setEditForm({ ...editForm, cqSqTime: parseInt(e.target.value) || 0 })}
+                  className="col-span-3"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="duration" className="text-right">
-                  Duration (mins)
+                  Total Duration (m)
                 </Label>
                 <Input
                   id="duration"

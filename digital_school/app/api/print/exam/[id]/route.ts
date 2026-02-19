@@ -20,7 +20,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   const exam = await prismadb.exam.findUnique({
     where: { id: examId },
     include: {
-      class: true,
+      class: {
+        include: {
+          institute: true
+        }
+      },
       examSets: {
         include: {
           questions: {
@@ -32,7 +36,6 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
               options: true,
               subQuestions: true,
               modelAnswer: true,
-
             }
           },
         },
@@ -93,12 +96,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     totalMarks: exam.totalMarks?.toString() || '',
     invigilator: '', // Add if available
     room: '', // Add if available
-    schoolName: '', // Add if available
-    schoolAddress: '', // Add if available
+    schoolName: exam.class?.institute?.name || '',
+    schoolAddress: exam.class?.institute?.address || '',
+    schoolLogo: exam.class?.institute?.logoUrl || '',
     // Add negative marking and question selection info
     mcqNegativeMarking: exam.mcqNegativeMarking || 0,
     cqRequiredQuestions: exam.cqRequiredQuestions || 0,
     sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+    objectiveTime: (exam as any).objectiveTime || null,
+    cqSqTime: (exam as any).cqSqTime || null,
     cqSubsections: exam.cqSubsections || null,
   };
 
@@ -247,6 +253,10 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       ...q,
     }));
 
+    const descriptive = questionsArr.filter((q: any) => q.type === 'DESCRIPTIVE').map((q: any) => ({
+      ...q,
+    }));
+
     return {
       setId: set.id,
       setName: set.name,
@@ -257,6 +267,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       mtf,
       cq,
       sq,
+      descriptive,
       qrData: { examId, setId: set.id, classId: exam.classId },
       barcode: `${examId}|${set.id}|${exam.classId}`,
     };
@@ -267,7 +278,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     set.ar?.length ||
     set.mtf?.length ||
     set.cq?.length ||
-    set.sq?.length
+    set.sq?.length ||
+    set.descriptive?.length
   );
 
   return NextResponse.json({ examInfo, sets });

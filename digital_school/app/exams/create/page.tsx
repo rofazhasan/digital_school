@@ -47,6 +47,8 @@ const schema = z.object({
   cqRequiredQuestions: z.coerce.number().min(0).optional(),
   sqTotalQuestions: z.coerce.number().min(0).optional(),
   sqRequiredQuestions: z.coerce.number().min(0).optional(),
+  objectiveTime: z.coerce.number().min(0).optional(),
+  cqSqTime: z.coerce.number().min(0).optional(),
   cqSubsections: z.array(cqSubsectionSchema).optional(),
 }).refine((data) => {
   if (data.cqRequiredQuestions !== undefined && data.cqTotalQuestions !== undefined) {
@@ -114,9 +116,23 @@ export default function CreateExamPage() {
       cqRequiredQuestions: 5,
       sqTotalQuestions: 15,
       sqRequiredQuestions: 5,
+      objectiveTime: 20,
+      cqSqTime: 40,
       cqSubsections: [],
     },
   });
+
+  const objectiveTime = form.watch("objectiveTime");
+  const cqSqTime = form.watch("cqSqTime");
+
+  useEffect(() => {
+    if (objectiveTime !== undefined || cqSqTime !== undefined) {
+      const objT = Number(objectiveTime);
+      const cqT = Number(cqSqTime);
+      const total = (isNaN(objT) ? 0 : objT) + (isNaN(cqT) ? 0 : cqT);
+      form.setValue("duration", total);
+    }
+  }, [objectiveTime, cqSqTime, form]);
 
   const cqTotalQuestions = form.watch("cqTotalQuestions");
   const cqSubsections = form.watch("cqSubsections");
@@ -258,6 +274,8 @@ export default function CreateExamPage() {
       "CQ Required",
       "SQ Total",
       "SQ Required",
+      "Objective Time (mins)",
+      "CQ/SQ Time (mins)",
       // Subsection 1
       "Sub 1 Name",
       "Sub 1 Start",
@@ -287,6 +305,8 @@ export default function CreateExamPage() {
       5,
       15,
       10,
+      20, // Objective Time
+      40, // CQ/SQ Time
       "Algebra", 1, 3, 2, // Sub 1
       "Geometry", 4, 8, 3 // Sub 2
     ];
@@ -492,11 +512,13 @@ export default function CreateExamPage() {
           classId: "", // Will be resolved in validation
           allowRetake: false,
           instructions: getValue(row, ["Instructions"]) || "",
-          mcqNegativeMarking: parseFloat(getValue(row, ["MCQ Negative Marking"]) ?? 0),
-          cqTotalQuestions: parseInt(getValue(row, ["CQ Total"]) ?? 8),
-          cqRequiredQuestions: parseInt(getValue(row, ["CQ Required"]) ?? 5),
-          sqTotalQuestions: parseInt(getValue(row, ["SQ Total"]) ?? 15),
-          sqRequiredQuestions: parseInt(getValue(row, ["SQ Required"]) ?? 5),
+          mcqNegativeMarking: parseFloat(getValue(row, ["MCQ Negative Marking", "Negative Marking"]) ?? 0) || 0,
+          cqTotalQuestions: parseInt(getValue(row, ["CQ Total Questions", "Total CQ"]) ?? 0) || 0,
+          cqRequiredQuestions: parseInt(getValue(row, ["CQ Required Questions", "Required CQ"]) ?? 0) || 0,
+          sqTotalQuestions: parseInt(getValue(row, ["SQ Total Questions", "Total SQ"]) ?? 0) || 0,
+          sqRequiredQuestions: parseInt(getValue(row, ["SQ Required Questions", "Required SQ"]) ?? 0) || 0,
+          objectiveTime: parseInt(getValue(row, ["Objective Time"]) ?? 20) || 20,
+          cqSqTime: parseInt(getValue(row, ["CQ/SQ Time", "CQ SQ Time"]) ?? 40) || 40,
           cqSubsections: subsections
         };
 
@@ -639,6 +661,14 @@ export default function CreateExamPage() {
                           )} />
                           <FormField name="endTime" control={form.control} render={({ field }) => (
                             <FormItem><FormLabel>End Time</FormLabel><FormControl><Input type="datetime-local" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <FormField name="objectiveTime" control={form.control} render={({ field }) => (
+                            <FormItem><FormLabel>Objective Time (mins)</FormLabel><FormControl><Input type="number" min={0} {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                          <FormField name="cqSqTime" control={form.control} render={({ field }) => (
+                            <FormItem><FormLabel>CQ/SQ Time (mins)</FormLabel><FormControl><Input type="number" min={0} {...field} /></FormControl><FormMessage /></FormItem>
                           )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

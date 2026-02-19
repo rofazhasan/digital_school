@@ -45,26 +45,57 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     let targetExamSetId = examStudentMap?.examSetId || null;
 
     // 2. If not in map or for validation, try finding it from existing submission
-    const existingSubmission = await prisma.examSubmission.findUnique({
+    const existingSubmission = (await prisma.examSubmission.findUnique({
       where: { studentId_examId: { studentId, examId } },
-      select: { examSetId: true, startedAt: true }
-    });
+      select: {
+        examSetId: true,
+        startedAt: true,
+        objectiveStartedAt: true,
+        cqSqStartedAt: true,
+        status: true
+      } as any
+    })) as any;
 
     if (!targetExamSetId && existingSubmission?.examSetId) {
       targetExamSetId = existingSubmission.examSetId;
     }
 
-    // TIME VALIDATION
+    // Determine current section being submitted
+    const section = data.section || 'objective';
+    const isObjective = section === 'objective';
+    const isCqSq = section === 'cqsq';
+
+    // TIME VALIDATION (Strict Enforcement)
+    const bufferMs = 120 * 1000; // 2 minutes buffer
+    const now = Date.now();
+
+    // A. Section-Specific Timing
+    if (isObjective && (exam as any).objectiveTime && existingSubmission?.objectiveStartedAt) {
+      const objStartTime = new Date(existingSubmission.objectiveStartedAt).getTime();
+      const objLimitMs = (exam as any).objectiveTime * 60 * 1000;
+      if (now > objStartTime + objLimitMs + bufferMs) {
+        console.warn(`[Submit] MCQ Time Limit Exceeded for student ${studentId}.`);
+        return NextResponse.json({ error: "MCQ time limit exceeded. Submission rejected.", section: 'objective' }, { status: 403 });
+      }
+    }
+
+    if (isCqSq && (exam as any).cqSqTime && existingSubmission?.cqSqStartedAt) {
+      const cqStartTime = new Date(existingSubmission.cqSqStartedAt).getTime();
+      const cqLimitMs = (exam as any).cqSqTime * 60 * 1000;
+      if (now > cqStartTime + cqLimitMs + bufferMs) {
+        console.warn(`[Submit] CQ/SQ Time Limit Exceeded for student ${studentId}.`);
+        return NextResponse.json({ error: "CQ/SQ time limit exceeded. Submission rejected.", section: 'cqsq' }, { status: 403 });
+      }
+    }
+
+    // B. Overall Timing
     if (existingSubmission?.startedAt) {
       const startTime = new Date(existingSubmission.startedAt).getTime();
       const durationMs = exam.duration * 60 * 1000;
-      const bufferMs = 120 * 1000; // 2 minutes buffer
-      const now = Date.now();
 
       if (now > startTime + durationMs + bufferMs) {
-        console.warn(`[Submit] Time Limit Exceeded for user ${studentId} (Accepting as late/auto-submit). Started: ${existingSubmission.startedAt}, Limit: ${durationMs / 60000}m`);
-        // We PROCEED to save the submission so the status becomes 'SUBMITTED' and the user doesn't get stuck.
-        // We can optionally flag this as late in the future if the schema supports it.
+        console.warn(`[Submit] Overall Time Limit Exceeded for user ${studentId}.`);
+        return NextResponse.json({ error: "Overall exam time limit exceeded. Submission rejected." }, { status: 403 });
       }
     }
 
@@ -116,25 +147,39 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (exam.cqRequiredQuestions && cqAnswered > exam.cqRequiredQuestions) exceededQuestionLimit = true;
     if (exam.sqRequiredQuestions && sqAnswered > exam.sqRequiredQuestions) exceededQuestionLimit = true;
 
+    // Check if there is a CQ/SQ section to follow
+    const hasCqSqSection = (exam.cqTotalQuestions || 0) > 0 || (exam.sqTotalQuestions || 0) > 0;
+    const isFinalSubmission = isCqSq || (!hasCqSqSection && isObjective);
+
+    const updateData: any = {
+      answers: processedAnswers,
+      exceededQuestionLimit
+    };
+
+    if (isObjective) {
+      updateData.objectiveStatus = 'SUBMITTED';
+      updateData.objectiveSubmittedAt = new Date();
+    }
+
+    if (isCqSq) {
+      updateData.cqSqStatus = 'SUBMITTED';
+      updateData.cqSqSubmittedAt = new Date();
+    }
+
+    if (isFinalSubmission) {
+      updateData.status = 'SUBMITTED';
+      updateData.submittedAt = new Date();
+    }
+
     // Save submission
     const submission = await prisma.examSubmission.upsert({
       where: { studentId_examId: { studentId, examId } },
-      update: {
-        answers: processedAnswers,
-        submittedAt: new Date(),
-        // @ts-ignore
-        status: 'SUBMITTED',
-        examSetId: targetExamSetId, // Use preserved or found ID
-        exceededQuestionLimit
-      },
+      update: updateData,
       create: {
         studentId,
         examId,
-        answers: processedAnswers,
-        // @ts-ignore
-        status: 'SUBMITTED',
         examSetId: targetExamSetId,
-        exceededQuestionLimit
+        ...updateData
       },
     });
 

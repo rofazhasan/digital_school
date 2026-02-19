@@ -65,8 +65,11 @@ export async function GET(
     // -------------------------------------------
 
     // Dynamic ExamSet filtering
-    const examSetWhere = studentId
-      ? (targetExamSetId ? { id: targetExamSetId } : { id: 'none' })
+    // IMPORTANT: Only filter to a specific set when we have a confirmed examSetId.
+    // If the student has no examSetId (not mapped to a set), fall back to fetching all
+    // exam sets (same as the initial load) so evaluation still works correctly.
+    const examSetWhere = (studentId && targetExamSetId)
+      ? { id: targetExamSetId }
       : {};
 
     // Common selection object for sub-relations to reuse

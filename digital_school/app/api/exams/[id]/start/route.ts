@@ -45,29 +45,51 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // Create or update submission with startedAt timestamp
     const now = new Date();
+    // Get section from body
+    let section = 'objective';
+    try {
+      const body = await req.json();
+      section = body.section || 'objective';
+    } catch (e) { }
+
+    const dataToUpdate: any = {
+      status: 'IN_PROGRESS',
+      examSetId: examStudentMap?.examSetId || null
+    };
+
+    if (section === 'objective') {
+      dataToUpdate.objectiveStatus = 'IN_PROGRESS';
+    } else if (section === 'cqsq') {
+      dataToUpdate.cqSqStatus = 'IN_PROGRESS';
+    }
+
     const submission = await prisma.examSubmission.upsert({
       where: { studentId_examId: { studentId, examId } },
-      update: {
-        // Only set startedAt if it's currently null to prevent resetting time on re-entry
-        // Also ensure status is IN_PROGRESS
-        status: 'IN_PROGRESS',
-        examSetId: examStudentMap?.examSetId || null
-      },
+      update: dataToUpdate,
       create: {
         studentId,
         examId,
         examSetId: examStudentMap?.examSetId || null,
         answers: {}, // Initialize with empty answers
         startedAt: now,
+        objectiveStartedAt: section === 'objective' ? now : null,
+        cqSqStartedAt: section === 'cqsq' ? now : null,
         status: 'IN_PROGRESS',
+        objectiveStatus: section === 'objective' ? 'IN_PROGRESS' : 'IN_PROGRESS',
+        cqSqStatus: 'IN_PROGRESS',
       },
     });
 
-    // If it was an update and startedAt was null, update it now
-    if (submission && !submission.startedAt) {
+    // If it was an update and specific startedAt was null, update it now
+    if (section === 'objective' && !submission.objectiveStartedAt) {
       await prisma.examSubmission.update({
         where: { id: submission.id },
-        data: { startedAt: now, status: 'IN_PROGRESS' }
+        data: { objectiveStartedAt: now, startedAt: submission.startedAt || now }
+      });
+    } else if (section === 'cqsq' && !submission.cqSqStartedAt) {
+      await prisma.examSubmission.update({
+        where: { id: submission.id },
+        data: { cqSqStartedAt: now }
       });
     }
 

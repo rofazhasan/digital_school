@@ -28,7 +28,7 @@ import { cleanupMath } from "@/lib/utils";
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -211,13 +211,19 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           </div>
         )}
 
-        {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') && (question.subQuestions || question.sub_questions) && (
+        {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ' || question.type?.toUpperCase() === 'DESCRIPTIVE') && (question.subQuestions || question.sub_questions) && (
           <div className="mt-3 space-y-3">
-            <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Sub Questions:</span>
+            <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
+              {question.type?.toUpperCase() === 'DESCRIPTIVE' ? 'Descriptive Parts:' : 'Sub Questions:'}
+            </span>
             {(question.subQuestions || question.sub_questions || []).map((sq: any, i: number) => (
               <div key={i} className="pl-4 border-l-2 border-indigo-100 dark:border-indigo-900 py-1">
                 <div className="text-xs font-medium">
-                  {String.fromCharCode(97 + i)}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax>
+                  {question.type?.toUpperCase() === 'DESCRIPTIVE' ? (
+                    <span>Part {sq.label || (i + 1)}: {sq.subType?.replace('_', ' ')}</span>
+                  ) : (
+                    <span>{String.fromCharCode(97 + i)}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax></span>
+                  )}
                   <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
                 </div>
                 {sq.image && (
@@ -510,7 +516,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(q.type)), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -557,7 +563,7 @@ export default function ExamBuilderPage() {
     }
 
     // For MCQ/Objective questions, check if adding would exceed total marks
-    if (['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(question.type)) {
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -576,7 +582,7 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF'].includes(question.type)) {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
       return `Add ${question.type} Question`;
     }

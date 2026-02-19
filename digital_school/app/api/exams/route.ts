@@ -59,35 +59,40 @@ export async function GET(request: NextRequest) {
         });
 
         // Find the subject with the highest count
-        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
-          (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
-        );
-
-        examSubject = mostCommonSubject[0] || '';
+        const entries = Object.entries(subjectCounts);
+        if (entries.length > 0) {
+          const mostCommonSubject = entries.reduce((a, b) =>
+            (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+          );
+          examSubject = mostCommonSubject[0] || '';
+        }
       }
 
+      const examAny = exam as any;
       const examData = {
-        id: exam.id,
-        name: exam.name,
-        description: exam.description,
-        date: exam.date,
-        startTime: exam.startTime,
-        endTime: exam.endTime,
-        subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
-        totalMarks: exam.totalMarks,
-        isActive: exam.isActive,
-        createdBy: exam.createdBy?.name || '',
-        classId: exam.classId,
-        createdAt: exam.createdAt,
-        generatedSet: exam.generatedSet || null,
-        type: exam.type,
-        allowRetake: exam.allowRetake || false,
-        mcqNegativeMarking: exam.mcqNegativeMarking,
-        cqTotalQuestions: exam.cqTotalQuestions || 0,
-        cqRequiredQuestions: exam.cqRequiredQuestions || 0,
-        sqTotalQuestions: exam.sqTotalQuestions || 0,
-        sqRequiredQuestions: exam.sqRequiredQuestions || 0,
-        cqSubsections: exam.cqSubsections || null,
+        id: examAny.id,
+        name: examAny.name,
+        description: examAny.description,
+        date: examAny.date,
+        startTime: examAny.startTime,
+        endTime: examAny.endTime,
+        subject: examSubject || examAny.class?.name || '', // Use actual subject, fallback to class name
+        totalMarks: examAny.totalMarks,
+        isActive: examAny.isActive,
+        createdBy: examAny.createdBy?.name || '',
+        classId: examAny.classId,
+        createdAt: examAny.createdAt,
+        generatedSet: examAny.generatedSet || null,
+        type: examAny.type,
+        allowRetake: examAny.allowRetake || false,
+        mcqNegativeMarking: examAny.mcqNegativeMarking,
+        cqTotalQuestions: examAny.cqTotalQuestions || 0,
+        cqRequiredQuestions: examAny.cqRequiredQuestions || 0,
+        sqTotalQuestions: examAny.sqTotalQuestions || 0,
+        sqRequiredQuestions: examAny.sqRequiredQuestions || 0,
+        objectiveTime: examAny.objectiveTime || null,
+        cqSqTime: examAny.cqSqTime || null,
+        cqSubsections: examAny.cqSubsections || null,
       };
 
       // Cache the result for 5 minutes (TTL)
@@ -152,22 +157,23 @@ export async function GET(request: NextRequest) {
               cqRequiredQuestions: true,
               sqTotalQuestions: true,
               sqRequiredQuestions: true,
+              objectiveTime: true,
+              cqSqTime: true,
               cqSubsections: true,
               class: { select: { id: true, name: true } },
               createdBy: { select: { id: true, name: true } },
-              // Ultra-optimized: Sampling only 5 questions to determine subject
               examSets: {
-                take: 1, // Only check one set
+                take: 1,
                 select: {
                   questions: {
-                    take: 5, // Sample 5 questions
+                    take: 5,
                     select: {
                       subject: true,
                     }
                   }
                 }
               }
-            },
+            } as any,
           }),
           db.exam.count()
         ]);
@@ -176,47 +182,52 @@ export async function GET(request: NextRequest) {
       'Fetch exams page'
     );
 
-    const examsData = exams.map((exam) => {
+    const examsData = (exams as any[]).map((exam) => {
       // Extract subject from questions - get the most common subject from sample
       let examSubject = '';
-      const sampleQuestions = exam.examSets.flatMap(set => set.questions);
+      const examAny = exam as any;
+      const sampleQuestions = (examAny.examSets || []).flatMap((set: any) => set.questions || []);
       if (sampleQuestions.length > 0) {
         const subjectCounts: { [key: string]: number } = {};
-        sampleQuestions.forEach(q => {
+        sampleQuestions.forEach((q: any) => {
           if (q.subject) {
             subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
           }
         });
 
         // Find the subject with the highest count
-        const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
-          (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
-        );
-
-        examSubject = mostCommonSubject[0] || '';
+        const entries = Object.entries(subjectCounts);
+        if (entries.length > 0) {
+          const mostCommonSubject = entries.reduce((a, b) =>
+            (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+          );
+          examSubject = mostCommonSubject[0] || '';
+        }
       }
 
       return {
-        id: exam.id,
-        name: exam.name,
-        description: exam.description,
-        date: exam.date,
-        startTime: exam.startTime,
-        endTime: exam.endTime,
-        subject: examSubject || exam.class?.name || '', // Use actual subject, fallback to class name
-        totalMarks: exam.totalMarks,
-        isActive: exam.isActive,
-        createdBy: exam.createdBy?.name || '',
-        classId: exam.classId,
-        createdAt: exam.createdAt,
-        type: exam.type,
-        allowRetake: exam.allowRetake || false,
-        mcqNegativeMarking: exam.mcqNegativeMarking,
-        cqTotalQuestions: exam.cqTotalQuestions || 0,
-        cqRequiredQuestions: exam.cqRequiredQuestions || 0,
-        sqTotalQuestions: exam.sqTotalQuestions || 0,
-        sqRequiredQuestions: exam.sqRequiredQuestions || 0,
-        cqSubsections: exam.cqSubsections || null,
+        id: examAny.id,
+        name: examAny.name,
+        description: examAny.description,
+        date: examAny.date,
+        startTime: examAny.startTime,
+        endTime: examAny.endTime,
+        subject: examSubject || examAny.class?.name || '', // Use actual subject, fallback to class name
+        totalMarks: examAny.totalMarks,
+        isActive: examAny.isActive,
+        createdBy: examAny.createdBy?.name || '',
+        classId: examAny.classId,
+        createdAt: examAny.createdAt,
+        type: examAny.type,
+        allowRetake: examAny.allowRetake || false,
+        mcqNegativeMarking: examAny.mcqNegativeMarking,
+        cqTotalQuestions: examAny.cqTotalQuestions || 0,
+        cqRequiredQuestions: examAny.cqRequiredQuestions || 0,
+        sqTotalQuestions: examAny.sqTotalQuestions || 0,
+        sqRequiredQuestions: examAny.sqRequiredQuestions || 0,
+        objectiveTime: examAny.objectiveTime || null,
+        cqSqTime: examAny.cqSqTime || null,
+        cqSubsections: examAny.cqSubsections || null,
       };
     });
 
@@ -236,8 +247,9 @@ export async function GET(request: NextRequest) {
     return createApiResponse(responseData, undefined, 200, {
       cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to fetch exams:', error);
+    console.error('Error stack:', error.stack);
     if (cached) {
       return createApiResponse(cached.data, undefined, 200, {
         cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
@@ -273,6 +285,8 @@ export async function POST(request: NextRequest) {
       cqRequiredQuestions,
       sqTotalQuestions,
       sqRequiredQuestions,
+      objectiveTime,
+      cqSqTime,
       cqSubsections,
     } = body;
 
@@ -302,10 +316,12 @@ export async function POST(request: NextRequest) {
             cqRequiredQuestions: cqRequiredQuestions ?? 0,
             sqTotalQuestions: sqTotalQuestions ?? 0,
             sqRequiredQuestions: sqRequiredQuestions ?? 0,
+            objectiveTime: objectiveTime ?? null,
+            cqSqTime: cqSqTime ?? null,
             cqSubsections: cqSubsections || null,
             classId,
             createdById: auth.user.id,
-          },
+          } as any,
         });
       },
       'Create exam'
@@ -319,7 +335,7 @@ export async function POST(request: NextRequest) {
       name: createdExam.name,
       message: 'Exam created successfully',
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Failed to create exam:', error);
     return createApiResponse(null, 'Failed to create exam', 500);
   }

@@ -41,7 +41,38 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
+
+// DESCRIPTIVE sub-type definitions
+type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table';
+type WritingType = 'paragraph' | 'letter' | 'essay' | 'summary' | 'expansion' | 'translation' | 'story' | 'dialogue' | 'composition' | 'report' | 'application' | 'email';
+type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question';
+type CompAnswerType = 'stem_mcq' | 'qa';
+
+interface DescPart {
+  subType: DescSubType;
+  label: string;
+  marks: number;
+  instructions?: string;
+  // writing
+  writingType?: WritingType;
+  sourceText?: string; // for translation/summary
+  // fill_in
+  fillType?: FillType;
+  passage?: string;    // for gap_passage
+  items?: string[];    // for item-based fill types
+  wordBox?: string[];  // word/verb box for gap_passage, right_form, suffix_prefix
+  // comprehension
+  answerType?: CompAnswerType;
+  stemPassage?: string;
+  requiredCount?: number; // any N out of M
+  questions?: string[];
+  // stem_mcq
+  stemQuestions?: { question: string; options: string[]; correct: number }[];
+  // table
+  tableHeaders?: string[];
+  tableRows?: string[][];
+}
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
 type Question = {
@@ -1249,6 +1280,480 @@ const QuestionCard: React.FC<{
   );
 };
 
+// ─── DescriptiveQuestionForm ─────────────────────────────────────────────────
+const WRITING_TYPE_LABELS: Record<string, string> = {
+  paragraph: 'অনুচ্ছেদ রচনা / Paragraph',
+  letter: 'চিঠিপত্র / Letter / Application',
+  report: 'সংবাদ প্রতিবেদন / Report',
+  essay: 'প্রবন্ধ/রচনা / Essay / Composition',
+  summary: 'সারাংশ / সারমর্ম / Summary',
+  expansion: 'ভাব-সম্প্রসারণ / Amplification',
+  translation: 'বাংলায় অনুবাদ / Translation',
+  story: 'Completing Story',
+  dialogue: 'Writing Dialogue',
+  composition: 'Short Composition',
+  email: 'E-mail / Formal Letter',
+  application: 'Application Writing',
+};
+
+const FILL_TYPE_LABELS: Record<string, string> = {
+  gap_passage: 'Gap Filling (passage with blanks)',
+  right_form: 'Right Form of Verbs',
+  suffix_prefix: 'Suffixes & Prefixes',
+  connector: 'Connectors / Prepositions',
+  punctuation: 'Punctuation & Capitalization',
+  sentence_change: 'Changing Sentences / Transformation',
+  substitution: 'Substitution Table',
+  tag_question: 'Tag Questions',
+};
+
+function DescriptiveQuestionForm({
+  parts,
+  setParts,
+}: {
+  parts: DescPart[];
+  setParts: React.Dispatch<React.SetStateAction<DescPart[]>>;
+}) {
+  const updatePart = (idx: number, changes: Partial<DescPart>) => {
+    setParts(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...changes };
+      return next;
+    });
+  };
+
+  const addPart = () => {
+    setParts(prev => [
+      ...prev,
+      { subType: 'writing', label: `Part ${prev.length + 1}`, marks: 10, writingType: 'essay', instructions: '' },
+    ]);
+  };
+
+  const removePart = (idx: number) => {
+    setParts(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  return (
+    <div className="space-y-4">
+      <Label className="text-base font-semibold">Descriptive Parts</Label>
+      {parts.map((part, idx) => (
+        <div key={idx} className="border rounded-lg p-4 bg-amber-50/60 dark:bg-amber-900/10 space-y-3 relative">
+          {/* Remove button */}
+          <button
+            type="button"
+            onClick={() => removePart(idx)}
+            className="absolute top-2 right-2 text-red-500 hover:text-red-700"
+          >
+            <X className="h-4 w-4" />
+          </button>
+
+          {/* Part label + marks */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-xs">Part Label</Label>
+              <Input
+                value={part.label}
+                onChange={e => updatePart(idx, { label: e.target.value })}
+                placeholder="e.g. ১. অনুচ্ছেদ রচনা"
+              />
+            </div>
+            <div>
+              <Label className="text-xs">Marks</Label>
+              <Input
+                type="number"
+                value={part.marks}
+                onChange={e => updatePart(idx, { marks: Number(e.target.value) })}
+                className="w-24"
+              />
+            </div>
+          </div>
+
+          {/* Sub-type selector */}
+          <div>
+            <Label className="text-xs">Sub-type Group</Label>
+            <Select
+              value={part.subType}
+              onValueChange={(v: DescSubType) => updatePart(idx, { subType: v })}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="writing">✍️ Writing (essay, letter, story, dialogue…)</SelectItem>
+                <SelectItem value="fill_in">📝 Fill In (gap, verbs, connectors, punctuation…)</SelectItem>
+                <SelectItem value="comprehension">📖 Comprehension (stem MCQ / Q&A from poem/story)</SelectItem>
+                <SelectItem value="table">📊 Table / Information Transfer</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* ── WRITING ── */}
+          {part.subType === 'writing' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Writing Type</Label>
+                <Select
+                  value={part.writingType || 'essay'}
+                  onValueChange={(v: WritingType) => updatePart(idx, { writingType: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(WRITING_TYPE_LABELS).map(([v, label]) => (
+                      <SelectItem key={v} value={v}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Instructions / Prompt</Label>
+                <Textarea
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  rows={3}
+                  placeholder="Write instructions shown to student…"
+                />
+              </div>
+              {(part.writingType === 'translation' || part.writingType === 'summary') && (
+                <div>
+                  <Label className="text-xs">Source Text (shown to student)</Label>
+                  <Textarea
+                    value={part.sourceText || ''}
+                    onChange={e => updatePart(idx, { sourceText: e.target.value })}
+                    rows={5}
+                    placeholder="Paste the original passage / poem here…"
+                  />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── FILL_IN ── */}
+          {part.subType === 'fill_in' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Fill-in Type</Label>
+                <Select
+                  value={part.fillType || 'gap_passage'}
+                  onValueChange={(v: FillType) => updatePart(idx, { fillType: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(FILL_TYPE_LABELS).map(([v, label]) => (
+                      <SelectItem key={v} value={v}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Instructions</Label>
+                <Input
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  placeholder="e.g. Fill in the blanks with suitable words…"
+                />
+              </div>
+
+              {/* Gap passage: write the passage with ___ for blanks */}
+              {(part.fillType === 'gap_passage' || !part.fillType) && (
+                <>
+                  <div>
+                    <Label className="text-xs">Word/Verb Box (comma-separated, optional)</Label>
+                    <Input
+                      value={(part.wordBox || []).join(', ')}
+                      onChange={e => updatePart(idx, { wordBox: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                      placeholder="e.g. play, played, playing, has, have…"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Passage (use ___ for each blank)</Label>
+                    <Textarea
+                      value={part.passage || ''}
+                      onChange={e => updatePart(idx, { passage: e.target.value })}
+                      rows={6}
+                      placeholder="Type the passage here. Use ___ for each blank. e.g. Bangladesh is ___ a beautiful country."
+                    />
+                    {part.passage && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Blanks detected: <span className="font-bold text-amber-600">{(part.passage.match(/___/g) || []).length}</span>
+                      </p>
+                    )}
+                  </div>
+                </>
+              )}
+
+              {/* Item-based fill types: numbered list */}
+              {part.fillType && part.fillType !== 'gap_passage' && (
+                <div className="space-y-2">
+                  {part.fillType === 'substitution' && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/30 p-2 rounded">
+                      For substitution table: enter each column fragment as an item. Students combine them into sentences.
+                    </p>
+                  )}
+                  <Label className="text-xs">Items (one per line)</Label>
+                  {(part.items || ['', '', '']).map((item, itemIdx) => (
+                    <div key={itemIdx} className="flex gap-2">
+                      <span className="text-xs text-gray-500 w-5 pt-2">{itemIdx + 1}.</span>
+                      <Input
+                        value={item}
+                        onChange={e => {
+                          const newItems = [...(part.items || [])];
+                          newItems[itemIdx] = e.target.value;
+                          updatePart(idx, { items: newItems });
+                        }}
+                        placeholder={
+                          part.fillType === 'right_form' ? 'e.g. She ___ (go) to school every day.' :
+                            part.fillType === 'suffix_prefix' ? 'e.g. ___ (environment) pollution is a concern.' :
+                              part.fillType === 'sentence_change' ? 'e.g. He is a good student. [Make it Negative]' :
+                                part.fillType === 'tag_question' ? 'e.g. She is very smart, ___?' :
+                                  part.fillType === 'punctuation' ? 'Unpunctuated sentence here…' :
+                                    'Item text…'
+                        }
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const newItems = (part.items || []).filter((_, i) => i !== itemIdx);
+                          updatePart(idx, { items: newItems });
+                        }}
+                      >
+                        <X className="h-3 w-3 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updatePart(idx, { items: [...(part.items || []), ''] })}
+                  >
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Item
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── COMPREHENSION ── */}
+          {part.subType === 'comprehension' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Answer Type</Label>
+                <Select
+                  value={part.answerType || 'qa'}
+                  onValueChange={(v: CompAnswerType) => updatePart(idx, { answerType: v })}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="qa">Q&A — Answering questions (any N out of M)</SelectItem>
+                    <SelectItem value="stem_mcq">Stem-based MCQ (passage + MCQ options)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Stem Passage / Poem (shown to student)</Label>
+                <Textarea
+                  value={part.stemPassage || ''}
+                  onChange={e => updatePart(idx, { stemPassage: e.target.value })}
+                  rows={5}
+                  placeholder="Paste the reading passage, poem, or story excerpt here…"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Instructions</Label>
+                <Input
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  placeholder="e.g. Answer any 5 out of the following 8 questions."
+                />
+              </div>
+              {/* Q&A mode: list questions */}
+              {(!part.answerType || part.answerType === 'qa') && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <Label className="text-xs">Total Questions</Label>
+                      <Input
+                        type="number"
+                        value={(part.questions || []).length || 8}
+                        readOnly
+                        className="w-20"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Required to Answer</Label>
+                      <Input
+                        type="number"
+                        value={part.requiredCount || 5}
+                        onChange={e => updatePart(idx, { requiredCount: Number(e.target.value) })}
+                        className="w-20"
+                      />
+                    </div>
+                  </div>
+                  <Label className="text-xs">Questions</Label>
+                  {(part.questions || ['', '', '', '', '', '', '', '']).map((q, qi) => (
+                    <div key={qi} className="flex gap-2">
+                      <span className="text-xs text-gray-500 w-5 pt-2">{qi + 1}.</span>
+                      <Input
+                        value={q}
+                        onChange={e => {
+                          const qs = [...(part.questions || [])];
+                          qs[qi] = e.target.value;
+                          updatePart(idx, { questions: qs });
+                        }}
+                        placeholder={`Question ${qi + 1}…`}
+                      />
+                      <Button type="button" variant="ghost" size="icon"
+                        onClick={() => updatePart(idx, { questions: (part.questions || []).filter((_, i) => i !== qi) })}>
+                        <X className="h-3 w-3 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => updatePart(idx, { questions: [...(part.questions || []), ''] })}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Question
+                  </Button>
+                </div>
+              )}
+              {/* stem_mcq mode */}
+              {part.answerType === 'stem_mcq' && (
+                <div className="space-y-3">
+                  <Label className="text-xs">MCQ Sub-Questions</Label>
+                  {(part.stemQuestions || [{ question: '', options: ['', '', '', ''], correct: 0 }]).map((sq, sqi) => (
+                    <div key={sqi} className="border rounded p-3 space-y-2 bg-white dark:bg-gray-900">
+                      <div className="flex gap-2">
+                        <span className="text-xs text-gray-500 pt-2">{sqi + 1}.</span>
+                        <Input
+                          value={sq.question}
+                          onChange={e => {
+                            const sqs = [...(part.stemQuestions || [])];
+                            sqs[sqi] = { ...sq, question: e.target.value };
+                            updatePart(idx, { stemQuestions: sqs });
+                          }}
+                          placeholder="MCQ question text…"
+                        />
+                        <Button type="button" variant="ghost" size="icon"
+                          onClick={() => updatePart(idx, { stemQuestions: (part.stemQuestions || []).filter((_, i) => i !== sqi) })}>
+                          <X className="h-3 w-3 text-red-500" />
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 pl-5">
+                        {sq.options.map((opt, oi) => (
+                          <div key={oi} className="flex gap-1 items-center">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const sqs = [...(part.stemQuestions || [])];
+                                sqs[sqi] = { ...sq, correct: oi };
+                                updatePart(idx, { stemQuestions: sqs });
+                              }}
+                              className={`w-5 h-5 rounded-full border flex-shrink-0 ${sq.correct === oi ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}
+                            />
+                            <Input
+                              value={opt}
+                              onChange={e => {
+                                const sqs = [...(part.stemQuestions || [])];
+                                const opts = [...sq.options];
+                                opts[oi] = e.target.value;
+                                sqs[sqi] = { ...sq, options: opts };
+                                updatePart(idx, { stemQuestions: sqs });
+                              }}
+                              placeholder={`Option ${String.fromCharCode(65 + oi)}`}
+                              className="h-7 text-xs"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm"
+                    onClick={() => updatePart(idx, {
+                      stemQuestions: [...(part.stemQuestions || []), { question: '', options: ['', '', '', ''], correct: 0 }]
+                    })}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add MCQ
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── TABLE ── */}
+          {part.subType === 'table' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Instructions</Label>
+                <Input
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  placeholder="e.g. Complete the following table based on the passage."
+                />
+              </div>
+              <div>
+                <Label className="text-xs">Column Headers (comma-separated)</Label>
+                <Input
+                  value={(part.tableHeaders || ['Who/What', 'Event', 'Where', 'When']).join(', ')}
+                  onChange={e => updatePart(idx, {
+                    tableHeaders: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
+                  })}
+                  placeholder="e.g. Who/What, Event/Activity, Where, When"
+                />
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-xs">
+                  <thead>
+                    <tr>
+                      {(part.tableHeaders || ['Who/What', 'Event', 'Where', 'When']).map((h, hi) => (
+                        <th key={hi} className="border border-gray-300 p-1 bg-amber-100 dark:bg-amber-900/30 font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(part.tableRows || [['', '', '', '']]).map((row, ri) => (
+                      <tr key={ri}>
+                        {(part.tableHeaders || ['', '', '', '']).map((_, ci) => (
+                          <td key={ci} className="border border-gray-300 p-1">
+                            <Input
+                              value={row[ci] || ''}
+                              onChange={e => {
+                                const rows = [...(part.tableRows || [])];
+                                rows[ri] = [...(rows[ri] || [])];
+                                rows[ri][ci] = e.target.value;
+                                updatePart(idx, { tableRows: rows });
+                              }}
+                              className="h-6 text-xs border-0 p-0 focus-visible:ring-0"
+                              placeholder={row[ci] === '___' ? '(blank)' : 'cell value or ___'}
+                            />
+                          </td>
+                        ))}
+                        <td className="border-0 pl-1">
+                          <Button type="button" variant="ghost" size="icon"
+                            onClick={() => updatePart(idx, { tableRows: (part.tableRows || []).filter((_, i) => i !== ri) })}>
+                            <X className="h-3 w-3 text-red-500" />
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <Button type="button" variant="outline" size="sm"
+                onClick={() => {
+                  const cols = (part.tableHeaders || ['', '', '', '']).length;
+                  updatePart(idx, { tableRows: [...(part.tableRows || []), Array(cols).fill('')] });
+                }}>
+                <PlusCircle className="mr-1 h-3 w-3" /> Add Row
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+
+      <Button type="button" variant="outline" size="sm" className="border-amber-400 text-amber-700 hover:bg-amber-50" onClick={addPart}>
+        <PlusCircle className="mr-2 h-4 w-4" /> Add Descriptive Part
+      </Button>
+    </div>
+  );
+}
+
 interface QuestionFormProps {
   initialData?: Question | null;
   onSave: (savedQuestion: Question) => void;
@@ -1278,6 +1783,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
   );
   const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string; image?: string }[]>(
     initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '', image: '' }]
+  );
+  // DESCRIPTIVE parts state (stored as subQuestions JSON on save)
+  const [descriptiveParts, setDescriptiveParts] = useState<DescPart[]>(
+    type === 'DESCRIPTIVE' && initialData?.subQuestions
+      ? (initialData.subQuestions as unknown as DescPart[])
+      : [
+        { subType: 'writing', label: '১. অনুচ্ছেদ রচনা', marks: 10, writingType: 'paragraph', instructions: 'নিচের যেকোনো একটি বিষয়ে অনুচ্ছেদ লেখো:' },
+      ]
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState<number>(initialData?.modelAnswer ? parseInt(initialData.modelAnswer) : 0);
@@ -1543,7 +2056,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         marks: Number(sq.marks),
         modelAnswer: sq.modelAnswer?.trim() || undefined,
         image: sq.image || undefined
-      })) : null,
+      })) : type === 'DESCRIPTIVE' ? descriptiveParts : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
         type === 'INT' ? correctAnswer.toString() : null,
       assertion: type === 'AR' ? assertion.trim() : null,
@@ -1607,7 +2120,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -1958,6 +2471,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 </Button>
               </div>
             )}
+            {type === 'DESCRIPTIVE' && (
+              <DescriptiveQuestionForm
+                parts={descriptiveParts}
+                setParts={setDescriptiveParts}
+              />
+            )}
           </motion.div></AnimatePresence>
           <Label>Live Preview</Label>
           <Card className="h-full min-h-[200px] p-6 bg-gray-50 dark:bg-gray-800/50 shadow-inner">
@@ -2108,6 +2627,29 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                     <UniversalMathJax dynamic>{cleanupMath(modelAnswer || '')}</UniversalMathJax>
                   </div>
+                </div>
+              )}
+              {type === 'DESCRIPTIVE' && descriptiveParts.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Descriptive Parts:</p>
+                  {descriptiveParts.map((part, idx) => (
+                    <div key={idx} className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${idx + 1}`}</span>
+                        <span className="text-xs text-amber-600 font-mono">[{part.marks} marks] · {part.subType}{part.writingType ? `/${part.writingType}` : ''}{part.fillType ? `/${part.fillType}` : ''}{part.answerType ? `/${part.answerType}` : ''}</span>
+                      </div>
+                      {part.instructions && <p className="text-xs text-gray-600 dark:text-gray-400 italic">{part.instructions}</p>}
+                      {part.subType === 'fill_in' && part.passage && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{part.passage}</p>
+                      )}
+                      {part.subType === 'comprehension' && part.stemPassage && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{part.stemPassage}</p>
+                      )}
+                      {part.subType === 'writing' && part.sourceText && (
+                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">[Source text provided]</p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

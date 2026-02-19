@@ -179,6 +179,8 @@ model Exam {
   cqSubsections         Json?
   mcNegativeMarking     Float?                     @default(0)
   mcPartialMarking      Boolean?                   @default(true)
+  objectiveTime         Int?
+  cqSqTime              Int?
   examSubmissions       ExamSubmission[]
   admitCards            AdmitCard[]
   evaluationAssignments ExamEvaluationAssignment[]
@@ -630,6 +632,12 @@ model ExamSubmission {
   startedAt             DateTime?
   exceededQuestionLimit Boolean                 @default(false)
   status                SubmissionStatus        @default(IN_PROGRESS)
+  objectiveStatus       SubmissionStatus        @default(IN_PROGRESS)
+  objectiveStartedAt    DateTime?
+  objectiveSubmittedAt  DateTime?
+  cqSqStatus            SubmissionStatus        @default(IN_PROGRESS)
+  cqSqStartedAt         DateTime?
+  cqSqSubmittedAt       DateTime?
   exam                  Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSet               ExamSet?                @relation(fields: [examSetId], references: [id])
   student               StudentProfile          @relation(fields: [studentId], references: [id])
@@ -910,6 +918,7 @@ enum QuestionType {
   INT
   AR
   MTF
+  DESCRIPTIVE
 }
 
 enum Difficulty {
