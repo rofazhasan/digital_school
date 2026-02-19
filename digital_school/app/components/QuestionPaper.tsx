@@ -225,14 +225,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             time={examInfo.objectiveTime || 0}
           />
 
-          {/* Instruction Box */}
+          {/* Special Instruction Box */}
           <div className="instruction-box">
-            <h4 className="font-bold border-b border-black mb-1 pb-1">সাধারণ নির্দেশাবলী:</h4>
-            <ul className="list-disc ml-5">
-              <li>প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।</li>
-              <li>প্রতিটি প্রশ্নের উত্তর স্পষ্ট অক্ষরে লিখতে হবে।</li>
-              <li>বহুনির্বাচনি প্রশ্নের ক্ষেত্রে প্রতিটি প্রশ্নের একটি মাত্র সঠিক উত্তর থাকবে।</li>
-            </ul>
+            <p><strong>বিশেষ দ্রষ্টব্য:</strong> সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।</p>
           </div>
         </div>
 
@@ -241,19 +236,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* MCQ Section */}
           {allObjective.length > 0 && (
             <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
-              {/* MCQ Header - only once */}
-              <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header">
-                <div className="flex flex-col">
-                  <h3>বহুনির্বাচনি প্রশ্ন (Objective Questions)</h3>
-                  <div className="text-sm font-normal">সময়: {formatBengaliDuration(examInfo.objectiveTime)}</div>
-                </div>
-                <div className="text-right">
-                  <div>মোট নম্বর: {toBengaliNumerals(objectiveTotal)}</div>
-                  {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 ? (
-                    <div className="text-red-600 text-sm">(ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
-                  ) : null}
-                </div>
-              </div>
+              {/* Negative marking note only if applicable */}
+              {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 && (
+                <div className="text-red-600 text-sm mb-1">(ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
+              )}
 
               <div className="mcq-container">
                 {allObjective.map((q: any, idx) => {
@@ -282,7 +268,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               {(q.options || []).map((opt: any, oidx: number) => (
                                 <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                   {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
-                                  <span className="mcq-option-label flex-shrink-0">{MCQ_LABELS[oidx]}.</span>
+                                  <span className="mcq-option-label flex-shrink-0">{MCQ_LABELS[oidx]}</span>
                                   <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
                                 </div>
                               ))}
@@ -382,7 +368,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   examInfo={examInfo}
                   type="cqsq"
                   qrData={qrData}
-                  marks={cqSqTotalMarks}
+                  marks={examInfo.totalMarks || cqSqTotalMarks}
                   time={examInfo.cqSqTime || 0}
                 />
               )}
@@ -393,7 +379,6 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   >
                     <div className="flex flex-col">
                       <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
-                      <div className="font-normal">সময়: {formatBengaliDuration(examInfo.cqSqTime)}</div>
                     </div>
                     <div className="text-right">
                       <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(cqRequiredMarks)}</div>
