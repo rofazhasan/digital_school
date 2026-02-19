@@ -97,6 +97,11 @@ interface QuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
+// English text wrapper - renders in Bookman Old Style for proper English typography
+const EnglishText = ({ children }: { children: React.ReactNode }) => (
+  <span style={{ fontFamily: "'Bookman Old Style', 'Book Antiqua', Georgia, serif" }}>{children}</span>
+);
+
 // Helper to chunk an array into N-sized pieces
 function chunkArray<T>(arr: T[], size: number): T[][] {
   const res: T[][] = [];
@@ -244,7 +249,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {/* MCQ Header - only once */}
               <div className="flex justify-between items-center font-bold mb-2 text-lg border-b border-dotted border-black pb-1 break-inside-avoid mcq-header">
                 <div className="flex flex-col">
-                  <h3>বহুনির্বাচনি প্রশ্ন (Objective Questions)</h3>
+                  <h3>বহুনির্বাচনি প্রশ্ন (<EnglishText>Objective Questions</EnglishText>)</h3>
                   <div className="text-sm font-normal">সময়: {formatBengaliDuration(examInfo.objectiveTime)}</div>
                 </div>
                 <div className="text-right">
@@ -260,10 +265,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   const qNum = toBengaliNumerals(idx + 1);
 
                   if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
-                    const totalOptionsLength = (q.options || []).reduce((acc: number, opt: any) => acc + (opt.text || '').length, 0);
-                    let gridClass = "options-grid-4";
-                    if (totalOptionsLength > 60) gridClass = "options-grid-1";
-                    else if (totalOptionsLength > 30) gridClass = "options-grid-2";
+                    // Bengali chars are ~2x wider than Latin. Use max single-option length
+                    // to determine grid: if any option > 5 chars → 2-col, if any > 10 → 1-col
+                    const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
+                    let gridClass = "options-grid-4"; // Only for very short options (≤5 chars each)
+                    if (maxOptLen > 10) gridClass = "options-grid-1";
+                    else if (maxOptLen > 5) gridClass = "options-grid-2";
 
                     return (
                       <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
@@ -388,7 +395,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 cq-section section-break"
                   >
                     <div className="flex flex-col">
-                      <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
+                      <h3>সৃজনশীল প্রশ্ন (<EnglishText>CQ</EnglishText>)</h3>
                       <div className="font-normal">সময়: {formatBengaliDuration(examInfo.cqSqTime)}</div>
                     </div>
                     <div className="text-right">
@@ -484,7 +491,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {sqs.length > 0 && (
                 <>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 sq-section section-break">
-                    <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
+                    <h3>সংক্ষিপ্ত প্রশ্ন (<EnglishText>SQ</EnglishText>)</h3>
                     <div className="text-right">
                       <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(sqRequiredMarks)}</div>
                       {sqRequired > 0 && (
@@ -511,7 +518,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {descriptives.length > 0 && (
                 <>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 desc-section section-break">
-                    <h3>রচনামূলক ও ব্যাকরণ প্রশ্ন (Descriptive & Grammar)</h3>
+                    <h3>রচনামূলক ও ব্যাকরণ প্রশ্ন (<EnglishText>Descriptive &amp; Grammar</EnglishText>)</h3>
                     <div className="text-right">
                       <div>মোট নম্বর: {toBengaliNumerals(descMarks)}</div>
                     </div>

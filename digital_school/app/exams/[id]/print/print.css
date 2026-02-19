@@ -286,6 +286,33 @@
   min-width: 0;
 }
 
+/* Global grid classes (also used on screen in print preview) */
+.options-grid-1 {
+  display: block;
+  width: 100%;
+}
+
+.options-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.3rem 0.5rem;
+  align-items: start;
+}
+
+.options-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.2rem 0.4rem;
+  align-items: start;
+}
+
+.options-grid-2>.option-item,
+.options-grid-4>.option-item {
+  min-width: 0;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
 /* BanglaOMR label for MCQ option letters (ক, খ, গ, ঘ) */
 .mcq-option-label {
   font-family: 'BanglaOMR', 'NazrulOMR-Regular', 'Noto Sans Bengali', sans-serif !important;
