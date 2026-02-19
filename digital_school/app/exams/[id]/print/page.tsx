@@ -156,7 +156,7 @@ export default function PrintExamPage() {
 
   return (
     <MathJaxContext config={mathJaxConfig}>
-      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: "'SutonnyMJ', 'Bookman Old Style', 'Book Antiqua', 'Noto Serif Bengali', Georgia, serif" }}>
+      <div className="min-h-screen bg-gray-200 print:bg-white print:text-black" style={{ fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif" }}>
         <Head>
           <title>প্রিন্ট প্রশ্নপত্র ও OMR</title>
         </Head>
