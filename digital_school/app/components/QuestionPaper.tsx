@@ -227,7 +227,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
           {/* Special Instruction Box */}
           <div className="instruction-box">
-            <p><strong>বিশেষ দ্রষ্টব্য:</strong> সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।</p>
+            <p><strong>বিশেষ দ্রষ্টব্য:</strong> সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।{examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 && (<span className="font-semibold"> প্রতিটি ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কাটা যাবে।</span>)}</p>
           </div>
         </div>
 
@@ -236,10 +236,6 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
           {/* MCQ Section */}
           {allObjective.length > 0 && (
             <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
-              {/* Negative marking note only if applicable */}
-              {examInfo.mcqNegativeMarking && Number(examInfo.mcqNegativeMarking) > 0 && (
-                <div className="text-red-600 text-sm mb-1">(ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কর্তন করা হবে)</div>
-              )}
 
               <div className="mcq-container">
                 {allObjective.map((q: any, idx) => {
@@ -264,7 +260,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex-1">
                             <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
                             {q.type?.toUpperCase() === 'MC' && <div className="text-blue-700 font-bold mb-1">[সকল সঠিক উত্তর নির্বাচন করো]</div>}
-                            <div className={`mt-1 question-options ${gridClass}`}>
+                            <div className={`mt-1 ${gridClass}`}>
                               {(q.options || []).map((opt: any, oidx: number) => (
                                 <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                   {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
