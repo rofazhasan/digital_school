@@ -92,9 +92,12 @@ interface QuestionPaperProps {
   fontSize?: number;
   cqSqFontSize?: number;
   forcePageBreak?: boolean;
+  language?: 'bn' | 'en';
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+const MCQ_LABELS_EN = ['a', 'b', 'c', 'd', 'e', 'f'];
+const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ']; // runtime overridden below
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
 // Helper to chunk an array into N-sized pieces
@@ -132,24 +135,43 @@ const BANGLA_BEAUTIFUL_WORDS = [
   'নিরন্তর', 'অনন্ত', 'মহাকাশ', 'গগন', 'অম্বর', 'মুক্ত', 'স্বাধীন', 'অবারিত', 'নিষ্পাপ', 'নির্মল'
 ];
 
+// 100+ beautiful English words for set label decoration
+const ENGLISH_BEAUTIFUL_WORDS = [
+  'Aurora', 'Serenity', 'Harmony', 'Luminous', 'Celestial', 'Radiance', 'Infinity', 'Cascade', 'Zenith', 'Solace',
+  'Elysian', 'Verdant', 'Tranquil', 'Ethereal', 'Solstice', 'Equinox', 'Opaline', 'Iridescent', 'Blossom', 'Zephyr',
+  'Horizon', 'Meridian', 'Labyrinth', 'Odyssey', 'Epoch', 'Genesis', 'Phoenix', 'Vortex', 'Solaris', 'Nebula',
+  'Vivid', 'Serene', 'Pristine', 'Sublime', 'Vibrant', 'Majestic', 'Eloquent', 'Graceful', 'Opulent', 'Regal',
+  'Sapphire', 'Amber', 'Crimson', 'Velvet', 'Ivory', 'Cobalt', 'Scarlet', 'Indigo', 'Topaz', 'Emerald',
+  'Willow', 'Meadow', 'Breeze', 'Twilight', 'Ember', 'Thunder', 'Crystal', 'Glacier', 'Torrent', 'Mirage',
+  'Victory', 'Triumph', 'Clarity', 'Wisdom', 'Virtue', 'Courage', 'Justice', 'Liberty', 'Legacy', 'Vision',
+  'Anthem', 'Symphony', 'Sonnet', 'Lyric', 'Rhapsody', 'Ballad', 'Melody', 'Cadence', 'Rhythm', 'Harmony',
+  'Pinnacle', 'Summit', 'Apex', 'Acme', 'Zenith', 'Crest', 'Ascent', 'Aura', 'Nimbus', 'Nimble',
+  'Stellar', 'Radiant', 'Brilliant', 'Gleaming', 'Splendid', 'Glorious', 'Resplendent', 'Effulgent', 'Bright',
+  'Compass', 'Beacon', 'Haven', 'Anchor', 'Voyage', 'Quest', 'Journey', 'Pilgrimage', 'Odyssey', 'Venture'
+];
+
 // Picks a deterministic word from seed string + offset (different per page type)
-function pickBanglaWord(seed: string, offset: number = 0): string {
+function pickBanglaWord(seed: string, offset: number = 0, lang: 'bn' | 'en' = 'bn'): string {
+  const wordList = lang === 'en' ? ENGLISH_BEAUTIFUL_WORDS : BANGLA_BEAUTIFUL_WORDS;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   }
-  const idx = (hash + offset * 37) % BANGLA_BEAUTIFUL_WORDS.length;
-  return BANGLA_BEAUTIFUL_WORDS[idx];
+  const idx = (hash + offset * 37) % wordList.length;
+  return wordList[idx];
 }
 
-const Header = ({ examInfo, type, qrData, marks, time, banglaWord }: {
+const Header = ({ examInfo, type, qrData, marks, time, banglaWord, lang = 'bn' }: {
   examInfo: any,
   type: 'objective' | 'cqsq',
   qrData: any,
   marks: string | number,
   time: number | string,
-  banglaWord?: string
-}) => (
+  banglaWord?: string,
+  lang?: 'bn' | 'en'
+}) => {
+  const isHEn = lang === 'en';
+  return (
   <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
     <div className="flex items-center justify-between gap-4">
       {/* Logo Spacer to balance QR */}
@@ -193,7 +215,8 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord }: {
       <span><strong>পূর্ণমান:</strong> {toBengaliNumerals(marks)}</span>
     </div>
   </header>
-);
+  );
+};
 
 // Main QuestionPaper component (forwardRef for printing)
 const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
@@ -258,7 +281,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             qrData={qrData}
             marks={objectiveTotal}
             time={examInfo.objectiveTime || 0}
-            banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 0) : undefined}
+            banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 0, lang) : undefined}
+            lang={lang}
           />
 
           {/* Special Instruction Box */}
@@ -275,7 +299,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
               <div className="mcq-container">
                 {allObjective.map((q: any, idx) => {
-                  const qNum = toBengaliNumerals(idx + 1);
+                  const qNum = isEn ? String(idx + 1) : toBengaliNumerals(idx + 1);
 
                   if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
                     // Column count based on max single option length (Bengali chars ~2x wider)
@@ -300,7 +324,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               {(q.options || []).map((opt: any, oidx: number) => (
                                 <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                   {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
-                                  <span className="mcq-option-label flex-shrink-0">{MCQ_LABELS[oidx]}</span>
+                                  <span className="mcq-option-label flex-shrink-0">{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
                                   <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
                                 </div>
                               ))}
@@ -402,7 +426,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   qrData={qrData}
                   marks={examInfo.totalMarks || cqSqTotalMarks}
                   time={examInfo.cqSqTime || 0}
-                  banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 1) : undefined}
+                  banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 1, lang) : undefined}
+                  lang={lang}
                 />
               )}
               {cqs.length > 0 && (
@@ -411,12 +436,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 cq-section section-break"
                   >
                     <div className="flex flex-col">
-                      <h3>সৃজনশীল প্রশ্ন (CQ)</h3>
+                      <h3>{isEn ? 'Creative Questions (CQ)' : 'সৃজনশীল প্রশ্ন (CQ)'}</h3>
                     </div>
                     <div className="text-right">
-                      <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(cqRequiredMarks)}</div>
+                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? cqRequiredMarks : toBengaliNumerals(cqRequiredMarks)}</div>
                       {cqRequired > 0 && (
-                        <div className="">(মোট {toBengaliNumerals(cqRequired)} টি উত্তর করতে হবে)</div>
+                        <div className="">{isEn ? `(Answer any ${cqRequired})` : `(মোট ${toBengaliNumerals(cqRequired)} টি উত্তর করতে হবে)`}</div>
                       )}
                     </div>
                   </div>
@@ -506,9 +531,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {sqs.length > 0 && (
                 <>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 sq-section section-break">
-                    <h3>সংক্ষিপ্ত প্রশ্ন (SQ)</h3>
+                    <h3>{isEn ? 'Short Questions (SQ)' : 'সংক্ষিপ্ত প্রশ্ন (SQ)'}</h3>
                     <div className="text-right">
-                      <div>সর্বোচ্চ নম্বর: {toBengaliNumerals(sqRequiredMarks)}</div>
+                      <div>{isEn ? 'Max Marks' : 'সর্বোচ্চ নম্বর'}: {isEn ? sqRequiredMarks : toBengaliNumerals(sqRequiredMarks)}</div>
                       {sqRequired > 0 && (
                         <div className="">(মোট {toBengaliNumerals(sqRequired)} টি উত্তর করতে হবে)</div>
                       )}
@@ -533,9 +558,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
               {descriptives.length > 0 && (
                 <>
                   <div className="flex justify-between items-center font-bold mb-2 border-b border-dotted border-black pb-1 mt-6 desc-section section-break">
-                    <h3>রচনামূলক ও ব্যাকরণ প্রশ্ন (Descriptive &amp; Grammar)</h3>
+                    <h3>{isEn ? 'Descriptive & Grammar Questions' : 'রচনামূলক ও ব্যাকরণ প্রশ্ন (Descriptive & Grammar)'}</h3>
                     <div className="text-right">
-                      <div>মোট নম্বর: {toBengaliNumerals(descMarks)}</div>
+                      <div>{isEn ? 'Total Marks' : 'মোট নম্বর'}: {isEn ? descMarks : toBengaliNumerals(descMarks)}</div>
                     </div>
                   </div>
                   <div>

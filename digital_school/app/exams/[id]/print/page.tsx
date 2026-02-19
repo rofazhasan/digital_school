@@ -216,6 +216,7 @@ export default function PrintExamPage() {
                     fontSize={objectiveFontSize}
                     cqSqFontSize={cqSqFontSize}
                     forcePageBreak={forcePageBreak}
+                    language={language}
                   />
                 </div>
               ))}
@@ -245,6 +246,7 @@ export default function PrintExamPage() {
                   fontSize={objectiveFontSize}
                   cqSqFontSize={cqSqFontSize}
                   forcePageBreak={forcePageBreak}
+                  language={language}
                 />
               </div>
             ))
