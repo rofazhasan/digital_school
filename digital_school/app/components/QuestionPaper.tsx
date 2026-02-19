@@ -220,7 +220,9 @@ const Header = ({ examInfo, type, qrData, marks, time, banglaWord, lang = 'bn' }
 
 // Main QuestionPaper component (forwardRef for printing)
 const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
-  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak }, ref) => {
+  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language }, ref) => {
+    const lang = language || 'bn';
+    const isEn = lang === 'en';
     const mcqs = questions.mcq || [];
     const mcs = questions.mc || [];
     const ints = questions.int || [];
