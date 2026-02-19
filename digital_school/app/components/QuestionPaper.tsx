@@ -113,12 +113,42 @@ const Text = ({ children }: { children: string }) => (
   </UniversalMathJax>
 );
 
-const Header = ({ examInfo, type, qrData, marks, time }: {
+
+// 100+ beautiful Bangla words for set label decoration
+const BANGLA_BEAUTIFUL_WORDS = [
+  'আনন্দ', 'প্রভাত', 'নির্ঝর', 'তারা', 'জ্যোৎস্না', 'ফুলদল', 'শান্তি', 'বুলবুল', 'কোকিল', 'হৃদয়',
+  'সুপ্রভাত', 'আজাদ', 'দোয়েল', 'শিশির', 'তুষার', 'ময়ূর', 'দর্পণ', 'স্বপ্ন', 'আশা', 'করুণা',
+  'প্রীতি', 'সাহস', 'মাধুর্য', 'বিজয়', 'শক্তি', 'জ্ঞান', 'বিদ্যা', 'মেধা', 'সৌন্দর্য', 'অরুণ',
+  'আলো', 'কিরণ', 'সফল', 'দিগন্ত', 'আকাশ', 'নদী', 'সাগর', 'বনানি', 'শরৎ', 'বসন্ত',
+  'বর্ষা', 'শীত', 'হেমন্ত', 'গ্রীষ্ম', 'মেঘ', 'বায়ু', 'বাদল', 'দিরাজ', 'উষা', 'ধ্রুবতারা',
+  'মাতৃভূমি', 'দেশপ্রেম', 'ধরণী', 'লালন', 'জারিণী', 'সুয়োনা', 'সোনালী', 'রাঙা', 'দামিনী',
+  'বিদ্যুৎ', 'তরঙ্গ', 'সহস্রদল', 'পদ্ম', 'ভোর', 'শ্যামল', 'সবুজ', 'রহস্য', 'স্মৃতি',
+  'প্রকৃতি', 'বিশ্ব', 'মানবতা', 'সভ্যতা', 'সৃষ্টি', 'অবাক', 'বিস্ময়', 'বর্ণমালা', 'বাঁশি',
+  'আরণ্য', 'সুবর্ণ', 'হীরা', 'রত্ন', 'মাণিক', 'প্রবাল', 'স্ফটিক', 'মরকত', 'নীলমণি', 'চন্দ্র',
+  'সূর্য', 'সমুদ্র', 'পাহাড়', 'নীলাভ', 'অপার', 'অজস্র', 'বিশাল', 'শুভ্র', 'ধবল', 'চাঁদ',
+  'চাঁদনী', 'জোছনা', 'জলধারা', 'ঝরনা', 'ফোঁটা', 'শিশিরবিন্দু', 'শিপ্রা', 'রোশনারা', 'সাততারা',
+  'মল্লিকা', 'জুই', 'টগর', 'বাঁধবী', 'ধুতুরা', 'শাপলা', 'নিশিঠা', 'বেলি', 'সিক্ত', 'অঞ্জন',
+  'নার্গিস', 'প্রাণ', 'জনম', 'ক্ষণ', 'মুহূর্ত', 'আবেশ', 'উদ্দীপনা', 'বিভোর',
+  'নিরন্তর', 'অনন্ত', 'মহাকাশ', 'গগন', 'অম্বর', 'মুক্ত', 'স্বাধীন', 'অবারিত', 'নিষ্পাপ', 'নির্মল'
+];
+
+// Picks a deterministic word from seed string + offset (different per page type)
+function pickBanglaWord(seed: string, offset: number = 0): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const idx = (hash + offset * 37) % BANGLA_BEAUTIFUL_WORDS.length;
+  return BANGLA_BEAUTIFUL_WORDS[idx];
+}
+
+const Header = ({ examInfo, type, qrData, marks, time, banglaWord }: {
   examInfo: any,
   type: 'objective' | 'cqsq',
   qrData: any,
   marks: string | number,
-  time: number | string
+  time: number | string,
+  banglaWord?: string
 }) => (
   <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
     <div className="flex items-center justify-between gap-4">
@@ -153,7 +183,12 @@ const Header = ({ examInfo, type, qrData, marks, time }: {
       {/* বিষয়: removed as per request */}
       <span><strong>শ্রেণি:</strong> {toBengaliNumerals(examInfo.class)}</span>
       <span><strong>তারিখ:</strong> {toBengaliNumerals(examInfo.date)}</span>
-      {examInfo.set && <span><strong>সেট:</strong> {examInfo.set}</span>}
+      {examInfo.set && (
+        <span>
+          <strong>সেট:</strong> {examInfo.set}
+          {banglaWord && <span className="ml-1 text-gray-600">({banglaWord})</span>}
+        </span>
+      )}
       <span><strong>সময়:</strong> {typeof time === 'number' ? formatBengaliDuration(time) : toBengaliNumerals(time)}</span>
       <span><strong>পূর্ণমান:</strong> {toBengaliNumerals(marks)}</span>
     </div>
@@ -223,6 +258,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             qrData={qrData}
             marks={objectiveTotal}
             time={examInfo.objectiveTime || 0}
+            banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 0) : undefined}
           />
 
           {/* Special Instruction Box */}
@@ -366,6 +402,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   qrData={qrData}
                   marks={examInfo.totalMarks || cqSqTotalMarks}
                   time={examInfo.cqSqTime || 0}
+                  banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 1) : undefined}
                 />
               )}
               {cqs.length > 0 && (
