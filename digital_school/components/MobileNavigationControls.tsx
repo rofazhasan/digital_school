@@ -25,8 +25,8 @@ export default function MobileNavigationControls() {
 
     if (!isNative) return null;
 
-    // Don't show on login/signup pages to keep it clean
-    if (pathname === '/login' || pathname === '/signup') return null;
+    // Don't show on login/signup pages or online exams to keep it clean and focused
+    if (pathname === '/login' || pathname === '/signup' || pathname.startsWith('/exams/online/')) return null;
 
     const handleAction = (action: () => void) => {
         triggerHaptic(ImpactStyle.Light);

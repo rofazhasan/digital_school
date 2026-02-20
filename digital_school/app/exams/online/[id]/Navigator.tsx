@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { useExamContext } from "./ExamContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface NavigatorProps {
@@ -76,8 +75,8 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
           h-full min-h-0 overflow-hidden
         `}>
 
-      {/* Scrollable Content */}
-      <ScrollArea className="flex-1 w-full">
+      {/* Scrollable Content - Uses native scroll for better mobile reliability */}
+      <div className="flex-1 w-full overflow-y-auto overscroll-behavior-contain scrollbar-thin">
         <div className="p-3 pb-20">
           {/* Render CQ Group */}
           {groupedQuestions?.creative?.length > 0 && renderGroup("Creative (CQ)", groupedQuestions.creative, 0)}
@@ -93,7 +92,7 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
             renderGroup("Questions", questionList, 0)
           }
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Footer Legend */}
       {!isCollapsed && (

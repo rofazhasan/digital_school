@@ -585,11 +585,11 @@ export default function ExamLayout() {
                     <Menu className="w-5 h-5 text-muted-foreground" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] p-0 flex flex-col h-full">
+                <SheetContent side="left" className="w-[300px] p-0 flex flex-col h-full bg-background border-r outline-none">
                   <div className="p-4 border-b bg-muted/30 shrink-0">
                     <h2 className="font-bold text-lg">Navigator</h2>
                   </div>
-                  <div className="flex-1 overflow-hidden">
+                  <div className="flex-1 min-h-0 overflow-hidden relative">
                     <Navigator questions={questions} />
                   </div>
                 </SheetContent>
