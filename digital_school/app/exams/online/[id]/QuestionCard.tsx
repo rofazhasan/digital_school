@@ -14,6 +14,10 @@ import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/
 import { ZoomIn, ShieldAlert } from "lucide-react";
 import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
 import { cn } from "@/lib/utils";
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Capacitor } from '@capacitor/core';
+import { Camera as CameraIcon } from "lucide-react";
+
 
 // Image Zoom Component
 const ZoomableImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
@@ -1017,57 +1021,116 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                           })()}
 
                           {/* Upload Button */}
+                          {/* Upload Actions */}
                           {!disabled && !submitted && (
                             ((answers[`${question.id}_sub_${idx}_image`] ? 1 : 0) + (answers[`${question.id}_sub_${idx}_images`]?.length || 0)) < 5
                           ) ? (
-                            <div className="relative">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                multiple
-                                onClick={() => setIsUploading?.(true)}
-                                onChange={async (e) => {
-                                  const files = Array.from(e.target.files || []);
-                                  if (files.length === 0) {
-                                    setIsUploading?.(false);
-                                    return;
-                                  }
-
-                                  const singleImage = answers[`${question.id}_sub_${idx}_image`];
-                                  const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
-                                  const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
-
-                                  const remainingSlots = 5 - currentImages.length;
-                                  const filesToUpload = files.slice(0, remainingSlots);
-
-                                  const uploadedUrls: string[] = [];
-                                  for (const file of filesToUpload) {
-                                    const formData = new FormData();
-                                    formData.append('file', file);
+                            <div className="flex flex-wrap gap-2 items-center">
+                              {/* Native Camera Button */}
+                              {Capacitor.isNativePlatform() && (
+                                <button
+                                  type="button"
+                                  onClick={async () => {
                                     try {
-                                      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-                                      const data = await res.json();
-                                      if (res.ok) uploadedUrls.push(data.url);
-                                    } catch (err) { console.error('Upload error:', err); }
-                                  }
+                                      setIsUploading?.(true);
+                                      const image = await Camera.getPhoto({
+                                        quality: 80,
+                                        allowEditing: false,
+                                        resultType: CameraResultType.Base64,
+                                        source: CameraSource.Camera,
+                                      });
 
-                                  if (uploadedUrls.length > 0) {
-                                    setAnswers((prev: any) => ({
-                                      ...prev,
-                                      [`${question.id}_sub_${idx}_images`]: [...currentImages, ...uploadedUrls]
-                                    }));
-                                  }
-                                  setIsUploading?.(false);
-                                  e.target.value = '';
-                                }}
-                                className="hidden"
-                                id={`q-img-${question.id}-${idx}`}
-                              />
-                              <label htmlFor={`q-img-${question.id}-${idx}`} className="inline-flex items-center gap-1.5 cursor-pointer text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/70 bg-primary/5 px-2 py-1 rounded-md border border-primary/10">
-                                <Upload className="w-3 h-3" /> Upload Photo (Max 5)
-                              </label>
+                                      if (image.base64String) {
+                                        // Convert base64 to File-like object or upload directly
+                                        const res = await fetch('/api/upload', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({
+                                            file: `data:image/${image.format};base64,${image.base64String}`,
+                                            fileName: `exam_${question.id}_sub_${idx}_${Date.now()}.${image.format}`
+                                          })
+                                        });
+
+                                        const data = await res.json();
+                                        if (res.ok && data.url) {
+                                          const singleImage = answers[`${question.id}_sub_${idx}_image`];
+                                          const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
+                                          const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                                          setAnswers((prev: any) => ({
+                                            ...prev,
+                                            [`${question.id}_sub_${idx}_images`]: [...currentImages, data.url]
+                                          }));
+                                          toast.success('Photo captured and uploaded!');
+                                        } else {
+                                          toast.error('Upload failed. Please try again.');
+                                        }
+                                      }
+                                    } catch (err) {
+                                      console.error('Camera error:', err);
+                                      if (String(err).includes('User cancelled')) return;
+                                      toast.error('Could not access camera');
+                                    } finally {
+                                      setIsUploading?.(false);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 cursor-pointer text-[10px] font-bold uppercase tracking-widest text-white bg-primary px-3 py-1.5 rounded-md shadow-sm hover:bg-primary/90 transition-all active:scale-95"
+                                >
+                                  <CameraIcon className="w-3.5 h-3.5" /> Take Photo
+                                </button>
+                              )}
+
+                              {/* Standard File Upload */}
+                              <div className="relative">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onClick={() => setIsUploading?.(true)}
+                                  onChange={async (e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length === 0) {
+                                      setIsUploading?.(false);
+                                      return;
+                                    }
+
+                                    const singleImage = answers[`${question.id}_sub_${idx}_image`];
+                                    const multipleImages = answers[`${question.id}_sub_${idx}_images`] || [];
+                                    const currentImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                                    const remainingSlots = 5 - currentImages.length;
+                                    const filesToUpload = files.slice(0, remainingSlots);
+
+                                    const uploadedUrls: string[] = [];
+                                    for (const file of filesToUpload) {
+                                      const formData = new FormData();
+                                      formData.append('file', file);
+                                      try {
+                                        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+                                        const data = await res.json();
+                                        if (res.ok) uploadedUrls.push(data.url);
+                                      } catch (err) { console.error('Upload error:', err); }
+                                    }
+
+                                    if (uploadedUrls.length > 0) {
+                                      setAnswers((prev: any) => ({
+                                        ...prev,
+                                        [`${question.id}_sub_${idx}_images`]: [...currentImages, ...uploadedUrls]
+                                      }));
+                                    }
+                                    setIsUploading?.(false);
+                                    e.target.value = '';
+                                  }}
+                                  className="hidden"
+                                  id={`q-img-${question.id}-${idx}`}
+                                />
+                                <label htmlFor={`q-img-${question.id}-${idx}`} className="inline-flex items-center gap-1.5 cursor-pointer text-[10px] font-bold uppercase tracking-widest text-primary hover:text-primary/70 bg-primary/5 px-2 py-1.5 rounded-md border border-primary/10 transition-colors">
+                                  <Upload className="w-3.5 h-3.5" /> {Capacitor.isNativePlatform() ? 'Gallery' : 'Upload Photo'}
+                                </label>
+                              </div>
                             </div>
                           ) : null}
+
                         </div>
                       </div>
                     ))}

@@ -22,6 +22,12 @@ import { ControllerRenderProps } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { cn } from '@/lib/utils';
+import { triggerHaptic, ImpactStyle } from '@/lib/haptics';
+import { performBiometricAuth, checkBiometry } from '@/lib/native/auth';
+import { openUrl } from '@/lib/native/interaction';
+import { Capacitor } from '@capacitor/core';
+import { Fingerprint } from 'lucide-react';
+
 
 const loginSchema = z.object({
     identifier: z.string().min(1, { message: 'Email or phone number is required.' }),
@@ -42,6 +48,16 @@ function LoginContent() {
 
     useEffect(() => {
         setMounted(true);
+
+        const handleBiometricOnMount = async () => {
+            if (Capacitor.isNativePlatform()) {
+                const bio = await checkBiometry();
+                if (bio.isAvailable) {
+                    // We could auto-trigger or show a button
+                }
+            }
+        };
+        handleBiometricOnMount();
 
         const reason = searchParams.get('reason');
         const info = searchParams.get('info');
@@ -71,6 +87,7 @@ function LoginContent() {
     });
 
     const onSubmit = (data: TLoginSchema) => {
+        triggerHaptic(ImpactStyle.Medium);
         setError(null);
         startTransition(async () => {
             try {
@@ -84,8 +101,10 @@ function LoginContent() {
                 });
                 const result = await response.json();
                 if (!response.ok) {
+                    triggerHaptic(ImpactStyle.Heavy);
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
+                    triggerHaptic(ImpactStyle.Medium);
                     const userRole = result.user.role;
                     let redirectUrl = '/dashboard';
 
@@ -109,10 +128,12 @@ function LoginContent() {
                     window.location.href = redirectUrl;
                 }
             } catch {
+                triggerHaptic(ImpactStyle.Heavy);
                 setError('Failed to connect to the server. Please try again.');
             }
         });
     };
+
 
     if (!mounted) return null;
 
@@ -228,7 +249,7 @@ function LoginContent() {
                         <div className="p-1 bg-muted rounded-xl grid grid-cols-2 gap-1">
                             <button
                                 type="button"
-                                onClick={() => setLoginMethod('email')}
+                                onClick={() => { triggerHaptic(ImpactStyle.Light); setLoginMethod('email'); }}
                                 className={cn(
                                     "flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
                                     loginMethod === 'email'
@@ -240,7 +261,7 @@ function LoginContent() {
                             </button>
                             <button
                                 type="button"
-                                onClick={() => setLoginMethod('phone')}
+                                onClick={() => { triggerHaptic(ImpactStyle.Light); setLoginMethod('phone'); }}
                                 className={cn(
                                     "flex items-center justify-center gap-2 py-2.5 text-sm font-medium rounded-lg transition-all duration-200",
                                     loginMethod === 'phone'
@@ -251,6 +272,7 @@ function LoginContent() {
                                 <Phone className="w-4 h-4" /> Phone
                             </button>
                         </div>
+
 
                         <Form {...form}>
                             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
@@ -329,6 +351,7 @@ function LoginContent() {
                                             <FormMessage />
                                         </FormItem>
                                     )}
+
                                 />
 
                                 <Button
@@ -349,6 +372,29 @@ function LoginContent() {
                                 </Button>
                             </form>
                         </Form>
+
+                        {/* Biometric Login Button */}
+                        {mounted && Capacitor.isNativePlatform() && (
+                            <motion.div
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                className="pt-2"
+                            >
+                                <Button
+                                    variant="outline"
+                                    className="w-full h-12 rounded-xl border-indigo-200 dark:border-indigo-900/30 flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400"
+                                    onClick={async () => {
+                                        const success = await performBiometricAuth();
+                                        if (success) {
+                                            toast.success('Biometric identity verified.');
+                                        }
+                                    }}
+                                >
+                                    <Fingerprint className="w-5 h-5" />
+                                    <span>Sign in with Biometrics</span>
+                                </Button>
+                            </motion.div>
+                        )}
 
                         <div className="text-center space-y-4">
                             <div className="relative">
@@ -371,9 +417,9 @@ function LoginContent() {
                             </p>
                         </div>
                     </div>
-                </div>
-            </div>
-        </div>
+                </div >
+            </div >
+        </div >
     );
 }
 

@@ -13,6 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { setKeepAwake, setBrightness } from "@/lib/native/display";
+import { nativeConfirm } from "@/lib/native/interaction";
+import { speakText, stopSpeech } from "@/lib/native/accessibility";
+import { Capacitor } from "@capacitor/core";
+import { Volume2, VolumeX } from "lucide-react";
+
 
 // Mobile-optimized navigation component
 const MobileNavigator = memo(({
@@ -170,7 +176,17 @@ export default function ExamLayout() {
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
 
   const handleSubmit = useCallback(async (forced: boolean = false) => {
-    if (showSubmitConfirm || forced) {
+    let confirmed = false;
+    if (forced) {
+      confirmed = true;
+    } else {
+      confirmed = await nativeConfirm(
+        "Submit Assessment?",
+        "You are about to submit your answers. This action cannot be undone."
+      );
+    }
+
+    if (confirmed) {
       setIsSubmitting(true);
       if (forced) {
         toast.error(`${activeSection === 'objective' ? 'Objective' : 'Exam'} auto-submitted due to time limit.`);
@@ -193,6 +209,8 @@ export default function ExamLayout() {
             setTransitionState('objective_submitted');
             toast.success("Objective answers saved. Proceed to Subjective section.");
           } else {
+            // Re-allow sleep after exam
+            setKeepAwake(false);
             window.location.href = `/exams/results/${exam.id}`;
           }
         } else {
@@ -205,6 +223,7 @@ export default function ExamLayout() {
 
         if (forced || errorMessage.includes('time limit') || errorMessage.includes('submitted')) {
           toast.warning("Time limit processed. Redirecting...");
+          setKeepAwake(false);
           if (activeSection === 'objective' && hasCqSq) {
             window.location.reload();
           } else {
@@ -218,10 +237,9 @@ export default function ExamLayout() {
         setIsSubmitting(false);
         setShowSubmitConfirm(false);
       }
-    } else {
-      setShowSubmitConfirm(true);
     }
-  }, [showSubmitConfirm, exam, answers, activeSection]);
+  }, [exam, answers, activeSection, hasCqSq]);
+
 
   // Combined Violation Handler
   const onViolation = useCallback((count: number) => {
@@ -254,8 +272,15 @@ export default function ExamLayout() {
   useEffect(() => {
     if (exam.startedAt) {
       setIsExamActive(true);
+      setKeepAwake(true);
+      setBrightness(1.0);
     }
+    return () => {
+      setKeepAwake(false);
+      stopSpeech();
+    };
   }, [exam.startedAt]);
+
 
   const handleStartExam = async () => {
     try {
@@ -290,10 +315,14 @@ export default function ExamLayout() {
       setShowInstructions(false);
       setTransitionState(null); // Clear any transition overlays
 
+      setKeepAwake(true);
+      setBrightness(1.0);
+
       toast.success("Exam Started Successfully", { position: "top-center" });
 
       // Disable grace period after 3 seconds (enough time for fullscreen to settle)
       setTimeout(() => setGracePeriod(false), 3000);
+
 
     } catch (error) {
       console.error("Error starting exam:", error);
@@ -377,10 +406,10 @@ export default function ExamLayout() {
     const requiredTotalQuestions = mcqQuestions.length + cqRequired + sqRequired + otherQuestions.length;
 
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4 font-sans animate-in fade-in duration-500">
-        <Card className="max-w-3xl w-full p-6 md:p-10 shadow-2xl rounded-3xl bg-card border-border relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-          <div className="text-center mb-8">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-start md:justify-center p-2 sm:p-4 font-sans animate-in fade-in duration-500 overflow-y-auto">
+        <Card className="max-w-3xl w-full p-5 md:p-10 my-4 shadow-2xl rounded-3xl bg-card border-border relative overflow-hidden flex flex-col shrink-0">
+          <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <div className="text-center mb-6">
             <div className="flex justify-center mb-4">
               <img src={instituteLogo} alt={instituteName} className="h-16 w-auto object-contain" />
             </div>
@@ -556,11 +585,11 @@ export default function ExamLayout() {
                     <Menu className="w-5 h-5 text-muted-foreground" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-[300px] p-0">
-                  <div className="p-4 border-b bg-muted/30">
+                <SheetContent side="left" className="w-[300px] p-0 flex flex-col h-full">
+                  <div className="p-4 border-b bg-muted/30 shrink-0">
                     <h2 className="font-bold text-lg">Navigator</h2>
                   </div>
-                  <div className="p-4">
+                  <div className="flex-1 overflow-hidden">
                     <Navigator questions={questions} />
                   </div>
                 </SheetContent>
@@ -577,11 +606,33 @@ export default function ExamLayout() {
                     {activeSection === 'objective' ? 'Objective Section' : 'Subjective Section'}
                   </Badge>
                 </div>
+                {/* TTS Accessibility Control */}
+                {Capacitor.isNativePlatform() && (
+                  <div className="flex gap-1 ml-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={() => speakText(currentQuestion?.questionText || '')}
+                    >
+                      <Volume2 className="w-4 h-4 text-primary" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 rounded-full"
+                      onClick={stopSpeech}
+                    >
+                      <VolumeX className="w-4 h-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                )}
               </div>
+
             </div>
 
             {/* Centered Timer */}
-            <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none flex flex-col items-center gap-1">
+            <div className="absolute left-1/2 top-1 lg:top-1/2 transform -translate-x-1/2 lg:-translate-y-1/2 pointer-events-none flex flex-col items-center gap-1 scale-90 lg:scale-100">
               <div className="pointer-events-auto">
                 <Timer onTimeUp={() => handleSubmit(true)} />
               </div>

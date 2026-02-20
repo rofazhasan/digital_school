@@ -29,6 +29,8 @@ import { Eye, EyeOff, Loader2, PartyPopper, AlertCircle, Home, Mail, Phone, Buil
 import { AnimatePresence, motion } from 'framer-motion';
 import { ControllerRenderProps } from 'react-hook-form';
 import { cn } from '@/lib/utils';
+import { triggerHaptic, ImpactStyle } from '@/lib/haptics';
+
 
 export default function SignupPage() {
     const [error, setError] = useState<string | null>(null);
@@ -140,6 +142,7 @@ export default function SignupPage() {
 
     // Clear the other field when switching contact method
     const handleContactMethodChange = (method: 'email' | 'phone') => {
+        triggerHaptic(ImpactStyle.Light);
         setContactMethod(method);
         if (method === 'email') {
             form.setValue('phone', '');
@@ -148,7 +151,9 @@ export default function SignupPage() {
         }
     };
 
+
     const onSubmit = (data: TSignupSchema) => {
+        triggerHaptic(ImpactStyle.Medium);
         setError(null);
         setSuccess(false);
         startTransition(async () => {
@@ -167,16 +172,20 @@ export default function SignupPage() {
                 });
                 const result = await response.json();
                 if (!response.ok) {
+                    triggerHaptic(ImpactStyle.Heavy);
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
+                    triggerHaptic(ImpactStyle.Medium);
                     setSuccess(true);
                     form.reset();
                 }
             } catch {
+                triggerHaptic(ImpactStyle.Heavy);
                 setError('Failed to connect to the server. Please try again.');
             }
         });
     };
+
 
     if (!mounted) return null;
 

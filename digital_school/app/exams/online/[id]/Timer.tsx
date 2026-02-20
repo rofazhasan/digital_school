@@ -109,11 +109,11 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
 
   return (
     <div className={`
-      relative group flex items-center gap-3 px-4 py-2 rounded-2xl transition-all duration-500 border backdrop-blur-md
+      relative group flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-1.5 sm:py-2 rounded-xl sm:rounded-2xl transition-all duration-500 border backdrop-blur-md
       ${bgColor} ${borderColor} ${isUrgent ? 'animate-bounce-subtle shadow-lg shadow-rose-500/20' : 'shadow-sm'}
     `}>
       {/* Circular Progress SVG */}
-      <div className="relative w-10 h-10 flex-shrink-0">
+      <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0">
         <svg className="w-full h-full -rotate-90 transform">
           {/* Background Ring */}
           <circle
@@ -148,10 +148,10 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
       </div>
 
       <div className="flex flex-col">
-        <span className={`text-[10px] font-black uppercase tracking-widest opacity-60 ${timerColor}`}>
+        <span className={`text-[8px] sm:text-[10px] font-black uppercase tracking-widest opacity-60 ${timerColor}`}>
           Time Remaining
         </span>
-        <span className={`text-xl font-black tabular-nums tracking-tight leading-none ${timerColor}`}>
+        <span className={`text-base sm:text-xl font-black tabular-nums tracking-tight leading-none ${timerColor}`}>
           {formatTime(secondsLeft)}
         </span>
       </div>

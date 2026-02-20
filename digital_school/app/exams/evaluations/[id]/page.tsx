@@ -50,9 +50,17 @@ import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
+import { triggerHaptic, ImpactStyle, triggerGradingHaptic } from "@/lib/haptics";
+import { verifyAdminAction } from "@/lib/native/auth";
+import { Capacitor } from "@capacitor/core";
+import { ShieldCheck, Battery, Wifi, Scan } from "lucide-react";
+import { scanDocument } from "@/lib/native/scanner";
+
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
+
+const normalize = (val: any) => String(val || "").trim().toLowerCase();
 
 interface LiveStudent {
   id: string;
@@ -68,6 +76,9 @@ interface LiveStudent {
   maxScore: number;
   lastActive: string;
   answers: Record<string, any>;
+  batteryLevel?: number;
+  isOnline?: boolean;
+  isFocus?: boolean;
 }
 
 interface LiveExamStats {
@@ -170,7 +181,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [monitorViewMode, setMonitorViewMode] = useState<'grid' | 'list'>('grid');
 
   const [currentStudentIndex, setCurrentStudentIndex] = useState(0);
+  const handleStudentChange = (idx: number) => {
+    setCurrentStudentIndex(idx);
+    triggerHaptic(ImpactStyle.Light);
+  };
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const handleQuestionChange = (idx: number) => {
+    setCurrentQuestionIndex(idx);
+    triggerHaptic(ImpactStyle.Light);
+  };
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive'>('all');
@@ -200,12 +221,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [activeAnnotationImage, setActiveAnnotationImage] = useState<string | null>(null);
   const [activeAnnotationOriginal, setActiveAnnotationOriginal] = useState<string | null>(null);
   const [activeAnnotationMeta, setActiveAnnotationMeta] = useState<{ questionId: string; index: number; studentId: string } | null>(null);
+  const [annotationTarget, setAnnotationTarget] = useState<{ imageUrl: string; questionId: string; index: number; studentId: string } | null>(null);
+  const [isCanvasOpen, setIsCanvasOpen] = useState(false);
 
   // Store all annotations for the current student: key = "questionId_imageIndex", value = annotated image URL
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
 
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string) => {
-
     // Check if there is an existing annotation for this image
     const key = `${questionId}_${index}`;
     const annotationUrl = annotations[key] || imageUrl;
@@ -218,6 +240,63 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     // Important: We still want to track which question/index this belongs to
     setActiveAnnotationMeta({ questionId, index, studentId });
     setIsAnnotationOpen(true);
+  };
+
+  const handleScan = async (questionId: string, pIdx?: number) => {
+    if (!Capacitor.isNativePlatform()) {
+      toast.error("Document scanner is only available on native Android.");
+      return;
+    }
+
+    const currentStudent = exam?.submissions[currentStudentIndex];
+    if (!currentStudent?.student?.id) {
+      toast.error("Cannot scan: No student selected or student ID missing.");
+      return;
+    }
+
+    try {
+      const scanResult = await scanDocument();
+      if (scanResult) {
+        toast.success("Document scanned successfully! Starting upload...");
+
+        // Convert file path to blob for upload
+        const response = await fetch(Capacitor.convertFileSrc(scanResult));
+        const blob = await response.blob();
+
+        const formData = new FormData();
+        formData.append('file', blob, 'scanned_script.jpg');
+
+        const uploadRes = await fetch('/api/upload', { method: 'POST', body: formData });
+        if (!uploadRes.ok) throw new Error("Upload failed");
+        const { url } = await uploadRes.json();
+
+        // Save scanned script as an annotation or answer?
+        // Let's save it as an annotation for consistency with current flow
+        const saveRes = await fetch(`/api/exams/evaluations/${id}/drawing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: currentStudent?.student?.id,
+            questionId,
+            imageIndex: pIdx ?? 0,
+            originalImagePath: url, // The scanned image is the "original" for this annotation
+            imageData: url // And also the annotated image initially
+          })
+        });
+
+        if (saveRes.ok) {
+          toast.success("Scanned script uploaded and linked!");
+          fetchAnnotations(currentStudent?.student?.id || '');
+        } else {
+          throw new Error("Failed to save scanned script record.");
+        }
+      } else {
+        toast.info("No document was scanned.");
+      }
+    } catch (error) {
+      console.error("Scan failed:", error);
+      toast.error("Failed to scan document");
+    }
   };
 
   const handleSaveAnnotation = async (blob: Blob) => {
@@ -261,7 +340,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         [key]: url
       }));
 
+      setAnnotations(prev => ({
+        ...prev,
+        [key]: url
+      }));
+
+      triggerHaptic(ImpactStyle.Medium);
       toast.success("Annotation saved!");
+
       setIsAnnotationOpen(false);
     } catch (e) {
       console.error(e);
@@ -616,8 +702,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       <Badge variant="outline" className={`border-none ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-600' : 'bg-green-500/10 text-green-600'}`}>
                         {student?.status === 'IN_PROGRESS' ? '● Pending' : '✓ Evaluated'}
                       </Badge>
-                      <span className="text-muted-foreground/80">
-                        {student?.lastActive ? new Date(student?.lastActive).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'N/A'}
+
+                      <div className="flex items-center gap-2">
+                        <Wifi className={`w-3 h-3 ${student?.isOnline !== false ? 'text-emerald-500' : 'text-rose-500'}`} />
+                        <Battery className={`w-3 h-3 ${(student?.batteryLevel ?? 100) > 20 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                        <ShieldCheck className={`w-3 h-3 ${student?.isFocus !== false ? 'text-blue-500' : 'text-amber-500'}`} />
+                      </div>
+
+                      <span className="text-muted-foreground font-medium">
+                        {new Date(student?.lastActive || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </CardContent>
@@ -880,6 +973,45 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       toast.error("Failed to fetch exam data");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const releaseResults = async () => {
+    if (!exam) return;
+
+    // 1. NATIVE BIOMETRIC SECURITY GATE
+    const confirmed = await verifyAdminAction("Release Exam Results");
+    if (!confirmed) return;
+
+    // 2. Check if there are any pending review requests
+    const pendingReviews = reviewRequests.filter(r => r?.status === 'PENDING' || r?.status === 'UNDER_REVIEW');
+    if (pendingReviews.length > 0) {
+      const shouldContinue = confirm(
+        `There are ${pendingReviews.length} pending review request${pendingReviews.length > 1 ? 's' : ''}. ` +
+        'Releasing results will close all pending reviews. Do you want to continue?'
+      );
+      if (!shouldContinue) return;
+    }
+
+    try {
+      const response = await fetch(`/api/exams/evaluations/release-results`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ examId: id })
+      });
+
+      if (response.ok) {
+        toast.success("Results released successfully!");
+        fetchExamData(); // Refresh data to show updated status
+        fetchReviewRequests(); // Refresh review requests
+      } else {
+        const errorData = await response.json();
+        toast.error(errorData.message || "Failed to release results");
+      }
+    } catch (error) {
+      console.error("Error releasing results:", error);
+      toast.error("Failed to release results");
     }
   };
 
@@ -1253,6 +1385,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
 
       // Success - no toast to avoid delays, UI already updated optimistically
+      if (marks === maxMarks) {
+        triggerGradingHaptic('CORRECT');
+      } else if (marks === 0) {
+        triggerGradingHaptic('WRONG');
+      } else {
+        triggerGradingHaptic('REVIEW');
+      }
 
       // Check if this student has a pending review request and mark it as under review
       const studentReview = reviewRequests.find(r => r.studentId === currentStudent?.student?.id);
@@ -1370,6 +1509,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
+    // NATIVE BIOMETRIC SECURITY GATE
+    const confirmed = await verifyAdminAction("Submit All Evaluations");
+    if (!confirmed) return;
+
     setSaving(true);
     try {
       const response = await fetch(`/api/exams/evaluations/${id}/submit-all`, {
@@ -1389,40 +1532,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       toast.error("Failed to submit all evaluations");
     } finally {
       setSaving(false);
-    }
-  };
-
-  const releaseResults = async () => {
-    if (!exam) return;
-
-    // Check if there are any pending review requests
-    const pendingReviews = reviewRequests.filter(r => r?.status === 'PENDING' || r?.status === 'UNDER_REVIEW');
-    if (pendingReviews.length > 0) {
-      const shouldContinue = confirm(
-        `There are ${pendingReviews.length} pending review request${pendingReviews.length > 1 ? 's' : ''}. ` +
-        'Releasing results will close all pending reviews. Do you want to continue?'
-      );
-      if (!shouldContinue) return;
-    }
-
-    try {
-      const response = await fetch(`/api/exams/evaluations/release-results`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ examId: id })
-      });
-
-      if (response.ok) {
-        toast.success("Results released successfully");
-        fetchExamData(); // Refresh data
-        fetchReviewRequests(); // Refresh review requests
-      } else {
-        toast.error("Failed to release results");
-      }
-    } catch (error) {
-      console.error("Error releasing results:", error);
-      toast.error("Failed to release results");
     }
   };
 
@@ -2533,7 +2642,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               <div className="w-1.5 h-1.5 bg-amber-600 rounded-full"></div> Student response:
                                                             </div>
                                                             <div className="bg-white p-4 rounded-xl border-2 border-amber-100 shadow-sm min-h-[100px] relative overflow-hidden">
-                                                              <div className="absolute top-0 right-0 px-2 py-1 bg-amber-50 text-[8px] font-black text-amber-400 uppercase tracking-tighter">Verified Entry</div>
+                                                              {Capacitor.isNativePlatform() && (
+                                                                <Button
+                                                                  size="sm"
+                                                                  variant="ghost"
+                                                                  className="absolute top-2 right-2 h-7 px-2 text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
+                                                                  onClick={() => handleScan(currentQuestion.id, pIdx)}
+                                                                >
+                                                                  <Scan className="w-3 h-3 mr-1" />
+                                                                  Smart Scan
+                                                                </Button>
+                                                              )}
+                                                              <div className="absolute top-0 right-0 px-2 py-1 bg-amber-50 text-[8px] font-black text-amber-400 uppercase tracking-tighter invisible group-hover:visible transition-all">Verified Entry</div>
                                                               {part.subType === 'writing' && (
                                                                 <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">{getAns('ans') || <span className="text-muted-foreground/40">No text provided…</span>}</div>
                                                               )}

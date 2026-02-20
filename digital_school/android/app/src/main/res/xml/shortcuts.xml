@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="create_exam"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_create_exam_short"
+        android:shortcutLongLabel="@string/shortcut_create_exam_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.examify.app"
+            android:targetClass="com.examify.app.MainActivity"
+            android:data="examify://exams/create" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="live_results"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_live_results_short"
+        android:shortcutLongLabel="@string/shortcut_live_results_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.examify.app"
+            android:targetClass="com.examify.app.MainActivity"
+            android:data="examify://exams/live" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="admin_dashboard"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_dashboard_short"
+        android:shortcutLongLabel="@string/shortcut_dashboard_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.examify.app"
+            android:targetClass="com.examify.app.MainActivity"
+            android:data="examify://dashboard" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="nfc_verification"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_nfc_verify_short"
+        android:shortcutLongLabel="@string/shortcut_nfc_verify_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.examify.app"
+            android:targetClass="com.examify.app.MainActivity"
+            android:data="examify://teacher/check-in" />
+    </shortcut>
+</shortcuts>

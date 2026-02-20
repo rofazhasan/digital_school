@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useRouter } from "next/navigation";
 import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
+import { verifyAdminAction } from "@/lib/native/auth";
 
 interface Exam {
   id: string;
@@ -212,6 +213,10 @@ export default function EvaluationsPage() {
 
   const releaseResults = async (examId: string) => {
     try {
+      // NATIVE BIOMETRIC SECURITY GATE
+      const confirmed = await verifyAdminAction("Release Exam Results");
+      if (!confirmed) return;
+
       const response = await fetch("/api/exams/evaluations/release-results", {
         method: "POST",
         credentials: 'include', // Include cookies

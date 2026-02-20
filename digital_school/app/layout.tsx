@@ -53,12 +53,12 @@ const balooDa2 = { variable: '' };
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
-  let title = "Digital School";
+  let title = "Examify";
   try {
     const settings = await db.settings.findFirst({
       select: { instituteName: true, institute: { select: { name: true } } }
     });
-    title = settings?.instituteName || settings?.institute?.name || "Digital School";
+    title = settings?.instituteName || settings?.institute?.name || "Examify";
   } catch (error) {
     console.warn("Failed to fetch settings for metadata:", error);
   }
@@ -85,6 +85,8 @@ export const viewport: Viewport = {
 };
 
 import { ThemeProvider } from "@/components/theme-provider";
+import MobileEnhancements from "@/components/MobileEnhancements";
+import MobileNavigationControls from "@/components/MobileNavigationControls";
 
 // ... existing imports
 
@@ -106,6 +108,8 @@ export default function RootLayout({
           <ErrorBoundary>
             <SessionProviderWrapper>
               <NavigationWrapper>
+                <MobileEnhancements />
+                <MobileNavigationControls />
                 <MaintenanceGuard>
                   <SessionGuard />
                   <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">

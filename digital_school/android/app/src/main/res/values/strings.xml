@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Examify</string>
+    <string name="title_activity_main">Examify</string>
+    <string name="package_name">com.examify.app</string>
+    <string name="custom_url_scheme">com.examify.app</string>
+    <string name="shortcut_create_exam_short">Create Exam</string>
+    <string name="shortcut_create_exam_long">Schedule a New Exam</string>
+    <string name="shortcut_live_results_short">Live Results</string>
+    <string name="shortcut_live_results_long">View Live Exam Results</string>
+    <string name="shortcut_dashboard_short">Dashboard</string>
+    <string name="shortcut_dashboard_long">Open Admin Dashboard</string>
+    <string name="shortcut_nfc_verify_short">NFC Verify</string>
+    <string name="shortcut_nfc_verify_long">Open NFC Hall Verification</string>
+</resources>

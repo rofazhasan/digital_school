@@ -40,6 +40,8 @@ import {
   Star
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { nativeShare } from '@/lib/native/interaction';
+import { Capacitor } from "@capacitor/core";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
@@ -49,6 +51,8 @@ import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
+import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+
 // import QRCode from "react-qr-code"; // Unused
 
 interface StudentResult {
@@ -195,6 +199,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [downloading, setDownloading] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+
+  const handleShare = async () => {
+    if (!result) return;
+    const shareTitle = `My Result: ${result.exam.name}`;
+    const shareText = `I scored ${result.result?.total || result.submission.score} in ${result.exam.name} on Examify!`;
+    const shareUrl = window.location.href;
+    await nativeShare(shareTitle, shareText, shareUrl);
+  };
   const printRef = useRef<HTMLDivElement>(null);
 
   // Pagination State
@@ -215,8 +227,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     },
     onAfterPrint: () => {
       setIsPrinting(false);
+      triggerHaptic(ImpactStyle.Medium);
     }
   } as any);
+
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -736,6 +750,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           />
         </div>
 
+        {Capacitor.isNativePlatform() && (
+          <div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-[100] animate-pulse" />
+        )}
+
+
         <div className="relative z-10 w-full max-w-7xl 2xl:max-w-[95vw] mx-auto p-4 sm:p-0">
           {/* Header */}
           <motion.div
@@ -784,10 +803,16 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <span className="hidden sm:inline ml-2">Print Script</span>
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" className="rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/60">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/60"
+                    onClick={handleShare}
+                  >
                     <Share2 className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                     <span className="hidden sm:inline ml-2">Share</span>
                   </Button>
+
                 </div>
               </div>
             </div>

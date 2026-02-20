@@ -39,6 +39,9 @@ import {
   Download, Save, AlertTriangle, LayoutDashboard
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+import { Capacitor } from "@capacitor/core";
+
 
 // --- Types ---
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
@@ -360,7 +363,12 @@ export default function QuestionBankPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const handleEdit = (question: Question) => { setEditingQuestion(question); setIsFormOpen(true); };
+  const handleEdit = (question: Question) => {
+    triggerHaptic(ImpactStyle.Light);
+    setEditingQuestion(question);
+    setIsFormOpen(true);
+  };
+
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure? This action cannot be undone.")) return;
@@ -380,6 +388,7 @@ export default function QuestionBankPage() {
   };
 
   const toggleSelection = (id: string) => {
+    triggerHaptic(ImpactStyle.Light);
     setSelectedQuestions(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) newSet.delete(id);
@@ -387,6 +396,7 @@ export default function QuestionBankPage() {
       return newSet;
     });
   };
+
 
   const toggleSelectPage = () => {
     const pageIds = paginatedQuestions.map(q => q.id);
@@ -635,14 +645,28 @@ export default function QuestionBankPage() {
                 <span className="hidden sm:inline">Exams Hub</span>
               </Button>
               <Button
-                onClick={() => { setEditingQuestion(null); setIsFormOpen(true); }}
+                onClick={() => { triggerHaptic(ImpactStyle.Medium); setEditingQuestion(null); setIsFormOpen(true); }}
                 className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-[1.02] active:scale-95 text-white shadow-xl shadow-blue-500/20 rounded-full px-6 transition-all duration-300"
               >
                 <PlusCircle className="w-5 h-5" />
-                <span className="font-semibold">Add New</span>
+                <span className="font-semibold text-sm">Add New</span>
               </Button>
             </div>
           </div>
+
+          {/* Mobile FAB */}
+          {Capacitor.isNativePlatform() && (
+            <motion.button
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => { triggerHaptic(ImpactStyle.Heavy); setEditingQuestion(null); setIsFormOpen(true); }}
+              className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 border-4 border-white/20 backdrop-blur-md"
+            >
+              <Plus className="w-6 h-6" />
+            </motion.button>
+          )}
+
 
           <Card className="bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm border-0 shadow-2xl rounded-[2.5rem] overflow-hidden">
             <CardContent className="p-0">

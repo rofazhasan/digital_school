@@ -73,7 +73,7 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
     <div className={`
           flex flex-col bg-background/60 backdrop-blur-xl transition-all duration-300
           ${isCollapsed ? 'w-14 items-center' : 'w-full'}
-          h-full max-h-full overflow-hidden
+          h-full min-h-0 overflow-hidden
         `}>
 
       {/* Scrollable Content */}

@@ -34,7 +34,7 @@ class SocketService {
   initialize(server: HTTPServer) {
     this.io = new SocketIOServer(server, {
       cors: {
-        origin: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        origin: process.env.NEXT_PUBLIC_APP_URL || "https://digitalsch.netlify.app",
         methods: ["GET", "POST"]
       }
     });

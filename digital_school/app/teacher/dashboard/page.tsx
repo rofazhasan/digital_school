@@ -16,6 +16,7 @@ import {
     MessageSquare,
     Activity,
     Shield,
+    Lock,
     Menu,
     Scan,
     ChevronDown,
@@ -61,6 +62,7 @@ const sidebarItems: SidebarItem[] = [
     { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
     { id: 'omr-scanner', label: 'OMR Scanner', icon: Scan, href: '/omr_scanner' },
     { id: 'attendance', label: 'Attendance', icon: Calendar, href: '#attendance' },
+    { id: 'check-in', label: 'NFC Check-in', icon: Lock, href: '/teacher/check-in' },
     { id: 'notices', label: 'Notices', icon: Bell, href: '#notices' },
     { id: 'chat', label: 'Chat Support', icon: MessageSquare, href: '#chat' },
     { id: 'analytics', label: 'Analytics', icon: Activity, href: '#analytics' },
@@ -289,6 +291,7 @@ export default function TeacherDashboard() {
                                                     { label: 'Create Exam', icon: FileText, color: 'text-blue-500', href: '/exams/create' },
                                                     { label: 'Question Bank', icon: BookOpen, color: 'text-amber-500', href: '/question-bank' },
                                                     { label: 'Attendance', icon: Calendar, color: 'text-emerald-500', href: '#attendance' },
+                                                    { label: 'NFC Check-in', icon: Lock, color: 'text-indigo-500', href: '/teacher/check-in' },
                                                     { label: 'Results', icon: BarChart3, color: 'text-purple-500', href: '/exams/results' },
                                                 ].map((action, i) => (
                                                     <motion.button

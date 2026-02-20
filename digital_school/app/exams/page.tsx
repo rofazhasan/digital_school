@@ -35,6 +35,11 @@ import {
 } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
+import { Capacitor } from "@capacitor/core";
+import { copyToClipboard } from "@/lib/native/interaction";
+import { Copy, Check } from "lucide-react";
+
 
 // Mock user role (replace with real auth logic)
 // const userRole = "SUPER_USER"; // or "ADMIN", "TEACHER", etc.
@@ -93,6 +98,14 @@ export default function ExamsPage() {
   const [pageSize] = useState(12);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyId = async (id: string) => {
+    await copyToClipboard(id);
+    setCopiedId(id);
+    toast({ title: "Copied", description: "Exam ID copied to clipboard." });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
 
   // Edit Modal State
@@ -179,11 +192,13 @@ export default function ExamsPage() {
   };
 
   const handleRefresh = async () => {
+    triggerHaptic(ImpactStyle.Medium);
     setRefreshing(true);
     await fetchExams();
     setRefreshing(false);
     toast({ title: "Refreshed", description: "Exam list updated." });
   };
+
 
   const handleEdit = (id: string) => {
     const exam = exams.find((e) => e.id === id);
@@ -608,12 +623,26 @@ export default function ExamsPage() {
                     className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-[1.02] active:scale-95 text-white shadow-xl shadow-blue-500/20 rounded-full px-6 transition-all duration-300"
                   >
                     <Plus className="w-5 h-5" />
-                    <span className="font-semibold">Create Exam</span>
+                    <span className="font-semibold text-sm">Create Exam</span>
                   </Button>
                 )}
               </div>
             </div>
           </motion.div>
+
+          {/* Mobile FAB */}
+          {Capacitor.isNativePlatform() && (
+            <motion.button
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => { triggerHaptic(ImpactStyle.Heavy); router.push("/exams/create"); }}
+              className="fixed bottom-24 right-6 w-14 h-14 bg-gradient-to-br from-primary to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center z-50 border-4 border-white/20 backdrop-blur-md"
+            >
+              <Plus className="w-6 h-6" />
+            </motion.button>
+          )}
+
 
           {/* Statistics Cards */}
           <motion.div
@@ -985,9 +1014,23 @@ export default function ExamsPage() {
 
                             {/* Subject & Name */}
                             <div className="mb-4">
-                              <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block mb-1">
-                                {exam.subject || 'Academic Exam'}
-                              </span>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-[10px] font-bold uppercase tracking-widest text-blue-600 dark:text-blue-400 block">
+                                  {exam.subject || 'Academic Exam'}
+                                </span>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 w-6 p-0 rounded-md hover:bg-muted"
+                                  onClick={(e) => { e.stopPropagation(); handleCopyId(exam.id); }}
+                                >
+                                  {copiedId === exam.id ? (
+                                    <Check className="w-3 h-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="w-3 h-3 text-muted-foreground" />
+                                  )}
+                                </Button>
+                              </div>
                               <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight line-clamp-2 min-h-[3rem] font-fancy">
                                 {exam.name}
                               </h3>

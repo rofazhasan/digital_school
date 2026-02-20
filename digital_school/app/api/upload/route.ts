@@ -12,24 +12,38 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
+        const contentType = req.headers.get("content-type") || "";
+        let fileBuffer: Buffer;
+        let fileName: string = "upload";
 
-        if (!file) {
-            console.error('[Upload API] No file in request');
-            return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+        if (contentType.includes("application/json")) {
+            const body = await req.json();
+            if (!body.file) {
+                return NextResponse.json({ error: "No base64 file provided" }, { status: 400 });
+            }
+            // Remove data:image/xxx;base64, prefix if present
+            const base64Data = body.file.replace(/^data:image\/\w+;base64,/, "");
+            fileBuffer = Buffer.from(base64Data, 'base64');
+            fileName = body.fileName || "camera_upload.jpg";
+        } else {
+            const formData = await req.formData();
+            const file = formData.get("file") as File;
+            if (!file) {
+                console.error('[Upload API] No file in request');
+                return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
+            }
+            const arrayBuffer = await file.arrayBuffer();
+            fileBuffer = Buffer.from(arrayBuffer);
+            fileName = file.name;
         }
 
-        console.log('[Upload API] File received:', file.name, file.type, file.size, 'bytes');
+        console.log('[Upload API] File received:', fileName, 'Size:', fileBuffer.length, 'bytes');
 
         // Check if Cloudinary is configured
         if (!process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET || !process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME) {
             console.error('[Upload API] Cloudinary not configured. Missing env vars.');
             return NextResponse.json({ error: "Server configuration error: Cloudinary not configured" }, { status: 500 });
         }
-
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
 
         console.log('[Upload API] Starting Cloudinary upload...');
 
@@ -53,7 +67,7 @@ export async function POST(req: NextRequest) {
                         resolve(result);
                     }
                 }
-            ).end(buffer);
+            ).end(fileBuffer);
         });
 
         return NextResponse.json({
