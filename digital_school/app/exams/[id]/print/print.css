@@ -94,6 +94,8 @@
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
     min-height: 100vh;
+    orphans: 3;
+    widows: 3;
   }
 
   .print-page-container {
@@ -167,12 +169,18 @@
 
   /* Premium Section Headers */
   .mcq-header,
+  .section-break,
+  .cq-section,
+  .sq-section,
+  .desc-section,
+  .subsection-header,
   h3 {
     border-bottom: 2px solid #000 !important;
     background: #f8fafc !important;
     padding: 2px 8px !important;
     margin-top: 1rem !important;
     break-after: avoid !important;
+    page-break-after: avoid !important;
     display: flex !important;
     justify-content: space-between !important;
     align-items: center !important;

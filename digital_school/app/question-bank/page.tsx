@@ -44,9 +44,9 @@ import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, Tabl
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
 
 // DESCRIPTIVE sub-type definitions
-type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table';
+type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram';
 type WritingType = 'paragraph' | 'letter' | 'essay' | 'summary' | 'expansion' | 'translation' | 'story' | 'dialogue' | 'composition' | 'report' | 'application' | 'email';
-type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question';
+type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question' | 'prepositions' | 'articles';
 type CompAnswerType = 'stem_mcq' | 'qa';
 
 interface DescPart {
@@ -54,6 +54,8 @@ interface DescPart {
   label: string;
   marks: number;
   instructions?: string;
+  modelAnswer?: string; // model answer for this part
+  explanation?: string; // explanation for this part
   // writing
   writingType?: WritingType;
   sourceText?: string; // for translation/summary
@@ -72,6 +74,18 @@ interface DescPart {
   // table
   tableHeaders?: string[];
   tableRows?: string[][];
+  // matching
+  leftColumn?: { id: string; text: string }[];
+  rightColumn?: { id: string; text: string }[];
+  matches?: Record<string, string>;
+  // rearranging
+  correctOrder?: string[];
+  // true_false
+  statements?: string[];
+  correctAnswers?: boolean[];
+  // label_diagram
+  imageUrl?: string;
+  labels?: { text: string; x: number; y: number }[];
 }
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
@@ -106,7 +120,7 @@ type GeneratedQuestion = {
   topic?: string;
   class: { id: string; name: string };
   hasMath?: boolean;
-
+  explanation?: string;
 };
 
 // Add this at the top of your project (e.g., types/react-latex.d.ts):
@@ -1282,37 +1296,41 @@ const QuestionCard: React.FC<{
 
 // ─── DescriptiveQuestionForm ─────────────────────────────────────────────────
 const WRITING_TYPE_LABELS: Record<string, string> = {
-  paragraph: 'অনুচ্ছেদ রচনা / Paragraph',
-  letter: 'চিঠিপত্র / Letter / Application',
-  report: 'সংবাদ প্রতিবেদন / Report',
-  essay: 'প্রবন্ধ/রচনা / Essay / Composition',
-  summary: 'সারাংশ / সারমর্ম / Summary',
-  expansion: 'ভাব-সম্প্রসারণ / Amplification',
-  translation: 'বাংলায় অনুবাদ / Translation',
-  story: 'Completing Story',
-  dialogue: 'Writing Dialogue',
+  paragraph: 'অনুচ্ছেদ রচনা / Paragraph Writing (e.g. A Rainy Day)',
+  letter: 'চিঠিপত্র / Informal Letter / Application',
+  report: 'সংবাদ প্রতিবেদন / News Report Writing',
+  essay: 'প্রবন্ধ/রচনা / Essay / Composition (e.g. Wonders of Science)',
+  summary: 'সারাংশ / সারমর্ম / Main Idea Summary',
+  expansion: 'ভাব-সম্প্রসারণ / Amplification of Idea',
+  translation: 'বাংলায় অনুবাদ / English to Bangla Translation',
+  story: 'Completing Story (with given beginning)',
+  dialogue: 'Writing Dialogue (between two persons)',
   composition: 'Short Composition',
-  email: 'E-mail / Formal Letter',
-  application: 'Application Writing',
+  email: 'E-mail / Formal Communication',
+  application: 'Formal Application / CV Writing',
 };
 
 const FILL_TYPE_LABELS: Record<string, string> = {
-  gap_passage: 'Gap Filling (passage with blanks)',
+  gap_passage: 'Gap Filling (Cloze test with/without clues)',
   right_form: 'Right Form of Verbs',
-  suffix_prefix: 'Suffixes & Prefixes',
-  connector: 'Connectors / Prepositions',
-  punctuation: 'Punctuation & Capitalization',
-  sentence_change: 'Changing Sentences / Transformation',
-  substitution: 'Substitution Table',
+  suffix_prefix: 'Suffixes and Prefixes',
+  substitution: 'Substitution Table (Matching phrases to sentences)',
+  punctuation: 'Punctuation and Capitalization',
+  sentence_change: 'Changing Sentences (Voice/Degree/Narrative)',
   tag_question: 'Tag Questions',
+  connectors: 'Sentence Connectors',
+  articles: 'Articles (a, an, the)',
+  prepositions: 'Prepositions',
 };
 
 function DescriptiveQuestionForm({
   parts,
   setParts,
+  handleFieldImageUpload,
 }: {
   parts: DescPart[];
   setParts: React.Dispatch<React.SetStateAction<DescPart[]>>;
+  handleFieldImageUpload?: (file: File, callback: (url: string) => void) => void;
 }) {
   const updatePart = (idx: number, changes: Partial<DescPart>) => {
     setParts(prev => {
@@ -1381,8 +1399,22 @@ function DescriptiveQuestionForm({
                 <SelectItem value="fill_in">📝 Fill In (gap, verbs, connectors, punctuation…)</SelectItem>
                 <SelectItem value="comprehension">📖 Comprehension (stem MCQ / Q&A from poem/story)</SelectItem>
                 <SelectItem value="table">📊 Table / Information Transfer</SelectItem>
+                <SelectItem value="true_false">⚖️ True / False</SelectItem>
+                <SelectItem value="label_diagram">🖼️ Label Diagram</SelectItem>
+                <SelectItem value="rearranging">🔄 Rearranging</SelectItem>
+                <SelectItem value="matching">🧩 Matching</SelectItem>
               </SelectContent>
             </Select>
+            <p className="text-[10px] text-amber-700/60 mt-1 italic leading-tight">
+              {part.subType === 'writing' && "Handles essays, letters, and other long-form creative writing tasks."}
+              {part.subType === 'fill_in' && "For grammar exercises like gap filling, verbs, and sentence transformation."}
+              {part.subType === 'comprehension' && "Questions based on a provided passage or poem (MCQ or Open-ended)."}
+              {part.subType === 'table' && "Grid-based exercises for information transfer or substitution tables."}
+              {part.subType === 'true_false' && "Truth verification of statements based on context."}
+              {part.subType === 'label_diagram' && "Image identification using coordinate-based markers."}
+              {part.subType === 'rearranging' && "Contextual ordering of jumbled sentences or fragments."}
+              {part.subType === 'matching' && "Pairing items from two columns (e.g., Column A vs Column B)."}
+            </p>
           </div>
 
           {/* ── WRITING ── */}
@@ -1401,6 +1433,9 @@ function DescriptiveQuestionForm({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-gray-500 mt-1 italic">
+                  Select the specific creative writing format (e.g., Essay, Letter, Translation).
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Instructions / Prompt</Label>
@@ -1441,6 +1476,9 @@ function DescriptiveQuestionForm({
                     ))}
                   </SelectContent>
                 </Select>
+                <p className="text-[10px] text-gray-500 mt-1 italic">
+                  Choose between passage-based gaps or list-based grammar exercises (e.g., Suffix/Prefix, Articles).
+                </p>
               </div>
               <div>
                 <Label className="text-xs">Instructions</Label>
@@ -1744,6 +1782,182 @@ function DescriptiveQuestionForm({
               </Button>
             </div>
           )}
+
+          {/* ── REARRANGING ── */}
+          {part.subType === 'rearranging' && (
+            <div className="space-y-2">
+              <Label className="text-xs">Items to Rearrange (one per line, in correct order)</Label>
+              <Textarea
+                value={(part.items || []).join('\n')}
+                onChange={e => {
+                  const items = e.target.value.split('\n').filter(s => s.trim());
+                  updatePart(idx, { items, correctOrder: items });
+                }}
+                rows={5}
+                placeholder="Item 1&#10;Item 2&#10;Item 3..."
+              />
+              <p className="text-[10px] text-gray-500 italic">Enter items in the correct order. The system will randomize them for students.</p>
+            </div>
+          )}
+
+          {/* ── MATCHING ── */}
+          {part.subType === 'matching' && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Left Column (one per line)</Label>
+                  <Textarea
+                    value={(part.leftColumn || []).map(l => l.text).join('\n')}
+                    onChange={e => {
+                      const texts = e.target.value.split('\n').filter(s => s.trim());
+                      updatePart(idx, { leftColumn: texts.map((t, i) => ({ id: (i + 1).toString(), text: t })) });
+                    }}
+                    rows={5}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Right Column (one per line)</Label>
+                  <Textarea
+                    value={(part.rightColumn || []).map(r => r.text).join('\n')}
+                    onChange={e => {
+                      const texts = e.target.value.split('\n').filter(s => s.trim());
+                      updatePart(idx, { rightColumn: texts.map((t, i) => ({ id: String.fromCharCode(65 + i), text: t })) });
+                    }}
+                    rows={5}
+                  />
+                </div>
+              </div>
+              <Label className="text-xs">Matches (e.g. 1-A, 2-B)</Label>
+              <Input
+                value={Object.entries(part.matches || {}).map(([k, v]) => `${k}-${v}`).join(', ')}
+                onChange={e => {
+                  const matches: any = {};
+                  e.target.value.split(',').forEach(p => {
+                    const [k, v] = p.split('-').map(s => s.trim());
+                    if (k && v) matches[k] = v;
+                  });
+                  updatePart(idx, { matches });
+                }}
+                placeholder="1-A, 2-C, 3-B"
+              />
+            </div>
+          )}
+
+          {/* ── TRUE_FALSE ── */}
+          {part.subType === 'true_false' && (
+            <div className="space-y-3">
+              <Label className="text-xs">Statements (one per line)</Label>
+              <Textarea
+                value={(part.statements || []).join('\n')}
+                onChange={e => {
+                  const statements = e.target.value.split('\n').filter(s => s.trim());
+                  updatePart(idx, { statements, correctAnswers: Array(statements.length).fill(true) });
+                }}
+                rows={5}
+                placeholder="Statement 1&#10;Statement 2..."
+              />
+              <div className="space-y-2">
+                <Label className="text-xs">Set Correct Answers</Label>
+                {(part.statements || []).map((stmt, sIdx) => (
+                  <div key={sIdx} className="flex items-center gap-2 text-xs">
+                    <span className="w-4">{sIdx + 1}.</span>
+                    <span className="flex-1 truncate">{stmt}</span>
+                    <Button
+                      type="button"
+                      variant={part.correctAnswers?.[sIdx] ? "default" : "outline"}
+                      size="sm"
+                      className="h-6 text-[10px] px-2"
+                      onClick={() => {
+                        const ans = [...(part.correctAnswers || [])];
+                        ans[sIdx] = !ans[sIdx];
+                        updatePart(idx, { correctAnswers: ans });
+                      }}
+                    >
+                      {part.correctAnswers?.[sIdx] ? 'True' : 'False'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── LABEL_DIAGRAM ── */}
+          {part.subType === 'label_diagram' && (
+            <div className="space-y-3">
+              <div>
+                <Label className="text-xs">Diagram Image URL</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={part.imageUrl || ''}
+                    onChange={e => updatePart(idx, { imageUrl: e.target.value })}
+                    placeholder="https://..."
+                  />
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        if (e.target.files?.[0]) {
+                          handleFieldImageUpload?.(e.target.files[0], (url) => {
+                            updatePart(idx, { imageUrl: url });
+                          });
+                          e.target.value = '';
+                        }
+                      }}
+                      className="hidden"
+                      id={`desc-img-${idx}`}
+                    />
+                    <Label htmlFor={`desc-img-${idx}`} className="cursor-pointer">
+                      <Button type="button" variant="ghost" size="icon" className="text-gray-500 hover:text-indigo-600" asChild>
+                        <span><Upload className="h-4 w-4" /></span>
+                      </Button>
+                    </Label>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Labels (Name:x:y, one per line)</Label>
+                <Textarea
+                  value={(part.labels || []).map(l => `${l.text}:${l.x}:${l.y}`).join('\n')}
+                  onChange={e => {
+                    const lines = e.target.value.split('\n').filter(s => s.trim());
+                    const labels = lines.map(line => {
+                      const [text, x, y] = line.split(':').map(s => s.trim());
+                      return { text: text || 'Label', x: parseInt(x) || 50, y: parseInt(y) || 50 };
+                    });
+                    updatePart(idx, { labels });
+                  }}
+                  rows={5}
+                  placeholder="Petal:50:30&#10;Stamen:40:50"
+                />
+                <p className="text-[10px] text-gray-500 italic">Coordinates x,y are percentages from 0-100.</p>
+              </div>
+            </div>
+          )}
+
+          {/* ── COMMON FIELDS: Model Answer & Explanation ── */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-amber-200/50">
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-amber-700/70">Model Answer / Key</Label>
+              <Textarea
+                value={part.modelAnswer || ''}
+                onChange={e => updatePart(idx, { modelAnswer: e.target.value })}
+                rows={2}
+                placeholder="Correct answer(s) or model response…"
+                className="text-xs bg-white/50"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[10px] font-bold uppercase text-amber-700/70">Part Explanation / Note</Label>
+              <Textarea
+                value={part.explanation || ''}
+                onChange={e => updatePart(idx, { explanation: e.target.value })}
+                rows={2}
+                placeholder="Additional notes or logic for this part…"
+                className="text-xs bg-white/50"
+              />
+            </div>
+          </div>
         </div>
       ))}
 
@@ -2065,7 +2279,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       leftColumn: type === 'MTF' ? leftColumn : null,
       rightColumn: type === 'MTF' ? rightColumn : null,
       matches: type === 'MTF' ? matches : null,
-      explanation: (type === 'AR' || type === 'MTF' || type === 'INT') ? explanation.trim() : undefined,
+      explanation: explanation.trim() || undefined,
       hasMath: /\\/.test(questionText) ||
         ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
@@ -2475,9 +2689,25 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
               <DescriptiveQuestionForm
                 parts={descriptiveParts}
                 setParts={setDescriptiveParts}
+                handleFieldImageUpload={handleFieldImageUpload}
               />
             )}
           </motion.div></AnimatePresence>
+
+          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+            <Label className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-[10px] text-blue-600 dark:text-blue-400 font-bold">!</span>
+              Teacher Note / Shared Explanation
+            </Label>
+            <Textarea
+              value={explanation}
+              onChange={e => setExplanation(e.target.value)}
+              placeholder="Enter internal notes, source references, or general explanation shared with this question..."
+              rows={3}
+              className="mt-2 text-sm"
+            />
+            <p className="text-[10px] text-gray-400 mt-1 italic">This note is primarily for teachers and administrators.</p>
+          </div>
           <Label>Live Preview</Label>
           <Card className="h-full min-h-[200px] p-6 bg-gray-50 dark:bg-gray-800/50 shadow-inner">
             <div className="prose dark:prose-invert max-w-none">
@@ -2963,7 +3193,7 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
   );
 };
 
-const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => void }) => {
+function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [results, setResults] = useState<{ success: number; failed: number; errors: string[] } | null>(null);
@@ -3077,6 +3307,153 @@ const BulkUpload = ({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         { "question": "Define inertia.", "marks": 2, "modelAnswer": "Inertia is the tendency of an object to resist changes in its state of motion." },
         { "question": "State Newton's Second Law and provide its mathematical formula.", "marks": 4, "modelAnswer": "Newton's Second Law states that $F = ma$." }
       ]
+    },
+    {
+      "type": "DESCRIPTIVE",
+      "questionText": "Bangla 2nd Paper (পূর্ণাঙ্গ নমুনা)",
+      "marks": 50,
+      "difficulty": "MEDIUM",
+      "subject": "Bangla 2nd",
+      "className": "Class 10",
+      "subQuestions": [
+        {
+          "subType": "writing",
+          "writingType": "paragraph",
+          "label": "১. অনুচ্ছেদ রচনা",
+          "marks": 10,
+          "instructions": "যেকোনো একটি বিষয়ে অনুচ্ছেদ লেখো: 'ডিজিটাল বাংলাদেশ' অথবা 'শীতের সকাল'।"
+        },
+        {
+          "subType": "writing",
+          "writingType": "application",
+          "label": "২. পত্র/দরখাস্ত",
+          "marks": 10,
+          "instructions": "অসুস্থতার কারণে ছুটি চেয়ে প্রধান শিক্ষকের নিকট একখানা দরখাস্ত লেখো।"
+        },
+        {
+          "subType": "fill_in",
+          "fillType": "punctuation",
+          "label": "৩. বিরাম চিহ্ন",
+          "marks": 5,
+          "instructions": "নিচের অনুচ্ছেদটিতে বিরাম চিহ্নের সঠিক প্রয়োগ করো।",
+          "passage": "আমি তাকে জিজ্ঞাসা করলাম আপনার নাম কী তিনি বললেন আমার নাম রহমান আমি তখন বললাম আপনি কি ঢাকা যাবেন তিনি উত্তর দিলেন না তবে কাল যাব",
+          "modelAnswer": "আমি তাকে জিজ্ঞাসা করলাম, \"আপনার নাম কী?\" তিনি বললেন, \"আমার নাম রহমান।\" আমি তখন বললাম, \"আপনি কি ঢাকা যাবেন?\" তিনি উত্তর দিলেন, \"না, তবে কাল যাব।\""
+        },
+        {
+          "subType": "fill_in",
+          "fillType": "sentence_change",
+          "label": "৪. বাক্য পরিবর্তন",
+          "marks": 5,
+          "instructions": "নির্দেশনা অনুযায়ী বাক্যগুলো পরিবর্তন করো।",
+          "items": [
+            "চাঁদ উঠেছে। (নেতিবাচক)",
+            "সে খুব বুদ্ধিমান। (বিস্ময়সূচক)",
+            "মানুষ মরণশীল। (নেতিবাচক)",
+            "ফুলটি খুব সুন্দর। (প্রশ্নবোধক)",
+            "সত্য কথা বলবে। (অনুজ্ঞাসੂচক)"
+          ],
+          "modelAnswer": "১. চাঁদ উঠেনি। ২. সে কতই না বুদ্ধিমান! ৩. মানুষ অমর নয়। ৪. ফুলটি কি সুন্দর নয়? ৫. সর্বদা সত্য কথা বলবে।"
+        }
+      ],
+      "explanation": "এই প্রশ্নপত্রটি বাংলা ২য় পত্রের মান বন্টন এবং বোর্ড পরীক্ষার প্যাটার্ন অনুযায়ী তৈরি করা হয়েছে।"
+    },
+    {
+      "type": "DESCRIPTIVE",
+      "questionText": "English 1st Paper (Full Mock)",
+      "marks": 50,
+      "difficulty": "MEDIUM",
+      "subject": "English 1st",
+      "className": "Class 10",
+      "subQuestions": [
+        {
+          "subType": "comprehension",
+          "answerType": "stem_mcq",
+          "label": "1. Seen Comprehension (MCQ)",
+          "marks": 7,
+          "stemPassage": "21 February is observed as Shaheed Dibosh every year throughout the country in memory of the martyrs of the Language Movement of 1952. The day is also observed worldwide as the International Mother Language Day.",
+          "stemQuestions": [
+            { "question": "The word 'observed' means:", "options": ["Ignored", "Celebrated", "Rejected", "Forgotten"], "correct": 1 },
+            { "question": "The Language Movement took place in:", "options": ["1947", "1952", "1971", "1990"], "correct": 1 }
+          ],
+          "explanation": "Based on Unit 3, Lesson 3 of EFTe."
+        },
+        {
+          "subType": "matching",
+          "label": "2. Column Matching",
+          "marks": 5,
+          "leftColumn": [
+            { "id": "1", "text": "Education" },
+            { "id": "2", "text": "Illiteracy" },
+            { "id": "3", "text": "A teacher" }
+          ],
+          "rightColumn": [
+            { "id": "A", "text": "is the backbone of a nation." },
+            { "id": "B", "text": "lights the candle of knowledge." },
+            { "id": "C", "text": "is a curse for a country." }
+          ],
+          "matches": { "1": "A", "2": "C", "3": "B" },
+          "modelAnswer": "1+A, 2+C, 3+B"
+        },
+        {
+          "subType": "rearranging",
+          "label": "3. Rearranging Sentences",
+          "marks": 8,
+          "instructions": "Rearrange the following sentences in correct order.",
+          "items": [
+            "The teacher then started the lesson.",
+            "The students stood up to greet him.",
+            "A teacher entered the classroom.",
+            "He smiled at them and told them to sit down."
+          ],
+          "correctOrder": [
+            "A teacher entered the classroom.",
+            "The students stood up to greet him.",
+            "He smiled at them and told them to sit down.",
+            "The teacher then started the lesson."
+          ]
+        }
+      ]
+    },
+    {
+      "type": "DESCRIPTIVE",
+      "questionText": "English 2nd Paper (Grammar & Composition)",
+      "marks": 50,
+      "difficulty": "MEDIUM",
+      "subject": "English 2nd",
+      "className": "Class 10",
+      "subQuestions": [
+        {
+          "subType": "fill_in",
+          "fillType": "gap_passage",
+          "label": "1. Gap Filling with Clues",
+          "marks": 5,
+          "wordBox": ["nature", "beauty", "source", "joy", "preserve"],
+          "passage": "Nature is a great ___ of pleasure. We should ___ its ___ for our future generation.",
+          "modelAnswer": "source, preserve, beauty"
+        },
+        {
+          "subType": "fill_in",
+          "fillType": "prepositions",
+          "label": "2. Prepositions",
+          "marks": 5,
+          "instructions": "Fill in the blanks with suitable prepositions.",
+          "items": [
+            "He is good ___ English.",
+            "Send the letter ___ post.",
+            "Divide the mangoes ___ the two boys."
+          ],
+          "modelAnswer": "at, by, between"
+        },
+        {
+          "subType": "writing",
+          "writingType": "application",
+          "label": "3. Formal Letter",
+          "marks": 10,
+          "instructions": "Write an application to the Headmaster for a testimonial.",
+          "explanation": "Follow formal application layout including date, subject, and salutation."
+        }
+      ],
+      "explanation": "This question set covers key grammar points and creative writing for the SSC 2025 syllabus."
     }
   ];
 

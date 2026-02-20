@@ -803,10 +803,23 @@ export default function StudentDashboardPage() {
 
                             <div className="flex space-x-2">
                               {exam.type === 'ONLINE' ? (
-                                <Button className="w-full group-hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20" onClick={() => router.push('/exams/online')}>
-                                  <Play className="h-4 w-4 mr-2 fill-current" />
-                                  Start Exam
-                                </Button>
+                                (() => {
+                                  const result = results.find((r: any) => r.examId === exam.id);
+                                  if (result) {
+                                    return (
+                                      <Button variant="outline" className="w-full rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
+                                        <BarChart3 className="h-4 w-4 mr-2" />
+                                        View Result
+                                      </Button>
+                                    );
+                                  }
+                                  return (
+                                    <Button className="w-full group-hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20" onClick={() => router.push('/exams/online')}>
+                                      <Play className="h-4 w-4 mr-2 fill-current" />
+                                      Start Exam
+                                    </Button>
+                                  );
+                                })()
                               ) : (
                                 <Button variant="outline" className="w-full rounded-xl">
                                   <Download className="h-4 w-4 mr-2" />

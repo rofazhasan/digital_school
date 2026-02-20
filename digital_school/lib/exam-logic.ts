@@ -82,11 +82,31 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             const studentAnswer = answers[question.id];
             const manualMark = answers[`${question.id}_marks`];
 
-            // A. Handle Manual Grading (CQ/SQ)
-            if (type === 'CQ' || type === 'SQ') {
-                const score = typeof manualMark === 'number' ? manualMark : 0;
+            // A. Handle Manual Grading (CQ/SQ/DESCRIPTIVE)
+            if (type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE') {
+                let score = 0;
+
+                // For CQ/SQ, we also check sub-questions now
+                if ((type === 'DESCRIPTIVE' || type === 'CQ' || type === 'SQ') && question.subQuestions) {
+                    // Sum up sub-question marks if they exist
+                    question.subQuestions.forEach((sub: any, idx: number) => {
+                        // Support both _desc_ and _sub_ prefixes for maximum compatibility
+                        const subMark = answers[`${question.id}_desc_${idx}_marks`] ?? answers[`${question.id}_sub_${idx}_marks`];
+                        if (typeof subMark === 'number') {
+                            score += subMark;
+                        }
+                    });
+
+                    // Fallback to top-level manual mark if no sub-marks were found but a main mark exists
+                    if (score === 0 && typeof manualMark === 'number') {
+                        score = manualMark;
+                    }
+                } else {
+                    score = typeof manualMark === 'number' ? manualMark : 0;
+                }
+
                 if (type === 'CQ') allCqScores.push(score);
-                else allSqScores.push(score);
+                else allSqScores.push(score); // DESCRIPTIVE is usually grouped with SQ marks
                 continue;
             }
 

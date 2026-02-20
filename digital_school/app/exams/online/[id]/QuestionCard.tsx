@@ -1112,11 +1112,12 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
 
                         {/* ── WRITING ── */}
                         {part.subType === 'writing' && (
-                          <div className="space-y-2">
-                            {/* Source text for translation / summary */}
+                          <div className="space-y-4">
+                            {/* Source text for translation / summary / rearrangement */}
                             {part.sourceText && (
-                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm whitespace-pre-wrap">
-                                {part.sourceText}
+                              <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-base leading-relaxed text-blue-900 dark:text-blue-100 relative group">
+                                <div className="absolute top-2 right-4 text-[10px] font-bold text-blue-300 dark:text-blue-700 uppercase tracking-widest pointer-events-none group-hover:text-blue-400 transition-colors">Source Material</div>
+                                <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
                               </div>
                             )}
                             <DebouncedTextarea
@@ -1125,26 +1126,26 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                               disabled={!!(disabled || submitted)}
                               rows={8}
                               placeholder={
-                                part.writingType === 'translation' ? 'Write your Bangla translation here…' :
-                                  part.writingType === 'summary' ? 'Write your summary / সারাংশ here…' :
-                                    part.writingType === 'story' ? 'Continue the story here…' :
-                                      part.writingType === 'dialogue' ? 'Write the dialogue here…' :
-                                        'Write your answer here…'
+                                part.writingType === 'translation' ? 'Enter the translation in target language…' :
+                                  part.writingType === 'summary' ? 'Write your concise summary (সারাংশ) here…' :
+                                    part.writingType === 'story' ? 'Continue the narrative based on the prompt…' :
+                                      part.writingType === 'dialogue' ? 'Compose the dialogue between characters…' :
+                                        'Provide your detailed answer here…'
                               }
-                              className="w-full"
+                              className="w-full p-5 rounded-2xl border-2 border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all text-base leading-relaxed resize-none"
                             />
                           </div>
                         )}
 
                         {/* ── FILL_IN ── */}
                         {part.subType === 'fill_in' && (
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             {/* Word/Verb Box */}
                             {part.wordBox && part.wordBox.length > 0 && (
-                              <div className="flex flex-wrap gap-2 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
-                                <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300 w-full mb-1">Word Box:</span>
+                              <div className="flex flex-wrap gap-2 p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-200/30 dark:border-indigo-800/30 rounded-2xl shadow-sm">
+                                <div className="text-[10px] font-bold text-indigo-700/60 dark:text-indigo-300/60 w-full mb-2 uppercase tracking-tight">Available Words:</div>
                                 {part.wordBox.map((w: string, wi: number) => (
-                                  <span key={wi} className="px-2 py-0.5 bg-indigo-100 dark:bg-indigo-800/50 text-indigo-800 dark:text-indigo-200 rounded text-xs font-mono">{w}</span>
+                                  <span key={wi} className="px-3 py-1 bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 rounded-lg text-xs font-bold border border-indigo-100 dark:border-indigo-900/50 shadow-sm">{w}</span>
                                 ))}
                               </div>
                             )}
@@ -1153,17 +1154,17 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                             {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (() => {
                               const segments = part.passage.split('___');
                               return (
-                                <div className="text-sm leading-relaxed p-3 bg-white dark:bg-gray-900 rounded-lg border">
+                                <div className="text-base leading-relaxed p-5 bg-white/50 dark:bg-gray-900/50 rounded-2xl border border-border backdrop-blur-sm">
                                   {segments.map((seg: string, si: number) => (
                                     <span key={si}>
-                                      <span>{seg}</span>
+                                      <UniversalMathJax inline dynamic>{seg}</UniversalMathJax>
                                       {si < segments.length - 1 && (
                                         <input
                                           type="text"
                                           value={getAns(si) as string}
                                           onChange={(e) => setAns(si, e.target.value)}
                                           disabled={disabled || submitted}
-                                          className="inline-block w-24 border-b-2 border-amber-400 bg-transparent text-center text-sm focus:outline-none focus:border-primary mx-1"
+                                          className="inline-block w-28 border-b-2 border-primary/40 bg-transparent text-center text-sm font-bold focus:outline-none focus:border-primary focus:bg-primary/5 transition-all mx-1 h-8 rounded-t-md"
                                           placeholder={`(${si + 1})`}
                                         />
                                       )}
@@ -1175,26 +1176,26 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
 
                             {/* Item-based fill types */}
                             {part.fillType && part.fillType !== 'gap_passage' && (
-                              <div className="space-y-2">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {(part.items || []).map((item: string, ii: number) => (
-                                  <div key={ii} className="flex gap-3 items-start">
-                                    <span className="text-sm font-semibold text-gray-500 w-6 pt-2 flex-shrink-0">{ii + 1}.</span>
-                                    <div className="flex-1 space-y-1">
-                                      <p className="text-sm text-gray-700 dark:text-gray-300">{item}</p>
-                                      <input
-                                        type="text"
-                                        value={getAns(ii) as string}
-                                        onChange={(e) => setAns(ii, e.target.value)}
-                                        disabled={disabled || submitted}
-                                        className="w-full border-b-2 border-amber-400 bg-transparent text-sm focus:outline-none focus:border-primary py-1"
-                                        placeholder={
-                                          part.fillType === 'punctuation' ? 'Rewrite with punctuation…' :
-                                            part.fillType === 'sentence_change' ? 'Write the changed sentence…' :
-                                              part.fillType === 'tag_question' ? 'Write the tag…' :
-                                                'Your answer…'
-                                        }
-                                      />
+                                  <div key={ii} className="p-4 bg-white/30 dark:bg-gray-800/30 rounded-2xl border border-border/50 group hover:border-primary/30 transition-colors">
+                                    <div className="flex gap-3 items-start mb-3">
+                                      <span className="shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-bold text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary transition-colors">{ii + 1}</span>
+                                      <div className="text-sm font-medium text-foreground/80 pt-0.5"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
                                     </div>
+                                    <input
+                                      type="text"
+                                      value={getAns(ii) as string}
+                                      onChange={(e) => setAns(ii, e.target.value)}
+                                      disabled={disabled || submitted}
+                                      className="w-full bg-background/50 border border-border/50 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                                      placeholder={
+                                        part.fillType === 'punctuation' ? 'Rewrite with punctuation…' :
+                                          part.fillType === 'sentence_change' ? 'Write the changed sentence…' :
+                                            part.fillType === 'tag_question' ? 'Write the tag…' :
+                                              'Your answer…'
+                                      }
+                                    />
                                   </div>
                                 ))}
                               </div>
@@ -1204,101 +1205,126 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
 
                         {/* ── COMPREHENSION ── */}
                         {part.subType === 'comprehension' && (
-                          <div className="space-y-4">
-                            {/* Stem passage */}
-                            {part.stemPassage && (
-                              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg text-sm whitespace-pre-wrap">
-                                {part.stemPassage}
-                              </div>
-                            )}
-
-                            {/* Q&A mode */}
-                            {(!part.answerType || part.answerType === 'qa') && (
-                              <div className="space-y-4">
-                                {part.requiredCount && (
-                                  <p className="text-xs text-amber-700 dark:text-amber-300 font-semibold">
-                                    Answer any {part.requiredCount} out of {(part.questions || []).length} questions.
-                                  </p>
-                                )}
-                                {(part.questions || []).map((q: string, qi: number) => (
-                                  <div key={qi} className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{qi + 1}. {q}</p>
-                                    <DebouncedTextarea
-                                      value={getAns(qi) as string}
-                                      onChange={(val) => setAns(qi, val)}
-                                      disabled={!!(disabled || submitted)}
-                                      rows={3}
-                                      placeholder="Write your answer here…"
-                                      className="w-full"
-                                    />
+                          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 mt-4">
+                            {/* Left: Passage / Stem */}
+                            <div className="space-y-4">
+                              <div className="sticky top-4">
+                                <div className="p-6 bg-blue-50/50 dark:bg-blue-950/10 border border-blue-100 dark:border-blue-900/30 rounded-3xl shadow-sm">
+                                  <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1.5 h-4 bg-primary rounded-full"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary/60">Passage</span>
                                   </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Stem MCQ mode */}
-                            {part.answerType === 'stem_mcq' && (
-                              <div className="space-y-4">
-                                {(part.stemQuestions || []).map((sq: any, sqi: number) => {
-                                  const chosen = getAns(sqi);
-                                  return (
-                                    <div key={sqi} className="space-y-2">
-                                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{sqi + 1}. {sq.question}</p>
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-4">
-                                        {(sq.options || []).map((opt: string, oi: number) => (
-                                          <button
-                                            key={oi}
-                                            type="button"
-                                            disabled={disabled || submitted}
-                                            onClick={() => setAns(sqi, String(oi))}
-                                            className={`flex items-center gap-2 p-2 rounded-lg border text-sm text-left transition-all ${String(chosen) === String(oi)
-                                              ? 'border-primary bg-primary/10 text-primary font-semibold'
-                                              : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'}`}
-                                          >
-                                            <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${String(chosen) === String(oi) ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-600'}`}>
-                                              {String.fromCharCode(65 + oi)}
-                                            </span>
-                                            {opt}
-                                          </button>
-                                        ))}
-                                      </div>
+                                  <div className="text-base md:text-lg leading-relaxed text-foreground/90 font-medium max-h-[60vh] overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-primary/10">
+                                    <UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax>
+                                  </div>
+                                  {part.stemImage && (
+                                    <div className="mt-6">
+                                      <ZoomableImage src={part.stemImage} alt="Comprehension Image" className="rounded-2xl border border-border bg-card p-1 shadow-md hover:shadow-lg transition-shadow" />
                                     </div>
-                                  );
-                                })}
+                                  )}
+                                </div>
                               </div>
-                            )}
+                            </div>
+
+                            {/* Right: Interaction */}
+                            <div className="space-y-6">
+                              {/* Q&A mode */}
+                              {(!part.answerType || part.answerType === 'qa') && (
+                                <div className="space-y-6">
+                                  {part.requiredCount && (
+                                    <div className="px-4 py-2 bg-amber-500/10 border border-amber-500/20 rounded-full w-fit">
+                                      <p className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-wider">
+                                        Answer any {part.requiredCount} of {(part.questions || []).length} questions
+                                      </p>
+                                    </div>
+                                  )}
+                                  {(part.questions || []).map((q: string, qi: number) => (
+                                    <div key={qi} className="group p-5 bg-white/30 dark:bg-gray-800/20 border border-border/50 rounded-3xl hover:border-primary/30 transition-all duration-300">
+                                      <div className="flex items-start gap-3 mb-4">
+                                        <span className="shrink-0 w-7 h-7 bg-primary/10 text-primary flex items-center justify-center rounded-xl text-xs font-black">{qi + 1}</span>
+                                        <p className="text-sm md:text-base font-bold text-foreground/90 pt-0.5 leading-snug"><UniversalMathJax dynamic>{q}</UniversalMathJax></p>
+                                      </div>
+                                      <DebouncedTextarea
+                                        value={getAns(qi) as string}
+                                        onChange={(val) => setAns(qi, val)}
+                                        disabled={!!(disabled || submitted)}
+                                        rows={3}
+                                        placeholder="Formulate your response here…"
+                                        className="w-full bg-background/50 border-border/50 focus:border-primary/50 focus:ring-primary/5 transition-all rounded-2xl py-3 px-4 text-sm md:text-base"
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Stem MCQ mode */}
+                              {part.answerType === 'stem_mcq' && (
+                                <div className="space-y-6">
+                                  {(part.stemQuestions || []).map((sq: any, sqi: number) => {
+                                    const chosen = getAns(sqi);
+                                    return (
+                                      <div key={sqi} className="p-5 bg-white/30 dark:bg-gray-800/20 border border-border/50 rounded-3xl hover:border-primary/30 transition-all duration-300">
+                                        <div className="flex items-start gap-3 mb-4">
+                                          <span className="shrink-0 w-7 h-7 bg-indigo-500/10 text-indigo-500 flex items-center justify-center rounded-xl text-xs font-black">{sqi + 1}</span>
+                                          <p className="text-sm md:text-base font-bold text-foreground/90 pt-0.5"><UniversalMathJax dynamic>{sq.question}</UniversalMathJax></p>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-2">
+                                          {(sq.options || []).map((opt: string, oi: number) => (
+                                            <button
+                                              key={oi}
+                                              type="button"
+                                              disabled={disabled || submitted}
+                                              onClick={() => setAns(sqi, String(oi))}
+                                              className={`flex items-center gap-3 p-3 rounded-2xl border text-sm text-left transition-all duration-300 group/opt ${String(chosen) === String(oi)
+                                                ? 'border-primary bg-primary shadow-lg shadow-primary/20 text-primary-foreground scale-[1.02] z-10'
+                                                : 'border-border/50 bg-background/50 text-foreground/70 hover:border-primary/40 hover:bg-accent/50'}`}
+                                            >
+                                              <span className={`w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black transition-all ${String(chosen) === String(oi) ? 'bg-white/20 text-white shadow-inner' : 'bg-muted text-muted-foreground'}`}>
+                                                {String.fromCharCode(65 + oi)}
+                                              </span>
+                                              <span className="flex-1 font-medium">{opt}</span>
+                                              {String(chosen) === String(oi) && <div className="w-2 h-2 bg-white rounded-full animate-pulse mr-2"></div>}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
 
                         {/* ── TABLE ── */}
                         {part.subType === 'table' && (
-                          <div className="overflow-x-auto">
-                            <table className="w-full border-collapse text-sm">
+                          <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-amber-200">
+                            <table className="w-full border-separate border-spacing-0 rounded-2xl overflow-hidden border border-border bg-white/50 dark:bg-gray-900/50">
                               <thead>
                                 <tr>
                                   {(part.tableHeaders || []).map((h: string, hi: number) => (
-                                    <th key={hi} className="border border-gray-300 dark:border-gray-700 p-2 bg-amber-100 dark:bg-amber-900/30 font-semibold text-left">{h}</th>
+                                    <th key={hi} className="border-b border-r last:border-r-0 border-border p-4 bg-amber-500/10 font-bold text-xs uppercase tracking-widest text-amber-800 dark:text-amber-300 text-left">{h}</th>
                                   ))}
                                 </tr>
                               </thead>
                               <tbody>
                                 {(part.tableRows || []).map((row: string[], ri: number) => (
-                                  <tr key={ri}>
+                                  <tr key={ri} className="group hover:bg-amber-500/5 transition-colors">
                                     {(part.tableHeaders || []).map((_: string, ci: number) => {
                                       const isBlank = !row[ci] || row[ci] === '___';
                                       return (
-                                        <td key={ci} className="border border-gray-300 dark:border-gray-700 p-2">
+                                        <td key={ci} className="border-b border-r last:border-r-0 border-border/50 p-3">
                                           {isBlank ? (
                                             <input
                                               type="text"
                                               value={getAns(`${ri}_${ci}`) as string}
                                               onChange={(e) => setAns(`${ri}_${ci}`, e.target.value)}
                                               disabled={disabled || submitted}
-                                              className="w-full border-b-2 border-amber-400 bg-transparent focus:outline-none focus:border-primary py-0.5"
-                                              placeholder="Fill in…"
+                                              className="w-full bg-white dark:bg-gray-800 border-b-2 border-amber-400 focus:border-primary focus:bg-amber-50 dark:focus:bg-amber-900/10 transition-all focus:outline-none px-2 py-1.5 text-sm font-medium rounded-t-lg"
+                                              placeholder="…"
                                             />
                                           ) : (
-                                            <span className="text-gray-700 dark:text-gray-300">{row[ci]}</span>
+                                            <span className="text-sm font-medium text-foreground/80 px-2 py-1.5 inline-block"><UniversalMathJax inline dynamic>{row[ci]}</UniversalMathJax></span>
                                           )}
                                         </td>
                                       );
@@ -1309,14 +1335,214 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                             </table>
                           </div>
                         )}
+
+                        {/* ── MATCHING & REARRANGING ── */}
+                        {(part.subType === 'matching' || part.subType === 'mtf') && (
+                          <div className="mt-4">
+                            <MTFGrid
+                              question={part}
+                              userAnswer={Object.keys(userAnswer || {}).filter(k => k.startsWith(ansKey(''))).reduce((acc: any, k) => {
+                                const subId = k.replace(ansKey(''), '');
+                                acc[subId] = userAnswer[k];
+                                return acc;
+                              }, {})}
+                              showResult={showResult}
+                              disabled={!!disabled}
+                              onSelect={(l, r) => setAns(l, r)}
+                            />
+                          </div>
+                        )}
+
+                        {part.subType === 'rearranging' && (
+                          <div className="space-y-6 mt-4">
+                            <div className="p-6 bg-gray-50/50 dark:bg-gray-800/10 border border-border rounded-3xl shadow-inner">
+                              <div className="flex items-center justify-between mb-4">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Scrambled Elements</span>
+                                <span className="text-[10px] font-bold text-primary/60">Tap to select in correct order</span>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {(part.items || []).map((item: string, iIdx: number) => {
+                                  const label = String.fromCharCode(65 + iIdx);
+                                  const currentOrder: string[] = (getAns('order') as string || "").split(',').filter(Boolean);
+                                  const isSelected = currentOrder.includes(label);
+                                  return (
+                                    <button
+                                      key={iIdx}
+                                      type="button"
+                                      disabled={disabled || submitted || isSelected}
+                                      onClick={() => {
+                                        const newOrder = [...currentOrder, label].join(',');
+                                        setAns('order', newOrder);
+                                      }}
+                                      className={cn(
+                                        "px-4 py-2 rounded-xl border-2 transition-all text-sm font-bold flex items-center gap-2",
+                                        isSelected ? "bg-muted border-transparent text-muted-foreground/50 opacity-50 grayscale" : "bg-white dark:bg-gray-800 border-border hover:border-primary hover:shadow-lg hover:-translate-y-0.5"
+                                      )}
+                                    >
+                                      <span className="w-5 h-5 rounded-lg bg-muted flex items-center justify-center text-[10px] font-black">{label}</span>
+                                      <UniversalMathJax inline dynamic>{item}</UniversalMathJax>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+
+                            {/* Selection Preview */}
+                            <div className="p-6 bg-primary/5 dark:bg-primary/10 border-2 border-primary/20 rounded-3xl relative overflow-hidden group">
+                              <div className="absolute top-2 right-4 text-[10px] font-black text-primary/30 uppercase tracking-[0.2em] pointer-events-none group-hover:text-primary/50 transition-colors">Your Sequence</div>
+                              <div className="flex flex-wrap gap-3 items-center min-h-[50px]">
+                                {(() => {
+                                  const currentOrder = (getAns('order') as string || "").split(',').filter(Boolean);
+                                  if (currentOrder.length === 0) return <div className="text-muted-foreground/40 text-sm font-medium italic">No items selected yet…</div>;
+                                  return currentOrder.map((label, oIdx) => (
+                                    <React.Fragment key={label}>
+                                      <div className="relative group/tag">
+                                        <div className="bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-bold shadow-md shadow-primary/20 flex items-center gap-2 group-hover/tag:scale-105 transition-transform">
+                                          <span className="w-4 h-4 rounded-md bg-white/20 flex items-center justify-center text-[8px] font-black">{label}</span>
+                                          <span>{part.items[label.charCodeAt(0) - 65]}</span>
+                                          {!disabled && !submitted && (
+                                            <button
+                                              onClick={() => {
+                                                const newOrder = currentOrder.filter(l => l !== label).join(',');
+                                                setAns('order', newOrder);
+                                              }}
+                                              className="ml-1 p-0.5 hover:bg-white/20 rounded-full transition-colors"
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                      {oIdx < currentOrder.length - 1 && <div className="w-6 h-px bg-primary/20"></div>}
+                                    </React.Fragment>
+                                  ));
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {/* ── TRUE / FALSE ── */}
+                        {part.subType === 'true_false' && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            {(part.statements || []).map((stmt: string, sIdx: number) => {
+                              const chosen = getAns(sIdx);
+                              return (
+                                <div key={sIdx} className="p-5 bg-white/30 dark:bg-gray-800/20 border border-border/50 rounded-3xl group hover:border-primary/30 transition-all duration-300">
+                                  <div className="flex items-start gap-3 mb-4">
+                                    <span className="shrink-0 w-7 h-7 bg-amber-500/10 text-amber-500 flex items-center justify-center rounded-xl text-xs font-black">{sIdx + 1}</span>
+                                    <p className="text-sm md:text-base font-bold text-foreground/90 pt-0.5 leading-snug"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></p>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    {['True', 'False'].map((option) => (
+                                      <button
+                                        key={option}
+                                        type="button"
+                                        disabled={disabled || submitted}
+                                        onClick={() => setAns(sIdx, option)}
+                                        className={cn(
+                                          "flex-1 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all duration-300",
+                                          chosen === option
+                                            ? "bg-primary border-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]"
+                                            : "bg-background/50 border-border/50 text-foreground/60 hover:border-primary/40"
+                                        )}
+                                      >
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* ── LABEL DIAGRAM ── */}
+                        {part.subType === 'label_diagram' && (
+                          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 mt-4">
+                            <div className="flex justify-center">
+                              <div className="relative inline-block group">
+                                {part.imageUrl ? (
+                                  <div className="relative border-2 border-primary/20 rounded-3xl overflow-hidden shadow-2xl shadow-primary/10 bg-card">
+                                    <img src={part.imageUrl} alt="Diagram" className="max-h-[60vh] object-contain" />
+                                    {/* Overlay markers */}
+                                    <div className="absolute inset-0">
+                                      {(part.labels || []).map((l: any, i: number) => (
+                                        <div
+                                          key={i}
+                                          className="absolute w-8 h-8 -ml-4 -mt-4 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-black border-2 border-white shadow-lg animate-in zoom-in duration-300"
+                                          style={{ top: `${l.y}%`, left: `${l.x}%` }}
+                                        >
+                                          {i + 1}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="w-full aspect-video bg-muted rounded-3xl flex items-center justify-center text-muted-foreground/40 italic">Diagram Image Missing</div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+                              {(part.labels || []).map((_: any, i: number) => (
+                                <div key={i} className="p-4 bg-white/30 dark:bg-gray-800/20 border border-border/50 rounded-3xl flex items-center gap-4 group hover:border-primary/30 transition-all">
+                                  <span className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-xs font-black shrink-0">{i + 1}</span>
+                                  <div className="flex-1">
+                                    <input
+                                      type="text"
+                                      value={getAns(i) as string}
+                                      onChange={(e) => setAns(i, e.target.value)}
+                                      disabled={disabled || submitted}
+                                      placeholder="Identify label…"
+                                      className="w-full bg-transparent border-b border-border/50 focus:border-primary transition-all focus:outline-none py-1 text-sm font-bold"
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── PART SOLUTION / EXPLANATION ── */}
+                        {submitted && (part.modelAnswer || part.explanation) && (
+                          <div className="mt-4 pt-4 border-t border-amber-200/50 space-y-3 animate-in fade-in slide-in-from-top-2 duration-500">
+                            {part.modelAnswer && (
+                              <div className="p-4 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 rounded-2xl">
+                                <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1">Model Answer / Key</div>
+                                <div className="text-sm text-emerald-900 dark:text-emerald-100 leading-relaxed font-medium">
+                                  <UniversalMathJax dynamic>{part.modelAnswer}</UniversalMathJax>
+                                </div>
+                              </div>
+                            )}
+                            {part.explanation && (
+                              <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl">
+                                <div className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1">Teacher's Explanation</div>
+                                <div className="text-sm text-blue-900 dark:text-blue-100 leading-relaxed italic">
+                                  <UniversalMathJax dynamic>{part.explanation}</UniversalMathJax>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               );
             })()}
-
           </div>
+
+          {/* ── GLOBAL QUESTION SOLUTION / EXPLANATION ── */}
+          {submitted && question.explanation && (
+            <div className="mt-8 p-6 bg-indigo-50/50 dark:bg-indigo-950/20 border-2 border-indigo-100/50 dark:border-indigo-900/30 rounded-3xl animate-in fade-in slide-in-from-bottom-2 duration-700">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-2 h-6 bg-indigo-500 rounded-full" />
+                <div className="text-xs font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-[0.2em]">Overall Teacher Note & Solution</div>
+              </div>
+              <div className="text-base text-indigo-900 dark:text-indigo-100 leading-relaxed font-medium">
+                <UniversalMathJax dynamic>{question.explanation}</UniversalMathJax>
+              </div>
+            </div>
+          )}
 
           {/* Status Bar */}
           <div className="mt-10 flex items-center justify-between text-[10px] text-muted-foreground border-t border-border/50 pt-5 uppercase tracking-widest font-black">

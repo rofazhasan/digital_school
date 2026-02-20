@@ -70,7 +70,7 @@ const SectionTransitionOverlay = memo(({
   stats?: { answered: number, total: number }
 }) => {
   return (
-    <div className="fixed inset-0 z-[120] bg-background/95 backdrop-blur-2xl flex items-center justify-center p-6 animate-in fade-in zoom-in duration-500">
+    <div className="fixed inset-0 z-[120] bg-background/98 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in duration-500">
       <div className="max-w-md w-full text-center space-y-8">
         <div className="relative inline-block">
           <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/5">
@@ -241,7 +241,7 @@ export default function ExamLayout() {
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
     maxWarnings: 4,
-    isExamActive: isExamActive,
+    isExamActive: isExamActive && activeSection !== 'cqsq',
     isUploading: isUploading, // Pass context state
     externalWarnings: contextWarnings,
     setExternalWarnings: setContextWarnings
@@ -470,11 +470,11 @@ export default function ExamLayout() {
               <ul className="space-y-2 text-xs font-medium text-muted-foreground">
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>ফুলস্ক্রিন মোড বজায় রাখো। ট্যাব পরিবর্তন করলে বা অন্য উইন্ডোতে গেলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
+                  <span>ফুলস্ক্রিন মোড বজায় রাখো। অবজেক্টিভ অংশে ট্যাব পরিবর্তন করলে বা অন্য উইন্ডোতে গেলে সিকিউরিটি ওয়ার্নিং দেওয়া হবে।</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <Check className="w-3 h-3 text-emerald-500 mt-0.5 shrink-0" />
-                  <span>৪ বার সিকিউরিটি ওয়ার্নিং দিলে পরীক্ষা অটো-সাবমিট হয়ে যাবে।</span>
+                  <span>অবজেক্টিভ অংশে ৪ বার সিকিউরিটি ওয়ার্নিং দিলে পরীক্ষা অটো-সাবমিট হয়ে যাবে।</span>
                 </li>
                 <li className="flex items-start gap-2">
                   {exam.mcqNegativeMarking > 0 ? (
@@ -540,8 +540,7 @@ export default function ExamLayout() {
       isBlocked ? "select-none overflow-hidden" : ""
     )}>
       <div className={cn(
-        "flex flex-col flex-1",
-        isBlocked ? "blur-sm" : ""
+        "flex flex-col flex-1"
       )}>
 
         {/* --- HEADER (Hidden in Illusion Mode) --- */}
@@ -587,7 +586,7 @@ export default function ExamLayout() {
                 <Timer onTimeUp={() => handleSubmit(true)} />
               </div>
               {/* Conditional Proctor Warning in Header */}
-              {warnings > 0 && (
+              {warnings > 0 && activeSection !== 'cqsq' && (
                 <div className="pointer-events-auto animate-in fade-in slide-in-from-top-1 duration-300">
                   <Badge variant="destructive" className="flex items-center gap-1 text-[10px] px-2 h-5 bg-red-600 hover:bg-red-700 animate-pulse">
                     <ShieldAlert className="w-3 h-3" />
@@ -664,7 +663,7 @@ export default function ExamLayout() {
                 </Card>
 
                 {/* Warnings Widget */}
-                {warnings > 0 && (
+                {warnings > 0 && activeSection !== 'cqsq' && (
                   <div className="bg-destructive/5 text-destructive border border-destructive/20 p-4 rounded-xl flex items-center gap-3">
                     <ShieldAlert className="w-5 h-5" />
                     <div className="text-sm font-semibold">
@@ -787,7 +786,7 @@ export default function ExamLayout() {
         )}
 
         {isBlocked && !isSubmitting && !transitionState && (
-          <div className="fixed inset-0 z-[140] bg-background/90 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500 select-none">
+          <div className="fixed inset-0 z-[140] bg-background/98 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-500 select-none">
             <div className="relative mb-8">
               <div className="w-32 h-32 bg-destructive/10 rounded-full flex items-center justify-center animate-pulse">
                 <ShieldAlert className="w-16 h-16 text-destructive" />

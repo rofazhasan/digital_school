@@ -180,10 +180,91 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                 const q = s(getValue(row, [`Sub-Question ${i} Text`, `Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
                 const m = n(getValue(row, [`Sub-Question ${i} Marks`, `SQ${i} Marks`]));
                 const a = s(getValue(row, [`Sub-Question ${i} Model Answer`, `Sub-Question ${i} Answer`, `SQ${i} Answer`]));
-                if (q) data.subQuestions.push({ question: q, marks: m, modelAnswer: a });
+                const e = s(getValue(row, [`Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
+                if (q) data.subQuestions.push({ question: q, marks: m, modelAnswer: a, explanation: e });
             }
 
             if (data.subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
+        } else if (data.type === 'DESCRIPTIVE') {
+            data.subQuestions = [];
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const text = s(getValue(row, [`${prefix} Text`, `${prefix} Question`]));
+                if (!text && i > 1) continue;
+                if (!text && i === 1) break; // Should have at least one
+
+                const subType = s(getValue(row, [`${prefix} Type`])).toLowerCase() || 'writing';
+                const marks = n(getValue(row, [`${prefix} Marks`]));
+                const modelAnswer = s(getValue(row, [`${prefix} Model Answer`, `${prefix} Answer`]));
+                const explanation = s(getValue(row, [`${prefix} Explanation`, `${prefix} Note`]));
+                const label = s(getValue(row, [`${prefix} Label`]));
+                const instructions = s(getValue(row, [`${prefix} Instructions`]));
+
+                const subQ: any = { subType, text, marks, modelAnswer, explanation, label, instructions };
+
+                // Handle Sub-type specific data from delimited strings
+                if (subType === 'fill_in') {
+                    subQ.fillType = s(getValue(row, [`${prefix} Fill Type`])) || 'gap_passage';
+                    subQ.passage = s(getValue(row, [`${prefix} Passage`]));
+                    const answersStr = s(getValue(row, [`${prefix} Answers`]));
+                    if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
+                } else if (subType === 'table') {
+                    const headersStr = s(getValue(row, [`${prefix} Table Headers`]));
+                    if (headersStr) subQ.tableHeaders = headersStr.split('|').map(x => x.trim());
+                    const rowsStr = s(getValue(row, [`${prefix} Table Rows`]));
+                    if (rowsStr) {
+                        subQ.tableRows = rowsStr.split('||').map(r => r.split('|').map(x => x.trim()));
+                    }
+                } else if (subType === 'comprehension') {
+                    subQ.stemPassage = s(getValue(row, [`${prefix} Stem Passage`]));
+                    const questionsStr = s(getValue(row, [`${prefix} Questions`]));
+                    if (questionsStr) subQ.questions = questionsStr.split('|').map(x => x.trim());
+                    const answersStr = s(getValue(row, [`${prefix} Answers`]));
+                    if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
+                } else if (subType === 'matching' || subType === 'mtf') {
+                    const leftStr = s(getValue(row, [`${prefix} Left`]));
+                    if (leftStr) subQ.leftColumn = leftStr.split('|').map((t, idx) => ({ id: (idx + 1).toString(), text: t.trim() }));
+                    const rightStr = s(getValue(row, [`${prefix} Right`]));
+                    if (rightStr) subQ.rightColumn = rightStr.split('|').map((t, idx) => ({ id: String.fromCharCode(65 + idx), text: t.trim() }));
+                    const matchesStr = s(getValue(row, [`${prefix} Matches`]));
+                    if (matchesStr) {
+                        const matchMap: any = {};
+                        matchesStr.split(',').forEach(p => {
+                            const pts = p.split('-');
+                            if (pts.length === 2) matchMap[pts[0].trim()] = pts[1].trim();
+                        });
+                        subQ.matches = matchMap;
+                    }
+                } else if (subType === 'rearranging') {
+                    const itemsStr = s(getValue(row, [`${prefix} Rearrange Items`]));
+                    if (itemsStr) subQ.items = itemsStr.split('|').map(x => x.trim());
+                    const correctOrderStr = s(getValue(row, [`${prefix} Correct Order`]));
+                    if (correctOrderStr) subQ.correctOrder = correctOrderStr.split('|').map(x => x.trim());
+                } else if (subType === 'true_false') {
+                    const statementsStr = s(getValue(row, [`${prefix} Statements`]));
+                    if (statementsStr) subQ.statements = statementsStr.split('|').map(x => x.trim());
+                    const correctAnswersStr = s(getValue(row, [`${prefix} Answers`]));
+                    if (correctAnswersStr) {
+                        subQ.correctAnswers = correctAnswersStr.split('|').map(x => {
+                            const val = x.trim().toLowerCase();
+                            return val === 'true' || val === 't' || val === '1';
+                        });
+                    }
+                } else if (subType === 'label_diagram') {
+                    subQ.imageUrl = s(getValue(row, [`${prefix} Image URL`, `${prefix} Diagram URL`, `${prefix} Image`]));
+                    const labelsStr = s(getValue(row, [`${prefix} Labels`]));
+                    if (labelsStr) {
+                        // Expect format: "Name1:x1:y1|Name2:x2:y2"
+                        subQ.labels = labelsStr.split('|').map(item => {
+                            const [text, x, y] = item.split(':').map(s => s.trim());
+                            return { text, x: n(x), y: n(y) };
+                        });
+                    }
+                }
+
+                data.subQuestions.push(subQ);
+            }
+            if (data.subQuestions.length === 0) throw new Error("DESCRIPTIVE requires at least one Sub-Question");
         }
 
         const { processedData } = processQuestionWithInlineFBDs(data);

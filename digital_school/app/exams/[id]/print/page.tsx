@@ -39,6 +39,8 @@ export default function PrintExamPage() {
   const [objectiveFontSize, setObjectiveFontSize] = useState(100);
   const [cqSqFontSize, setCqSqFontSize] = useState(100);
   const [forcePageBreak, setForcePageBreak] = useState(false);
+  const [showOMR, setShowOMR] = useState(true);
+  const [showDate, setShowDate] = useState(true);
   const printRef = useRef<HTMLDivElement>(null);
 
   // --- Data Fetching ---
@@ -175,6 +177,10 @@ export default function PrintExamPage() {
           setCqSqFontSize={setCqSqFontSize}
           forcePageBreak={forcePageBreak}
           setForcePageBreak={setForcePageBreak}
+          showOMR={showOMR}
+          setShowOMR={setShowOMR}
+          showDate={showDate}
+          setShowDate={setShowDate}
           t={t}
         />
 
@@ -217,12 +223,14 @@ export default function PrintExamPage() {
                     cqSqFontSize={cqSqFontSize}
                     forcePageBreak={forcePageBreak}
                     language={language}
+                    hideOMR={!showOMR}
+                    showDate={showDate}
                   />
                 </div>
               ))}
 
-              {/* Render OMR Sheets only for question papers */}
-              {nonEmptySets.map((set: any) => (
+              {/* Render OMR Sheets only for question papers if showOMR is true */}
+              {showOMR && nonEmptySets.map((set: any) => (
                 <OMRPage key={`omr-${set.setId}`} set={set} examInfo={examInfo} language={language} />
               ))}
             </>
@@ -247,6 +255,8 @@ export default function PrintExamPage() {
                   cqSqFontSize={cqSqFontSize}
                   forcePageBreak={forcePageBreak}
                   language={language}
+                  hideOMR={!showOMR}
+                  showDate={showDate}
                 />
               </div>
             ))
@@ -301,7 +311,7 @@ const OMRPage = ({ set, examInfo, language }: { set: any, examInfo: any, languag
 const PrintControls = ({
   language, setLanguage, onPrint, isPrinting, isMathJaxReady, showAnswers, setShowAnswers,
   objectiveFontSize, setObjectiveFontSize, cqSqFontSize, setCqSqFontSize,
-  forcePageBreak, setForcePageBreak, t
+  forcePageBreak, setForcePageBreak, showOMR, setShowOMR, showDate, setShowDate, t
 }: any) => {
   // If page break is off, keep font sizes in sync
   const updateGlobalFontSize = (delta: number) => {
@@ -335,6 +345,26 @@ const PrintControls = ({
               className={`px-3 py-1 rounded text-[10px] font-bold transition ${forcePageBreak ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}
             >
               {forcePageBreak ? 'চালু' : 'বন্ধ'}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'OMR Sheet:' : 'OMR শিট:'}</span>
+            <button
+              onClick={() => setShowOMR(!showOMR)}
+              className={`px-3 py-1 rounded text-[10px] font-bold transition ${showOMR ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              {showOMR ? (language === 'en' ? 'Show' : 'চালু') : (language === 'en' ? 'Hide' : 'বন্ধ')}
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] font-bold text-gray-600">{language === 'en' ? 'Show Date:' : 'তারিখ দেখান:'}</span>
+            <button
+              onClick={() => setShowDate(!showDate)}
+              className={`px-3 py-1 rounded text-[10px] font-bold transition ${showDate ? 'bg-teal-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            >
+              {showDate ? (language === 'en' ? 'Show' : 'চালু') : (language === 'en' ? 'Hide' : 'বন্ধ')}
             </button>
           </div>
 

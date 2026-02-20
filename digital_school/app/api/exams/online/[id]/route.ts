@@ -44,16 +44,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     let existingSubmission = submissions[0];
 
+    // Check for existing result
+    const existingResult = await prisma.result.findUnique({
+      where: {
+        studentId_examId: { studentId: studentId, examId: examId }
+      }
+    });
+
     // Check if the latest submission is finished
     // @ts-ignore
-    const isFinished = existingSubmission && (existingSubmission.status === SUBMITTED);
+    const isFinished = (existingSubmission && existingSubmission.status === SUBMITTED) || !!existingResult;
 
     // Check for 'action' param
     const searchParams = req.nextUrl.searchParams;
     const action = searchParams.get('action');
 
     // 1. REDIRECTION LOGIC: If submitted and no retake allowed, redirect to results
-    if (existingSubmission && isFinished && !exam.allowRetake) {
+    if (isFinished && !exam.allowRetake) {
       console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId}`);
       return NextResponse.json({
         id: exam.id,

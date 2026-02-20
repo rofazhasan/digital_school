@@ -182,7 +182,11 @@ export default function OnlineExamsPage() {
   };
 
   const getResult = (examId: string) => results.find((r) => r.examId === examId);
-  const hasSubmitted = (examId: string) => submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'SUBMITTED');
+  const hasSubmitted = (examId: string) => {
+    const submittedSubmission = submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'SUBMITTED');
+    const resultExists = results.some((r) => r.examId === examId);
+    return submittedSubmission || resultExists;
+  };
   const hasInProgress = (examId: string) => submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'IN_PROGRESS');
 
   return (

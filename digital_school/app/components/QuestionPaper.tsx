@@ -58,6 +58,7 @@ interface DESCRIPTIVE {
   type: string;
   marks: number;
   subQuestions: any[];
+  questionText?: string;
 }
 interface QuestionPaperProps {
   examInfo: {
@@ -77,6 +78,7 @@ interface QuestionPaperProps {
     cqRequiredQuestions?: number;
     sqRequiredQuestions?: number;
     cqSubsections?: any[];
+    id?: string;
   };
   questions: {
     mcq: MCQ[];
@@ -93,12 +95,15 @@ interface QuestionPaperProps {
   cqSqFontSize?: number;
   forcePageBreak?: boolean;
   language?: 'bn' | 'en';
+  hideOMR?: boolean;
+  showDate?: boolean;
 }
 
 const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
-const MCQ_LABELS_EN = ['a', 'b', 'c', 'd', 'e', 'f'];
+const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E', 'F'];
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ']; // runtime overridden below
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
+const ENGLISH_SUB_LABELS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'];
 
 // Helper to chunk an array into N-sized pieces
 function chunkArray<T>(arr: T[], size: number): T[][] {
@@ -161,66 +166,68 @@ function pickBanglaWord(seed: string, offset: number = 0, lang: 'bn' | 'en' = 'b
   return wordList[idx];
 }
 
-const Header = ({ examInfo, type, qrData, marks, time, banglaWord, lang = 'bn' }: {
+const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lang = 'bn' }: {
   examInfo: any,
   type: 'objective' | 'cqsq',
   qrData: any,
   marks: string | number,
   time: number | string,
   banglaWord?: string,
+  showDate?: boolean,
   lang?: 'bn' | 'en'
 }) => {
   const isHEn = lang === 'en';
   return (
-  <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
-    <div className="flex items-center justify-between gap-4">
-      {/* Logo Spacer to balance QR */}
-      <div className="w-20" />
+    <header className="mb-6 relative border-b-[3px] border-black pb-4 text-black">
+      <div className="flex items-center justify-between gap-4">
+        {/* Logo Spacer to balance QR */}
+        <div className="w-20" />
 
-      {/* Middle Section: School Info */}
-      <div className="flex-1 text-center">
-        <h1 className="text-3xl font-black tracking-tight mb-0.5">
-          {examInfo.schoolName || 'শিক্ষা প্রতিষ্ঠানের নাম'}
-        </h1>
-        <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
-          {examInfo.schoolAddress || 'প্রতিষ্ঠানের ঠিকানা'}
-        </p>
-      </div>
+        {/* Middle Section: School Info */}
+        <div className="flex-1 text-center">
+          <h1 className="text-3xl font-black tracking-tight mb-0.5">
+            {examInfo.schoolName || 'শিক্ষা প্রতিষ্ঠানের নাম'}
+          </h1>
+          <p className="text-sm font-semibold text-gray-800 uppercase tracking-widest">
+            {examInfo.schoolAddress || 'প্রতিষ্ঠানের ঠিকানা'}
+          </p>
+        </div>
 
-      {/* QR Code Section */}
-      <div className="w-20 h-20 flex items-center justify-end">
-        <div className="p-1 border border-black bg-white shadow-sm">
-          <QRCode value={JSON.stringify(qrData)} size={64} />
+        {/* QR Code Section */}
+        <div className="w-20 h-20 flex items-center justify-end">
+          <div className="p-1 border border-black bg-white shadow-sm">
+            <QRCode value={JSON.stringify(qrData)} size={64} />
+          </div>
         </div>
       </div>
-    </div>
 
-    <div className="flex justify-center">
-      <div className="inline-block border-y-2 border-black py-1.5 px-10 my-3 bg-gray-50/50">
-        <h2 className="text-2xl font-black uppercase tracking-tight">{examInfo.title}</h2>
+      <div className="flex justify-center">
+        <div className="inline-block border-y-2 border-black py-1.5 px-10 my-3 bg-gray-50/50">
+          <h2 className="text-2xl font-black uppercase tracking-tight">{examInfo.title}</h2>
+        </div>
       </div>
-    </div>
 
-    <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
-      {/* বিষয়: removed as per request */}
-      <span><strong>শ্রেণি:</strong> {toBengaliNumerals(examInfo.class)}</span>
-      <span><strong>তারিখ:</strong> {toBengaliNumerals(examInfo.date)}</span>
-      {examInfo.set && (
-        <span>
-          <strong>সেট:</strong> {examInfo.set}
-          {banglaWord && <span className="ml-1 text-gray-600">({banglaWord})</span>}
-        </span>
-      )}
-      <span><strong>সময়:</strong> {typeof time === 'number' ? formatBengaliDuration(time) : toBengaliNumerals(time)}</span>
-      <span><strong>পূর্ণমান:</strong> {toBengaliNumerals(marks)}</span>
-    </div>
-  </header>
+      <div className="text-base flex flex-row justify-center gap-x-6 flex-wrap mt-2 font-medium">
+        <span><strong>{isHEn ? 'Class' : 'শ্রেণি'}:</strong> {isHEn ? examInfo.class : toBengaliNumerals(examInfo.class)}</span>
+        {showDate !== false && (
+          <span><strong>{isHEn ? 'Date' : 'তারিখ'}:</strong> {isHEn ? examInfo.date : toBengaliNumerals(examInfo.date)}</span>
+        )}
+        {examInfo.set && (
+          <span>
+            <strong>{isHEn ? 'Set' : 'সেট'}:</strong> {examInfo.set}
+            {banglaWord && <span className="ml-1 text-gray-500">({banglaWord})</span>}
+          </span>
+        )}
+        <span><strong>{isHEn ? 'Time' : 'সময়'}:</strong> {typeof time === 'number' ? formatBengaliDuration(time) : (isHEn ? time : toBengaliNumerals(String(time)))}</span>
+        <span><strong>{isHEn ? 'Full Marks' : 'পূর্ণমান'}:</strong> {isHEn ? marks : toBengaliNumerals(marks)}</span>
+      </div>
+    </header>
   );
 };
 
 // Main QuestionPaper component (forwardRef for printing)
 const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
-  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language }, ref) => {
+  ({ examInfo, questions, qrData, fontSize, cqSqFontSize, forcePageBreak, language, hideOMR, showDate }, ref) => {
     const lang = language || 'bn';
     const isEn = lang === 'en';
     const mcqs = questions.mcq || [];
@@ -270,7 +277,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         ref={ref}
         className="question-paper-container bg-white relative overflow-hidden"
         style={{
-          fontFamily: "'ExamFont', 'Noto Serif Bengali', Georgia, serif",
+          fontFamily: isEn ? "'Bookman Old Style', 'Georgia', serif" : "'ExamFont', 'Noto Serif Bengali', Georgia, serif",
           fontSize: fontSize ? `${fontSize}%` : '100%'
         }}
       >
@@ -283,13 +290,42 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             qrData={qrData}
             marks={objectiveTotal}
             time={examInfo.objectiveTime || 0}
-            banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 0, lang) : undefined}
+            banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
+            showDate={showDate}
             lang={lang}
           />
 
           {/* Special Instruction Box */}
           <div className="instruction-box">
-            <p><strong>বিশেষ দ্রষ্টব্য:</strong> সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।{Number(examInfo.mcqNegativeMarking) > 0 && (<span className="font-semibold"> প্রতিটি ভুল উত্তরের জন্য {toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কাটা যাবে।</span>)}</p>
+            {hideOMR ? (
+              <p>
+                <strong>{isEn ? 'General Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
+                {isEn
+                  ? 'Answer the following questions carefully. The figures in the right margin indicate full marks.'
+                  : 'নিচের প্রশ্নগুলোর উত্তর দাও। ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।'}
+                {Number(examInfo.mcqNegativeMarking) > 0 && (
+                  <span className="font-semibold">
+                    {' '}{isEn
+                      ? `Negative marking of ${examInfo.mcqNegativeMarking}% for each wrong answer.`
+                      : `প্রতিটি ভুল উত্তরের জন্য ${toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কাটা যাবে।`}
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p>
+                <strong>{isEn ? 'General Instructions:' : 'বিশেষ দ্রষ্টব্য:'}</strong>{' '}
+                {isEn
+                  ? 'Fill in the corresponding circles on the provided MCQ answer sheet with a black ballpoint pen. Figures in the right margin indicate full marks.'
+                  : 'সরবরাহকৃত বহুনির্বাচনি অভীক্ষার উত্তরপত্রে প্রশ্নের ক্রমিক নম্বরের বিপরীতে প্রদত্ত বর্ণসংবলিত বৃত্তসমূহ হতে সঠিক/সর্বোৎকৃষ্ট বল পয়েন্ট কলম দ্বারা সম্পূর্ণ ভরাট করো। প্রশ্নপত্রের ডান পাশের সংখ্যা প্রশ্নের পূর্ণমান জ্ঞাপন করে।'}
+                {Number(examInfo.mcqNegativeMarking) > 0 && (
+                  <span className="font-semibold">
+                    {' '}{isEn
+                      ? `Negative marking of ${examInfo.mcqNegativeMarking}% for each wrong answer.`
+                      : `প্রতিটি ভুল উত্তরের জন্য ${toBengaliNumerals(examInfo.mcqNegativeMarking)}% নম্বর কাটা যাবে।`}
+                  </span>
+                )}
+              </p>
+            )}
           </div>
         </div>
 
@@ -321,12 +357,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           </span>
                           <div className="flex-1">
                             <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
-                            {q.type?.toUpperCase() === 'MC' && <div className="text-blue-700 font-bold mb-1">[সকল সঠিক উত্তর নির্বাচন করো]</div>}
+                            {q.type?.toUpperCase() === 'MC' && <div className="text-blue-700 font-bold mb-1">{isEn ? '[Select all correct answers]' : '[সকল সঠিক উত্তর নির্বাচন করো]'}</div>}
                             <div className={`mt-1 ${gridClass}`}>
                               {(q.options || []).map((opt: any, oidx: number) => (
                                 <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
                                   {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
-                                  <span className="mcq-option-label flex-shrink-0">{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
+                                  <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
                                   <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
                                 </div>
                               ))}
@@ -345,11 +381,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             <span className="font-bold">{qNum}. </span>
                             <UniversalMathJax inline>{q.q || q.questionText || ''}</UniversalMathJax>
                             <div className="mt-2 ml-6 flex items-center gap-2">
-                              <span className="font-bold">উত্তর:</span>
+                              <span className="font-bold text-gray-800">{isEn ? 'Answer:' : 'উত্তর:'} </span>
                               <div className="border border-black w-12 h-8 flex items-center justify-center font-bold"></div>
                             </div>
                           </div>
-                          <span className="ml-4 font-bold">[{toBengaliNumerals(q.marks || 1)}]</span>
+                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                         </div>
                       </div>
                     );
@@ -361,18 +397,18 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1 space-y-1">
                             <span className="font-bold">{qNum}. </span>
-                            <strong>নিশ্চয়তা (Assertion):</strong> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
+                            <strong>{isEn ? 'Assertion:' : 'নিশ্চয়তা (Assertion):'}</strong> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
                             <br />
-                            <span className="ml-6"><strong>কারণ (Reason):</strong> <UniversalMathJax inline>{q.reason}</UniversalMathJax></span>
+                            <span className="ml-6"><strong>{isEn ? 'Reason:' : 'কারণ (Reason):'}</strong> <UniversalMathJax inline>{q.reason}</UniversalMathJax></span>
                           </div>
-                          <span className="ml-4 font-bold">[{toBengaliNumerals(q.marks || 1)}]</span>
+                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                         </div>
                         <div className="ml-6 grid grid-cols-1 gap-1 border-l-2 border-gray-200 pl-3">
-                          <div>ক. Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।</div>
-                          <div>খ. Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।</div>
-                          <div>গ. Assertion সত্য কিন্তু Reason মিথ্যা।</div>
-                          <div>ঘ. Assertion মিথ্যা কিন্তু Reason সত্য।</div>
-                          <div>ঙ. Assertion ও Reason উভয়ই মিথ্যা।</div>
+                          <div>{isEn ? 'a Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'কAssertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।'}</div>
+                          <div>{isEn ? 'b Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'খAssertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।'}</div>
+                          <div>{isEn ? 'c Assertion is true but Reason is false.' : 'গAssertion সত্য কিন্তু Reason মিথ্যা।'}</div>
+                          <div>{isEn ? 'd Assertion is false but Reason is true.' : 'ঘAssertion মিথ্যা কিন্তু Reason সত্য।'}</div>
+                          <div>{isEn ? 'e Both Assertion and Reason are false.' : 'ঙAssertion ও Reason উভয়ই মিথ্যা।'}</div>
                         </div>
                       </div>
                     );
@@ -382,24 +418,24 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     return (
                       <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                         <div className="flex justify-between items-start mb-2">
-                          <span className="font-bold">{qNum}. বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:</span>
-                          <span className="ml-4 font-bold">[{toBengaliNumerals(q.marks || 1)}]</span>
+                          <span className="font-bold">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
+                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                         </div>
                         <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
                           <div className="border-r border-black pr-2">
-                            <p className="font-bold text-center border-b border-black mb-1">স্তম্ভ ক</p>
+                            <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column A' : 'স্তম্ভ ক'}</p>
                             {(q.leftColumn || []).map((item: any, i: number) => (
                               <div key={i} className="flex gap-1">
-                                <span className="font-bold">{toBengaliNumerals(i + 1)}.</span>
+                                <span className="font-bold">{toBengaliNumerals(i + 1)}</span>
                                 <UniversalMathJax inline>{item.text}</UniversalMathJax>
                               </div>
                             ))}
                           </div>
                           <div>
-                            <p className="font-bold text-center border-b border-black mb-1">স্তম্ভ খ</p>
+                            <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column B' : 'স্তম্ভ খ'}</p>
                             {(q.rightColumn || []).map((item: any, i: number) => (
                               <div key={i} className="flex gap-1">
-                                <span className="font-bold">{String.fromCharCode(65 + i)}.</span>
+                                <span className="font-bold">{String.fromCharCode(65 + i)}</span>
                                 <UniversalMathJax inline>{item.text}</UniversalMathJax>
                               </div>
                             ))}
@@ -428,7 +464,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   qrData={qrData}
                   marks={examInfo.totalMarks || cqSqTotalMarks}
                   time={examInfo.cqSqTime || 0}
-                  banglaWord={examInfo.set ? pickBanglaWord(examInfo.set, 1, lang) : undefined}
+                  banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 1, lang) : undefined}
+                  showDate={showDate}
                   lang={lang}
                 />
               )}
@@ -458,11 +495,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       return (
                         <div key={subIdx} className="mb-4">
                           {/* Subsection header */}
-                          <div className="font-semibold text-blue-800 dark:text-blue-400 mb-2 border-l-4 border-blue-500 pl-3 bg-blue-50 dark:bg-blue-900/20 py-2">
-                            {subsection.name || ` Subsection ${toBengaliNumerals(subIdx + 1)}`}
+                          <div className="font-semibold text-blue-800 dark:text-blue-400 mb-2 border-l-4 border-blue-500 pl-3 bg-blue-50 dark:bg-blue-900/20 py-2 subsection-header">
+                            {subsection.name || ` ${isEn ? 'Subsection' : 'উপ-অনুচ্ছেদ'} ${toBengaliNumerals(subIdx + 1)}`}
                             {subsectionRequired > 0 && (
                               <span className="font-normal text-gray-600 dark:text-gray-400 ml-2">
-                                (কমপক্ষে {toBengaliNumerals(subsectionRequired)} টি উত্তর করতে হবে)
+                                {isEn ? `(Answer at least ${toBengaliNumerals(subsectionRequired)} questions)` : `(কমপক্ষে ${toBengaliNumerals(subsectionRequired)} টি উত্তর করতে হবে)`}
                               </span>
                             )}
                           </div>
@@ -472,17 +509,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             {subsectionQuestions.map((q, idx) => (
                               <div key={idx} className="mb-3 text-left cq-question">
                                 <div className="flex items-start">
-                                  <span className="font-bold mr-2">{toBengaliNumerals(subsection.startIndex + idx)}.</span>
+                                  <span className="font-bold mr-2">{isEn ? (subsection.startIndex + idx) : toBengaliNumerals(subsection.startIndex + idx)}.</span>
                                   <div className="flex-1">
                                     <Text>{`${q.questionText} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
                                     {q.subQuestions && Array.isArray(q.subQuestions) && (
                                       <ul className="list-inside mt-1 ml-4">
                                         {q.subQuestions.map((sub, sidx) => (
                                           <li key={sidx} className="ml-4 flex items-start">
-                                            <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                            <span className="font-bold mr-1">{isEn ? (ENGLISH_SUB_LABELS[sidx] || String.fromCharCode(97 + sidx)) : (BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx))}.</span>
                                             <span className="flex-1">
                                               <Text>
-                                                {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${toBengaliNumerals(sub.marks)}]` : ''}`}
+                                                {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${isEn ? sub.marks : toBengaliNumerals(sub.marks)}]` : ''}`}
                                               </Text>
                                             </span>
                                           </li>
@@ -503,17 +540,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       {cqs.map((q, idx) => (
                         <div key={idx} className="mb-3 text-left cq-question">
                           <div className="flex items-start">
-                            <span className="font-bold mr-2">{toBengaliNumerals(idx + 1)}.</span>
+                            <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
                             <div className="flex-1">
                               <Text>{`${q.questionText} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
                               {q.subQuestions && Array.isArray(q.subQuestions) && (
                                 <ul className="list-inside mt-1 ml-4">
                                   {q.subQuestions.map((sub, sidx) => (
                                     <li key={sidx} className="ml-4 flex items-start">
-                                      <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx)}.</span>
+                                      <span className="font-bold mr-1">{isEn ? (ENGLISH_SUB_LABELS[sidx] || String.fromCharCode(97 + sidx)) : (BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx))}.</span>
                                       <span className="flex-1">
                                         <Text>
-                                          {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${toBengaliNumerals(sub.marks)}]` : ''}`}
+                                          {`${sub.question || sub.questionText || sub.text || sub}${sub.marks ? ` [${isEn ? sub.marks : toBengaliNumerals(sub.marks)}]` : ''}`}
                                         </Text>
                                       </span>
                                     </li>
@@ -545,9 +582,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     {sqs.map((q, idx) => (
                       <div key={idx} className="mb-3 text-left sq-question">
                         <div className="flex items-start">
-                          <span className="font-bold mr-2">{toBengaliNumerals(cqs.length + idx + 1)}.</span>
+                          <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
                           <div className="flex-1">
-                            <Text>{`${q.questionText} [${toBengaliNumerals(q.marks || '?')}]`}</Text>
+                            <Text>{`${q.questionText} [${isEn ? (q.marks || '?') : toBengaliNumerals(q.marks || '?')}]`}</Text>
                           </div>
                         </div>
                       </div>
@@ -567,12 +604,13 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                   </div>
                   <div>
                     {descriptives.map((q, idx) => {
-                      const questionBaseNum = cqs.length + sqs.length + idx + 1;
+                      const questionBaseNum = (cqs.length || 0) + (sqs.length || 0) + idx + 1;
                       return (
                         <div key={idx} className="mb-4 text-left descriptive-question break-inside-avoid">
                           <div className="flex items-start">
-                            <span className="font-bold mr-2">{toBengaliNumerals(questionBaseNum)}.</span>
+                            <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
+                              <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
                               {/* Render each sub-part of the descriptive question */}
                               {(q.subQuestions || []).map((part: any, pIdx: number) => (
                                 <div key={pIdx} className="mb-3">
@@ -602,7 +640,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                                 <React.Fragment key={sIdx}>
                                                   {segment}
                                                   {sIdx < array.length - 1 && (
-                                                    <span className="font-bold underline px-1">({toBengaliNumerals(sIdx + 1)}) _______</span>
+                                                    <span className="font-bold underline px-1">({isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}) _______</span>
                                                   )}
                                                 </React.Fragment>
                                               ))}
@@ -610,12 +648,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                           </div>
                                         )}
                                         {part.fillType && part.fillType !== 'gap_passage' && (
-                                          <div className="grid grid-cols-2 gap-x-8 gap-y-1">
+                                          <div className="grid grid-cols-2 gap-x-12 gap-y-2 ml-4">
                                             {(part.items || []).map((item: string, iIdx: number) => (
-                                              <div key={iIdx} className="flex items-start gap-1">
-                                                <span className="font-bold">{String.fromCharCode(97 + iIdx)}.</span>
-                                                <UniversalMathJax inline dynamic>{item}</UniversalMathJax>
-                                                <span className="border-b border-black w-20 ml-auto mr-4"></span>
+                                              <div key={iIdx} className="flex items-start gap-2 border-b border-gray-100 pb-1">
+                                                <span className="font-bold shrink-0">{isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}.</span>
+                                                <div className="flex-1"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                                <span className="border-b-2 border-black w-24 shrink-0 mt-3 h-0"></span>
                                               </div>
                                             ))}
                                           </div>
@@ -624,19 +662,19 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     )}
 
                                     {part.subType === 'comprehension' && (
-                                      <div className="space-y-2">
-                                        {part.stem && (
-                                          <div className="p-3 bg-gray-50 border border-gray-300 rounded mb-3">
-                                            <UniversalMathJax dynamic>{part.stem}</UniversalMathJax>
+                                      <div className="space-y-3">
+                                        {part.stemPassage && (
+                                          <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
+                                            <UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax>
                                           </div>
                                         )}
-                                        {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-48 mx-auto mb-3" />}
+                                        {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
 
                                         {(!part.answerType || part.answerType === 'qa') && (
-                                          <div className="space-y-2">
+                                          <div className="grid grid-cols-1 gap-2 ml-4">
                                             {(part.questions || []).map((quest: string, qIdx: number) => (
                                               <div key={qIdx} className="flex items-start gap-2">
-                                                <span className="font-bold">{toBengaliNumerals(qIdx + 1)}.</span>
+                                                <span className="font-bold">{isEn ? String.fromCharCode(97 + qIdx) : BENGALI_SUB_LABELS[qIdx]}.</span>
                                                 <UniversalMathJax dynamic>{quest}</UniversalMathJax>
                                               </div>
                                             ))}
@@ -644,19 +682,70 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                         )}
 
                                         {part.answerType === 'stem_mcq' && (
-                                          <div className="grid grid-cols-2 gap-4">
+                                          <div className="grid grid-cols-2 gap-x-8 gap-y-4 ml-4">
                                             {(part.stemQuestions || []).map((sq: any, sqIdx: number) => (
-                                              <div key={sqIdx} className="mb-2">
-                                                <div className="font-medium mb-1">{toBengaliNumerals(sqIdx + 1)}. {sq.question}</div>
-                                                <div className="grid grid-cols-2 text-[10px] gap-1 ml-4">
+                                              <div key={sqIdx} className="break-inside-avoid">
+                                                <div className="font-bold mb-1">{isEn ? (sqIdx + 1) : toBengaliNumerals(sqIdx + 1)}. {sq.question}</div>
+                                                <div className="grid grid-cols-2 text-[10px] gap-2 ml-2">
                                                   {(sq.options || []).map((opt: string, oIdx: number) => (
-                                                    <div key={oIdx}>({MCQ_LABELS[oIdx]}) {opt}</div>
+                                                    <div key={oIdx} className="flex items-center gap-1">
+                                                      <span className="font-bold">({isEn ? MCQ_LABELS_EN[oIdx] : MCQ_LABELS_BN[oIdx]})</span>
+                                                      <span>{opt}</span>
+                                                    </div>
                                                   ))}
                                                 </div>
                                               </div>
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+
+                                    {(part.subType === 'matching' || part.subType === 'mtf') && (
+                                      <div className="mt-3 ml-4">
+                                        <div className="grid grid-cols-2 gap-0 border border-black max-w-2xl mx-auto">
+                                          {/* Header */}
+                                          <div className="border-r border-b border-black p-2 bg-gray-100 font-bold text-center">Column A</div>
+                                          <div className="border-b border-black p-2 bg-gray-100 font-bold text-center">Column B</div>
+
+                                          {/* Rows */}
+                                          {(() => {
+                                            const left = part.leftColumn || [];
+                                            const right = part.rightColumn || [];
+                                            const rows = Math.max(left.length, right.length);
+                                            const res = [];
+                                            for (let i = 0; i < rows; i++) {
+                                              res.push(
+                                                <React.Fragment key={i}>
+                                                  <div className="border-r border-b border-black p-2 flex items-start gap-2">
+                                                    <span className="font-bold w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
+                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{left[i]?.text || ""}</UniversalMathJax></span>
+                                                  </div>
+                                                  <div className="border-b border-black p-2 flex items-start gap-2">
+                                                    <span className="font-bold w-6">({isEn ? String.fromCharCode(105 + i) : toBengaliNumerals(i + 1)})</span>
+                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{right[i]?.text || ""}</UniversalMathJax></span>
+                                                  </div>
+                                                </React.Fragment>
+                                              );
+                                            }
+                                            return res;
+                                          })()}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'rearranging' && (
+                                      <div className="mt-3 ml-4 bg-gray-50 border-2 border-dashed border-gray-300 p-4 rounded-xl">
+                                        <div className="grid grid-cols-1 gap-2">
+                                          {(part.items || []).map((item: string, iIdx: number) => (
+                                            <div key={iIdx} className="flex items-start gap-3">
+                                              <div className="w-8 h-8 rounded bg-white border border-gray-200 flex items-center justify-center font-bold shadow-sm shrink-0">
+                                                {isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}
+                                              </div>
+                                              <div className="pt-1 flex-1 leading-relaxed"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
 
@@ -685,7 +774,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                       </div>
                                     )}
                                   </div>
-                                  <div className="text-right font-bold text-xs mt-1">[{toBengaliNumerals(part.marks)}]</div>
+                                  <div className="text-right font-bold text-xs mt-1">[{isEn ? part.marks : toBengaliNumerals(part.marks)} {isEn ? 'Marks' : 'নম্বর'}]</div>
                                 </div>
                               ))}
                             </div>
@@ -704,11 +793,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
         <div className="signature-container print-only">
           <div className="signature-block">
             <div className="signature-line"></div>
-            <p className="font-bold">পরীক্ষকের স্বাক্ষর</p>
+            <p className="font-bold">{isEn ? "Examiner's Signature" : 'পরীক্ষকের স্বাক্ষর'}</p>
           </div>
           <div className="signature-block">
             <div className="signature-line"></div>
-            <p className="font-bold">প্রধান শিক্ষকের স্বাক্ষর</p>
+            <p className="font-bold">{isEn ? "Headmaster's Signature" : 'প্রধান শিক্ষকের স্বাক্ষর'}</p>
           </div>
         </div>
       </div>

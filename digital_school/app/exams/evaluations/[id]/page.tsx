@@ -41,6 +41,7 @@ import {
   Printer,
   Menu,
   Loader2,
+  AlertCircle,
   FileSearch
 } from "lucide-react";
 import { toast } from "sonner";
@@ -1174,7 +1175,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return exam?.submissions?.some(submission => submission?.status !== 'COMPLETED');
   };
 
-  const updateMarks = async (questionId: string, marks: number) => {
+  const updateMarks = async (questionId: string, marks: number, subIndex?: number) => {
     if (!currentStudent || !currentQuestion) return;
 
     // Check if evaluator can edit marks
@@ -1183,13 +1184,20 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    if (marks > currentQuestion?.marks) {
-      toast.error(`Cannot give more than ${currentQuestion?.marks} marks`);
+    const targetQuestion = exam?.questions?.find(q => q.id === questionId);
+    const maxMarks = subIndex !== undefined && targetQuestion?.subQuestions?.[subIndex]
+      ? targetQuestion.subQuestions[subIndex].marks
+      : targetQuestion?.marks || 0;
+
+    if (marks > maxMarks) {
+      toast.error(`Cannot give more than ${maxMarks} marks`);
       return;
     }
 
+    const marksKey = subIndex !== undefined ? `${questionId}_desc_${subIndex}_marks` : `${questionId}_marks`;
+
     // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
-    const previousMarks = currentStudent?.answers?.[`${questionId}_marks`] || 0;
+    const previousMarks = currentStudent?.answers?.[marksKey] || 0;
 
     if (exam && currentStudent) {
       const studentIndex = (exam?.submissions?.findIndex(s => s?.student?.id === currentStudent?.student?.id) ?? -1);
@@ -1200,7 +1208,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             ...updatedSubmissions[studentIndex],
             answers: {
               ...updatedSubmissions[studentIndex]?.answers,
-              [`${questionId}_marks`]: marks
+              [marksKey]: marks
             }
           };
           setExam({ ...exam, submissions: updatedSubmissions });
@@ -1216,7 +1224,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         body: JSON.stringify({
           studentId: currentStudent?.student?.id,
           questionId,
-          marks,
+          marks: marksKey.endsWith('_marks') ? marks : marks, // Logic for backend to handle subMarks
+          subIndex, // Pass subIndex to backend if needed, though updatedAnswers already contains it
           notes: currentStudent?.evaluatorNotes || ''
         })
       });
@@ -1232,7 +1241,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                 ...revertedSubmissions[studentIndex],
                 answers: {
                   ...revertedSubmissions[studentIndex]?.answers,
-                  [`${questionId}_marks`]: previousMarks
+                  [marksKey]: previousMarks
                 }
               };
               setExam({ ...exam, submissions: revertedSubmissions });
@@ -2464,100 +2473,270 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             )}
 
                                             {currentQuestion?.type?.toLowerCase() === 'descriptive' && (
-                                              <div className="space-y-4">
+                                              <div className="space-y-8">
                                                 {(currentQuestion?.subQuestions || []).map((part: any, pIdx: number) => {
                                                   const ansKey = (sub: string | number) => `${currentQuestion.id}_desc_${pIdx}_${sub}`;
                                                   const getAns = (sub: string | number) => currentStudent?.answers?.[ansKey(sub)] ?? '';
+                                                  const currentSubMarks = currentStudent?.answers?.[`${currentQuestion.id}_desc_${pIdx}_marks`] || 0;
 
                                                   return (
-                                                    <div key={pIdx} className="p-3 bg-amber-50/40 dark:bg-amber-900/10 border border-amber-200/50 dark:border-amber-800/50 rounded-lg">
-                                                      <div className="flex items-center gap-2 mb-2">
-                                                        <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${pIdx + 1}`}</span>
-                                                        <span className="text-xs text-muted-foreground">[{part.marks} marks]</span>
+                                                    <div key={pIdx} className="relative group">
+                                                      {/* Sub-question Header & Gradings */}
+                                                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200/50 shadow-sm">
+                                                        <div className="flex items-center gap-3">
+                                                          <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-black shadow-md shadow-amber-200">
+                                                            {toBengaliNumerals(pIdx + 1)}
+                                                          </div>
+                                                          <div>
+                                                            <div className="text-sm font-black text-amber-800 uppercase tracking-widest">{part.subType?.replace('_', ' ') || "Question"} Part</div>
+                                                            <div className="text-xs text-amber-600 font-bold">Allocated: {part.marks} Marks</div>
+                                                          </div>
+                                                        </div>
+
+                                                        {/* Individual Part Marking */}
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                          <div className="text-[10px] font-black text-amber-600/70 uppercase tracking-wider mr-2">Award Marks:</div>
+                                                          <div className="flex gap-1.5 p-1 bg-white/60 rounded-lg border border-amber-100 shadow-inner">
+                                                            {Array.from({ length: (part.marks || 0) + 1 }, (_, i) => i).map((mark) => (
+                                                              <button
+                                                                key={mark}
+                                                                onClick={() => updateMarks(currentQuestion.id, mark, pIdx)}
+                                                                disabled={!canEditMarks()}
+                                                                className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all ${currentSubMarks === mark
+                                                                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 scale-110'
+                                                                  : 'bg-white text-amber-600 hover:bg-amber-50 border border-amber-100'
+                                                                  } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-0.5'}`}
+                                                              >
+                                                                {mark}
+                                                              </button>
+                                                            ))}
+                                                          </div>
+                                                        </div>
                                                       </div>
 
-                                                      <div className="bg-card p-3 rounded border border-border mt-1">
-                                                        {part.subType === 'writing' && (
-                                                          <div className="whitespace-pre-wrap text-sm">{getAns('ans')}</div>
-                                                        )}
-                                                        {part.subType === 'fill_in' && (
+                                                      {/* Content Grid: Question vs Answer vs Reference */}
+                                                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pl-4 border-l-4 border-amber-200/30">
+
+                                                        {/* Left Side: Question & Student Answer */}
+                                                        <div className="space-y-4">
                                                           <div className="space-y-2">
-                                                            {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (
-                                                              <div className="text-sm border-b pb-2 mb-2 italic text-gray-500">
-                                                                Passage with blanks...
-                                                              </div>
-                                                            )}
-                                                            <div className="flex flex-wrap gap-x-6 gap-y-2">
-                                                              {/* For gap_passage, show numbered answers */}
-                                                              {(part.fillType === 'gap_passage' || !part.fillType) && (part.passage?.match(/___/g) || []).map((_: any, si: number) => (
-                                                                <div key={si} className="text-sm">
-                                                                  <span className="font-bold text-amber-600 mr-1">({si + 1})</span>
-                                                                  <span className="underline decoration-amber-400">{getAns(si) || '___'}</span>
-                                                                </div>
-                                                              ))}
-                                                              {/* For item-based, show item answers */}
-                                                              {part.fillType && part.fillType !== 'gap_passage' && (part.items || []).map((_: any, ii: number) => (
-                                                                <div key={ii} className="text-sm">
-                                                                  <span className="font-bold text-amber-600 mr-1">{ii + 1}.</span>
-                                                                  <span className="underline decoration-amber-400">{getAns(ii) || '___'}</span>
-                                                                </div>
-                                                              ))}
+                                                            <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
+                                                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Quest:
+                                                            </div>
+                                                            <div className="text-sm font-semibold text-gray-800 leading-relaxed bg-blue-50/30 p-3 rounded-lg border border-blue-100/50">
+                                                              {part.questionText || "Reference text/question missing in metadata"}
                                                             </div>
                                                           </div>
-                                                        )}
-                                                        {part.subType === 'comprehension' && (
-                                                          <div className="space-y-3">
-                                                            {(!part.answerType || part.answerType === 'qa') && (part.questions || []).map((q: string, qi: number) => (
-                                                              <div key={qi} className="text-sm">
-                                                                <p className="font-medium text-gray-600">Q: {q}</p>
-                                                                <p className="mt-1 pl-3 border-l-2 border-amber-200 bg-amber-50/30 py-1">{getAns(qi)}</p>
-                                                              </div>
-                                                            ))}
-                                                            {part.answerType === 'stem_mcq' && (part.stemQuestions || []).map((sq: any, sqi: number) => {
-                                                              const ansIdx = getAns(sqi);
-                                                              const isCorrect = String(ansIdx) === String(sq.correct);
-                                                              return (
-                                                                <div key={sqi} className="text-sm flex items-center gap-3">
-                                                                  <span className="font-medium">{sqi + 1}. {sq.question}</span>
-                                                                  <Badge variant={isCorrect ? "default" : "destructive"} className={isCorrect ? "bg-green-500 hover:bg-green-600" : ""}>
-                                                                    Answer: {String.fromCharCode(65 + Number(ansIdx)) || 'N/A'} {isCorrect ? '(Correct)' : '(Wrong)'}
-                                                                  </Badge>
+
+                                                          <div className="space-y-2">
+                                                            <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
+                                                              <div className="w-1.5 h-1.5 bg-amber-600 rounded-full"></div> Student response:
+                                                            </div>
+                                                            <div className="bg-white p-4 rounded-xl border-2 border-amber-100 shadow-sm min-h-[100px] relative overflow-hidden">
+                                                              <div className="absolute top-0 right-0 px-2 py-1 bg-amber-50 text-[8px] font-black text-amber-400 uppercase tracking-tighter">Verified Entry</div>
+                                                              {part.subType === 'writing' && (
+                                                                <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">{getAns('ans') || <span className="text-muted-foreground/40">No text provided…</span>}</div>
+                                                              )}
+                                                              {part.subType === 'fill_in' && (
+                                                                <div className="space-y-3">
+                                                                  {(part.fillType === 'gap_passage' || !part.fillType) && (
+                                                                    <div className="flex flex-wrap gap-4">
+                                                                      {(part.passage?.match(/___/g) || []).map((_: any, si: number) => (
+                                                                        <div key={si} className="flex items-center bg-amber-50/50 px-3 py-1.5 rounded-lg border border-amber-100">
+                                                                          <span className="text-[10px] font-black text-amber-500 mr-2">{toBengaliNumerals(si + 1)}</span>
+                                                                          <span className="text-sm font-bold text-gray-700">{getAns(si) || '___'}</span>
+                                                                        </div>
+                                                                      ))}
+                                                                    </div>
+                                                                  )}
+                                                                  {part.fillType && part.fillType !== 'gap_passage' && (
+                                                                    <div className="grid grid-cols-2 gap-3">
+                                                                      {(part.items || []).map((item: any, ii: number) => (
+                                                                        <div key={ii} className="flex items-center gap-3 p-2 bg-amber-50/30 rounded border border-amber-100">
+                                                                          <span className="text-xs font-black text-amber-400">{ii + 1}.</span>
+                                                                          <div className="flex-1">
+                                                                            <div className="text-[8px] font-bold text-amber-600/50 uppercase">{item}</div>
+                                                                            <div className="text-sm font-bold text-gray-800">{getAns(ii) || '___'}</div>
+                                                                          </div>
+                                                                        </div>
+                                                                      ))}
+                                                                    </div>
+                                                                  )}
                                                                 </div>
-                                                              );
-                                                            })}
-                                                          </div>
-                                                        )}
-                                                        {part.subType === 'table' && (
-                                                          <div className="overflow-x-auto">
-                                                            <table className="w-full border-collapse text-xs">
-                                                              <thead>
-                                                                <tr>
-                                                                  {(part.tableHeaders || []).map((h: string, hi: number) => (
-                                                                    <th key={hi} className="border p-1 bg-muted">{h}</th>
+                                                              )}
+                                                              {part.subType === 'comprehension' && (
+                                                                <div className="space-y-4">
+                                                                  {(!part.answerType || part.answerType === 'qa') && (part.questions || []).map((q: string, qi: number) => (
+                                                                    <div key={qi} className="space-y-1">
+                                                                      <div className="text-[10px] font-bold text-amber-800/60">Q{qi + 1}: {q}</div>
+                                                                      <div className="text-sm border-l-2 border-amber-400 pl-3 py-1 bg-amber-50/20 italic">{getAns(qi) || 'No response'}</div>
+                                                                    </div>
                                                                   ))}
-                                                                </tr>
-                                                              </thead>
-                                                              <tbody>
-                                                                {(part.tableRows || []).map((row: string[], ri: number) => (
-                                                                  <tr key={ri}>
-                                                                    {(part.tableHeaders || []).map((_: string, ci: number) => {
-                                                                      const isBlank = !row[ci] || row[ci] === '___';
+                                                                  {part.answerType === 'stem_mcq' && (part.stemQuestions || []).map((sq: any, sqi: number) => {
+                                                                    const ansIdx = getAns(sqi);
+                                                                    const isCorrect = String(ansIdx) === String(sq.correct);
+                                                                    return (
+                                                                      <div key={sqi} className="flex items-center justify-between p-2 bg-muted/30 rounded border text-xs">
+                                                                        <span className="font-medium">{sqi + 1}. {sq.question}</span>
+                                                                        <Badge variant={isCorrect ? "default" : "destructive"} className={isCorrect ? "bg-green-500" : "bg-red-500"}>
+                                                                          Selected: {String.fromCharCode(65 + Number(ansIdx)) || 'X'}
+                                                                        </Badge>
+                                                                      </div>
+                                                                    );
+                                                                  })}
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'table' && (
+                                                                <div className="overflow-x-auto rounded-lg border border-amber-200">
+                                                                  <table className="w-full text-[10px]">
+                                                                    <thead className="bg-amber-100/50">
+                                                                      <tr>
+                                                                        {(part.tableHeaders || []).map((h: string, hi: number) => <th key={hi} className="border-b border-amber-200 p-2 text-left text-amber-800">{h}</th>)}
+                                                                      </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                      {(part.tableRows || []).map((row: string[], ri: number) => (
+                                                                        <tr key={ri} className="hover:bg-amber-50/30">
+                                                                          {(part.tableHeaders || []).map((_: string, ci: number) => {
+                                                                            const isBlank = !row[ci] || row[ci] === '___';
+                                                                            return (
+                                                                              <td key={ci} className="border-b border-amber-100 p-2">
+                                                                                {isBlank ? <span className="font-black text-amber-600">{getAns(`${ri}_${ci}`) || '___'}</span> : <span className="text-gray-500">{row[ci]}</span>}
+                                                                              </td>
+                                                                            );
+                                                                          })}
+                                                                        </tr>
+                                                                      ))}
+                                                                    </tbody>
+                                                                  </table>
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'matching' && (
+                                                                <div className="grid grid-cols-2 gap-2">
+                                                                  {Object.entries((part.matches as Record<string, string>) || {}).map(([l, r], mIdx) => {
+                                                                    const studentR = getAns(l);
+                                                                    const isCorrect = studentR === r;
+                                                                    return (
+                                                                      <div key={mIdx} className={`p-2 rounded border flex flex-col gap-0.5 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                                                        <div className="text-[8px] font-black text-gray-400 uppercase">{l}</div>
+                                                                        <div className="text-xs font-bold">{studentR || <span className="opacity-30">Pending</span>}</div>
+                                                                        {!isCorrect && <div className="text-[8px] text-green-600 mt-1 font-black">Ref: {r}</div>}
+                                                                      </div>
+                                                                    );
+                                                                  })}
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'rearranging' && (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                  {(getAns('order') as string || "").split(',').filter(Boolean).map((label, oIdx) => (
+                                                                    <div key={oIdx} className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold border border-amber-200 flex items-center gap-1.5">
+                                                                      <span className="w-4 h-4 rounded-full bg-white flex items-center justify-center text-[8px] shadow-sm">{label}</span>
+                                                                      <span>{part.items[label.charCodeAt(0) - 65]}</span>
+                                                                    </div>
+                                                                  ))}
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'true_false' && (
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                  {(part.statements || []).map((stmt: string, sIdx: number) => {
+                                                                    const studentAns = getAns(sIdx);
+                                                                    const correctAns = part.correct?.[sIdx];
+                                                                    const isCorrect = studentAns === correctAns;
+                                                                    return (
+                                                                      <div key={sIdx} className={`p-3 rounded-lg border-2 flex flex-col gap-1 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                                                                        <div className="text-[10px] font-black text-gray-400 uppercase">Statement {sIdx + 1}</div>
+                                                                        <div className="text-sm font-medium">{stmt}</div>
+                                                                        <div className="flex items-center gap-2 mt-1">
+                                                                          <Badge variant={isCorrect ? "default" : "destructive"} className={isCorrect ? "bg-green-500" : "bg-red-500"}>
+                                                                            {studentAns || 'No response'}
+                                                                          </Badge>
+                                                                          {!isCorrect && <span className="text-[10px] font-bold text-green-600">Correct: {correctAns}</span>}
+                                                                        </div>
+                                                                      </div>
+                                                                    );
+                                                                  })}
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'label_diagram' && (
+                                                                <div className="space-y-4">
+                                                                  {part.imageUrl && (
+                                                                    <div className="relative inline-block border-2 border-amber-200 rounded-xl overflow-hidden shadow-sm">
+                                                                      <img src={part.imageUrl} alt="Diagram" className="max-h-48 rounded-lg" />
+                                                                      <div className="absolute inset-0 pointer-events-none">
+                                                                        {(part.labels || []).map((l: any, i: number) => (
+                                                                          <div key={i} className="absolute w-5 h-5 bg-amber-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white shadow-sm" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                                            {i + 1}
+                                                                          </div>
+                                                                        ))}
+                                                                      </div>
+                                                                    </div>
+                                                                  )}
+                                                                  <div className="grid grid-cols-2 gap-2">
+                                                                    {(part.labels || []).map((_: any, i: number) => {
+                                                                      const ans = getAns(i);
+                                                                      const correct = part.correctLabels?.[i];
+                                                                      const isCorrect = normalize(ans) === normalize(correct);
                                                                       return (
-                                                                        <td key={ci} className="border p-1">
-                                                                          {isBlank ? (
-                                                                            <span className="font-bold text-amber-600">{getAns(`${ri}_${ci}`) || '___'}</span>
-                                                                          ) : (
-                                                                            <span>{row[ci]}</span>
-                                                                          )}
-                                                                        </td>
+                                                                        <div key={i} className={`p-2 rounded border flex flex-col gap-0.5 ${isCorrect ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
+                                                                          <div className="text-[9px] font-black text-amber-600/50 uppercase">Label {i + 1}</div>
+                                                                          <div className="text-xs font-bold">{ans || '___'}</div>
+                                                                          {!isCorrect && <div className="text-[8px] text-green-600 font-bold">Key: {correct}</div>}
+                                                                        </div>
                                                                       );
                                                                     })}
-                                                                  </tr>
-                                                                ))}
-                                                              </tbody>
-                                                            </table>
+                                                                  </div>
+                                                                </div>
+                                                              )}
+                                                            </div>
                                                           </div>
-                                                        )}
+                                                        </div>
+
+                                                        {/* Right Side: Reference/Model Answer */}
+                                                        <div className="space-y-4">
+                                                          <div className="space-y-2">
+                                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
+                                                              <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></div> Model Verification Key:
+                                                            </div>
+                                                            <div className="bg-emerald-50/30 p-5 rounded-2xl border-2 border-emerald-100/50 shadow-sm relative overflow-hidden group-hover:border-emerald-200 transition-colors">
+                                                              <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-sm">Standard Key</div>
+                                                              {part.modelAnswer ? (
+                                                                <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                                                                  <UniversalMathJax dynamic>{cleanupMath(part.modelAnswer)}</UniversalMathJax>
+                                                                </div>
+                                                              ) : (
+                                                                <div className="flex flex-col items-center justify-center py-6 text-emerald-600/40">
+                                                                  <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
+                                                                  <span className="text-[10px] font-black uppercase tracking-tighter">No model answer provided</span>
+                                                                </div>
+                                                              )}
+
+                                                              {/* Context Hints for Objective Sub-types */}
+                                                              {part.subType === 'rearranging' && (
+                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500">Correct Sequence</div>
+                                                                  <div className="flex gap-2">
+                                                                    {(part.correctOrder || []).map((label: string, i: number) => (
+                                                                      <span key={i} className="w-6 h-6 rounded bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">{label}</span>
+                                                                    ))}
+                                                                  </div>
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'matching' && (
+                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500">Correct Pairing Matrix</div>
+                                                                  <div className="grid grid-cols-2 gap-2">
+                                                                    {Object.entries((part.matches as Record<string, string>) || {}).map(([l, r], mIdx) => (
+                                                                      <div key={mIdx} className="bg-emerald-100/50 p-1.5 rounded border border-emerald-200 flex items-center gap-2">
+                                                                        <span className="font-black text-emerald-700">{l}:</span>
+                                                                        <span className="font-bold">{r}</span>
+                                                                      </div>
+                                                                    ))}
+                                                                  </div>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          </div>
+                                                        </div>
                                                       </div>
                                                     </div>
                                                   );
@@ -2641,21 +2820,55 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               );
 
                                               return (
-                                                <div key={idx} className="pl-4 border-l-2 border-indigo-100">
-                                                  <div className="text-sm font-semibold text-gray-600 mb-1">Sub-question {idx + 1}</div>
-                                                  {subQ?.text || subQ?.question || subQ?.questionText ? (
-                                                    <div className="text-gray-800 font-medium leading-relaxed">
-                                                      <UniversalMathJax inline dynamic>{cleanupMath(subQ?.text || subQ?.question || subQ?.questionText)}</UniversalMathJax>
+                                                <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-3">
+                                                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                                    <div className="flex-1">
+                                                      <div className="text-sm font-semibold text-indigo-700 mb-1 flex items-center gap-2">
+                                                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Part {toBengaliNumerals(idx + 1)}
+                                                        <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">[{subQ.marks || 0} Marks]</span>
+                                                      </div>
+                                                      {subQ?.text || subQ?.question || subQ?.questionText ? (
+                                                        <div className="text-gray-800 text-sm font-medium leading-relaxed mb-1">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath(subQ?.text || subQ?.question || subQ?.questionText)}</UniversalMathJax>
+                                                        </div>
+                                                      ) : null}
+                                                      <div className="mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-2 rounded border border-indigo-50/50">
+                                                        <UniversalMathJax dynamic>{cleanupMath(subText || "")}</UniversalMathJax>
+                                                      </div>
                                                     </div>
-                                                  ) : null}
-                                                  <div className="mb-2 text-gray-800 text-sm md:text-base"><UniversalMathJax dynamic>{cleanupMath(subText)}</UniversalMathJax></div>
+
+                                                    {/* Inline Marking for CQ Sub-question */}
+                                                    <div className="flex flex-wrap items-center gap-2 bg-indigo-50/30 p-2 rounded-lg border border-indigo-100/50 self-start">
+                                                      <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mr-1">Grade:</div>
+                                                      <div className="flex gap-1">
+                                                        {Array.from({ length: (subQ?.marks || 0) + 1 }, (_, i) => i).map((mark) => {
+                                                          const marksKey = `${currentQuestion?.id}_sub_${idx}_marks`;
+                                                          const isSelected = (currentStudent?.answers?.[marksKey] || 0) === mark;
+                                                          return (
+                                                            <button
+                                                              key={mark}
+                                                              onClick={() => updateMarks(currentQuestion?.id, mark, idx)}
+                                                              disabled={!canEditMarks()}
+                                                              className={`w-7 h-7 rounded flex items-center justify-center text-[10px] font-black transition-all ${isSelected
+                                                                ? 'bg-indigo-600 text-white shadow-md'
+                                                                : 'bg-white text-indigo-600 border border-indigo-100 hover:bg-indigo-50'
+                                                                } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-0.5'}`}
+                                                            >
+                                                              {mark}
+                                                            </button>
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    </div>
+                                                  </div>
+
                                                   {(() => {
                                                     const singleImg = currentStudent?.answers?.[`${subKey}_image`];
                                                     const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
                                                     const allSubImages = singleImg ? [singleImg, ...(multipleImgs || [])] : (multipleImgs || []);
 
                                                     return allSubImages.length > 0 ? (
-                                                      <div className="flex flex-wrap gap-2 mt-2">
+                                                      <div className="flex flex-wrap gap-2 mt-2 ml-4">
                                                         {(allSubImages || [])?.map((imgUrl: string, imgIdx: number) => {
                                                           const questionIndex = idx * 100 + imgIdx;
                                                           const displayUrl = getImageUrl(imgUrl, currentQuestion?.id, questionIndex);
@@ -2667,20 +2880,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 src={displayUrl}
                                                                 alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
                                                                 crossOrigin="anonymous"
-                                                                className="h-24 w-24 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
+                                                                className="h-20 w-20 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
                                                                 onClick={() => openAnnotation(imgUrl, currentQuestion?.id, questionIndex, currentStudent?.student?.id)}
                                                               />
                                                               <button
                                                                 onClick={() => openAnnotation(imgUrl, currentQuestion?.id, questionIndex, currentStudent?.student?.id)}
-                                                                className="absolute top-1 right-1 bg-background/90 p-1 rounded-full shadow-sm hover:bg-muted text-primary"
+                                                                className="absolute top-1 right-1 bg-background/90 p-1 rounded-full shadow-sm hover:bg-muted text-primary opacity-0 group-hover:opacity-100 transition-opacity"
                                                               >
-                                                                <PenTool className="w-3 h-3" />
+                                                                <PenTool className="w-2.5 h-2.5" />
                                                               </button>
-                                                              <div className="absolute bottom-1 left-1 bg-black/60 text-white text-xs px-1 py-0.5 rounded">
-                                                                {imgIdx + 1}/{(allSubImages?.length || 0)}
-                                                              </div>
                                                               {hasAnnotation && (
-                                                                <div className="absolute top-0 left-0 bg-green-500 text-white text-[10px] px-1 py-0.5 rounded-br font-semibold shadow-sm z-10 pointer-events-none">
+                                                                <div className="absolute top-0 left-0 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded-br font-semibold shadow-sm z-10">
                                                                   ✓
                                                                 </div>
                                                               )}
@@ -3046,21 +3256,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       </div>
                                     ) : (
                                       <div className="flex flex-col gap-3">
-                                        <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium text-gray-700">Quick Grade:</span>
-                                          <span className="text-xs text-gray-500">/ {currentQuestion?.marks}</span>
+                                        <div className="flex items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-sm font-medium text-gray-700">Quick Global Grade:</span>
+                                            <span className="text-xs text-gray-500">/ {currentQuestion?.marks}</span>
+                                          </div>
                                           {canEditMarks() ? (
-                                            <Badge className="bg-green-100 text-green-800 text-xs">
-                                              ✏️ Editable
-                                            </Badge>
+                                            <Badge className="bg-green-100 text-green-800 text-[10px] py-0">✏️ Editable</Badge>
                                           ) : (
-                                            <Badge className="bg-gray-100 text-gray-800 text-xs">
-                                              🔒 Locked
-                                            </Badge>
+                                            <Badge className="bg-gray-100 text-gray-800 text-[10px] py-0">🔒 Locked</Badge>
                                           )}
                                         </div>
 
-                                        {/* Quick-click buttons for marks */}
+                                        {/* Quick-click buttons: Now visible for all manual types as a global override */}
                                         <div className="flex flex-wrap gap-2">
                                           {Array.from({ length: (currentQuestion?.marks || 0) + 1 }, (_, i) => i).map((mark) => {
                                             const currentMarks = currentStudent?.answers?.[`${currentQuestion?.id}_marks`] || 0;
@@ -3072,14 +3280,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 onClick={() => updateMarks(currentQuestion?.id, mark)}
                                                 disabled={!canEditMarks()}
                                                 className={`
-                                                px-4 py-2 rounded-lg font-semibold text-sm transition-all
-                                                ${isSelected
+                                                  px-4 py-2 rounded-lg font-semibold text-sm transition-all
+                                                  ${isSelected
                                                     ? 'bg-indigo-600 text-white shadow-md scale-105 ring-2 ring-indigo-300'
                                                     : 'bg-gray-100 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600'
                                                   }
-                                                ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
-                                                min-w-[3rem]
-                                              `}
+                                                  ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105 cursor-pointer'}
+                                                  min-w-[3rem]
+                                                `}
                                               >
                                                 {mark}
                                               </button>
@@ -3087,18 +3295,49 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                           })}
                                         </div>
 
-                                        {/* Current marks display */}
-                                        <div className="flex items-center gap-2 text-sm">
-                                          <span className="text-gray-600">Current:</span>
-                                          <Badge className={
-                                            (currentStudent?.answers?.[`${currentQuestion?.id}_marks`] || 0) === currentQuestion?.marks
-                                              ? 'bg-green-100 text-green-800'
-                                              : (currentStudent?.answers?.[`${currentQuestion?.id}_marks`] || 0) === 0
-                                                ? 'bg-red-100 text-red-800'
-                                                : 'bg-yellow-100 text-yellow-800'
-                                          }>
-                                            {currentStudent?.answers?.[`${currentQuestion?.id}_marks`] || 0} / {currentQuestion?.marks}
-                                          </Badge>
+                                        {currentQuestion?.subQuestions && currentQuestion.subQuestions.length > 0 && (
+                                          <p className="text-[10px] text-gray-400 italic">
+                                            * Using these buttons will set a global mark. Individual part marks will still be calculated if provided.
+                                          </p>
+                                        )}
+
+                                        {/* Current marks display (Sum for descriptive/CQ sub-questions) */}
+                                        <div className="flex items-center gap-2 text-sm border-t pt-2 mt-1">
+                                          <span className="text-gray-600 font-medium">Final Question Score:</span>
+                                          {(() => {
+                                            let subTotal = 0;
+                                            let hasSubMarks = false;
+                                            if (currentQuestion?.subQuestions) {
+                                              currentQuestion.subQuestions.forEach((_: any, idx: number) => {
+                                                // Check both desc and sub prefixes
+                                                const m = (currentStudent?.answers?.[`${currentQuestion.id}_desc_${idx}_marks`] ?? currentStudent?.answers?.[`${currentQuestion.id}_sub_${idx}_marks`]);
+                                                if (typeof m === 'number') {
+                                                  subTotal += m;
+                                                  hasSubMarks = true;
+                                                }
+                                              });
+                                            }
+
+                                            const globalMark = currentStudent?.answers?.[`${currentQuestion?.id}_marks`] || 0;
+                                            const finalMarks = hasSubMarks ? subTotal : globalMark;
+
+                                            return (
+                                              <div className="flex items-center gap-2">
+                                                <Badge className={
+                                                  finalMarks === currentQuestion?.marks
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : finalMarks === 0
+                                                      ? 'bg-red-100 text-red-800'
+                                                      : 'bg-yellow-100 text-yellow-800'
+                                                }>
+                                                  {finalMarks} / {currentQuestion?.marks}
+                                                </Badge>
+                                                {hasSubMarks && globalMark > 0 && (
+                                                  <span className="text-[9px] text-gray-400">(Sub-marks prioritize over global {globalMark})</span>
+                                                )}
+                                              </div>
+                                            );
+                                          })()}
                                         </div>
                                       </div>
                                     )}

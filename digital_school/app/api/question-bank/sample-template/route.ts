@@ -26,12 +26,14 @@ export async function GET() {
             ["Step 5", "Save and upload this file back to the system."],
             [""],
             ["FIELD GUIDE BY TYPE:", ""],
-            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
+            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C'). Use 'Teacher Note / Explanation' for general notes."],
             ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
-            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5). Symbols: 1: Both true & explanation, 2: Both true not explanation, 3: A true R false, 4: A false R true, 5: Both false."],
+            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
-            ["CQ (Creative)", "Fill 'Question Text' (passage) and 'Sub-Question' fields."],
+            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields, and 'Sub-Question Explanation' for each part."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'."],
+            ["DESCRIPTIVE", "Flexible format. Use 'Sub 1 Text', 'Sub 1 Type', etc. Use 'Sub 1 Explanation' for per-part notes."],
+            ["Sub-Type Delimiters:", "Use '|' to separate items. For matching/mtf, use '|' for columns and '-' for mapping (e.g. 1-A). For labels: 'Text:x:y|Text:x:y'."],
             [""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
             ["Marks", "Number only."]
@@ -92,20 +94,29 @@ export async function GET() {
             { header: "Right D", key: "rd", width: 15 },
             { header: "Right E", key: "re", width: 15 },
             { header: "Matches", key: "matches", width: 15 },
-            { header: "Explanation", key: "explanation", width: 20 },
+            { header: "Teacher Note / Explanation", key: "explanation", width: 30 },
             { header: "Model Answer", key: "modelAnswer", width: 20 },
             { header: "Sub-Question 1 Text", key: "sq1Text", width: 25 },
             { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 12 },
             { header: "Sub-Question 1 Model Answer", key: "sq1ModelAnswer", width: 25 },
+            { header: "Sub-Question 1 Explanation", key: "sq1Explanation", width: 25 },
             { header: "Sub-Question 2 Text", key: "sq2Text", width: 25 },
             { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 12 },
             { header: "Sub-Question 2 Model Answer", key: "sq2ModelAnswer", width: 25 },
+            { header: "Sub-Question 2 Explanation", key: "sq2Explanation", width: 25 },
             { header: "Sub-Question 3 Text", key: "sq3Text", width: 25 },
             { header: "Sub-Question 3 Marks", key: "sq3Marks", width: 12 },
             { header: "Sub-Question 3 Model Answer", key: "sq3ModelAnswer", width: 25 },
+            { header: "Sub-Question 3 Explanation", key: "sq3Explanation", width: 25 },
             { header: "Sub-Question 4 Text", key: "sq4Text", width: 25 },
             { header: "Sub-Question 4 Marks", key: "sq4Marks", width: 12 },
             { header: "Sub-Question 4 Model Answer", key: "sq4ModelAnswer", width: 25 },
+            { header: "Sub-Question 4 Explanation", key: "sq4Explanation", width: 25 },
+            // Descriptive Dynamic Sub-fields (Prefixes used in loop below)
+            { header: "Sub 1 Explanation", key: "s1Explanation", width: 20 },
+            { header: "Sub 2 Explanation", key: "s2Explanation", width: 20 },
+            { header: "Sub 3 Explanation", key: "s3Explanation", width: 20 },
+            { header: "Sub 4 Explanation", key: "s4Explanation", width: 20 },
         ];
         templateSheet.columns = columns;
 
@@ -129,7 +140,7 @@ export async function GET() {
             row.getCell(1).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ"'],
+                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ,DESCRIPTIVE"'],
                 showErrorMessage: true,
                 errorTitle: 'Invalid Type',
                 error: 'Select: MCQ, MC, INT, AR, MTF, CQ, SQ'
@@ -170,6 +181,10 @@ export async function GET() {
         templateSheet.addRow(["INT", sampleClass, "Math", "Algebra", "EASY", 2, "2+2=?", "", "", "", "", "", "", "4"]);
         templateSheet.addRow(["AR", sampleClass, "History", "Events", "MEDIUM", 1, "", "", "", "", "", "", "1", "", "S1 is true", "S2 is reason"]);
         templateSheet.addRow(["MTF", sampleClass, "GK", "Capitals", "MEDIUM", 5, "Match capitals:", "", "", "", "", "", "", "", "", "", "India", "USA", "France", "", "", "Delhi", "Washington", "Paris", "", "", "1-A, 2-B, 3-C"]);
+        templateSheet.addRow(["DESCRIPTIVE", sampleClass, "Bangla 2nd", "Grammar", "MEDIUM", 10, "Writing & Grammar Part", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Various sub-parts..."]);
+
+        // Detailed Descriptive samples are usually easier via JSON, but we can add more specific columns if we expand the template.
+        // For now, these rows demonstrate the type exists.
 
         // Freeze top row
         templateSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
