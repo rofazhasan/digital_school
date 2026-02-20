@@ -153,19 +153,20 @@ export default function HeroCanvas() {
     const webglSupported = useWebGLSupport();
 
     return (
-        <div className="absolute inset-0 z-0 opacity-40 dark:opacity-50 transition-opacity duration-500">
+        <div className="absolute inset-0 z-0 opacity-40 dark:opacity-50 transition-opacity duration-500 pointer-events-none">
             <WebGLFallback webglSupported={webglSupported}>
                 <Canvas
                     camera={{ fov: 50, position: [0, 0, 14] }}
-                    dpr={[1, 2]} // Limit pixel ratio for performance
-                    frameloop="always"
+                    dpr={[1, 1.5]} // More conservative DPR for thermal performance
+                    frameloop="demand" // Only render when needed or requested
+                    performance={{ min: 0.5 }} // Allow downscaling if struggling
                     gl={{
-                        powerPreference: "high-performance",
-                        antialias: true,
+                        powerPreference: "low-power", // Prioritize battery/thermals
+                        antialias: false, // Turn off for performance boost
                         alpha: false,
                         stencil: false,
                         depth: true,
-                        preserveDrawingBuffer: false // Optimization
+                        preserveDrawingBuffer: false
                     }}
                     onCreated={({ gl }) => {
                         gl.setClearColor(0x000000, 0);

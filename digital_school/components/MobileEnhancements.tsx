@@ -22,42 +22,10 @@ export default function MobileEnhancements() {
     useEffect(() => {
         if (!Capacitor.isNativePlatform()) return;
 
-        // --- Core Infrastructure Setup ---
-        setupNetworkMonitoring();
-        setupKeyboardManagement();
-        setupNotifications();
+        // Add a class to the body to allow native-only CSS scoping
+        document.body.classList.add('is-native');
 
-        // --- Device Intelligence Pulse ---
-        const logDeviceContext = async () => {
-            const info = await getDeviceInfo();
-            console.log('Mobile Device Context:', info);
-            // In a real app, you'd send this to your proctoring API
-        };
-        logDeviceContext();
-
-        // --- Battery Management (Polling) ---
-        const checkBattery = async () => {
-            const level = await getBatteryLevel();
-            if (level !== null && level < 0.15) {
-                toast.warning('Low Battery', {
-                    description: `Your battery is at ${Math.round(level * 100)}%. Please plug in to avoid exam disruption.`,
-                    duration: 10000,
-                });
-            }
-        };
-        checkBattery();
-        const batteryInterval = setInterval(checkBattery, 1000 * 60 * 5); // 5 mins
-
-        // --- Biometric Security Pulse ---
-        const handleBiometricSession = async () => {
-            const bio: any = await checkBiometry();
-            if (bio && bio.isAvailable) {
-                console.log('Biometrics available:', bio.biometryType);
-            }
-        };
-        handleBiometricSession();
-
-        // --- Status Bar Lifecycle ---
+        // --- Phase 1: Immediate Status Bar Sync ---
         const updateStatusBar = async () => {
             try {
                 const currentTheme = resolvedTheme || theme;
@@ -72,10 +40,50 @@ export default function MobileEnhancements() {
                 console.warn('StatusBar error:', err);
             }
         };
-
         updateStatusBar();
 
+        // --- Phase 2: Deferred Heavy Infrastructure (500ms) ---
+        const deferredSetup = setTimeout(() => {
+            setupNetworkMonitoring();
+            setupKeyboardManagement();
+            setupNotifications();
+            handleBiometricSession();
+        }, 500);
+
+        // --- Phase 3: Background Intelligence (2000ms) ---
+        const backgroundPulse = setTimeout(() => {
+            logDeviceContext();
+            checkBattery();
+        }, 2000);
+
+        // --- Internal Logic Helpers ---
+        const logDeviceContext = async () => {
+            const info = await getDeviceInfo();
+            console.log('Mobile Device Context:', info);
+        };
+
+        const checkBattery = async () => {
+            const level = await getBatteryLevel();
+            if (level !== null && level < 0.15) {
+                toast.warning('Low Battery', {
+                    description: `Your battery is at ${Math.round(level * 100)}%. Please plug in to avoid exam disruption.`,
+                    duration: 10000,
+                });
+            }
+        };
+
+        const handleBiometricSession = async () => {
+            const bio: any = await checkBiometry();
+            if (bio && bio.isAvailable) {
+                console.log('Biometrics available:', bio.biometryType);
+            }
+        };
+
+        const batteryInterval = setInterval(checkBattery, 1000 * 60 * 5); // 5 mins
+
         return () => {
+            clearTimeout(deferredSetup);
+            clearTimeout(backgroundPulse);
             clearInterval(batteryInterval);
         };
     }, [theme, resolvedTheme]);

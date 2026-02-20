@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Upload, UserPlus, Edit, Trash2, Users, Shield, Loader2, CheckCircle, XCircle, LayoutDashboard, MoreHorizontal, Mail, Phone, Eye, EyeOff } from "lucide-react";
+import { Upload, UserPlus, Edit, Trash2, Users, Shield, Loader2, CheckCircle, XCircle, LayoutDashboard, MoreHorizontal, Mail, Phone, Eye, EyeOff, School, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
@@ -59,6 +59,10 @@ export default function AdminUsersPage() {
     const [classes, setClasses] = useState<Array<{ id: string; name: string; section: string }>>([]);
     const [selectedClass, setSelectedClass] = useState<string>("ALL");
     const [activeUserRole, setActiveUserRole] = useState<'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT' | null>(null);
+    const [showClassManagement, setShowClassManagement] = useState(false);
+    const [isCreatingClass, setIsCreatingClass] = useState(false);
+    const [newClassName, setNewClassName] = useState("");
+    const [newClassSection, setNewClassSection] = useState("");
 
     // Bulk Selection State
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -152,6 +156,42 @@ export default function AdminUsersPage() {
             })
             .finally(() => setLoading(false));
     }, []);
+
+    const fetchClasses = async () => {
+        try {
+            const res = await fetch("/api/classes");
+            const data = await res.json();
+            if (data.classes) setClasses(data.classes);
+        } catch (err) {
+            console.error("Failed to fetch classes", err);
+        }
+    };
+
+    const handleCreateClass = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newClassName || !newClassSection) return;
+
+        setIsCreatingClass(true);
+        try {
+            const res = await fetch("/api/classes", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ name: newClassName, section: newClassSection }),
+            });
+            const data = await res.json();
+            if (res.ok) {
+                setNewClassName("");
+                setNewClassSection("");
+                await fetchClasses();
+            } else {
+                alert(data.error || "Failed to create class");
+            }
+        } catch (err) {
+            alert("An error occurred while creating the class");
+        } finally {
+            setIsCreatingClass(false);
+        }
+    };
 
     const refreshUsers = async () => {
         setLoading(true);
@@ -421,6 +461,9 @@ export default function AdminUsersPage() {
                         </Button>
                         <Button onClick={() => setShowBulkAdd(true)} variant="secondary" className="gap-2">
                             <Upload className="h-4 w-4" /> Import
+                        </Button>
+                        <Button onClick={() => setShowClassManagement(true)} variant="outline" className="gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50">
+                            <School className="h-4 w-4" /> Manage Classes
                         </Button>
                         <Button onClick={() => setShowAddUser(true)} className="gap-2 bg-primary hover:bg-primary/90">
                             <UserPlus className="h-4 w-4" /> Add User
@@ -915,6 +958,77 @@ export default function AdminUsersPage() {
                             Confirm Import
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Class Management Dialog */}
+            <Dialog open={showClassManagement} onOpenChange={setShowClassManagement}>
+                <DialogContent className="max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <School className="h-5 w-5 text-indigo-600" /> Class Management
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {/* Add Class Form */}
+                    <form onSubmit={handleCreateClass} className="flex flex-col sm:flex-row gap-3 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 mb-4">
+                        <div className="flex-1">
+                            <Input
+                                placeholder="Class Name (e.g. Class 10)"
+                                value={newClassName}
+                                onChange={(e) => setNewClassName(e.target.value)}
+                                className="bg-white"
+                                required
+                            />
+                        </div>
+                        <div className="flex-1">
+                            <Input
+                                placeholder="Section (e.g. Science)"
+                                value={newClassSection}
+                                onChange={(e) => setNewClassSection(e.target.value)}
+                                className="bg-white"
+                                required
+                            />
+                        </div>
+                        <Button type="submit" disabled={isCreatingClass} className="bg-indigo-600 hover:bg-indigo-700">
+                            {isCreatingClass ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                            Add Class
+                        </Button>
+                    </form>
+
+                    {/* Classes Table */}
+                    <div className="border rounded-xl overflow-hidden max-h-[400px] overflow-y-auto">
+                        <Table>
+                            <TableHeader className="bg-gray-50 sticky top-0 z-10">
+                                <TableRow>
+                                    <TableHead>Class Name</TableHead>
+                                    <TableHead>Section</TableHead>
+                                    <TableHead className="text-right">Students</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {classes.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
+                                            No classes found. Add one above.
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    classes.map((cls: any) => (
+                                        <TableRow key={cls.id}>
+                                            <TableCell className="font-medium">{cls.name}</TableCell>
+                                            <TableCell className="text-muted-foreground">{cls.section}</TableCell>
+                                            <TableCell className="text-right">
+                                                <Badge variant="secondary" className="font-bold">
+                                                    {cls._count?.students || 0}
+                                                </Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </DialogContent>
             </Dialog>
 

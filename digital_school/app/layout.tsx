@@ -112,7 +112,7 @@ export default function RootLayout({
                 <MobileNavigationControls />
                 <MaintenanceGuard>
                   <SessionGuard />
-                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw]">
+                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
                     {children}
                   </div>
                   <AppFooter />
