@@ -734,7 +734,11 @@ export default function ExamBuilderPage() {
     setIsSubmitting(true);
     try {
       const setsToSave = Array.from({ length: numSets }).map((_, i) => {
-        const shuffledQuestions = shuffleArray(selectedQuestions).map(q => {
+        const cqQuestions = selectedQuestions.filter(q => q.type === 'CQ');
+        const otherQuestions = selectedQuestions.filter(q => q.type !== 'CQ');
+        const shuffledOthers = shuffleArray(otherQuestions);
+
+        const orderedQuestions = [...cqQuestions, ...shuffledOthers].map(q => {
           let processedQuestion = { ...q };
 
           // Shuffle MCQ/MC options
@@ -820,7 +824,7 @@ export default function ExamBuilderPage() {
         });
         return {
           name: `${newSetName.trim()} ${String.fromCharCode(65 + i)}`,
-          questions: shuffledQuestions,
+          questions: orderedQuestions,
         };
       });
       const response = await fetch(`/api/exams/${examId}/set`, {
