@@ -282,6 +282,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const sqRequiredMarksNum = Number(sqRequiredMarks) || 0;
     const descMarks = descriptives.reduce((sum, q) => sum + (q.marks || 0), 0);
     const cqSqTotalMarks = cqRequiredMarksNum + sqRequiredMarksNum + descMarks;
+    const grandTotalMarks = objectiveTotal + cqSqTotalMarks;
 
     return (
       <div
@@ -299,8 +300,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
             examInfo={examInfo}
             type="objective"
             qrData={qrData}
-            marks={objectiveTotal}
-            time={examInfo.objectiveTime || 0}
+            marks={forcePageBreak ? objectiveTotal : grandTotalMarks}
+            time={forcePageBreak ? (examInfo.objectiveTime || 0) : totalTimeMinutes}
             banglaWord={examInfo.set ? pickBanglaWord((examInfo.id || '') + examInfo.set, 0, lang) : undefined}
             showDate={showDate}
             lang={lang}

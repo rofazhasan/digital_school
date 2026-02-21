@@ -111,8 +111,8 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
   selectionReason?: string;
 }) => (
   <div className={`p-4 border rounded-lg mb-3 transition-all ${isAdded ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-800/50'}`}>
-    <div className="flex justify-between items-start gap-4">
-      <div className="prose prose-sm dark:prose-invert max-w-full flex-grow">
+    <div className="grid grid-cols-[1fr_auto] gap-4 relative w-full items-start">
+      <div className="prose prose-sm dark:prose-invert min-w-0 w-full overflow-x-auto pr-2 custom-scrollbar">
         <h4 className="font-semibold text-sm mb-1 leading-snug"><UniversalMathJax inline>{cleanupMath(question.questionText)}</UniversalMathJax></h4>
         {question.images && question.images.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-2">
@@ -216,29 +216,31 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
             <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
               {question.type?.toUpperCase() === 'DESCRIPTIVE' ? 'Descriptive Parts:' : 'Sub Questions:'}
             </span>
-            {(question.subQuestions || question.sub_questions || []).map((sq: any, i: number) => (
-              <div key={i} className="pl-4 border-l-2 border-indigo-100 dark:border-indigo-900 py-1">
-                <div className="text-xs font-medium">
-                  {question.type?.toUpperCase() === 'DESCRIPTIVE' ? (
-                    <span>Part {sq.label || (i + 1)}: {sq.subType?.replace('_', ' ')}</span>
-                  ) : (
-                    <span>{String.fromCharCode(97 + i)}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax></span>
+            <div className="space-y-3 mt-2">
+              {(question.subQuestions || question.sub_questions || []).map((sq: any, i: number) => (
+                <div key={i} className="pl-4 border-l-2 border-indigo-100 dark:border-indigo-900 py-1 min-w-0 break-words overflow-x-auto">
+                  <div className="text-xs font-medium">
+                    {question.type?.toUpperCase() === 'DESCRIPTIVE' ? (
+                      <span>Part {sq.label || (i + 1)}: {sq.subType?.replace('_', ' ')}</span>
+                    ) : (
+                      <span>{String.fromCharCode(97 + i)}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax></span>
+                    )}
+                    <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                  </div>
+                  {sq.image && (
+                    <div className="mt-1">
+                      <img src={sq.image} alt="Sub-question" className="max-h-24 rounded border" />
+                    </div>
                   )}
-                  <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                  {sq.modelAnswer && (
+                    <div className="mt-1 text-[10px] text-indigo-600 dark:text-indigo-400 italic">
+                      <span className="font-bold uppercase tracking-tighter">Model Answer: </span>
+                      <UniversalMathJax inline>{cleanupMath(sq.modelAnswer)}</UniversalMathJax>
+                    </div>
+                  )}
                 </div>
-                {sq.image && (
-                  <div className="mt-1">
-                    <img src={sq.image} alt="Sub-question" className="max-h-24 rounded border" />
-                  </div>
-                )}
-                {sq.modelAnswer && (
-                  <div className="mt-1 text-[10px] text-indigo-600 dark:text-indigo-400 italic">
-                    <span className="font-bold uppercase tracking-tighter">Model Answer: </span>
-                    <UniversalMathJax inline>{cleanupMath(sq.modelAnswer)}</UniversalMathJax>
-                  </div>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         )}
 
@@ -251,33 +253,48 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           </div>
         )}
       </div>
-      <TooltipProvider>
-        {onAdd && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onAdd(question)} disabled={isAdded || !isSelectable}>
-                <PlusCircle className={`h-5 w-5 ${isAdded || !isSelectable ? 'text-gray-400' : 'text-green-500 hover:text-green-600'}`} />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>{isAdded ? 'Already Added' : selectionReason || 'Add Question'}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
-        {onRemove && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button size="icon" variant="ghost" onClick={() => onRemove(question.id)}>
-                <X className="h-5 w-5 text-red-500 hover:text-red-600" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Remove Question</p></TooltipContent>
-          </Tooltip>
-        )}
-      </TooltipProvider>
-    </div>
-    <div className="flex items-center justify-between mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="w-[100px] flex justify-end z-20 sticky top-0 pt-1">
+        <TooltipProvider>
+          {onAdd && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className={`shadow-sm ${isAdded || !isSelectable ? 'bg-gray-100 text-gray-400' : 'bg-green-600 hover:bg-green-700 text-white'}`}
+                  onClick={() => onAdd(question)}
+                  disabled={isAdded || !isSelectable}
+                >
+                  <PlusCircle className="h-4 w-4 mr-1.5" />
+                  <span className="text-xs font-bold">Add</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{isAdded ? 'Already Added' : selectionReason || 'Add Question'}</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+          {onRemove && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                  onClick={() => onRemove(question.id)}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  <span className="text-xs font-bold">Remove</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Remove Question</p></TooltipContent>
+            </Tooltip>
+          )}
+        </TooltipProvider>
+      </div>
+    </div >
+    <div className="grid grid-cols-[1fr_auto] gap-4 items-center mt-3 pt-4 border-t border-gray-200 dark:border-gray-700 w-full overflow-hidden">
+      <div className="flex items-center gap-2 flex-wrap min-w-0">
         <Badge variant="secondary">{question.type}</Badge>
         <Badge variant={
           question.difficulty === 'HARD'
@@ -298,8 +315,33 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           <Badge variant="outline" className="text-xs">{selectionReason}</Badge>
         )}
       </div>
+
+      <div className="w-[100px] flex justify-end">
+        {onAdd ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className={`h-8 border-green-200 text-green-700 hover:bg-green-50 font-bold whitespace-nowrap ${isAdded || !isSelectable ? 'opacity-50' : ''}`}
+            onClick={() => onAdd(question)}
+            disabled={isAdded || !isSelectable}
+          >
+            <PlusCircle className="mr-1.5 h-3.5 w-3.5" />
+            {isAdded ? 'Added' : selectionReason || 'Add'}
+          </Button>
+        ) : onRemove ? (
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-8 border-red-200 text-red-700 hover:bg-red-50 font-bold whitespace-nowrap"
+            onClick={() => onRemove(question.id)}
+          >
+            <X className="mr-1.5 h-3.5 w-3.5" />
+            Remove
+          </Button>
+        ) : null}
+      </div>
     </div>
-  </div>
+  </div >
 );
 
 const AutoGenerateDialog = ({ onGenerate }: { onGenerate: (name: string) => Promise<void> }) => {
