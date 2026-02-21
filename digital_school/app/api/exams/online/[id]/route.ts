@@ -32,7 +32,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let questions: any[] = [];
     let assignedExamSetId = null;
 
-    // Check for existing submissions (fetch latest)
     const submissions = await prisma.examSubmission.findMany({
       where: {
         examId: examId,
@@ -43,6 +42,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     });
 
     let existingSubmission = submissions[0];
+
+    // AUTO-SUBMIT SWEEP: Check if time expired while away
+    if (existingSubmission && existingSubmission.status === 'IN_PROGRESS') {
+      const { autoSubmitExpiredSections } = await import("@/lib/exam-logic");
+      existingSubmission = await autoSubmitExpiredSections(existingSubmission, exam);
+    }
 
     // Check for existing result
     const existingResult = await prisma.result.findUnique({

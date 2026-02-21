@@ -73,11 +73,20 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
     checkTime();
     intervalRef.current = setInterval(checkTime, 1000);
 
+    // Visibility Listener: Recalculate immediately when returning to tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkTime();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [onTimeUp, exam.startedAt, exam.duration, activeSection, exam.objectiveStartedAt, exam.cqSqStartedAt, exam.objectiveTime, exam.cqSqTime]);
 

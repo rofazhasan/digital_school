@@ -276,6 +276,74 @@ export async function releaseExamResults(examId: string) {
 }
 
 /**
+ * Check for expired sections and auto-submit them
+ */
+export async function autoSubmitExpiredSections(submission: any, exam: any) {
+    if (!submission || submission.status === 'SUBMITTED') return submission;
+
+    const now = new Date();
+    const bufferMs = 60 * 1000; // 1 minute buffer for auto-submission
+    let hasChanges = false;
+    const updateData: any = {};
+
+    const isObjective = (exam as any).hasObjective || (exam.objectiveTime && exam.objectiveTime > 0);
+    const hasCqSq = (exam as any).hasCqSq || (exam.cqSqTime && exam.cqSqTime > 0);
+
+    // 1. Check Objective Section
+    if (submission.objectiveStatus === 'IN_PROGRESS' && submission.objectiveStartedAt && exam.objectiveTime) {
+        const objStartTime = new Date(submission.objectiveStartedAt).getTime();
+        const objLimitMs = exam.objectiveTime * 60 * 1000;
+        if (now.getTime() > objStartTime + objLimitMs + bufferMs) {
+            updateData.objectiveStatus = 'SUBMITTED';
+            updateData.objectiveSubmittedAt = now;
+            hasChanges = true;
+            console.log(`[Auto-Submit] Objective expired for submission ${submission.id}`);
+        }
+    }
+
+    // 2. Check CQ/SQ Section
+    if (submission.cqSqStatus === 'IN_PROGRESS' && submission.cqSqStartedAt && exam.cqSqTime) {
+        const cqStartTime = new Date(submission.cqSqStartedAt).getTime();
+        const cqLimitMs = exam.cqSqTime * 60 * 1000;
+        if (now.getTime() > cqStartTime + cqLimitMs + bufferMs) {
+            updateData.cqSqStatus = 'SUBMITTED';
+            updateData.cqSqSubmittedAt = now;
+            hasChanges = true;
+            console.log(`[Auto-Submit] CQ/SQ expired for submission ${submission.id}`);
+        }
+    }
+
+    // 3. Check Overall Exam Time (Absolute end time)
+    const examEndTime = new Date(exam.endTime).getTime();
+    if (now.getTime() > examEndTime + bufferMs) {
+        if (submission.status !== 'SUBMITTED') {
+            updateData.status = 'SUBMITTED';
+            updateData.submittedAt = now;
+            // Also force sections to submitted if overall time is over
+            if (submission.objectiveStatus === 'IN_PROGRESS') {
+                updateData.objectiveStatus = 'SUBMITTED';
+                updateData.objectiveSubmittedAt = now;
+            }
+            if (submission.cqSqStatus === 'IN_PROGRESS') {
+                updateData.cqSqStatus = 'SUBMITTED';
+                updateData.cqSqSubmittedAt = now;
+            }
+            hasChanges = true;
+            console.log(`[Auto-Submit] Overall exam time expired for submission ${submission.id}`);
+        }
+    }
+
+    if (hasChanges) {
+        return await prisma.examSubmission.update({
+            where: { id: submission.id },
+            data: updateData
+        });
+    }
+
+    return submission;
+}
+
+/**
  * Finalize an exam: Force-submit pending sessions (if time over) and release results
  */
 export async function finalizeAndReleaseExam(examId: string) {
@@ -286,7 +354,7 @@ export async function finalizeAndReleaseExam(examId: string) {
 
     if (!exam) return;
 
-    // Find IN_PROGRESS submissions
+    // Find all active submissions
     const pendingSubmissions = await prisma.examSubmission.findMany({
         where: {
             examId,
@@ -294,12 +362,15 @@ export async function finalizeAndReleaseExam(examId: string) {
         }
     });
 
-    // Force evaluate them
+    // Force evaluate them after checking for expirations
     for (const submission of pendingSubmissions) {
+        // First ensure statuses are up to date if they expired
+        const updatedSubmission = await autoSubmitExpiredSections(submission, exam);
+
         // This will set status to SUBMITTED and calculate marks
-        await evaluateSubmission(submission, exam, exam.examSets);
+        await evaluateSubmission(updatedSubmission, exam, exam.examSets);
     }
 
-    // Now release
+    // Now release results to students
     await releaseExamResults(examId);
 }

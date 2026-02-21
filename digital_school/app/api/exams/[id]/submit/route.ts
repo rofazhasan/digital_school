@@ -65,8 +65,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isObjective = section === 'objective';
     const isCqSq = section === 'cqsq';
 
-    // TIME VALIDATION (Strict Enforcement)
-    const bufferMs = 120 * 1000; // 2 minutes buffer
+    // TIME VALIDATION (Strict Enforcement for manual, relaxed for auto)
+    const bufferMs = 300 * 1000; // 5 minutes buffer to handle sync/network lag and passive auto-submit
     const now = Date.now();
 
     // A. Section-Specific Timing

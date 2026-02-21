@@ -179,6 +179,7 @@ export function ExamContextProvider({
   // Server perspective: only sync periodically
   const saveAnswers = useCallback(async (answersToSave: any) => {
     if (Object.keys(answersToSave).length === 0) return;
+    if (exam.status === 'SUBMITTED') return; // Don't save if already submitted
 
     try {
       setSaveStatus("saving");
@@ -187,6 +188,12 @@ export function ExamContextProvider({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: answersToSave }),
       });
+
+      if (response.status === 403) {
+        // likely already submitted or time up
+        setSaveStatus("error");
+        return;
+      }
 
       if (!response.ok) throw new Error("Failed to save");
 
@@ -197,7 +204,7 @@ export function ExamContextProvider({
       setSaveStatus("error");
       setTimeout(() => setSaveStatus("idle"), 3000);
     }
-  }, [exam.id]);
+  }, [exam.id, exam.status]);
 
   // Autosave answers to API (debounced)
   useDebouncedEffect(() => {
