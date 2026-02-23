@@ -81,19 +81,53 @@ export function parseDiagramsInText(text: string): string {
                     const presetFn = getPreset(name);
 
                     if (presetFn) {
-                        const args = argsStr ? argsStr.split(',').map((a: string) => {
+                        // Improved argument splitter that respects brackets
+                        const splitByComma = (str: string) => {
+                            const result: string[] = [];
+                            let current = '';
+                            let depth = 0;
+                            for (let i = 0; i < str.length; i++) {
+                                if (str[i] === '[') depth++;
+                                if (str[i] === ']') depth--;
+                                if (str[i] === ',' && depth === 0) {
+                                    result.push(current.trim());
+                                    current = '';
+                                } else {
+                                    current += str[i];
+                                }
+                            }
+                            if (current) result.push(current.trim());
+                            return result;
+                        };
+
+                        const args = argsStr ? splitByComma(argsStr).map((a: string) => {
                             let val = a.trim();
 
                             // Detect and strip named parameters like "radius=5" or "angle:30"
                             if (val.includes('=') || val.includes(':')) {
-                                const parts = val.split(/[=:]/);
-                                val = parts[parts.length - 1].trim();
+                                if (!val.startsWith('{') && !val.startsWith('[')) {
+                                    const parts = val.split(/[=:]/);
+                                    val = parts[parts.length - 1].trim();
+                                }
                             }
 
                             if (val === 'true') return true;
                             if (val === 'false') return false;
 
-                            // Clean numeric strings (remove stray units or non-numeric baggage)
+                            if (val.startsWith('[') && val.endsWith(']')) {
+                                try {
+                                    const inner = val.slice(1, -1).trim();
+                                    if (!inner) return [];
+                                    return inner.split(',').map(v => {
+                                        const trimmed = v.trim();
+                                        const n = parseFloat(trimmed);
+                                        return isNaN(n) ? trimmed : n;
+                                    });
+                                } catch (e) {
+                                    return val;
+                                }
+                            }
+
                             const numericVal = parseFloat(val);
                             if (!isNaN(numericVal) && String(numericVal) === val.replace(/[^0-9.-]/g, '')) {
                                 return numericVal;
@@ -118,7 +152,6 @@ export function parseDiagramsInText(text: string): string {
                             if (!svg.trim().startsWith('<svg')) {
                                 svg = `<svg width="${diagram.width}" height="${diagram.height}" viewBox="0 0 ${diagram.width} ${diagram.height}" xmlns="http://www.w3.org/2000/svg">${diagram.customSVG}</svg>`;
                             }
-                            // Inject sizeStyle if present
                             if (sizeStyle) svg = svg.replace('<svg', `<svg style="${sizeStyle}"`);
                             return svg;
                         }
@@ -126,7 +159,6 @@ export function parseDiagramsInText(text: string): string {
                     }
                 }
             }
-
             // 3. Fallback: Try Legacy/Excel FBD Parsing
             const legacyDiagram = parseExcelFBD(trimmedContent, `legacy-${Math.random().toString(36).substr(2, 5)}`);
             if (legacyDiagram) {
