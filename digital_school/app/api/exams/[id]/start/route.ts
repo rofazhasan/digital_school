@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
-
-const prisma = new PrismaClient();
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: examId } = await params;
@@ -59,8 +57,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (section === 'objective') {
       dataToUpdate.objectiveStatus = 'IN_PROGRESS';
+      dataToUpdate.objectiveStartedAt = now;
     } else if (section === 'cqsq') {
       dataToUpdate.cqSqStatus = 'IN_PROGRESS';
+      dataToUpdate.cqSqStartedAt = now;
     }
 
     const submission = await prisma.examSubmission.upsert({
@@ -71,20 +71,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         examId,
         examSetId: examStudentMap?.examSetId || null,
         answers: {}, // Initialize with empty answers
-        startedAt: now,
         objectiveStartedAt: section === 'objective' ? now : null,
         cqSqStartedAt: section === 'cqsq' ? now : null,
         status: 'IN_PROGRESS',
-        objectiveStatus: section === 'objective' ? 'IN_PROGRESS' : 'IN_PROGRESS',
-        cqSqStatus: 'IN_PROGRESS',
+        objectiveStatus: (section === 'objective' ? 'IN_PROGRESS' : 'PENDING') as any,
+        cqSqStatus: (section === 'cqsq' ? 'IN_PROGRESS' : 'PENDING') as any,
       },
     });
 
-    // If it was an update and specific startedAt was null, update it now
+    // For updates where startedAt was null (redundant now but keeping logic structure)
     if (section === 'objective' && !submission.objectiveStartedAt) {
       await prisma.examSubmission.update({
         where: { id: submission.id },
-        data: { objectiveStartedAt: now, startedAt: submission.startedAt || now }
+        data: { objectiveStartedAt: now }
       });
     } else if (section === 'cqsq' && !submission.cqSqStartedAt) {
       await prisma.examSubmission.update({

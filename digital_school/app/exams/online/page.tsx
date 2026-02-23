@@ -187,7 +187,11 @@ export default function OnlineExamsPage() {
     const resultExists = results.some((r) => r.examId === examId);
     return submittedSubmission || resultExists;
   };
-  const hasInProgress = (examId: string) => submissions.some((s) => s.examId === examId && s.studentId === user?.studentProfile?.id && s.status === 'IN_PROGRESS');
+  const hasInProgress = (examId: string) => submissions.some((s) =>
+    s.examId === examId &&
+    s.studentId === user?.studentProfile?.id &&
+    s.status === 'IN_PROGRESS'
+  );
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans selection:bg-blue-100">

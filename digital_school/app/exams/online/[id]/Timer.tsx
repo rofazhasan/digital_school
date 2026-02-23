@@ -88,7 +88,7 @@ export default function Timer({ onTimeUp }: { onTimeUp?: () => void }) {
       }
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [onTimeUp, exam.startedAt, exam.duration, activeSection, exam.objectiveStartedAt, exam.cqSqStartedAt, exam.objectiveTime, exam.cqSqTime]);
+  }, [onTimeUp, exam.duration, activeSection, exam.objectiveStartedAt, exam.cqSqStartedAt, exam.objectiveTime, exam.cqSqTime]);
 
   const percentage = totalDuration > 0 ? (secondsLeft / totalDuration) * 100 : 0;
   const isUrgent = secondsLeft <= 60; // 1 minute

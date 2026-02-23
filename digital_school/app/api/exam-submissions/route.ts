@@ -30,13 +30,14 @@ export async function GET(request: NextRequest) {
       select: {
         examId: true,
         studentId: true,
-        submittedAt: true,
+        objectiveSubmittedAt: true,
+        cqSqSubmittedAt: true,
         score: true,
         answers: true,
         status: true
       },
       orderBy: {
-        submittedAt: 'desc'
+        id: 'desc'
       }
     });
 

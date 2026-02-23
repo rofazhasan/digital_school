@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         examId: examId,
         studentId: studentId
       },
-      orderBy: { startedAt: 'desc' },
+      orderBy: [{ objectiveStartedAt: 'desc' }, { cqSqStartedAt: 'desc' }],
       take: 1
     });
 
@@ -122,15 +122,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           answers: {},
           // @ts-ignore
           status: IN_PROGRESS,
-          startedAt: new Date(),
-          examSetId: assignedExamSetId
+          examSetId: assignedExamSetId,
+          objectiveStatus: 'PENDING',
+          cqSqStatus: 'PENDING'
         }
       });
-    } else if (existingSubmission && !existingSubmission.startedAt && action === 'start') {
+    } else if (existingSubmission && !existingSubmission.objectiveStartedAt && !existingSubmission.cqSqStartedAt && action === 'start') {
       existingSubmission = await prisma.examSubmission.update({
         where: { id: existingSubmission.id },
         // @ts-ignore
-        data: { startedAt: new Date(), status: IN_PROGRESS }
+        data: { status: IN_PROGRESS } // Section specific starts will happen in start API
       });
     } else if (existingSubmission) {
       assignedExamSetId = existingSubmission.examSetId;
@@ -205,9 +206,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       assignedExamSetId,
       hasSubmitted,
       submissionId: existingSubmission?.id || null,
-      // Only return startedAt if the submission is actually active/in-progress.
-      // @ts-ignore
-      startedAt: (existingSubmission && existingSubmission.status === IN_PROGRESS) ? existingSubmission.startedAt : null,
+      // Derive startedAt from either objective or cqSq start time
+      startedAt: (existingSubmission as any)?.objectiveStartedAt || (existingSubmission as any)?.cqSqStartedAt || null,
       passMarks: exam.passMarks,
       // Question selection settings
       cqTotalQuestions: exam.cqTotalQuestions,
@@ -218,12 +218,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       savedAnswers: existingSubmission?.answers || {},
       objectiveTime: (exam as any).objectiveTime,
       cqSqTime: (exam as any).cqSqTime,
-      objectiveStatus: (existingSubmission as any)?.objectiveStatus || 'IN_PROGRESS',
+      objectiveStatus: (existingSubmission as any)?.objectiveStatus || 'PENDING',
       objectiveStartedAt: (existingSubmission as any)?.objectiveStartedAt || null,
-      cqSqStatus: (existingSubmission as any)?.cqSqStatus || 'IN_PROGRESS',
+      cqSqStatus: (existingSubmission as any)?.cqSqStatus || 'PENDING',
       cqSqStartedAt: (existingSubmission as any)?.cqSqStartedAt || null,
     });
-  } catch (_) {
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  } catch (error) {
+    console.error(`[OnlineExamAPI] Error loading exam ${examId}:`, error);
+    return NextResponse.json({
+      error: "Server error",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
   }
 } 

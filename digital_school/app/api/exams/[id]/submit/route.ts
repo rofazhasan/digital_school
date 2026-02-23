@@ -49,7 +49,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: { studentId_examId: { studentId, examId } },
       select: {
         examSetId: true,
-        startedAt: true,
         objectiveStartedAt: true,
         cqSqStartedAt: true,
         status: true
@@ -65,8 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const isObjective = section === 'objective';
     const isCqSq = section === 'cqsq';
 
-    // TIME VALIDATION (Strict Enforcement for manual, relaxed for auto)
-    const bufferMs = 300 * 1000; // 5 minutes buffer to handle sync/network lag and passive auto-submit
+    // TIME VALIDATION (Strict Enforcement)
+    const bufferMs = 60 * 1000; // 1 minute buffer to handle sync/network lag and passive auto-submit
     const now = Date.now();
 
     // A. Section-Specific Timing
@@ -88,9 +87,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    // B. Overall Timing
-    if (existingSubmission?.startedAt) {
-      const startTime = new Date(existingSubmission.startedAt).getTime();
+    // B. Overall Timing (Based on first section started)
+    const overallStartTime = existingSubmission?.objectiveStartedAt || existingSubmission?.cqSqStartedAt;
+    if (overallStartTime) {
+      const startTime = new Date(overallStartTime).getTime();
       const durationMs = exam.duration * 60 * 1000;
 
       if (now > startTime + durationMs + bufferMs) {
@@ -168,7 +168,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (isFinalSubmission) {
       updateData.status = 'SUBMITTED';
-      updateData.submittedAt = new Date();
     }
 
     // Save submission

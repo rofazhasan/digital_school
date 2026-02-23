@@ -196,8 +196,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         data: {
             score: totalScore,
             evaluatedAt: new Date(),
-            // Ensure status is submitted if we are fully evaluating
-            status: 'SUBMITTED' as any // Use as any to bypass dev type issues
+            status: 'SUBMITTED' // Final status
         }
     });
 
@@ -286,13 +285,15 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     let hasChanges = false;
     const updateData: any = {};
 
-    const isObjective = (exam as any).hasObjective || (exam.objectiveTime && exam.objectiveTime > 0);
-    const hasCqSq = (exam as any).hasCqSq || (exam.cqSqTime && exam.cqSqTime > 0);
+    // Intelligent section detection
+    const isMCQOnly = isMCQOnlyExam(exam, exam.examSets || []);
+    const isObjectiveAvailable = (exam.objectiveTime && exam.objectiveTime > 0) || isMCQOnly || (exam as any).hasObjective;
+    const isCqSqAvailable = (exam.cqSqTime && exam.cqSqTime > 0) || !isMCQOnly || (exam as any).hasCqSq;
 
     // 1. Check Objective Section
-    if (submission.objectiveStatus === 'IN_PROGRESS' && submission.objectiveStartedAt && exam.objectiveTime) {
+    if (submission.objectiveStatus === 'IN_PROGRESS' && submission.objectiveStartedAt && isObjectiveAvailable) {
         const objStartTime = new Date(submission.objectiveStartedAt).getTime();
-        const objLimitMs = exam.objectiveTime * 60 * 1000;
+        const objLimitMs = (exam.objectiveTime || exam.duration) * 60 * 1000;
         if (now.getTime() > objStartTime + objLimitMs + bufferMs) {
             updateData.objectiveStatus = 'SUBMITTED';
             updateData.objectiveSubmittedAt = now;
@@ -302,9 +303,9 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     }
 
     // 2. Check CQ/SQ Section
-    if (submission.cqSqStatus === 'IN_PROGRESS' && submission.cqSqStartedAt && exam.cqSqTime) {
+    if (submission.cqSqStatus === 'IN_PROGRESS' && submission.cqSqStartedAt && isCqSqAvailable) {
         const cqStartTime = new Date(submission.cqSqStartedAt).getTime();
-        const cqLimitMs = exam.cqSqTime * 60 * 1000;
+        const cqLimitMs = (exam.cqSqTime || exam.duration) * 60 * 1000;
         if (now.getTime() > cqStartTime + cqLimitMs + bufferMs) {
             updateData.cqSqStatus = 'SUBMITTED';
             updateData.cqSqSubmittedAt = now;
@@ -318,13 +319,12 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     if (now.getTime() > examEndTime + bufferMs) {
         if (submission.status !== 'SUBMITTED') {
             updateData.status = 'SUBMITTED';
-            updateData.submittedAt = now;
             // Also force sections to submitted if overall time is over
-            if (submission.objectiveStatus === 'IN_PROGRESS') {
+            if (submission.objectiveStatus !== 'SUBMITTED') {
                 updateData.objectiveStatus = 'SUBMITTED';
                 updateData.objectiveSubmittedAt = now;
             }
-            if (submission.cqSqStatus === 'IN_PROGRESS') {
+            if (submission.cqSqStatus !== 'SUBMITTED') {
                 updateData.cqSqStatus = 'SUBMITTED';
                 updateData.cqSqSubmittedAt = now;
             }

@@ -115,12 +115,12 @@ export async function GET(request: NextRequest) {
   }
 
   // Fetch exams with caching and pagination (SWR)
-  // url is already defined at line 8
   const page = parseInt(url.searchParams.get('page') || '1');
   const limit = parseInt(url.searchParams.get('limit') || '1000');
+  const summary = url.searchParams.get('summary') === 'true';
   const skip = (page - 1) * limit;
 
-  const cacheKey = `exams:all:${page}:${limit}`;
+  const cacheKey = `exams:all:${page}:${limit}:${summary}`;
   const cached = DatabaseCache.getSWR(cacheKey);
 
   // If valid cache exists, return immediately (Edge will handle SWR)
@@ -134,46 +134,54 @@ export async function GET(request: NextRequest) {
     const [exams, total] = await safeDatabaseOperation(
       async () => {
         const db = await DatabaseClient.getInstance();
+        const selectFields: any = {
+          id: true,
+          name: true,
+          date: true,
+          startTime: true,
+          endTime: true,
+          totalMarks: true,
+          isActive: true,
+          classId: true,
+          type: true,
+          allowRetake: true,
+          duration: true,
+          class: { select: { id: true, name: true } },
+          createdBy: { select: { id: true, name: true } },
+        };
+
+        if (!summary) {
+          Object.assign(selectFields, {
+            description: true,
+            createdAt: true,
+            mcqNegativeMarking: true,
+            cqTotalQuestions: true,
+            cqRequiredQuestions: true,
+            sqTotalQuestions: true,
+            sqRequiredQuestions: true,
+            objectiveTime: true,
+            cqSqTime: true,
+            cqSubsections: true,
+            examSets: {
+              take: 1,
+              select: {
+                questions: {
+                  take: 5,
+                  select: {
+                    subject: true,
+                  }
+                }
+              }
+            }
+          });
+        }
+
         const [data, count] = await Promise.all([
           db.exam.findMany({
             orderBy: { createdAt: 'desc' },
             skip,
             take: limit,
-            select: {
-              id: true,
-              name: true,
-              description: true,
-              date: true,
-              startTime: true,
-              endTime: true,
-              totalMarks: true,
-              isActive: true,
-              classId: true,
-              createdAt: true,
-              type: true,
-              allowRetake: true,
-              mcqNegativeMarking: true,
-              cqTotalQuestions: true,
-              cqRequiredQuestions: true,
-              sqTotalQuestions: true,
-              sqRequiredQuestions: true,
-              objectiveTime: true,
-              cqSqTime: true,
-              cqSubsections: true,
-              class: { select: { id: true, name: true } },
-              createdBy: { select: { id: true, name: true } },
-              examSets: {
-                take: 1,
-                select: {
-                  questions: {
-                    take: 5,
-                    select: {
-                      subject: true,
-                    }
-                  }
-                }
-              }
-            } as any,
+            select: selectFields,
           }),
           db.exam.count()
         ]);
@@ -183,51 +191,54 @@ export async function GET(request: NextRequest) {
     );
 
     const examsData = (exams as any[]).map((exam) => {
-      // Extract subject from questions - get the most common subject from sample
-      let examSubject = '';
       const examAny = exam as any;
-      const sampleQuestions = (examAny.examSets || []).flatMap((set: any) => set.questions || []);
-      if (sampleQuestions.length > 0) {
-        const subjectCounts: { [key: string]: number } = {};
-        sampleQuestions.forEach((q: any) => {
-          if (q.subject) {
-            subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
-          }
-        });
+      let examSubject = '';
 
-        // Find the subject with the highest count
-        const entries = Object.entries(subjectCounts);
-        if (entries.length > 0) {
-          const mostCommonSubject = entries.reduce((a, b) =>
-            (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
-          );
-          examSubject = mostCommonSubject[0] || '';
+      if (!summary) {
+        // Extract subject from questions - get the most common subject from sample
+        const sampleQuestions = (examAny.examSets || []).flatMap((set: any) => set.questions || []);
+        if (sampleQuestions.length > 0) {
+          const subjectCounts: { [key: string]: number } = {};
+          sampleQuestions.forEach((q: any) => {
+            if (q.subject) {
+              subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
+            }
+          });
+
+          const entries = Object.entries(subjectCounts);
+          if (entries.length > 0) {
+            const mostCommonSubject = entries.reduce((a, b) =>
+              (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+            );
+            examSubject = mostCommonSubject[0] || '';
+          }
         }
       }
 
       return {
         id: examAny.id,
         name: examAny.name,
-        description: examAny.description,
+        description: summary ? undefined : examAny.description,
         date: examAny.date,
         startTime: examAny.startTime,
         endTime: examAny.endTime,
-        subject: examSubject || examAny.class?.name || '', // Use actual subject, fallback to class name
+        subject: examSubject || examAny.class?.name || '',
         totalMarks: examAny.totalMarks,
         isActive: examAny.isActive,
         createdBy: examAny.createdBy?.name || '',
         classId: examAny.classId,
-        createdAt: examAny.createdAt,
+        createdAt: summary ? undefined : examAny.createdAt,
         type: examAny.type,
         allowRetake: examAny.allowRetake || false,
-        mcqNegativeMarking: examAny.mcqNegativeMarking,
-        cqTotalQuestions: examAny.cqTotalQuestions || 0,
-        cqRequiredQuestions: examAny.cqRequiredQuestions || 0,
-        sqTotalQuestions: examAny.sqTotalQuestions || 0,
-        sqRequiredQuestions: examAny.sqRequiredQuestions || 0,
-        objectiveTime: examAny.objectiveTime || null,
-        cqSqTime: examAny.cqSqTime || null,
-        cqSubsections: examAny.cqSubsections || null,
+        duration: examAny.duration,
+        mcqNegativeMarking: summary ? undefined : examAny.mcqNegativeMarking,
+        cqTotalQuestions: summary ? undefined : examAny.cqTotalQuestions,
+        cqRequiredQuestions: summary ? undefined : examAny.cqRequiredQuestions,
+        sqTotalQuestions: summary ? undefined : examAny.sqTotalQuestions,
+        sqRequiredQuestions: summary ? undefined : examAny.sqRequiredQuestions,
+        objectiveTime: summary ? undefined : examAny.objectiveTime,
+        cqSqTime: summary ? undefined : examAny.cqSqTime,
+        cqSubsections: summary ? undefined : examAny.cqSubsections,
       };
     });
 

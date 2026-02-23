@@ -11,15 +11,33 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
+    const name = searchParams.get("name");
+    const classId = searchParams.get("classId");
+    const subject = searchParams.get("subject");
 
     let exams;
+
+    const commonWhere: any = {
+      ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } }),
+      ...(name && { name: { contains: name, mode: 'insensitive' } }),
+      ...(classId && { classId }),
+      ...(subject && {
+        examSets: {
+          some: {
+            questions: {
+              some: {
+                subject: { contains: subject, mode: 'insensitive' }
+              }
+            }
+          }
+        }
+      })
+    };
 
     if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
       // Super user and Admin sees all exams (active and inactive) with evaluation assignments
       exams = await prisma.exam.findMany({
-        where: {
-          ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } })
-        },
+        where: commonWhere,
         include: {
           class: true,
           createdBy: {
@@ -56,6 +74,7 @@ export async function GET(req: NextRequest) {
       // Evaluators (TEACHER/ADMIN) see assigned exams
       exams = await prisma.exam.findMany({
         where: {
+          ...commonWhere,
           evaluationAssignments: {
             some: {
               evaluatorId: tokenData.user.id,

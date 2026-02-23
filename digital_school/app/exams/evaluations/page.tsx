@@ -66,6 +66,10 @@ export default function EvaluationsPage() {
   const [evaluators, setEvaluators] = useState<Evaluator[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
+  const [searchName, setSearchName] = useState("");
+  const [selectedClass, setSelectedClass] = useState<string>("ALL");
+  const [selectedSubject, setSelectedSubject] = useState<string>("ALL");
+  const [classes, setClasses] = useState<any[]>([]);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [selectedExam, setSelectedExam] = useState<Exam | null>(null);
   const [selectedEvaluator, setSelectedEvaluator] = useState<string>("");
@@ -77,19 +81,21 @@ export default function EvaluationsPage() {
 
   const fetchExams = useCallback(async () => {
     try {
-      const params = selectedStatus && selectedStatus !== "ALL" ? `?status=${selectedStatus}` : "";
-      const response = await fetch(`/api/exams/evaluations${params}`, {
-        credentials: 'include', // Include cookies
-        headers: {
-          'Content-Type': 'application/json',
-        }
+      setLoading(true);
+      const queryParams = new URLSearchParams();
+      if (selectedStatus && selectedStatus !== "ALL") queryParams.append("status", selectedStatus);
+      if (searchName) queryParams.append("name", searchName);
+      if (selectedClass && selectedClass !== "ALL") queryParams.append("classId", selectedClass);
+      if (selectedSubject && selectedSubject !== "ALL") queryParams.append("subject", selectedSubject);
+
+      const response = await fetch(`/api/exams/evaluations?${queryParams.toString()}`, {
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
       });
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched exams:', data);
         setExams(data);
       } else {
-        console.error("Failed to fetch exams:", response.status, response.statusText);
         toast.error("Failed to fetch exams");
       }
     } catch (error) {
@@ -98,7 +104,19 @@ export default function EvaluationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedStatus]);
+  }, [selectedStatus, searchName, selectedClass, selectedSubject]);
+
+  const fetchClasses = async () => {
+    try {
+      const response = await fetch("/api/classes");
+      if (response.ok) {
+        const data = await response.json();
+        setClasses(data.classes || []);
+      }
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+    }
+  };
 
   useEffect(() => {
     // Get user role from custom JWT token
@@ -125,10 +143,14 @@ export default function EvaluationsPage() {
 
   useEffect(() => {
     fetchExams();
+  }, [fetchExams]);
+
+  useEffect(() => {
     if (isSuperUser) {
       fetchEvaluators();
+      fetchClasses();
     }
-  }, [selectedStatus, isSuperUser, fetchExams]);
+  }, [isSuperUser]);
 
   const fetchEvaluators = async () => {
     try {
@@ -303,28 +325,61 @@ export default function EvaluationsPage() {
         </div>
       </div>
 
-      <div className="mb-8 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="ALL">All Status</SelectItem>
-            <SelectItem value="UNASSIGNED">Unassigned</SelectItem>
-            <SelectItem value="PENDING">Pending</SelectItem>
-            <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-            <SelectItem value="COMPLETED">Completed</SelectItem>
-            <SelectItem value="APPROVED">Approved</SelectItem>
-            <SelectItem value="REJECTED">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {isSuperUser && (
-          <div className="text-sm text-muted-foreground flex items-center gap-2 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
-            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-            <span>Showing All Exams</span>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+          <div className="relative w-full sm:w-64">
+            <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search Exam Name..."
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              className="pl-10 pr-4 py-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+            />
           </div>
-        )}
+
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+              <SelectValue placeholder="All Classes" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Classes</SelectItem>
+              {classes.map((cls) => (
+                <SelectItem key={cls.id} value={cls.id}>
+                  {cls.name} - {cls.section}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+            <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Status</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+              <SelectItem value="COMPLETED">Completed</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+          {["ALL", "PENDING", "IN_PROGRESS", "COMPLETED"].includes(selectedStatus) && (
+            <Badge variant="outline" className="whitespace-nowrap rounded-lg px-3 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+              {selectedStatus === "ALL" ? `${exams.length} Exams` : `${exams.filter(e => e.status === selectedStatus).length} ${selectedStatus}`}
+            </Badge>
+          )}
+          {isSuperUser && (
+            <div className="text-sm text-muted-foreground flex items-center gap-2 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
+              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+              <span>Manager View</span>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-6">
@@ -334,7 +389,7 @@ export default function EvaluationsPage() {
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
-                  <p className="text-muted-foreground mt-1 line-clamp-2">{exam.description}</p>
+                  <p className="text-muted-foreground mt-1 line-clamp-2">{exam.description || "No description available."}</p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
                   <Badge className={getStatusColor(exam.status)}>
@@ -404,7 +459,7 @@ export default function EvaluationsPage() {
               {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
                 <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-3">
                   <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
-                  {exam.evaluationAssignments.map((assignment) => (
+                  {exam.evaluationAssignments.map((assignment: any) => (
                     <div key={assignment.id} className="border-b border-border last:border-0 pb-2 last:pb-0 text-sm">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <div>
@@ -424,19 +479,17 @@ export default function EvaluationsPage() {
               )}
 
               <div className="flex flex-col sm:flex-row gap-2">
-                {/* View Evaluation - Hidden for Admins unless they are also evaluators (handled by logic) */}
                 {(!isAdmin || isSuperUser) && (
                   <Button
                     variant="outline"
                     className="w-full sm:w-auto"
-                    onClick={() => window.location.href = `/exams/evaluations/${exam.id}`}
+                    onClick={() => router.push(`/exams/evaluations/${exam.id}`)}
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     View Evaluation
                   </Button>
                 )}
 
-                {/* Assign Evaluator - Visible for Admin and Super User */}
                 {(isSuperUser || isAdmin) && (
                   <Button
                     variant="outline"
@@ -451,9 +504,7 @@ export default function EvaluationsPage() {
                   </Button>
                 )}
 
-
-                {/* Release Results - Super User (Always) or Admin/Teacher (Only if COMPLETED) */}
-                {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some(a => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
+                {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some((a: any) => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
                   <Button
                     variant="outline"
                     className="w-full sm:w-auto text-green-600 dark:text-green-400 border-green-200 dark:border-green-800/50 hover:bg-green-50 dark:hover:bg-green-900/20"
@@ -473,10 +524,7 @@ export default function EvaluationsPage() {
         <div className="text-center py-12">
           <div className="text-muted-foreground text-lg">No exams found</div>
           <p className="text-muted-foreground/60 mt-2">
-            {selectedStatus && selectedStatus !== "ALL"
-              ? `No exams with status "${selectedStatus}"`
-              : "No exams available for evaluation"
-            }
+            Try adjusting your filters to find what you're looking for.
           </p>
         </div>
       )}

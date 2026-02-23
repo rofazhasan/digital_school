@@ -152,8 +152,12 @@ export default function ExamLayout() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transitionState, setTransitionState] = useState<'objective_submitted' | 'cqsq_starting' | null>(null);
   // Initialize instructions visibility based on whether exam has started
-  const [showInstructions, setShowInstructions] = useState(!exam.startedAt);
+  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
+  const [showInstructions, setShowInstructions] = useState(!hasStartedAny);
   const [isStarting, setIsStarting] = useState(false);
+
+  const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
+  const isActuallyResuming = hasStartedAny && !exam.hasSubmitted;
 
   // Illusion Mode State
   const [illusionMode, setIllusionMode] = useState(false);
@@ -279,10 +283,10 @@ export default function ExamLayout() {
       setKeepAwake(false);
       stopSpeech();
     };
-  }, [exam.startedAt]);
+  }, [exam.objectiveStartedAt, exam.cqSqStartedAt]);
 
 
-  const handleStartExam = async () => {
+  const handleStartExam = async (sectionToStart: 'objective' | 'cqsq') => {
     try {
       setIsStarting(true);
       setGracePeriod(true); // Enable grace period
@@ -305,15 +309,20 @@ export default function ExamLayout() {
       const res = await fetch(`/api/exams/${exam.id}/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ section: activeSection })
+        body: JSON.stringify({ section: sectionToStart })
       });
 
       if (!res.ok) throw new Error("Failed to start exam session");
 
       // 3. Update local state to show exam
+      // Reset navigation index to 0 BEFORE showing exam to prevent out-of-bounds loading state
+      navigateToQuestion(0);
+
       setIsExamActive(true);
       setShowInstructions(false);
       setTransitionState(null); // Clear any transition overlays
+      setActiveSection(sectionToStart); // Set active section
+      setIsStarting(false); // Reset starting state on success
 
       setKeepAwake(true);
       setBrightness(1.0);
@@ -526,34 +535,27 @@ export default function ExamLayout() {
             </div>
           </div>
 
-          {activeSection === 'objective' && hasObjective && exam.objectiveStatus !== 'SUBMITTED' && (
-            <Button
-              onClick={handleStartExam}
-              disabled={isStarting}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98] group mb-4"
-            >
-              {isStarting ? "প্রস্তুত করা হচ্ছে..." : "বহুনির্বাচনী অংশ শুরু করো (Start MCQ)"}
-            </Button>
-          )}
-
-          {hasObjective && exam.objectiveStatus === 'SUBMITTED' && activeSection === 'objective' && (
-            <Button
-              onClick={() => setActiveSection('cqsq')}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
-            >
-              সৃজনশীল/সংক্ষিপ্ত অংশ শুরু করো (Start CQ/SQ)
-            </Button>
-          )}
-
-          {(activeSection === 'cqsq' || !hasObjective) && hasCqSq && exam.cqSqStatus !== 'SUBMITTED' && (
-            <Button
-              onClick={handleStartExam}
-              disabled={isStarting}
-              className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
-            >
-              {isStarting ? "প্রস্তুত করা হচ্ছে..." : "সৃজনশীল/সংক্ষিপ্ত অংশ শুরু করো (Start CQ/SQ)"}
-            </Button>
-          )}
+          <div className="mt-4">
+            {hasObjective && (exam.objectiveStatus === 'PENDING' || exam.objectiveStatus === 'IN_PROGRESS') ? (
+              <Button
+                onClick={() => handleStartExam('objective')}
+                disabled={isStarting}
+                className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-blue-500/25 border-0 transition-all active:scale-[0.98] group mb-4"
+              >
+                {isStarting ? "প্রস্তুত করা হচ্ছে..." : isActuallyResuming ? "পরীক্ষা পুনরায় শুরু করো (Resume Exam)" : "পরীক্ষা শুরু করো (Start Exam)"}
+                <ChevronRight className="ml-2 h-6 w-6" />
+              </Button>
+            ) : hasCqSq && (exam.cqSqStatus === 'PENDING' || exam.cqSqStatus === 'IN_PROGRESS') ? (
+              <Button
+                onClick={() => handleStartExam('cqsq')}
+                disabled={isStarting}
+                className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white py-8 text-xl rounded-2xl shadow-xl shadow-emerald-200 dark:shadow-none transition-all active:scale-[0.98]"
+              >
+                {isStarting ? "প্রস্তুত করা হচ্ছে..." : (exam.cqSqStatus === 'IN_PROGRESS' ? "সৃজনশীল/সংক্ষিপ্ত অংশ পুনরায় শুরু করো (Resume CQ/SQ)" : "সৃজনশীল/সংক্ষিপ্ত অংশ শুরু করো (Start CQ/SQ)")}
+                <ChevronRight className="ml-2 h-6 w-6" />
+              </Button>
+            ) : null}
+          </div>
           <p className="text-center text-[10px] text-muted-foreground mt-4 uppercase tracking-widest font-bold opacity-50">কর্তৃক অনুমোদিত {instituteName}</p>
         </Card>
       </div>

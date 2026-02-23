@@ -942,24 +942,37 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white dark:border-slate-700/30 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500 mb-1">Time Used</label>
                       <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
-                        {result.submission.startedAt ? (() => {
-                          const startTime = new Date(result.submission.startedAt);
-                          const submitTime = new Date(result.submission.submittedAt);
-                          const timeDiff = submitTime.getTime() - startTime.getTime();
-                          const minutes = Math.floor(timeDiff / (1000 * 60));
-                          const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+                        {(() => {
+                          const objTime = result.submission.objectiveStartedAt && result.submission.objectiveSubmittedAt
+                            ? new Date(result.submission.objectiveSubmittedAt).getTime() - new Date(result.submission.objectiveStartedAt).getTime()
+                            : 0;
+                          const cqTime = result.submission.cqSqStartedAt && result.submission.cqSqSubmittedAt
+                            ? new Date(result.submission.cqSqSubmittedAt).getTime() - new Date(result.submission.cqSqStartedAt).getTime()
+                            : 0;
+
+                          const totalMs = objTime + cqTime;
+                          if (totalMs === 0) return 'N/A';
+
+                          const minutes = Math.floor(totalMs / (1000 * 60));
+                          const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
                           return <span className="flex items-baseline flex-wrap justify-center"><span className="text-xl sm:text-3xl">{minutes}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">m</span> <span className="text-xl sm:text-3xl ml-1">{seconds}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">s</span></span>;
-                        })() : 'N/A'}
+                        })()}
                       </div>
                     </div>
                     <div className="p-4 sm:p-6 rounded-[2rem] bg-emerald-50/80 dark:bg-emerald-950/30 border border-white dark:border-emerald-900/30 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-emerald-500 dark:text-emerald-700 mb-1">Efficiency Ratio</label>
-                      {result.submission.startedAt ? (() => {
-                        const startTime = new Date(result.submission.startedAt);
-                        const submitTime = new Date(result.submission.submittedAt);
-                        const timeTakenMs = submitTime.getTime() - startTime.getTime();
+                      {(() => {
+                        const objTime = result.submission.objectiveStartedAt && result.submission.objectiveSubmittedAt
+                          ? new Date(result.submission.objectiveSubmittedAt).getTime() - new Date(result.submission.objectiveStartedAt).getTime()
+                          : 0;
+                        const cqTime = result.submission.cqSqStartedAt && result.submission.cqSqSubmittedAt
+                          ? new Date(result.submission.cqSqSubmittedAt).getTime() - new Date(result.submission.cqSqStartedAt).getTime()
+                          : 0;
+
+                        const timeTakenMs = objTime + cqTime;
                         const durationMs = result.exam.duration * 60 * 1000;
 
+                        if (timeTakenMs === 0) return <div className="text-lg font-bold text-muted-foreground italic">N/A</div>;
                         const efficiency = Math.max(0, Math.min(100, ((durationMs - timeTakenMs) / durationMs) * 100)).toFixed(0);
 
                         return (
@@ -967,17 +980,21 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             {efficiency}<span className="text-sm sm:text-lg opacity-60">%</span>
                           </div>
                         );
-                      })() : <div className="text-lg font-bold text-muted-foreground italic">N/A</div>}
+                      })()}
                     </div>
                     <div className="col-span-2 p-4 sm:p-6 rounded-[2rem] bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-xl shadow-blue-500/20 flex items-center justify-between gap-4 overflow-hidden">
                       <div className="space-y-0.5 min-w-0">
                         <label className="text-[10px] uppercase tracking-widest font-black text-blue-200/80">Submission Deadline Status</label>
                         <div className="text-base md:text-xl font-bold break-words">
                           {(() => {
-                            if (!result.submission.startedAt) return "Status Unknown";
-                            const startTime = new Date(result.submission.startedAt);
-                            const submitTime = new Date(result.submission.submittedAt);
-                            const timeTaken = (submitTime.getTime() - startTime.getTime()) / (1000 * 60);
+                            const objTime = result.submission.objectiveStartedAt && result.submission.objectiveSubmittedAt
+                              ? new Date(result.submission.objectiveSubmittedAt).getTime() - new Date(result.submission.objectiveStartedAt).getTime()
+                              : 0;
+                            const cqTime = result.submission.cqSqStartedAt && result.submission.cqSqSubmittedAt
+                              ? new Date(result.submission.cqSqSubmittedAt).getTime() - new Date(result.submission.cqSqStartedAt).getTime()
+                              : 0;
+
+                            const timeTaken = (objTime + cqTime) / (1000 * 60);
                             return timeTaken <= result.exam.duration ? "Submitted on Time" : "Submitted Late";
                           })()}
                         </div>

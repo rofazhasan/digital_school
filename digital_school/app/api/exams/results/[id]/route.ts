@@ -602,8 +602,8 @@ export async function GET(
       },
       submission: {
         id: submission.id,
-        submittedAt: submission.submittedAt,
-        startedAt: submission.startedAt,
+        submittedAt: submission.objectiveSubmittedAt || submission.cqSqSubmittedAt,
+        startedAt: submission.objectiveStartedAt || submission.cqSqStartedAt,
         score: submission.score,
         evaluatorNotes: submission.evaluatorNotes,
         evaluatedAt: submission.evaluatedAt,

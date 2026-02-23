@@ -97,7 +97,8 @@ export async function GET(
           studentId: true,
           answers: true,
           status: true,
-          submittedAt: true,
+          objectiveSubmittedAt: true,
+          cqSqSubmittedAt: true,
           score: true,
           evaluatorNotes: true,
           evaluatedAt: true,
@@ -114,7 +115,7 @@ export async function GET(
             }
           }
         },
-        orderBy: { submittedAt: 'asc' }
+        orderBy: { id: 'asc' }
       },
       evaluationAssignments: {
         include: {
@@ -161,10 +162,13 @@ export async function GET(
       const isMCQOnly = isMCQOnlyExam(exam, (exam as any).examSets);
       const isTimeOver = (new Date() > new Date(exam.endTime));
 
-      // If MCQ only and time is over, trigger release (handled safely/idempotently by lib)
-      if (isMCQOnly && isTimeOver) {
-        // Run in background but await to ensure consistency if this is the first view
+      // Trigger full sweep and release if time is over
+      if (isTimeOver) {
+        // Run in background to avoid blocking initial load, but ensures DB is consistent
         await finalizeAndReleaseExam(exam.id);
+      } else if (isMCQOnly) {
+        // For MCQ only, we might want to release earlier if all submitted, 
+        // but typically time-over is the safest trigger for auto-release.
       }
     } catch (e) {
       console.error("Auto-release trigger failed in evaluation API:", e);
@@ -204,49 +208,14 @@ export async function GET(
       }
     }
 
-    // Collect all question IDs to fetch fresh difficultyDetail/explanation
-    const questionIds = new Set<string>();
-    allQuestions.forEach(q => {
-      if (q && q.id) {
-        questionIds.add(q.id);
-      }
-    });
 
-    // Fetch fresh details from DB
-    const questionDetailsMap = new Map<string, string>();
-    if (questionIds.size > 0) {
-      try {
-        const dbQuestions = await prisma.question.findMany({
-          where: {
-            id: {
-              in: Array.from(questionIds)
-            }
-          },
-          select: {
-            id: true,
-
-          }
-        });
-
-        dbQuestions.forEach(q => {
-
-        });
-      } catch (error) {
-        console.error("Error fetching question details:", error);
-      }
-    }
 
     // RESULT & MAP PROCESSING ------------------
-
-    // Reuse or Fetch Maps:
-    // If we have a preFetched map, use it. Otherwise fetch (Teacher View).
     let examStudentMaps: { studentId: string, examSetId: string | null }[] = [];
 
     if (preFetchedStudentMap) {
-      // Zero-Cost: Reuse the already fetched record
       examStudentMaps = [preFetchedStudentMap];
     } else {
-      // Teacher View: Fetch all maps
       examStudentMaps = await prisma.examStudentMap.findMany({
         where: auxiliaryWhere,
         select: {
@@ -256,30 +225,47 @@ export async function GET(
       });
     }
 
-    // Create lookup map: studentId -> examSetId
     const studentExamSetMap = new Map<string, string>();
     examStudentMaps.forEach(map => {
       if (map.examSetId) studentExamSetMap.set(map.studentId, map.examSetId);
     });
 
-    // Await parallel results
     const examResults = await resultsPromise;
-
-    // Create lookup map: studentId -> Result
     const studentResultMap = new Map<string, any>();
     examResults.forEach(res => {
       studentResultMap.set(res.studentId, res);
     });
 
+    // Collect and fetch fresh question details
+    const questionIds = new Set<string>();
+    allQuestions.forEach(q => {
+      if (q && q.id) questionIds.add(q.id);
+    });
+
+    const questionDetailsMap = new Map<string, string>();
+    if (questionIds.size > 0) {
+      try {
+        const dbQuestions = await prisma.question.findMany({
+          where: { id: { in: Array.from(questionIds) } },
+          select: { id: true, explanation: true }
+        });
+        dbQuestions.forEach(q => {
+          if (q.explanation) questionDetailsMap.set(q.id, q.explanation);
+        });
+      } catch (error) {
+        console.error("Error fetching question details:", error);
+      }
+    }
+
     // Process submissions using the centralized logic
     const { evaluateSubmission } = await import("@/lib/exam-logic");
     const processedSubmissions = [];
+    const examSets = (exam as any).examSets || [];
 
     for (const submission of (exam as any).examSubmissions) {
       try {
-        const evaluation = await evaluateSubmission(submission, exam, (exam as any).examSets);
+        const evaluation = await evaluateSubmission(submission, exam, examSets);
 
-        // Get evaluation status
         let evaluationStatus = 'PENDING';
         const hasManualGrading = Object.keys(submission.answers).some(key =>
           key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
@@ -291,14 +277,13 @@ export async function GET(
           evaluationStatus = 'IN_PROGRESS';
         }
 
-        // Get total marks for the questions assigned to this student
-        let totalMarks = 0;
+        let studentTotalMarks = 0;
         const examSetId = studentExamSetMap.get(submission.studentId);
         const studentQuestions = (examSetId && studentQuestionsMap.has(examSetId))
           ? studentQuestionsMap.get(examSetId)
           : allQuestions;
 
-        studentQuestions.forEach((q: any) => totalMarks += (q.marks || 0));
+        studentQuestions.forEach((q: any) => studentTotalMarks += (q.marks || 0));
 
         processedSubmissions.push({
           id: submission.id,
@@ -309,8 +294,8 @@ export async function GET(
             registrationNo: submission.student.registrationNo
           },
           answers: { ...submission.answers },
-          submittedAt: submission.submittedAt.toISOString(),
-          totalMarks,
+          submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
+          totalMarks: studentTotalMarks,
           earnedMarks: evaluation.totalScore,
           status: evaluationStatus,
           evaluatorNotes: submission.evaluatorNotes || null,
@@ -324,12 +309,11 @@ export async function GET(
         });
       } catch (error) {
         console.error(`Error processing submission for ${submission.studentId}:`, error);
-        // Fallback for failed processing
         processedSubmissions.push({
           id: submission.id,
           student: { id: submission.student.id, name: submission.student.user.name },
           answers: submission.answers,
-          submittedAt: submission.submittedAt.toISOString(),
+          submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
           earnedMarks: 0,
           status: 'ERROR'
         });

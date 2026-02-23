@@ -624,18 +624,16 @@ model ExamSubmission {
   studentId             String
   examId                String
   answers               Json
-  submittedAt           DateTime                @default(now())
   score                 Float?
   evaluatedAt           DateTime?
   evaluatorNotes        String?
   examSetId             String?
-  startedAt             DateTime?
   exceededQuestionLimit Boolean                 @default(false)
-  status                SubmissionStatus        @default(IN_PROGRESS)
-  objectiveStatus       SubmissionStatus        @default(IN_PROGRESS)
+  status                SubmissionStatus        @default(PENDING)
+  objectiveStatus       SubmissionStatus        @default(PENDING)
   objectiveStartedAt    DateTime?
   objectiveSubmittedAt  DateTime?
-  cqSqStatus            SubmissionStatus        @default(IN_PROGRESS)
+  cqSqStatus            SubmissionStatus        @default(PENDING)
   cqSqStartedAt         DateTime?
   cqSqSubmittedAt       DateTime?
   exam                  Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
@@ -648,7 +646,6 @@ model ExamSubmission {
   @@unique([studentId, examId])
   @@index([status])
   @@index([score])
-  @@index([submittedAt])
   @@index([examId])
 }
 
@@ -1015,6 +1012,7 @@ enum NotificationType {
 }
 
 enum SubmissionStatus {
+  PENDING
   IN_PROGRESS
   SUBMITTED
 }
