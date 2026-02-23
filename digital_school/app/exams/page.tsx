@@ -163,7 +163,7 @@ export default function ExamsPage() {
   const fetchExams = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/exams?summary=true");
+      const response = await fetch("/api/exams");
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
 
@@ -200,52 +200,40 @@ export default function ExamsPage() {
   };
 
 
-  const handleEdit = async (id: string) => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/api/exams?id=${id}`);
-      if (!response.ok) throw new Error("Failed to fetch exam details");
-      const result = await response.json();
-      const exam = result.data || result;
+  const handleEdit = (id: string) => {
+    const exam = exams.find((e) => e.id === id);
+    if (!exam) return;
 
-      if (!exam) return;
+    setEditingExam(exam);
 
-      setEditingExam(exam);
+    // Parse times
+    const dateObj = new Date(exam.date);
+    const startDate = exam.startTime ? new Date(exam.startTime) : dateObj;
+    const endDate = exam.endTime ? new Date(exam.endTime) : dateObj;
 
-      // Parse times
-      const dateObj = new Date(exam.date);
-      const startDate = exam.startTime ? new Date(exam.startTime) : dateObj;
-      const endDate = exam.endTime ? new Date(exam.endTime) : dateObj;
+    const formatDateTime = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
 
-      const formatDateTime = (d: Date) => {
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-      };
+    const formatDate = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
 
-      const formatDate = (d: Date) => {
-        const pad = (n: number) => n.toString().padStart(2, '0');
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-      };
+    setEditForm({
+      name: exam.name,
+      description: exam.description || '',
+      date: formatDate(dateObj),
+      startTime: formatDateTime(startDate),
+      endTime: formatDateTime(endDate),
+      duration: exam.duration || 0,
+      allowRetake: exam.allowRetake || false,
+      objectiveTime: exam.objectiveTime || 0,
+      cqSqTime: exam.cqSqTime || 0
+    });
 
-      setEditForm({
-        name: exam.name,
-        description: exam.description || '',
-        date: formatDate(dateObj),
-        startTime: formatDateTime(startDate),
-        endTime: formatDateTime(endDate),
-        duration: exam.duration || 0,
-        allowRetake: exam.allowRetake || false,
-        objectiveTime: exam.objectiveTime || 0,
-        cqSqTime: exam.cqSqTime || 0
-      });
-
-      setIsEditOpen(true);
-    } catch (error) {
-      console.error("Error fetching exam details:", error);
-      toast({ title: "Error", description: "Failed to load exam details for editing.", variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
+    setIsEditOpen(true);
   };
 
   const handleUpdateExam = async () => {
