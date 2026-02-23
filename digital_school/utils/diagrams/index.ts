@@ -261,7 +261,13 @@ import {
     createSineGraph,
     createVector,
     createCube,
+    createTriangleShaded,
+    createCircleShaded,
+    createRectangleShaded,
+    createPolygonShaded,
 } from './mathematics/shapes';
+
+
 
 // Advanced mathematics diagrams
 import {
@@ -287,7 +293,24 @@ import {
     createExponential,
     createLogarithm,
     createAbsoluteValue,
+    createCylinderShaded,
+    createConeShaded,
+    createPyramidShaded,
 } from './mathematics/advanced';
+
+import {
+    createSphereInCylinder,
+    createConeInCylinder,
+    createSphereInCone,
+    createCylinderInSphere,
+    createCubeInSphere,
+    createCircleInSquare,
+    createCircleInTriangle,
+    createSquareInCircle,
+    createTriangleInCircle,
+} from './mathematics/combinations_geo';
+
+
 
 import {
     createParabola,
@@ -570,6 +593,9 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'triangle-equilateral': (id: string) => createTriangle(id, 'equilateral'),
     'triangle-right': (id: string) => createTriangle(id, 'right'),
     'triangle-isosceles': (id: string) => createTriangle(id, 'isosceles'),
+    'triangle-scalene': (id: string) => createTriangleShaded(id, 'scalene'),
+    'triangle-obtuse': (id: string) => createTriangleShaded(id, 'obtuse'),
+
     'circle': createCircle,
     'rectangle': createRectangle,
     'square': createSquare,
@@ -588,8 +614,31 @@ export const DIAGRAM_PRESETS: Record<string, PresetGenerator> = {
     'cylinder': createCylinder,
     'cone': createCone,
     'pyramid': createPyramid,
+    'triangle-shaded': createTriangleShaded,
+
+    'circle-shaded': createCircleShaded,
+    'cylinder-shaded': createCylinderShaded,
+    'cone-shaded': createConeShaded,
+    'pyramid-shaded': createPyramidShaded,
+    'sphere-in-cylinder': createSphereInCylinder,
+    'cone-in-cylinder': createConeInCylinder,
+    'sphere-in-cone': createSphereInCone,
+    'cylinder-in-sphere': createCylinderInSphere,
+    'cube-in-sphere': createCubeInSphere,
+    'circle-in-square': createCircleInSquare,
+    'circle-in-triangle': createCircleInTriangle,
+    'square-in-circle': createSquareInCircle,
+    'triangle-in-circle': createTriangleInCircle,
+    'rectangle-shaded': createRectangleShaded,
+
+    'square-shaded': (id: string, side: number = 150, shade?: any) => createRectangleShaded(id, side, side, shade),
+    'pentagon-shaded': (id: string, r?: number, indices?: number[]) => createPolygonShaded(id, 5, r, indices),
+    'hexagon-shaded': (id: string, r?: number, indices?: number[]) => createPolygonShaded(id, 6, r, indices),
+    'octagon-shaded': (id: string, r?: number, indices?: number[]) => createPolygonShaded(id, 8, r, indices),
+
 
     // ===== MATHEMATICS: GRAPHS =====
+
     'graph-sine': createSineGraph,
     'graph-cosine': createCosine,
     'graph-tangent': createTangent,

@@ -140,6 +140,177 @@ export function createSineGraph(id: string, amplitude: number = 80, periods: num
   return createMathDiagram(id, width, height, elements);
 }
 
+/**
+ * Advanced Shaded Triangle
+ */
+export function createTriangleShaded(
+  id: string,
+  type: 'equilateral' | 'right' | 'isosceles' | 'scalene' | 'obtuse' = 'equilateral',
+  shadeRegion?: 'top' | 'bottom' | 'left' | 'right' | 'inner-circle'
+): FBDDiagram {
+  const elements: string[] = [];
+  let points = "";
+  let centroid = { x: 200, y: 233 };
+
+  if (type === 'equilateral') {
+    points = "200,100 100,300 300,300";
+    centroid = { x: 200, y: 233 };
+  } else if (type === 'right') {
+    points = "100,100 100,300 300,300";
+    centroid = { x: 167, y: 233 };
+  } else if (type === 'isosceles') {
+    points = "200,50 120,300 280,300";
+    centroid = { x: 200, y: 216 };
+  } else if (type === 'scalene') {
+    points = "150,120 100,300 350,280";
+    centroid = { x: 200, y: 233 };
+  } else if (type === 'obtuse') {
+    points = "100,200 350,200 150,100";
+    centroid = { x: 200, y: 167 };
+  }
+
+  const p = points.split(' ').map(pair => pair.split(',').map(Number));
+
+  // Draw main triangle
+  elements.push(`<polygon points="${points}" fill="none" stroke="#2563eb" stroke-width="3"/>`);
+
+  if (shadeRegion === 'inner-circle') {
+    elements.push(`<circle cx="${centroid.x}" cy="${centroid.y}" r="40" fill="#93c5fd" opacity="0.5" stroke="#2563eb" stroke-dasharray="2,2"/>`);
+  } else if (shadeRegion === 'top') {
+    const mid1 = [(p[0][0] + p[1][0]) / 2, (p[0][1] + p[1][1]) / 2];
+    const mid2 = [(p[0][0] + p[2][0]) / 2, (p[0][1] + p[2][1]) / 2];
+    elements.push(`<polygon points="${p[0][0]},${p[0][1]} ${mid1[0]},${mid1[1]} ${mid2[0]},${mid2[1]}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'bottom') {
+    const mid1 = [(p[0][0] + p[1][0]) / 2, (p[0][1] + p[1][1]) / 2];
+    const mid2 = [(p[0][0] + p[2][0]) / 2, (p[0][1] + p[2][1]) / 2];
+    elements.push(`<polygon points="${mid1[0]},${mid1[1]} ${p[1][0]},${p[1][1]} ${p[2][0]},${p[2][1]} ${mid2[0]},${mid2[1]}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'left') {
+    // Shade between vertex 0, vertex 1 and midpoint of (0,2) or similar split
+    const midBase = [(p[1][0] + p[2][0]) / 2, (p[1][1] + p[2][1]) / 2];
+    elements.push(`<polygon points="${p[0][0]},${p[0][1]} ${p[1][0]},${p[1][1]} ${midBase[0]},${midBase[1]}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'right') {
+    const midBase = [(p[1][0] + p[2][0]) / 2, (p[1][1] + p[2][1]) / 2];
+    elements.push(`<polygon points="${p[0][0]},${p[0][1]} ${midBase[0]},${midBase[1]} ${p[2][0]},${p[2][1]}" fill="#93c5fd" opacity="0.6"/>`);
+  }
+
+  elements.push(`<text x="200" y="30" font-size="14" font-weight="bold" text-anchor="middle">${type.charAt(0).toUpperCase() + type.slice(1)} Triangle</text>`);
+
+  return createMathDiagram(id, 400, 370, elements);
+}
+
+/**
+ * Advanced Shaded Circle (Sectors, Segments, Rings)
+ */
+export function createCircleShaded(
+  id: string,
+  radius: number = 100,
+  shadeType: 'sector' | 'segment' | 'ring' = 'sector',
+  val1: number = 0, // start angle or inner radius
+  val2: number = 90 // end angle
+): FBDDiagram {
+  const elements: string[] = [];
+  const cx = 200, cy = 200;
+
+  // Main circle
+  elements.push(`<circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="#2563eb" stroke-width="2"/>`);
+
+  if (shadeType === 'sector') {
+    const startRad = (val1 - 90) * Math.PI / 180;
+    const endRad = (val2 - 90) * Math.PI / 180;
+    const x1 = cx + radius * Math.cos(startRad);
+    const y1 = cy + radius * Math.sin(startRad);
+    const x2 = cx + radius * Math.cos(endRad);
+    const y2 = cy + radius * Math.sin(endRad);
+    const largeArc = (val2 - val1) > 180 ? 1 : 0;
+
+    elements.push(`<path d="M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${largeArc} 1 ${x2} ${y2} Z" fill="#93c5fd" opacity="0.6" stroke="#1d4ed8"/>`);
+  } else if (shadeType === 'ring') {
+    const innerR = val1;
+    elements.push(`<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="#2563eb" stroke-width="2" stroke-dasharray="4,2"/>`);
+    elements.push(`<path d="M ${cx} ${cy - radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy + radius} A ${radius} ${radius} 0 1 1 ${cx} ${cy - radius} Z
+                            M ${cx} ${cy - innerR} A ${innerR} ${innerR} 0 1 0 ${cx} ${cy + innerR} A ${innerR} ${innerR} 0 1 0 ${cx} ${cy - innerR} Z" 
+                   fill="#93c5fd" opacity="0.5" fill-rule="evenodd"/>`);
+  }
+
+  elements.push(`<circle cx="${cx}" cy="${cy}" r="3" fill="#333"/>`);
+  elements.push(`<text x="${cx}" y="30" font-size="14" font-weight="bold" text-anchor="middle">Circle (${shadeType})</text>`);
+
+  return createMathDiagram(id, 400, 400, elements);
+}
+
+/**
+ * Advanced Shaded Rectangle/Square
+ */
+export function createRectangleShaded(
+  id: string,
+  width: number = 200,
+  height: number = 100,
+  shadeRegion?: 'top' | 'bottom' | 'left' | 'right' | 'diagonal-tl-br' | 'diagonal-tr-bl'
+): FBDDiagram {
+  const elements: string[] = [];
+  const x = (400 - width) / 2;
+  const y = (300 - height) / 2;
+
+  // Main rectangle
+  elements.push(`<rect x="${x}" y="${y}" width="${width}" height="${height}" fill="none" stroke="#2563eb" stroke-width="3"/>`);
+
+  if (shadeRegion === 'top') {
+    elements.push(`<rect x="${x}" y="${y}" width="${width}" height="${height / 2}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'bottom') {
+    elements.push(`<rect x="${x}" y="${y + height / 2}" width="${width}" height="${height / 2}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'left') {
+    elements.push(`<rect x="${x}" y="${y}" width="${width / 2}" height="${height}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'right') {
+    elements.push(`<rect x="${x + width / 2}" y="${y}" width="${width / 2}" height="${height}" fill="#93c5fd" opacity="0.6"/>`);
+  } else if (shadeRegion === 'diagonal-tl-br') {
+    elements.push(`<polygon points="${x},${y} ${x + width},${y} ${x + width},${y + height}" fill="#93c5fd" opacity="0.6"/>`);
+  }
+
+  const title = width === height ? "Square" : "Rectangle";
+  elements.push(`<text x="200" y="30" font-size="14" font-weight="bold" text-anchor="middle">${title} (Shaded)</text>`);
+
+  return createMathDiagram(id, 400, 350, elements);
+}
+
+/**
+ * Advanced Shaded Regular Polygon
+ */
+export function createPolygonShaded(
+  id: string,
+  sides: number = 5,
+  radius: number = 80,
+  shadeIndices?: number[] // indices of vertices to form a shaded polygon
+): FBDDiagram {
+  const elements: string[] = [];
+  const cx = 200, cy = 200;
+  const points: [number, number][] = [];
+
+  for (let i = 0; i < sides; i++) {
+    const angle = (i * (360 / sides) - 90) * Math.PI / 180;
+    points.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+  }
+
+  const pointsStr = points.map(p => p.join(',')).join(' ');
+  elements.push(`<polygon points="${pointsStr}" fill="none" stroke="#2563eb" stroke-width="3"/>`);
+
+  if (shadeIndices && shadeIndices.length > 1) {
+    const shadePoints = shadeIndices.map(idx => points[idx % sides].join(',')).join(' ');
+    // Optionally connect to center for sectors
+    elements.push(`<polygon points="${shadePoints}" fill="#93c5fd" opacity="0.6" stroke="#1d4ed8" stroke-dasharray="2,2"/>`);
+  } else {
+    // Default: shade one triangular segment from center
+    const p1 = points[0];
+    const p2 = points[1];
+    elements.push(`<polygon points="${cx},${cy} ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}" fill="#93c5fd" opacity="0.6"/>`);
+  }
+
+  elements.push(`<text x="200" y="30" font-size="14" font-weight="bold" text-anchor="middle">${sides}-sided Polygon</text>`);
+
+  return createMathDiagram(id, 400, 400, elements);
+}
+
+
+
 export function createVector(id: string, magnitude: number = 100, angle: number = 45): FBDDiagram {
   const elements: string[] = [];
   const startX = 100;

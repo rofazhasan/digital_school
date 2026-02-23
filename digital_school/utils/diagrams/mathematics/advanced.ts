@@ -182,6 +182,85 @@ export function createCone(id: string, radius: number = 70, height: number = 120
     ]);
 }
 
+/**
+ * Advanced Shaded Cylinder (Filling level)
+ */
+export function createCylinderShaded(id: string, radius: number = 60, height: number = 120, fillRatio: number = 0.5): FBDDiagram {
+    const cx = 200, cy = 200;
+    const filledHeight = height * fillRatio;
+    const fillY = (cy + height / 2) - filledHeight;
+
+    return createMathDiagram(id, 400, 450, [
+        // Bottom ellipse
+        `<ellipse cx="${cx}" cy="${cy + height / 2}" rx="${radius}" ry="${radius * 0.3}" fill="#66bb6a" stroke="#2e7d32" stroke-width="3"/>`,
+        // Shaded part
+        `<rect x="${cx - radius}" y="${fillY}" width="${radius * 2}" height="${filledHeight}" fill="#81c784" opacity="0.8"/>`,
+        `<ellipse cx="${cx}" cy="${fillY}" rx="${radius}" ry="${radius * 0.3}" fill="#a5d6a7" stroke="#2e7d32" stroke-width="2"/>`,
+        // Side lines
+        `<line x1="${cx - radius}" y1="${cy - height / 2}" x2="${cx - radius}" y2="${cy + height / 2}" stroke="#2e7d32" stroke-width="3"/>`,
+        `<line x1="${cx + radius}" y1="${cy - height / 2}" x2="${cx + radius}" y2="${cy + height / 2}" stroke="#2e7d32" stroke-width="3"/>`,
+        // Top ellipse
+        `<ellipse cx="${cx}" cy="${cy - height / 2}" rx="${radius}" ry="${radius * 0.3}" fill="none" stroke="#2e7d32" stroke-width="3"/>`,
+        `<text x="${cx}" y="50" font-size="14" font-weight="bold" text-anchor="middle">Cylinder (Fill: ${(fillRatio * 100).toFixed(0)}%)</text>`
+    ]);
+}
+
+/**
+ * Advanced Shaded Cone (Frustum / Sliced)
+ */
+export function createConeShaded(id: string, radius: number = 70, height: number = 120, h1: number = 0, h2: number = 0.5): FBDDiagram {
+    const cx = 200, cy = 250;
+    const topY = cy - height / 2;
+
+    // Helper to get radius at a given ratio from apex (0 to 1)
+    const getRadAt = (ratio: number) => radius * ratio;
+    const getYAt = (ratio: number) => topY + height * ratio;
+
+    const r1 = getRadAt(h1);
+    const y1 = getYAt(h1);
+    const r2 = getRadAt(h2);
+    const y2 = getYAt(h2);
+
+    return createMathDiagram(id, 400, 450, [
+        // Base
+        `<ellipse cx="${cx}" cy="${cy + height / 2}" rx="${radius}" ry="${radius * 0.3}" fill="none" stroke="#d84315" stroke-width="2" stroke-dasharray="5,2"/>`,
+        // Shaded region (Frustum)
+        `<path d="M ${cx - r2} ${y2} A ${r2} ${r2 * 0.3} 0 0 0 ${cx + r2} ${y2} L ${cx + r1} ${y1} A ${r1} ${r1 * 0.3} 0 0 1 ${cx - r1} ${y1} Z" 
+               fill="#ffab91" opacity="0.8" stroke="#d84315" stroke-width="2"/>`,
+        // Main outline
+        `<path d="M ${cx} ${topY} L ${cx - radius} ${cy + height / 2}" fill="none" stroke="#d84315" stroke-width="3"/>`,
+        `<path d="M ${cx} ${topY} L ${cx + radius} ${cy + height / 2}" fill="none" stroke="#d84315" stroke-width="3"/>`,
+        `<ellipse cx="${cx}" cy="${y2}" rx="${r2}" ry="${r2 * 0.3}" fill="none" stroke="#d84315" stroke-width="2"/>`,
+        `<text x="${cx}" y="50" font-size="14" font-weight="bold" text-anchor="middle">Cone (Shaded Section)</text>`
+    ]);
+}
+
+/**
+ * Advanced Shaded Pyramid
+ */
+export function createPyramidShaded(id: string, base: number = 100, height: number = 120, h1: number = 0.3, h2: number = 0.7): FBDDiagram {
+    const cx = 200, cy = 250;
+    const topY = cy - height / 2;
+    const baseY = cy + height / 3;
+
+    const getSideAt = (ratio: number) => base * ratio;
+    const getYAt = (ratio: number) => topY + (baseY - topY) * ratio;
+
+    const s1 = getSideAt(h1);
+    const y1 = getYAt(h1);
+    const s2 = getSideAt(h2);
+    const y2 = getYAt(h2);
+
+    return createMathDiagram(id, 400, 450, [
+        // Outline
+        `<path d="M ${cx} ${topY} L ${cx - base / 2} ${baseY} L ${cx + base / 2} ${baseY} Z" fill="none" stroke="#f57f17" stroke-width="2"/>`,
+        // Shaded Frustum
+        `<path d="M ${cx - s1 / 2} ${y1} L ${cx + s1 / 2} ${y1} L ${cx + s2 / 2} ${y2} L ${cx - s2 / 2} ${y2} Z" fill="#fdd835" opacity="0.7"/>`,
+        `<text x="${cx}" y="50" font-size="14" font-weight="bold" text-anchor="middle">Pyramid (Shaded)</text>`
+    ]);
+}
+
+
 export function createPyramid(id: string, base: number = 100, height: number = 120): FBDDiagram {
     const cx = 200, cy = 250;
     return createMathDiagram(id, 400, 450, [
