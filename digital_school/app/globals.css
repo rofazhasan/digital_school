@@ -396,6 +396,20 @@ mjx-container {
   outline: none;
 }
 
+/* Fix Bangla font breaking in MathJax content */
+mjx-utext,
+mjx-utext *,
+.mjx-utext,
+[id^="MathJax-Element"] .mtext,
+.MathJax .mtext {
+  font-family: var(--font-hind-siliguri), var(--font-tiro-bangla), sans-serif !important;
+  font-variant-ligatures: common-ligatures discretionary-ligatures !important;
+  font-feature-settings: "liga" 1, "clig" 1 !important;
+  /* Prevent MathJax from trying to layout Bangla characters individually */
+  display: inline-block !important;
+  white-space: nowrap !important;
+}
+
 .font-exam-online mjx-container,
 .font-exam-online .mjx-chtml {
   font-family: inherit !important;

@@ -53,26 +53,30 @@ export function cleanupMath(text: string | null | undefined): string {
 
   let processed = text;
 
-  // Convert LaTeX display delimiters (\[...\]) and $$ to inline ($) for better print flow
+  // 1. Normalize LaTeX delimiters to inline ($) for consistent processing and print flow
   processed = processed
     .replace(/\$\$/g, '$')  // $$ -> $
     .replace(/\\\[/g, '$').replace(/\\\]/g, '$') // \[ -> $, \] -> $
     .replace(/\\\(/g, '$').replace(/\\\)/g, '$');   // \( -> $, \) -> $
 
-  // Process Bangla text in tables (array, tabular environments)
-  // This wraps Bangla Unicode characters in \text{} for proper rendering
-  const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
+  // 2. Wrap Bangla Unicode characters (U+0980 to U+09FF) in \text{} inside math delimiters
+  // This ensures conjuncts and ligatures render correctly instead of being treated as individual math symbols
+  processed = processed.replace(/\$([\s\S]*?)\$/g, (match, mathContent) => {
+    return '$' + mathContent.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
+      // Check if already wrapped in \text{} or similar command
+      const before = fullString.slice(0, offset);
+      if (/\\text\s*\{$/.test(before)) return match;
+      return `\\text{${match}}`;
+    }) + '$';
+  });
 
+  // 3. Fallback for Bangla text in explicit tables that might not be caught by the above
+  const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
   processed = processed.replace(tableRegex, (match) => {
-    // Wrap Bangla text (Unicode range U+0980 to U+09FF) in \text{}
-    // But only if it's not already wrapped
-    return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (banglaText) => {
-      // Check if already wrapped in \text{}
-      const beforeText = match.substring(0, match.indexOf(banglaText));
-      if (beforeText.endsWith('\\text{')) {
-        return banglaText; // Already wrapped
-      }
-      return `\\text{${banglaText}}`;
+    return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (m: string, banglaText: string, offset: number, fullString: string) => {
+      const before = fullString.slice(0, offset);
+      if (/\\text\s*\{$/.test(before)) return m;
+      return `\\text{${m}}`;
     });
   });
 
