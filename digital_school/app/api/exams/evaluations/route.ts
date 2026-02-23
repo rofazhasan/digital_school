@@ -160,6 +160,8 @@ export async function GET(req: NextRequest) {
         submittedStudents: exam.examSubmissions.length,
         publishedResults: exam.results.length,
         evaluationAssignments: exam.evaluationAssignments,
+        mcqNegativeMarking: exam.mcqNegativeMarking,
+        mcNegativeMarking: exam.mcNegativeMarking,
         status: evaluationStatus
       };
       console.log(`Exam ${exam.name}: status=${evaluationStatus}, submissions=${exam.examSubmissions.length}, assignments=${exam.evaluationAssignments.length}`);

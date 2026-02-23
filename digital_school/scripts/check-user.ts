@@ -10,8 +10,14 @@ async function main() {
 
     if (!user) {
         console.log(`User ${email} not found`);
-        const allUsers = await prisma.user.findMany({ take: 5 });
-        console.log('Sample users:', allUsers.map(u => u.email));
+        const allUsers = await prisma.user.findMany({
+            take: 10,
+            include: { studentProfile: true }
+        });
+        console.log('Database Users:');
+        allUsers.forEach(u => {
+            console.log(`- ${u.email} (${u.role}) - Profile: ${u.studentProfile ? 'YES' : 'NO'}`);
+        });
     } else {
         console.log(`User ${email} found:`, {
             id: user.id,

@@ -118,8 +118,6 @@ export async function GET(req: NextRequest) {
             .slice(0, 10); // Return top 10 for more depth
 
         // 6. Trends & Subject Performance
-        // Group by exam to show progress over time
-        // To compare with others, we need class-wide averages for these exams
         const examIds = results.map(r => r.examId);
         const classResults = await prisma.result.findMany({
             where: {
@@ -148,46 +146,33 @@ export async function GET(req: NextRequest) {
                 label: r.exam.name,
                 score: Math.round((r.total / r.exam.totalMarks) * 100),
                 classAverage: classAvg,
-                date: r.exam.date
+                date: r.exam.date,
+                // Removed invalid subject reference as it doesn't exist on Exam model in schema
             };
         });
 
         // Subject Strengths
-        const subjectGroups: { [key: string]: { total: number, possible: number, count: number } } = {};
+        const subjectGroups: { [key: string]: { total: number, possible: number, count: number, history: number[] } } = {};
         results.forEach(r => {
-            const subject = r.exam.description || 'General';
-            if (!subjectGroups[subject]) subjectGroups[subject] = { total: 0, possible: 0, count: 0 };
+            const subject = r.exam.name || 'General'; // Using exam name as subject identifier if subject field is missing or generic
+            if (!subjectGroups[subject]) subjectGroups[subject] = { total: 0, possible: 0, count: 0, history: [] };
             subjectGroups[subject].total += r.total;
             subjectGroups[subject].possible += r.exam.totalMarks;
             subjectGroups[subject].count += 1;
+            subjectGroups[subject].history.push(Math.round((r.total / r.exam.totalMarks) * 100));
         });
 
         const subjectPerformance = Object.entries(subjectGroups).map(([subject, data]) => ({
             subject,
-            score: Math.round((data.total / data.possible) * 100)
+            score: Math.round((data.total / data.possible) * 100),
+            trend: data.history.length > 1 ? (data.history[data.history.length - 1] - data.history[data.history.length - 2]) : 0
         }));
 
-        // 7. Insights (Good or Bad)
-        const insights = [];
-        if (averagePercentage >= 80) insights.push({ text: "Excellent overall performance!", type: "good" });
-        else if (averagePercentage < 50) insights.push({ text: "Overall score needs improvement.", type: "bad" });
+        // 7. AI Analysis & Insights
+        const aiInsights = generateInsights(averagePercentage, trends, subjectPerformance, attendancePercentage);
 
-        const topSubject = [...subjectPerformance].sort((a, b) => b.score - a.score)[0];
-        if (topSubject && topSubject.score >= 85) insights.push({ text: `Outstanding in ${topSubject.subject}!`, type: "good" });
-
-        const weakSubject = [...subjectPerformance].sort((a, b) => a.score - b.score)[0];
-        if (weakSubject && weakSubject.score < 50) insights.push({ text: `Focus more on ${weakSubject.subject}.`, type: "bad" });
-
-        // Growth Insight
-        if (trends.length >= 2) {
-            const last = trends[trends.length - 1].score;
-            const prev = trends[trends.length - 2].score;
-            if (last > prev) insights.push({ text: "Great job! Your performance is trending upwards.", type: "good" });
-            else if (last < prev - 10) insights.push({ text: "Your recent score dropped significantly. Stay focused!", type: "bad" });
-        }
-
-        if (attendancePercentage >= 95) insights.push({ text: "Great attendance record!", type: "good" });
-        else if (attendancePercentage < 75) insights.push({ text: "Low attendance might affect grades.", type: "bad" });
+        // 8. Predictive Analytics (Score Projection)
+        const projection = calculateProjection(trends);
 
         return NextResponse.json({
             analytics: {
@@ -208,7 +193,8 @@ export async function GET(req: NextRequest) {
                 leaderboard,
                 trends,
                 subjectPerformance,
-                insights
+                insights: aiInsights,
+                projection
             },
             badges
         });
@@ -219,12 +205,65 @@ export async function GET(req: NextRequest) {
     }
 }
 
+function generateInsights(avg: number, trends: any[], subjects: any[], attendance: number) {
+    const insights = [];
+
+    // General Performance
+    if (avg >= 80) insights.push({ text: "You're demonstrating mastery across subjects. Keep leading the way!", type: "good", icon: "🚀" });
+    else if (avg >= 60) insights.push({ text: "Steady progress. Aim for consistency in your core subjects.", type: "neutral", icon: "📈" });
+    else insights.push({ text: "Let's focus on building stronger fundamentals in weak areas.", type: "bad", icon: "💡" });
+
+    // Subject Insights
+    const topSubject = [...subjects].sort((a, b) => b.score - a.score)[0];
+    if (topSubject && topSubject.score >= 85) {
+        insights.push({ text: `Natural aptitude in ${topSubject.subject}! Consider advanced practice here.`, type: "good", icon: "🌟" });
+    }
+
+    const weakSubject = [...subjects].sort((a, b) => a.score - b.score)[0];
+    if (weakSubject && weakSubject.score < 50) {
+        insights.push({ text: `Prioritize ${weakSubject.subject} in your next study session to bridge the gap.`, type: "bad", icon: "🎯" });
+    }
+
+    // Trend Analysis
+    if (trends.length >= 2) {
+        const last = trends[trends.length - 1].score;
+        const prev = trends[trends.length - 2].score;
+        if (last > prev + 5) insights.push({ text: "Incredible growth in your recent exams! The effort is paying off.", type: "good", icon: "🔥" });
+        else if (last < prev - 10) insights.push({ text: "Recent scores show a slight dip. Take a breath and review the basics.", type: "bad", icon: "⚠️" });
+    }
+
+    // Attendance
+    if (attendance < 75) insights.push({ text: "Attending more classes could significantly boost your understanding.", type: "bad", icon: "📅" });
+
+    return insights;
+}
+
+function calculateProjection(trends: any[]) {
+    if (trends.length < 2) return null;
+
+    // Simple linear projection based on last 3 points
+    const recent = trends.slice(-3);
+    const sum = recent.reduce((acc, r) => acc + r.score, 0);
+    const avg = sum / recent.length;
+
+    // Growth factor
+    const growth = recent.length > 1 ? (recent[recent.length - 1].score - recent[0].score) / (recent.length - 1) : 0;
+
+    return {
+        nextPredictedScore: Math.min(100, Math.max(0, Math.round(avg + growth))),
+        growthRate: growth.toFixed(1),
+        confidence: recent.length > 2 ? 'High' : 'Medium'
+    };
+}
+
 function calculateGrade(percentage: number) {
     if (percentage >= 80) return 'A+';
-    if (percentage >= 70) return 'A';
-    if (percentage >= 60) return 'A-';
-    if (percentage >= 50) return 'B';
-    if (percentage >= 40) return 'C';
-    if (percentage >= 33) return 'D';
+    if (percentage >= 75) return 'A';
+    if (percentage >= 70) return 'A-';
+    if (percentage >= 65) return 'B+';
+    if (percentage >= 60) return 'B';
+    if (percentage >= 50) return 'C';
+    if (percentage >= 40) return 'D';
     return 'F';
 }
+

@@ -141,6 +141,11 @@ export default function ExamsPage() {
     return () => clearTimeout(handler);
   }, [filters.search]);
 
+  // Refetch when filters that are server-side change
+  useEffect(() => {
+    fetchExams();
+  }, [debouncedSearch, filters.status, filters.type, filters.subject]);
+
   const fetchUserRole = async () => {
     try {
       const response = await fetch("/api/user");
@@ -163,7 +168,15 @@ export default function ExamsPage() {
   const fetchExams = async () => {
     setLoading(true);
     try {
-      const response = await fetch("/api/exams");
+      const queryParams = new URLSearchParams();
+      queryParams.append('summary', 'true');
+      if (debouncedSearch) queryParams.append('search', debouncedSearch);
+      if (filters.status !== 'all') queryParams.append('status', filters.status);
+      if (filters.type !== 'all') queryParams.append('type', filters.type);
+      if (filters.subject !== 'all') queryParams.append('subject', filters.subject);
+
+      const response = await fetch(`/api/exams?${queryParams.toString()}`);
+
       if (!response.ok) throw new Error("Failed to fetch exams");
       const result = await response.json();
 
