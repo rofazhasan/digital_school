@@ -5,6 +5,7 @@
 
 import type { FBDDiagram, FBDForce, FBDPoint } from './types';
 import { FBDBuilder } from './generator';
+import { DIAGRAM_PRESETS } from '../diagrams/index';
 
 /**
  * Excel FBD Format (Compact Text Format)
@@ -56,13 +57,25 @@ export function parseExcelFBD(text: string, questionId: string = 'fbd'): FBDDiag
  * - PRESET:beam(400,100)
  */
 function parsePreset(text: string, questionId: string): FBDDiagram | null {
-    const match = text.match(/PRESET:(\w+)\((.*?)\)/);
+    const match = text.match(/PRESET:([\w-]+)\s*\(([\s\S]*)\)/);
     if (!match) return null;
 
-    const [, presetType, paramsStr] = match;
-    const params = paramsStr.split(',').map(p => p.trim());
+    const [, presetType, paramsRaw] = match;
+    const params = parseArguments(paramsRaw);
+    const presetKey = presetType.toLowerCase();
 
-    switch (presetType.toLowerCase()) {
+    // 1. Check centralized registry first (modern approach)
+    const generator = DIAGRAM_PRESETS[presetKey];
+    if (generator) {
+        try {
+            return generator(questionId, ...params);
+        } catch (error) {
+            console.error(`Error generating preset diagram for ${presetKey}:`, error);
+        }
+    }
+
+    // 2. Legacy hardcoded fallback
+    switch (presetKey) {
         case 'incline':
         case 'block': {
             const angle = parseFloat(params[0]) || 30;
@@ -122,6 +135,56 @@ function parsePreset(text: string, questionId: string): FBDDiagram | null {
         default:
             return null;
     }
+}
+
+/**
+ * Robustly parse argument string into an array of values.
+ * Handles numbers, booleans, strings, and arrays/objects.
+ */
+function parseArguments(argsStr: string): any[] {
+    const args: any[] = [];
+    let current = '';
+    let depth = 0;
+
+    for (let i = 0; i < argsStr.length; i++) {
+        const char = argsStr[i];
+        if (char === '[' || char === '{') depth++;
+        if (char === ']' || char === '}') depth--;
+
+        if (char === ',' && depth === 0) {
+            args.push(parseValue(current.trim()));
+            current = '';
+        } else {
+            current += char;
+        }
+    }
+    if (current.trim()) {
+        args.push(parseValue(current.trim()));
+    }
+    return args;
+}
+
+function parseValue(val: string): any {
+    if (val === 'true') return true;
+    if (val === 'false') return false;
+    if (!isNaN(Number(val)) && val !== '') return Number(val);
+
+    // Handle arrays/objects
+    if ((val.startsWith('[') && val.endsWith(']')) || (val.startsWith('{') && val.endsWith('}'))) {
+        try {
+            // Replace single quotes with double quotes for valid JSON parsing
+            const validJson = val.replace(/'/g, '"');
+            return JSON.parse(validJson);
+        } catch (e) {
+            return val;
+        }
+    }
+
+    // Remove quotes if present
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        return val.slice(1, -1);
+    }
+    return val;
 }
 
 /**
