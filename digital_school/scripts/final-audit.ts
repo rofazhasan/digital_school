@@ -6,7 +6,7 @@ import { PasswordResetEmail } from '../components/emails/PasswordResetEmail';
 import { NoticeEmail } from '../components/emails/NoticeEmail';
 import { VerificationEmail } from '../components/emails/VerificationEmail';
 
-const resend = new Resend('re_B9kNnUvv_58EGKLPRgMfBiFPG2jEQwskC');
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 async function testTemplates() {
     console.log('🚀 Starting Final Email Template Verification...');
