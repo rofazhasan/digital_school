@@ -29,32 +29,47 @@ export async function POST(request: NextRequest) {
 
         // ... find user logic ...
         // [Existing code for finding user and verifying password]
-        const user = await (prismadb.user as any).findFirst({
-            where: loginMethod === 'email'
-                ? { email: identifier }
-                : { phone: identifier },
-            include: {
-                institute: { select: { id: true, name: true } },
-                studentProfile: {
-                    select: {
-                        id: true, roll: true, registrationNo: true,
-                        class: { select: { id: true, name: true, section: true } },
+        let user;
+        try {
+            user = await (prismadb.user as any).findFirst({
+                where: loginMethod === 'email'
+                    ? { email: identifier }
+                    : { phone: identifier },
+                select: {
+                    id: true,
+                    email: true,
+                    phone: true,
+                    password: true,
+                    role: true,
+                    name: true,
+                    isActive: true, // Might be missing
+                    emailVerified: true, // Might be missing
+                    isApproved: true, // Might be missing
+                    instituteId: true,
+                    institute: { select: { id: true, name: true } },
+                    studentProfile: {
+                        select: {
+                            id: true, roll: true, registrationNo: true,
+                            class: { select: { id: true, name: true, section: true } },
+                        },
                     },
-                },
-                teacherProfile: {
-                    select: { id: true, employeeId: true, department: true, subjects: true },
-                },
-            }
-        });
+                    teacherProfile: {
+                        select: { id: true, employeeId: true, department: true, subjects: true },
+                    },
+                }
+            });
+        } catch (dbError: any) {
+            console.warn('[LOGIN] Initial findFirst failed, trying minimal select.', dbError.message);
+            user = await (prismadb.user as any).findFirst({
+                where: loginMethod === 'email'
+                    ? { email: identifier }
+                    : { phone: identifier }
+            });
+        }
 
         if (!user) {
             return NextResponse.json({ error: `Invalid ${loginMethod} or password` }, { status: 401 });
         }
-
-        // Check if account is deactivated (not just pending)
-        // If isActive is false, it could be pending or deactivated.
-        // For now, let's assume isActive: true is required for general access,
-        // but we'll check credentials first.
 
         const isPasswordValid = await bcrypt.compare(password, user.password);
         if (!isPasswordValid) {
@@ -101,8 +116,8 @@ export async function POST(request: NextRequest) {
             role: user.role as JWTPayload['role'],
             instituteId: user.instituteId || undefined,
             sid: sessionId,
-            verified: (user as any).emailVerified,
-            approved: (user as any).isApproved,
+            verified: (user as any).emailVerified !== false,
+            approved: (user as any).isApproved !== false,
         });
 
         // Update user session in DB - DEFENSIVE WRAPPER

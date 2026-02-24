@@ -2,24 +2,7 @@ import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import prismadb from './db';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
-);
-
-const JWT_ALGORITHM = 'HS256';
-
-export interface JWTPayload {
-  userId: string;
-  email: string;
-  role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
-  instituteId?: string;
-  sid: string;
-  verified?: boolean;
-  approved?: boolean;
-  iat: number;
-  exp: number;
-}
+import { getJwtSecretKey, JWT_ALGORITHM, JWTPayload } from './auth-config';
 
 // Create JWT token
 export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string> {
@@ -27,7 +10,7 @@ export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Pro
     .setProtectedHeader({ alg: JWT_ALGORITHM })
     .setIssuedAt()
     .setExpirationTime('24h')
-    .sign(JWT_SECRET);
+    .sign(getJwtSecretKey());
 
   return token;
 }
@@ -35,7 +18,7 @@ export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Pro
 // Verify JWT token
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
       algorithms: [JWT_ALGORITHM],
     });
 
@@ -55,9 +38,18 @@ export async function validateSession(token: string) {
     // Defensive check for database query
     let user;
     try {
+      // Use a minimal select to avoid triggering errors for missing columns
       user = await (prismadb.user as any).findUnique({
         where: { id: payload.userId },
-        include: {
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          isActive: true,
+          emailVerified: true,
+          isApproved: true,
+          activeSessionId: true,
+          lastSessionInfo: true,
           institute: { select: { id: true, name: true } },
           studentProfile: {
             select: {
@@ -72,14 +64,24 @@ export async function validateSession(token: string) {
       });
     } catch (dbError: any) {
       console.warn('[AUTH] Session validation query failed. Likely missing schema fields.', dbError.message);
-      return { status: 'valid', user: { id: payload.userId, role: payload.role } as any };
+      // Fallback: If the structured query fails, try a direct findUnique with no select
+      try {
+        user = await (prismadb.user as any).findUnique({ where: { id: payload.userId } });
+      } catch (innerError) {
+        return { status: 'invalid' };
+      }
     }
 
     if (!user) {
       return { status: 'invalid' };
     }
 
-    const isPending = !user.emailVerified || !user.isApproved;
+    // Safely check fields that might be missing in DB
+    const isEmailVerified = (user as any).emailVerified !== false; // Default to true if missing or null, except if explicitly false
+    const isApproved = (user as any).isApproved !== false;
+    const isActive = (user as any).isActive !== false;
+
+    const isPending = !isEmailVerified || !isApproved;
     if (isPending) {
       return {
         status: 'pending',

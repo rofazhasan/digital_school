@@ -1,23 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'your-secret-key-change-this-in-production'
-);
-
-const JWT_ALGORITHM = 'HS256';
-
-interface JWTPayload {
-  userId: string;
-  email: string;
-  role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
-  instituteId?: string;
-  verified?: boolean;
-  approved?: boolean;
-  iat: number;
-  exp: number;
-}
+import { getJwtSecretKey, JWT_ALGORITHM, JWTPayload } from './lib/auth-config';
 
 // Define route permissions
 const ROUTE_PERMISSIONS = {
@@ -227,12 +211,13 @@ function getDefaultRedirectUrl(role: string): string {
 // Verify JWT token (middleware-safe)
 async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET, {
+    const { payload } = await jwtVerify(token, getJwtSecretKey(), {
       algorithms: [JWT_ALGORITHM],
     });
 
     return payload as unknown as JWTPayload;
-  } catch (error) {
+  } catch (error: any) {
+    console.warn('[MIDDLEWARE] Token verification failed:', error.message);
     return null;
   }
 }

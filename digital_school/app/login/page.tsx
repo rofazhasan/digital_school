@@ -122,22 +122,26 @@ function LoginContent() {
                     triggerHaptic(ImpactStyle.Medium);
                     const userRole = result.user.role;
                     let redirectUrl = '/dashboard';
-
-                    switch (userRole) {
-                        case 'SUPER_USER':
-                            redirectUrl = '/super-user/dashboard';
-                            break;
-                        case 'ADMIN':
-                            redirectUrl = '/admin/dashboard';
-                            break;
-                        case 'TEACHER':
-                            redirectUrl = '/teacher/dashboard';
-                            break;
-                        case 'STUDENT':
-                            redirectUrl = '/student/dashboard';
-                            break;
-                        default:
-                            redirectUrl = '/dashboard';
+                    const callbackUrl = searchParams.get('callbackUrl');
+                    if (callbackUrl && callbackUrl.startsWith('/')) {
+                        redirectUrl = callbackUrl;
+                    } else {
+                        switch (userRole) {
+                            case 'SUPER_USER':
+                                redirectUrl = '/super-user/dashboard';
+                                break;
+                            case 'ADMIN':
+                                redirectUrl = '/admin/dashboard';
+                                break;
+                            case 'TEACHER':
+                                redirectUrl = '/teacher/dashboard';
+                                break;
+                            case 'STUDENT':
+                                redirectUrl = '/student/dashboard';
+                                break;
+                            default:
+                                redirectUrl = '/dashboard';
+                        }
                     }
 
                     window.location.href = redirectUrl;

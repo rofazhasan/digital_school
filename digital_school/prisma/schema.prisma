@@ -9,56 +9,56 @@ datasource db {
 }
 
 model User {
-  id                String                     @id @default(cuid())
-  email             String?                    @unique
-  phone             String?                    @unique
-  password          String
-  role              Role                       @default(STUDENT)
-  name              String
-  avatar            String?
-  isActive          Boolean                    @default(true)
-  emailVerified     Boolean                    @default(false)
-  isApproved        Boolean                    @default(false)
-  verificationToken String?                    @unique
-  pendingEmail      String?
-  pendingPhone      String?
-  emailChangeToken  String?                    @unique
-  lastLoginAt       DateTime?
-  createdAt         DateTime                   @default(now())
-  updatedAt         DateTime                   @updatedAt
+  id                   String                     @id @default(cuid())
+  email                String?                    @unique
+  phone                String?                    @unique
+  password             String
+  role                 Role                       @default(STUDENT)
+  name                 String
+  avatar               String?
+  isActive             Boolean                    @default(true)
+  lastLoginAt          DateTime?
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
   deletedAt            DateTime?
-  passwordResetToken   String?                    @unique
-  passwordResetExpires DateTime?
   instituteId          String?
-  activeSessionId   String?
-  lastSessionInfo   Json?
-  activityAudits    ActivityAudit[]
-  admissionReviews  AdmissionApplication[]     @relation("AdmissionReviewer")
-  aiActivities      AIActivity[]
-  attendanceRecords Attendance[]               @relation("AttendanceTeacher")
-  badges            Badge[]                    @relation("UserBadges")
-  billing           Billing[]
-  chatSessions      ChatSession[]
-  examAssignments   ExamEvaluationAssignment[] @relation("ExamAssignmentCreator")
-  examEvaluations   ExamEvaluationAssignment[] @relation("ExamEvaluator")
-  examSets          ExamSet[]
-  drawings          ExamSubmissionDrawing[]
-  assignedExams     Exam[]                     @relation("ExamAssigner")
-  createdExams      Exam[]                     @relation("ExamCreator")
-  exportJobs        ExportJob[]
-  managedInstitute  Institute?                 @relation("InstituteSuperUser")
-  createdInvoices   Invoice[]                  @relation("InvoiceCreator")
-  logs              Log[]
-  notices           Notice[]
-  notifications     Notification[]
-  collectedPayments Payment[]                  @relation("PaymentCollector")
-  questionBanks     QuestionBank[]
-  questions         Question[]
-  editedQuestions   Question[]                 @relation("EditedQuestions")
-  resultReviews     ResultReview[]             @relation("ResultReviewer")
-  studentProfile    StudentProfile?
-  teacherProfile    TeacherProfile?
-  institute         Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
+  activeSessionId      String?
+  lastSessionInfo      Json?
+  passwordResetExpires DateTime?
+  passwordResetToken   String?                    @unique
+  emailChangeToken     String?                    @unique
+  emailVerified        Boolean                    @default(false)
+  isApproved           Boolean                    @default(false)
+  pendingEmail         String?
+  pendingPhone         String?
+  verificationToken    String?                    @unique
+  activityAudits       ActivityAudit[]
+  admissionReviews     AdmissionApplication[]     @relation("AdmissionReviewer")
+  aiActivities         AIActivity[]
+  attendanceRecords    Attendance[]               @relation("AttendanceTeacher")
+  badges               Badge[]                    @relation("UserBadges")
+  billing              Billing[]
+  chatSessions         ChatSession[]
+  examAssignments      ExamEvaluationAssignment[] @relation("ExamAssignmentCreator")
+  examEvaluations      ExamEvaluationAssignment[] @relation("ExamEvaluator")
+  examSets             ExamSet[]
+  drawings             ExamSubmissionDrawing[]
+  assignedExams        Exam[]                     @relation("ExamAssigner")
+  createdExams         Exam[]                     @relation("ExamCreator")
+  exportJobs           ExportJob[]
+  managedInstitute     Institute?                 @relation("InstituteSuperUser")
+  createdInvoices      Invoice[]                  @relation("InvoiceCreator")
+  logs                 Log[]
+  notices              Notice[]
+  notifications        Notification[]
+  collectedPayments    Payment[]                  @relation("PaymentCollector")
+  questionBanks        QuestionBank[]
+  questions            Question[]
+  editedQuestions      Question[]                 @relation("EditedQuestions")
+  resultReviews        ResultReview[]             @relation("ResultReviewer")
+  studentProfile       StudentProfile?
+  teacherProfile       TeacherProfile?
+  institute            Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
 
   @@index([role])
   @@map("users")
@@ -187,8 +187,8 @@ model Exam {
   cqSubsections         Json?
   mcNegativeMarking     Float?                     @default(0)
   mcPartialMarking      Boolean?                   @default(true)
-  objectiveTime         Int?
   cqSqTime              Int?
+  objectiveTime         Int?
   examSubmissions       ExamSubmission[]
   admitCards            AdmitCard[]
   evaluationAssignments ExamEvaluationAssignment[]
@@ -233,14 +233,14 @@ model Question {
   difficulty             Difficulty
   hasMath                Boolean                  @default(false)
   images                 String[]
+  isForPractice          Boolean                  @default(false)
   assertion              String?
   correctOption          Int?
-  explanation            String?
-  isForPractice          Boolean                  @default(false)
   leftColumn             Json?
   matches                Json?
   reason                 String?
   rightColumn            Json?
+  explanation            String?
   versions               QuestionVersion[]        @relation("QuestionVersions")
   QuestionToQuestionBank QuestionToQuestionBank[]
   class                  Class                    @relation("ClassQuestions", fields: [classId], references: [id])
@@ -638,12 +638,12 @@ model ExamSubmission {
   examSetId             String?
   exceededQuestionLimit Boolean                 @default(false)
   status                SubmissionStatus        @default(PENDING)
-  objectiveStatus       SubmissionStatus        @default(PENDING)
-  objectiveStartedAt    DateTime?
-  objectiveSubmittedAt  DateTime?
-  cqSqStatus            SubmissionStatus        @default(PENDING)
   cqSqStartedAt         DateTime?
+  cqSqStatus            SubmissionStatus        @default(PENDING)
   cqSqSubmittedAt       DateTime?
+  objectiveStartedAt    DateTime?
+  objectiveStatus       SubmissionStatus        @default(PENDING)
+  objectiveSubmittedAt  DateTime?
   exam                  Exam                    @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSet               ExamSet?                @relation(fields: [examSetId], references: [id])
   student               StudentProfile          @relation(fields: [studentId], references: [id])
@@ -1020,9 +1020,9 @@ enum NotificationType {
 }
 
 enum SubmissionStatus {
-  PENDING
   IN_PROGRESS
   SUBMITTED
+  PENDING
 }
 
 enum QuestionStatus {
