@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
           isActive: u.isActive,
           emailVerified: u.emailVerified,
           isApproved: u.isApproved,
+          pendingEmail: u.pendingEmail,
+          pendingPhone: u.pendingPhone,
           class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
           section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
           roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
@@ -207,6 +209,9 @@ export async function PATCH(request: NextRequest) {
         role,
         isApproved: body.isApproved !== undefined ? body.isApproved : undefined,
         isActive: body.isActive !== undefined ? body.isActive : undefined,
+        // Handle phone approval/rejection
+        phone: body.approvePhone === true ? userToEdit.pendingPhone : undefined,
+        pendingPhone: body.approvePhone === true || body.rejectPhone === true ? null : undefined,
       },
     });
     // If student, update class

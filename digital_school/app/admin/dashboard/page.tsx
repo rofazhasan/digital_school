@@ -162,6 +162,7 @@ export default function AdminDashboard() {
         user={user}
         instituteName={instituteName}
         onLogout={handleLogout}
+        profileHref="/admin/profile"
       />
 
       <MobileDashboardSidebar
@@ -172,6 +173,7 @@ export default function AdminDashboard() {
         setIsOpen={setMobileSidebarOpen}
         user={user}
         onLogout={handleLogout}
+        profileHref="/admin/profile"
       />
 
       {/* Main Content */}

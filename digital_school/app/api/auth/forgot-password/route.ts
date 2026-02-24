@@ -48,28 +48,36 @@ export async function POST(request: NextRequest) {
         // 1. If user has an email, send the professional email
         if (user.email) {
             const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-            console.log('[FORGOT_PASSWORD] Attempting to send email to:', user.email, 'Link:', resetLink);
+            console.log('[FORGOT_PASSWORD] Attempting to send email to:', user.email);
 
-            const emailResult = await sendEmail({
-                to: user.email,
-                subject: 'Reset your password',
-                react: PasswordResetEmail({
-                    firstName: user.name.split(' ')[0],
-                    resetLink,
-                    institute: user.institute ? {
-                        name: user.institute.name,
-                        address: user.institute.address || undefined,
-                        phone: user.institute.phone || undefined,
-                        logoUrl: user.institute.logoUrl || undefined,
-                    } : undefined
-                }) as any,
-            });
+            try {
+                const emailResult = await sendEmail({
+                    to: user.email,
+                    subject: 'Reset your password',
+                    react: PasswordResetEmail({
+                        firstName: user.name.split(' ')[0],
+                        resetLink,
+                        institute: user.institute ? {
+                            name: user.institute.name,
+                            address: user.institute.address || undefined,
+                            phone: user.institute.phone || undefined,
+                            logoUrl: user.institute.logoUrl || undefined,
+                        } : undefined
+                    }) as any,
+                });
 
-            if (!emailResult.success) {
-                console.error('[FORGOT_PASSWORD] Email delivery failed:', emailResult.error);
+                if (!emailResult.success) {
+                    console.error('[FORGOT_PASSWORD] Email delivery failed:', emailResult.error);
+                    return NextResponse.json({
+                        message: 'Failed to send recovery email. Please ensure your email configuration (GMAIL_USER/GMAIL_APP_PASSWORD) is correct.',
+                        error: (emailResult.error as any)?.message || String(emailResult.error)
+                    }, { status: 500 });
+                }
+            } catch (renderError: any) {
+                console.error('[FORGOT_PASSWORD] Email rendering/sending crash:', renderError);
                 return NextResponse.json({
-                    message: 'Failed to send recovery email. Please try again later.',
-                    error: emailResult.error
+                    message: 'Internal error during email generation.',
+                    details: renderError.message || 'Unknown render error'
                 }, { status: 500 });
             }
 

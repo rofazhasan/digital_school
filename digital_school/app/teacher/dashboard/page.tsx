@@ -145,6 +145,7 @@ export default function TeacherDashboard() {
                 user={user}
                 instituteName={instituteName}
                 onLogout={handleLogout}
+                profileHref="/teacher/profile"
             />
 
             <MobileDashboardSidebar
@@ -155,6 +156,7 @@ export default function TeacherDashboard() {
                 setIsOpen={setMobileSidebarOpen}
                 user={user}
                 onLogout={handleLogout}
+                profileHref="/teacher/profile"
             />
 
             <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'} flex-1 flex flex-col min-h-screen w-full relative z-10`}>

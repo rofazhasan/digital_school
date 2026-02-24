@@ -397,11 +397,11 @@ export default function StudentDashboardPage() {
                     <p className="text-xs leading-none text-muted-foreground mt-1">{user.email}</p>
                   </div>
                   <DropdownMenuSeparator className="bg-border" />
-                  <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5">
+                  <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-lg cursor-pointer py-2.5">
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    <span>Profile Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
+                  <DropdownMenuItem onClick={() => router.push('/student/profile')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <User className="mr-2 h-4 w-4" />
                     <span>Change Password</span>
                   </DropdownMenuItem>

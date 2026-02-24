@@ -29,6 +29,7 @@ interface DashboardSidebarProps {
     user: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     instituteName: string;
     onLogout: () => void;
+    profileHref: string;
     className?: string;
 }
 
@@ -41,6 +42,7 @@ export function DashboardSidebar({
     user,
     instituteName,
     onLogout: _onLogout, // eslint-disable-line @typescript-eslint/no-unused-vars
+    profileHref,
     className
 }: DashboardSidebarProps) {
     const router = useRouter();
@@ -142,7 +144,7 @@ export function DashboardSidebar({
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         className="flex items-center gap-4 p-3 rounded-2xl bg-background/40 border border-border/40 hover:border-primary/30 transition-all duration-300 cursor-pointer group"
-                        onClick={() => onTabChange('settings')}
+                        onClick={() => router.push(profileHref)}
                     >
                         <div className="relative">
                             <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-muted to-muted/50 flex items-center justify-center text-primary font-black border-2 border-background shadow-md overflow-hidden transition-transform group-hover:scale-105">
@@ -158,7 +160,7 @@ export function DashboardSidebar({
                     </motion.div>
                 ) : (
                     <div className="flex justify-center">
-                        <div className="w-14 h-14 rounded-2xl bg-background/40 border border-border/40 flex items-center justify-center text-primary font-black border-2 border-background shadow-md group cursor-pointer hover:border-primary/30 transition-all" title={user?.name}>
+                        <div className="w-14 h-14 rounded-2xl bg-background/40 border border-border/40 flex items-center justify-center text-primary font-black border-2 border-background shadow-md group cursor-pointer hover:border-primary/30 transition-all" title={user?.name} onClick={() => router.push(profileHref)}>
                             {user?.name?.[0]}
                         </div>
                     </div>
@@ -176,6 +178,7 @@ interface MobileSidebarProps {
     setIsOpen: (open: boolean) => void;
     user?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
     onLogout: () => void;
+    profileHref: string;
 }
 
 export function MobileDashboardSidebar({
@@ -184,7 +187,8 @@ export function MobileDashboardSidebar({
     onTabChange,
     isOpen,
     setIsOpen,
-    onLogout
+    onLogout,
+    profileHref
 }: MobileSidebarProps) {
     const router = useRouter();
 
@@ -226,7 +230,11 @@ export function MobileDashboardSidebar({
                             </div>
                         </div>
                     ))}
-                    <div className="px-3 mt-8 pt-8 border-t border-border">
+                    <div className="px-3 mt-8 pt-8 border-t border-border space-y-2">
+                        <Button variant="ghost" className="w-full justify-start text-foreground hover:bg-muted/50 py-6 text-base rounded-xl" onClick={() => { router.push(profileHref); setIsOpen(false); }}>
+                            <Settings className="w-5 h-5 mr-3" />
+                            Profile Settings
+                        </Button>
                         <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 py-6 text-base rounded-xl" onClick={onLogout}>
                             <LogOut className="w-5 h-5 mr-3" />
                             Logout

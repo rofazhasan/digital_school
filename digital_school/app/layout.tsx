@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Outfit, Hind_Siliguri, Baloo_Da_2, Tiro_Bangla, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
-import SessionProviderWrapper from "@/components/SessionProviderWrapper";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import { NavigationWrapper } from "@/components/ui/navigation-wrapper";
 import MaintenanceGuard from "@/components/MaintenanceGuard";
@@ -106,20 +105,18 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ErrorBoundary>
-            <SessionProviderWrapper>
-              <NavigationWrapper>
-                <MobileEnhancements />
-                <MobileNavigationControls />
-                <MaintenanceGuard>
-                  <SessionGuard />
-                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
-                    {children}
-                  </div>
-                  <AppFooter />
-                  <Toaster />
-                </MaintenanceGuard>
-              </NavigationWrapper>
-            </SessionProviderWrapper>
+            <NavigationWrapper>
+              <MobileEnhancements />
+              <MobileNavigationControls />
+              <MaintenanceGuard>
+                <SessionGuard />
+                <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
+                  {children}
+                </div>
+                <AppFooter />
+                <Toaster />
+              </MaintenanceGuard>
+            </NavigationWrapper>
           </ErrorBoundary>
         </ThemeProvider>
       </body>

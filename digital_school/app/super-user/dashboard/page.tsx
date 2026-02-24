@@ -477,6 +477,7 @@ export default function SuperUserDashboardPage() {
         user={user}
         instituteName={institute?.name || "Digital School"}
         onLogout={handleLogout}
+        profileHref="/admin/profile"
       />
 
       <MobileDashboardSidebar
@@ -487,6 +488,7 @@ export default function SuperUserDashboardPage() {
         setIsOpen={setMobileSidebarOpen}
         user={user}
         onLogout={handleLogout}
+        profileHref="/admin/profile"
       />
 
       <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'} flex-1 flex flex-col min-h-screen w-full relative z-10`}>
@@ -548,7 +550,7 @@ export default function SuperUserDashboardPage() {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setActiveTab('profile')} className="rounded-lg cursor-pointer py-2.5">
+                <DropdownMenuItem onClick={() => router.push('/admin/profile')} className="rounded-lg cursor-pointer py-2.5">
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
                 </DropdownMenuItem>

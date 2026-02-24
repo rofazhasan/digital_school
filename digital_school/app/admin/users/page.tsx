@@ -28,6 +28,8 @@ type User = {
     emailVerified?: boolean;
     isApproved?: boolean;
     isActive?: boolean;
+    pendingEmail?: string;
+    pendingPhone?: string;
 };
 
 const roleLabels: Record<User['role'], string> = {
@@ -313,6 +315,40 @@ export default function AdminUsersPage() {
                 body: JSON.stringify({ id, isApproved: true, isActive: true })
             });
             if (!res.ok) throw new Error('Failed to approve user');
+            await refreshUsers();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleApprovePhone = async (id: string) => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/user', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, approvePhone: true })
+            });
+            if (!res.ok) throw new Error('Failed to approve phone change');
+            await refreshUsers();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRejectPhone = async (id: string) => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/user', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, rejectPhone: true })
+            });
+            if (!res.ok) throw new Error('Failed to reject phone change');
             await refreshUsers();
         } catch (err: any) {
             setError(err.message);
@@ -612,6 +648,16 @@ export default function AdminUsersPage() {
                                                         <Phone className="h-3.5 w-3.5 opacity-70" /> {user.phone}
                                                     </div>
                                                 )}
+                                                {user.pendingEmail && (
+                                                    <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[10px]">
+                                                        <Mail className="h-3 w-3" /> Pending: {user.pendingEmail}
+                                                    </div>
+                                                )}
+                                                {user.pendingPhone && (
+                                                    <div className="flex items-center gap-1.5 text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[10px]">
+                                                        <Phone className="h-3 w-3" /> Pending: {user.pendingPhone}
+                                                    </div>
+                                                )}
                                             </div>
                                         </TableCell>
                                         <TableCell>
@@ -640,6 +686,28 @@ export default function AdminUsersPage() {
                                                     >
                                                         <CheckCircle className="h-4 w-4" />
                                                     </Button>
+                                                )}
+                                                {user.pendingPhone && (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-green-600 hover:bg-green-50"
+                                                            onClick={() => handleApprovePhone(user.id)}
+                                                            title={`Approve phone change to ${user.pendingPhone}`}
+                                                        >
+                                                            <CheckCircle className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-8 w-8 text-red-600 hover:bg-red-50"
+                                                            onClick={() => handleRejectPhone(user.id)}
+                                                            title={`Reject phone change to ${user.pendingPhone}`}
+                                                        >
+                                                            <XCircle className="h-4 w-4" />
+                                                        </Button>
+                                                    </>
                                                 )}
                                                 <Button
                                                     variant="ghost"
