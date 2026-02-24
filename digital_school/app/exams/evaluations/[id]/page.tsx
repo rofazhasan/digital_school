@@ -1,5 +1,7 @@
 "use client";
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect, useRef, use } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import {
   User,
@@ -153,7 +154,6 @@ const mathJaxConfig = {
 export default function ExamEvaluationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
-  const { data: session } = useSession();
   const [exam, setExam] = useState<Exam | null>(null);
   const [renderError, setRenderError] = useState<string | null>(null);
 
@@ -1699,7 +1699,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             Fetching exam details and student submissions for ID: <code className="bg-muted px-1 rounded">{id}</code>
           </p>
           <div className="mt-8 text-xs text-muted-foreground flex gap-4">
-            <span>Auth: {session ? "✅" : "❌"}</span>
             <span>ID: {id ? "✅" : "❌"}</span>
           </div>
         </div>

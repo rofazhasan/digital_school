@@ -142,7 +142,12 @@ export async function POST(request: NextRequest) {
 
         return response;
     } catch (error: any) {
-        console.error('Login error:', error);
+        console.error('[LOGIN_ERROR] Type:', error?.constructor?.name);
+        console.error('[LOGIN_ERROR] Message:', error.message);
+
+        if (error.message?.toLowerCase().includes('column') || error.message?.toLowerCase().includes('field')) {
+            console.error('[CRITICAL] Database schema mismatch detected! Please run "npx prisma db push" or "npx prisma migrate deploy" in production.');
+        }
 
         if (error instanceof z.ZodError) {
             return NextResponse.json(

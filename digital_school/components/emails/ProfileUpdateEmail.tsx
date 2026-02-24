@@ -21,94 +21,100 @@ export const ProfileUpdateEmail: React.FC<Readonly<ProfileUpdateEmailProps>> = (
     newValue,
     verificationLink,
     institute = { name: 'Digital School' },
-}) => {
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-
-    return (
+}) => (
+    <div style={{
+        fontFamily: "'Outfit', 'Inter', -apple-system, sans-serif",
+        backgroundColor: '#070b14',
+        padding: '60px 10px',
+        color: '#f8fafc',
+    }}>
         <div style={{
-            fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-            backgroundColor: '#f9fafb',
-            padding: '48px 16px',
+            maxWidth: '580px',
+            margin: '0 auto',
+            backgroundColor: '#111827',
+            borderRadius: '40px',
+            overflow: 'hidden',
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+            border: '1px solid rgba(255, 255, 255, 0.05)'
         }}>
             <div style={{
-                maxWidth: '600px',
-                margin: '0 auto',
-                backgroundColor: '#ffffff',
-                borderRadius: '16px',
-                overflow: 'hidden',
-                boxShadow: '0 4px 50px rgba(0,0,0,0.08)',
-                border: '1px solid #edf2f7'
+                background: 'linear-gradient(135deg, #1e293b 0%, #312e81 100%)',
+                padding: '48px 40px',
+                textAlign: 'center' as const,
+                borderBottom: '1px solid rgba(255, 255, 255, 0.05)'
             }}>
-                {/* Header */}
                 <div style={{
-                    background: 'linear-gradient(135deg, #1e293b 0%, #334155 100%)',
-                    padding: '32px',
-                    textAlign: 'center'
+                    width: '80px',
+                    height: '80px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    borderRadius: '24px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: '24px',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    backdropFilter: 'blur(10px)'
                 }}>
-                    {institute.logoUrl && (
-                        <img src={institute.logoUrl} alt={institute.name} style={{ height: '48px', marginBottom: '16px' }} />
-                    )}
-                    <h1 style={{ color: '#ffffff', margin: 0, fontSize: '24px', fontWeight: '800', letterSpacing: '-0.025em' }}>
-                        {institute.name}
-                    </h1>
+                    <span style={{ fontSize: '40px' }}>🛡️</span>
                 </div>
+                <h1 style={{ fontSize: '32px', fontWeight: '800', color: '#ffffff', margin: 0, letterSpacing: '-0.03em' }}>
+                    Profile Update
+                </h1>
+                <p style={{ fontSize: '16px', color: '#94a3b8', marginTop: '12px' }}>
+                    Security Alert for {institute.name}
+                </p>
+            </div>
 
-                {/* Body */}
-                <div style={{ padding: '48px 40px' }}>
-                    <h2 style={{ fontSize: '24px', color: '#111827', fontWeight: '700', marginBottom: '16px', letterSpacing: '-0.025em' }}>
-                        Confirm your {updateType} change
-                    </h2>
-                    <p style={{ color: '#4b5563', fontSize: '16px', lineHeight: '28px', marginBottom: '32px' }}>
-                        Hello {firstName},<br /><br />
-                        We received a request to change your {updateType} to <strong>{newValue}</strong>.
-                        {updateType === 'email' ? ' To complete this change, please click the button below within the next 24 hours:' : ' This change is now awaiting administrator approval.'}
-                    </p>
+            <div style={{ padding: '48px 40px' }}>
+                <p style={{ fontSize: '18px', color: '#e2e8f0', marginBottom: '32px', fontWeight: '600' }}>
+                    Hello {firstName},
+                </p>
+                <p style={{ fontSize: '16px', lineHeight: '1.8', color: '#94a3b8', marginBottom: '32px' }}>
+                    We received a request to change your registered {updateType} to <strong>{newValue}</strong>.
+                    {updateType === 'email' ? ' To finalize this change, please confirm your new email address:' : ' This update is now pending administrative approval for security compliance.'}
+                </p>
 
-                    {updateType === 'email' && verificationLink && (
-                        <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-                            <a
-                                href={verificationLink}
-                                style={{
-                                    backgroundColor: '#2563eb',
-                                    color: '#ffffff',
-                                    padding: '16px 40px',
-                                    borderRadius: '12px',
-                                    textDecoration: 'none',
-                                    fontWeight: '700',
-                                    fontSize: '16px',
-                                    display: 'inline-block',
-                                    transition: 'background-color 0.2s'
-                                }}
-                            >
-                                Confirm Email Change
-                            </a>
-                        </div>
-                    )}
-
-                    <p style={{ color: '#6b7280', fontSize: '14px', marginTop: '32px', textAlign: 'center' }}>
-                        If you did not request this change, please secure your account immediately by changing your password.
-                    </p>
-                </div>
-
-                {/* Footer */}
-                <div style={{
-                    padding: '32px 40px',
-                    backgroundColor: '#f8fafc',
-                    borderTop: '1px solid #edf2f7',
-                    textAlign: 'center'
-                }}>
-                    <p style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', margin: '0 0 8px 0' }}>
-                        {institute.name}
-                    </p>
-                    <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '16px' }}>
-                        <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                            &copy; 2026 {institute.name} Learning Management System.
-                        </p>
+                {updateType === 'email' && verificationLink && (
+                    <div style={{ textAlign: 'center' as const, marginBottom: '40px' }}>
+                        <a
+                            href={verificationLink}
+                            style={{
+                                display: 'inline-block',
+                                backgroundColor: '#4f46e5',
+                                color: '#ffffff',
+                                padding: '20px 48px',
+                                borderRadius: '18px',
+                                textDecoration: 'none',
+                                fontWeight: '800',
+                                fontSize: '17px',
+                                boxShadow: '0 10px 25px -5px rgba(79, 70, 229, 0.4)'
+                            }}
+                        >
+                            Confirm Email Change
+                        </a>
                     </div>
+                )}
+
+                <div style={{ padding: '24px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <p style={{ fontSize: '14px', color: '#64748b', margin: 0, lineHeight: '1.6' }}>
+                        <strong>Not you?</strong> If you didn't request this change, please sign in and secure your account immediately or contact {institute.name} support.
+                    </p>
                 </div>
             </div>
+
+            <div style={{
+                padding: '48px 48px',
+                backgroundColor: 'rgba(0,0,0,0.2)',
+                textAlign: 'center' as const,
+                borderTop: '1px solid rgba(255, 255, 255, 0.05)'
+            }}>
+                <p style={{ fontSize: '15px', fontWeight: '800', color: '#ffffff', margin: '0 0 4px 0' }}>{institute.name}</p>
+                <p style={{ fontSize: '12px', color: '#475569', margin: 0, textTransform: 'uppercase' as const, letterSpacing: '0.1em' }}>
+                    Protected by Digital School Security v4.0
+                </p>
+            </div>
         </div>
-    );
-};
+    </div>
+);
 
 export default ProfileUpdateEmail;

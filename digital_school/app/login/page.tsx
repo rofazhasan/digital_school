@@ -17,7 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Eye, EyeOff, Loader2, AlertCircle, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, Mail, Phone, ArrowLeft, ArrowRight, ShieldCheck, CheckCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ControllerRenderProps } from 'react-hook-form';
 import { useSearchParams } from 'next/navigation';
@@ -46,6 +46,7 @@ function LoginContent() {
     const { toast } = useToast();
 
     const [sessionAlert, setSessionAlert] = useState<{ device: string, ip: string, time: string } | null>(null);
+    const [verificationSuccess, setVerificationSuccess] = useState<boolean>(false);
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -78,7 +79,19 @@ function LoginContent() {
                 }
             }
         }
-    }, [searchParams]);
+
+        if (searchParams.get('success') === 'email_verified') {
+            setVerificationSuccess(true);
+            toast({
+                title: "Email Verified Successfully!",
+                description: "You can now log in to your account.",
+                variant: "default",
+            });
+            // Clear message after 10 seconds
+            const timer = setTimeout(() => setVerificationSuccess(false), 10000);
+            return () => clearTimeout(timer);
+        }
+    }, [searchParams, toast]);
 
     const form = useForm<TLoginSchema>({
         resolver: zodResolver(loginSchema),
@@ -217,6 +230,27 @@ function LoginContent() {
 
                     <div className="space-y-6">
                         <AnimatePresence>
+                            {verificationSuccess && (
+                                <motion.div
+                                    initial={{ opacity: 0, scale: 0.9, y: -10 }}
+                                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className="mb-6"
+                                >
+                                    <Alert className="bg-primary/10 border-primary/20 text-primary dark:bg-primary/5 dark:border-primary/20 overflow-hidden relative group">
+                                        <div className="absolute inset-0 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 animate-pulse-slow"></div>
+                                        <div className="relative flex items-center gap-3 py-1">
+                                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary shrink-0 shadow-lg shadow-primary/10">
+                                                <CheckCircle className="w-6 h-6" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <h4 className="font-bold text-sm tracking-tight">Identity Verified</h4>
+                                                <p className="text-xs text-primary/70 font-medium">Your email has been successfully confirmed. Welcome aboard!</p>
+                                            </div>
+                                        </div>
+                                    </Alert>
+                                </motion.div>
+                            )}
                             {sessionAlert && (
                                 <motion.div
                                     initial={{ opacity: 0, height: 0 }}

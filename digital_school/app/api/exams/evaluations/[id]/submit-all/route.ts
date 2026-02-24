@@ -61,6 +61,11 @@ export async function POST(
       }
     }
 
+    // Trigger Final Release & Emails after all evaluations are processed
+    const { releaseExamResults } = await import("@/lib/exam-logic");
+    await releaseExamResults(examId);
+    console.log(`🚀 Manual release triggered for exam ${examId}`);
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error submitting all evaluations:", error);

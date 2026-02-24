@@ -4,6 +4,8 @@ import { evaluateMCQuestion } from "./evaluation/mcEvaluation";
 import { evaluateINTQuestion } from "./evaluation/intEvaluation";
 import { evaluateARQuestion } from "./evaluation/arEvaluation";
 import { evaluateMTFQuestion } from "./evaluation/mtfEvaluation";
+import { sendEmail } from "@/lib/email";
+import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 
 /**
  * Check if an exam consists only of MCQs
@@ -244,7 +246,6 @@ export async function releaseExamResults(examId: string) {
     const allResults = await prisma.result.findMany({
         where: { examId },
         orderBy: { total: 'desc' },
-        // Need to include students for debugging or notifications if added later, but for ranking just marks needed
     });
 
     // Calculate ranks
@@ -255,7 +256,6 @@ export async function releaseExamResults(examId: string) {
             const firstIndex = allResults.findIndex(r => r.total === result.total);
             rank = firstIndex + 1;
         }
-        // Only return the fields needed for update + id
         return { id: result.id, rank };
     });
 
@@ -271,7 +271,74 @@ export async function releaseExamResults(examId: string) {
         })
     ));
 
-    console.log(`🚀 Auto-released results for exam ${examId}. Published ${resultsWithRanks.length} results.`);
+    console.log(`🚀 Released results for exam ${examId}. Published ${resultsWithRanks.length} results.`);
+
+    // --- EMAIL NOTIFICATION LOGIC ---
+    try {
+        const exam = await prisma.exam.findUnique({
+            where: { id: examId },
+            include: { class: true }
+        });
+
+        const institute = await prisma.institute.findFirst({
+            select: { name: true, address: true, phone: true, logoUrl: true }
+        });
+
+        const resultsWithUsers = await prisma.result.findMany({
+            where: { examId, isPublished: true },
+            include: {
+                student: {
+                    include: {
+                        user: {
+                            select: { name: true, email: true }
+                        },
+                        class: { select: { name: true, section: true } }
+                    }
+                }
+            }
+        });
+
+        // Fetch all questions for this exam (using first set as reference for subjects)
+        const firstSet = await prisma.examSet.findFirst({
+            where: { examId }
+        });
+        const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
+
+        const emailPromises = resultsWithUsers
+            .filter(res => res.student.user.email) // Only send if student has email
+            .map(async (res) => {
+                // Map results to ResultItem format for email
+                // Note: The current result schema might not store per-subject marks in a way that maps perfectly to "results" prop in ExamResultEmail
+                // For now, we'll provide the overall summary and a generic entry for the exam subject
+                const resultItems = [{
+                    subject: (exam as any).subject || exam?.name || "General",
+                    marks: res.total,
+                    totalMarks: exam?.totalMarks || 100,
+                    grade: res.grade || "F"
+                }];
+
+                return sendEmail({
+                    to: res.student.user.email!,
+                    subject: `Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
+                    react: ExamResultEmail({
+                        studentName: res.student.user.name,
+                        examName: exam?.name || "Exam",
+                        results: resultItems,
+                        totalPercentage: res.percentage || 0,
+                        finalGrade: res.grade || "F",
+                        rank: res.rank || undefined,
+                        institute: institute as any,
+                        section: res.student.class?.section || undefined,
+                        examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined
+                    }) as any
+                });
+            });
+
+        await Promise.allSettled(emailPromises);
+        console.log(`✉️ Sent result emails to ${emailPromises.length} students.`);
+    } catch (emailError) {
+        console.error("Failed to send result emails:", emailError);
+    }
 }
 
 /**

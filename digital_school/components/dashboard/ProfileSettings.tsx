@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ interface UserProfile {
 }
 
 export function ProfileSettings({ user }: { user: UserProfile }) {
+    const router = useRouter();
     const [loading, setLoading] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
 
@@ -74,6 +76,7 @@ export function ProfileSettings({ user }: { user: UserProfile }) {
             if (res.ok) {
                 toast.success("Verification email sent to your new address");
                 setEmailPassword('');
+                router.refresh();
             } else {
                 toast.error(data.error || "Failed to initiate email change");
             }
@@ -99,6 +102,7 @@ export function ProfileSettings({ user }: { user: UserProfile }) {
             if (res.ok) {
                 toast.success("Phone change request submitted for admin approval");
                 setPhonePassword('');
+                router.refresh();
             } else {
                 toast.error(data.error || "Failed to submit phone change");
             }

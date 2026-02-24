@@ -2,6 +2,8 @@ import { getCurrentUser } from "@/lib/auth";
 import { ProfileSettings } from "@/components/dashboard/ProfileSettings";
 import { redirect } from "next/navigation";
 
+export const dynamic = 'force-dynamic';
+
 export default async function TeacherProfilePage() {
     const user = await getCurrentUser();
 

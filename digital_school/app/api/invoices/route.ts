@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from "@/lib/auth-options";
+import { getTokenFromRequest } from '@/lib/auth';
 import prisma from '@/lib/prisma';
 import {
     generateInvoiceNumber,
@@ -13,8 +12,8 @@ import {
 // GET /api/invoices - List invoices with filters
 export async function GET(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user) {
+        const auth = await getTokenFromRequest(request);
+        if (!auth?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
@@ -110,8 +109,8 @@ export async function GET(request: NextRequest) {
 // POST /api/invoices - Generate new invoice
 export async function POST(request: NextRequest) {
     try {
-        const session = await getServerSession(authOptions);
-        if (!session?.user || !['ADMIN', 'SUPER_USER'].includes((session.user as any).role)) {
+        const auth = await getTokenFromRequest(request);
+        if (!auth?.user || !['ADMIN', 'SUPER_USER'].includes(auth.user.role)) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
@@ -204,7 +203,7 @@ export async function POST(request: NextRequest) {
                 qrCode,
                 verificationUrl,
                 notes,
-                createdBy: session.user.id,
+                createdBy: auth.user.id,
             },
             include: {
                 student: {

@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { signupSchema, UserRole } from '@/lib/schemas/auth';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
+import { createToken, JWTPayload } from '@/lib/auth';
+import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
 import { sendEmail } from '@/lib/email';
@@ -57,7 +59,7 @@ export async function POST(request: NextRequest) {
         const verificationToken = validatedData.email ? crypto.randomUUID() : null;
 
         // Create user data
-        const userData: Prisma.UserCreateInput = {
+        const userData: any = {
             name: validatedData.name,
             password: hashedPassword,
             role: validatedData.role,
@@ -104,7 +106,7 @@ export async function POST(request: NextRequest) {
                         data: {
                             name: validatedData.class!,
                             section: validatedData.section!,
-                            instituteId: institute.id,
+                            instituteId: (institute as any).id,
                         }
                     });
                 }
@@ -147,6 +149,44 @@ export async function POST(request: NextRequest) {
             }
         });
 
+        // Create Session ID and Token for Auto-Login
+        const sessionId = uuidv4();
+
+        // Get device info
+        const userAgent = request.headers.get('user-agent') || 'Unknown Device';
+        const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'Unknown IP';
+
+        let deviceName = 'PC/Browser';
+        if (userAgent.includes('iPhone')) deviceName = 'iPhone';
+        else if (userAgent.includes('Android')) deviceName = 'Android Phone';
+        else if (userAgent.includes('iPad')) deviceName = 'iPad';
+        else if (userAgent.includes('Macintosh')) deviceName = 'Mac';
+        else if (userAgent.includes('Windows')) deviceName = 'Windows PC';
+
+        const sessionInfo = {
+            device: deviceName, ip, time: new Date().toISOString(), userAgent
+        };
+
+        const token = await createToken({
+            userId: user.id,
+            email: user.email || '',
+            role: user.role as JWTPayload['role'],
+            instituteId: user.instituteId || undefined,
+            sid: sessionId,
+            verified: (user as any).emailVerified,
+            approved: (user as any).isApproved,
+        });
+
+        // Update user session in DB
+        await (prismadb.user as any).update({
+            where: { id: user.id },
+            data: {
+                lastLoginAt: new Date(),
+                activeSessionId: sessionId,
+                lastSessionInfo: sessionInfo
+            },
+        });
+
         // Remove password from response
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
@@ -159,10 +199,11 @@ export async function POST(request: NextRequest) {
                 // Fetch institute data if associated
                 let institute = undefined;
                 if (user.instituteId) {
-                    institute = await (prismadb.institute as any).findUnique({
+                    const inst = await (prismadb.institute as any).findUnique({
                         where: { id: user.instituteId },
                         select: { name: true, address: true, phone: true, logoUrl: true }
-                    }) || undefined;
+                    });
+                    if (inst) institute = inst;
                 }
 
                 await sendEmail({
@@ -179,15 +220,26 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        return NextResponse.json(
+        const response = NextResponse.json(
             {
                 message: 'Account created successfully. ' +
                     (user.email ? 'Please check your email to verify your account. ' : '') +
                     (user.phone ? 'Your account is pending admin approval.' : ''),
-                user: userWithoutPassword
+                user: userWithoutPassword,
+                token
             },
             { status: 201 }
         );
+
+        // Set session token in cookies for auto-login
+        response.cookies.set('session-token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 60 * 60 * 24, // 24 hours
+        });
+
+        return response;
 
     } catch (error: unknown) {
         console.error('Signup error:', error);

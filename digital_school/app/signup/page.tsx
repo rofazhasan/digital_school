@@ -177,7 +177,10 @@ export default function SignupPage() {
                 } else {
                     triggerHaptic(ImpactStyle.Medium);
                     setSuccess(true);
-                    form.reset();
+                    // Redirect to pending page after a short delay
+                    setTimeout(() => {
+                        window.location.href = '/auth/pending';
+                    }, 1500);
                 }
             } catch {
                 triggerHaptic(ImpactStyle.Heavy);

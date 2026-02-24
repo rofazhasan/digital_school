@@ -79,12 +79,6 @@ export async function validateSession(token: string) {
       return { status: 'invalid' };
     }
 
-    if (!user.isActive) {
-      // If user is inactive, we return invalid, UNLESS it's a pending state
-      // But user said "if login a page come verify", so we need to allow 'pending'
-      return { status: 'invalid' };
-    }
-
     const isPending = !user.emailVerified || !user.isApproved;
     if (isPending) {
       return {
@@ -92,6 +86,10 @@ export async function validateSession(token: string) {
         user: { ...user } as any,
         reason: !user.emailVerified ? 'email' : 'approval'
       };
+    }
+
+    if (!user.isActive) {
+      return { status: 'invalid' };
     }
 
     // Single session validation
@@ -125,7 +123,7 @@ export async function validateSession(token: string) {
 // Get user from token (for API routes - includes database query)
 export async function getUserFromToken(token: string) {
   const { status, user } = await validateSession(token);
-  if (status === 'valid') return user;
+  if (status === 'valid' || status === 'pending') return user;
   return null;
 }
 

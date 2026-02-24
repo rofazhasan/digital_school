@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth-options';
+import { getTokenFromRequest } from '@/lib/auth';
 import prisma from '@/lib/db';
 
 export async function POST(request: Request) {
     try {
-        const session = await getServerSession(authOptions);
+        // Correct casting for request type if needed, but Request is usually fine for getTokenFromRequest if it handles it
+        // Basic cast to any to avoid type mismatch in the utility if necessary
+        const auth = await getTokenFromRequest(request as any);
 
         // Check Auth
-        if (!session || !session.user || !['ADMIN', 'TEACHER', 'SUPER_USER'].includes(session.user.role)) {
+        if (!auth || !auth.user || !['ADMIN', 'TEACHER', 'SUPER_USER'].includes(auth.user.role)) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
