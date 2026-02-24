@@ -29,8 +29,8 @@ export async function POST(request: NextRequest) {
         });
 
         if (!user) {
-            // For security reasons, don't reveal that the user doesn't exist
-            return NextResponse.json({ message: 'If an account exists, instructions have been sent.' });
+            console.log('[FORGOT_PASSWORD] User not found for identifier:', identifier);
+            return NextResponse.json({ message: 'No account found with that email or phone number.' }, { status: 404 });
         }
 
         // Generate token and expiry (1 hour)
@@ -47,9 +47,10 @@ export async function POST(request: NextRequest) {
 
         // 1. If user has an email, send the professional email
         if (user.email) {
-            const resetLink = `${process.env.NEXT_PUBLIC_APP_URL}/reset-password?token=${token}`;
+            const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
+            console.log('[FORGOT_PASSWORD] Attempting to send email to:', user.email, 'Link:', resetLink);
 
-            await sendEmail({
+            const emailResult = await sendEmail({
                 to: user.email,
                 subject: 'Reset your password',
                 react: PasswordResetEmail({
@@ -64,8 +65,17 @@ export async function POST(request: NextRequest) {
                 }) as any,
             });
 
+            if (!emailResult.success) {
+                console.error('[FORGOT_PASSWORD] Email delivery failed:', emailResult.error);
+                return NextResponse.json({
+                    message: 'Failed to send recovery email. Please try again later.',
+                    error: emailResult.error
+                }, { status: 500 });
+            }
+
+            console.log('[FORGOT_PASSWORD] Email sent successfully to:', user.email);
             return NextResponse.json({
-                message: 'If an account exists with that email, a reset link has been sent.',
+                message: 'A password reset link has been sent to your registered email.',
                 type: 'email'
             });
         }

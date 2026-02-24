@@ -35,6 +35,8 @@ export default function ForgotPasswordPage() {
     const onSubmit = (data: TForgotPasswordSchema) => {
         triggerHaptic(ImpactStyle.Medium);
         setError(null);
+        console.log('[FORGOT_PASSWORD] Submitting identifier:', data.identifier);
+
         startTransition(async () => {
             try {
                 const response = await fetch('/api/auth/forgot-password', {
@@ -43,20 +45,24 @@ export default function ForgotPasswordPage() {
                     body: JSON.stringify(data),
                 });
                 const result = await response.json();
+
+                console.log('[FORGOT_PASSWORD] Server response:', response.status, result);
+
                 if (!response.ok) {
                     triggerHaptic(ImpactStyle.Heavy);
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
                     triggerHaptic(ImpactStyle.Medium);
                     if (result.type === 'phone' && result.token) {
-                        // For phone users, no email verification is needed as requested.
-                        // We redirect directly to the reset page.
+                        console.log('[FORGOT_PASSWORD] Phone flow detected, redirecting...');
                         window.location.href = `/reset-password?token=${result.token}`;
                     } else {
+                        console.log('[FORGOT_PASSWORD] Email flow successful');
                         setSuccess(true);
                     }
                 }
-            } catch {
+            } catch (err) {
+                console.error('[FORGOT_PASSWORD] Network error:', err);
                 triggerHaptic(ImpactStyle.Heavy);
                 setError('Failed to connect to the server. Please try again.');
             }
