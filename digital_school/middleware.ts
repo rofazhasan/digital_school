@@ -32,7 +32,9 @@ const ROUTE_PERMISSIONS = {
     '/favicon.ico',
     '/_next',
     '/api/webhooks',
-    '/maintenance'
+    '/maintenance',
+    '/forgot-password',
+    '/reset-password'
   ],
 
   // Super User routes
