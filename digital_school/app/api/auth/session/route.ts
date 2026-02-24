@@ -11,12 +11,14 @@ export async function GET(req: NextRequest) {
         const { status, user, lastSessionInfo } = await validateSession(sessionToken);
 
         if (status === 'valid' && user) {
-            return NextResponse.json({
+            const response = NextResponse.json({
                 authenticated: true,
                 status: 'valid',
                 user: user,
                 sid: (user as any).activeSessionId
             });
+            response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            return response;
         }
 
         if (status === 'mismatch') {

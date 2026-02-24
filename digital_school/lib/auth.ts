@@ -81,6 +81,12 @@ export async function validateSession(token: string) {
 
     // Single session validation
     if ((user as any).activeSessionId && (user as any).activeSessionId !== payload.sid) {
+      console.warn('[AUTH] Session mismatch detected:', {
+        userId: user.id,
+        dbSid: (user as any).activeSessionId,
+        tokenSid: payload.sid,
+        reason: 'mismatch'
+      });
       return {
         status: 'mismatch',
         user,

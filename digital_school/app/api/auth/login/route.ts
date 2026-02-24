@@ -114,6 +114,7 @@ export async function POST(request: NextRequest) {
 
         // Update user session in DB - DEFENSIVE WRAPPER
         try {
+            console.log('[LOGIN] Updating session for user:', user.id, 'sid:', sessionId);
             await prismadb.user.update({
                 where: { id: user.id },
                 data: {
@@ -122,8 +123,9 @@ export async function POST(request: NextRequest) {
                     lastSessionInfo: sessionInfo
                 } as any,
             });
+            console.log('[LOGIN] Session updated successfully in DB');
         } catch (dbError: any) {
-            console.error('[LOGIN] DB Session update failed. Run "npx prisma db push".', dbError.message);
+            console.error('[LOGIN] DB Session update failed:', dbError.message);
         }
 
         // Return user data without password

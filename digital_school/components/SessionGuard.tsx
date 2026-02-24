@@ -9,7 +9,7 @@ export default function SessionGuard() {
     const isShowingModal = useRef(false);
 
     // Don't run on public pages
-    const isPublicPage = ['/login', '/signup', '/setup', '/maintenance'].includes(pathname);
+    const isPublicPage = ['/', '/login', '/signup', '/setup', '/maintenance', '/forgot-password', '/reset-password'].includes(pathname);
 
     const handleForcedLogout = (data: any) => {
         if (isShowingModal.current) return;
