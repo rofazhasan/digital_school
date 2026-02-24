@@ -12,6 +12,7 @@ interface WelcomeEmailProps {
     institute?: InstituteData;
     baseUrl?: string;
     temporaryPassword?: string;
+    verificationLink?: string;
 }
 
 export const WelcomeEmail: React.FC<Readonly<WelcomeEmailProps>> = ({
@@ -19,6 +20,7 @@ export const WelcomeEmail: React.FC<Readonly<WelcomeEmailProps>> = ({
     institute = { name: 'Digital School' },
     baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitalschool.netlify.app',
     temporaryPassword,
+    verificationLink,
 }) => (
     <div style={{
         fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
@@ -56,6 +58,33 @@ export const WelcomeEmail: React.FC<Readonly<WelcomeEmailProps>> = ({
                 <p style={{ fontSize: '18px', color: '#1e293b', lineHeight: '1.7', marginBottom: '32px' }}>
                     Hello **{firstName}**, we're thrilled to have you join our academic community. Your digital workspace is now ready for exploration.
                 </p>
+
+                {verificationLink && (
+                    <div style={{ padding: '32px', backgroundColor: '#f0fdf4', borderRadius: '20px', marginBottom: '32px', border: '1px solid #dcfce7', textAlign: 'center' as const }}>
+                        <p style={{ margin: 0, fontWeight: '800', color: '#166534', fontSize: '14px', marginBottom: '16px', textTransform: 'uppercase' as const, letterSpacing: '0.05em' }}>
+                            Action Required: Verify your email
+                        </p>
+                        <a
+                            href={verificationLink}
+                            style={{
+                                display: 'inline-block',
+                                backgroundColor: '#22c55e',
+                                color: '#ffffff',
+                                padding: '16px 32px',
+                                borderRadius: '12px',
+                                textDecoration: 'none',
+                                fontWeight: '700',
+                                fontSize: '16px',
+                                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.2)'
+                            }}
+                        >
+                            Verify Email Address
+                        </a>
+                        <p style={{ margin: '16px 0 0 0', fontSize: '13px', color: '#15803d' }}>
+                            This link will expire in 24 hours.
+                        </p>
+                    </div>
+                )}
 
                 {temporaryPassword && (
                     <div style={{ padding: '32px', backgroundColor: '#fefce8', borderRadius: '20px', marginBottom: '32px', border: '1px solid #fef08a', textAlign: 'center' as const }}>

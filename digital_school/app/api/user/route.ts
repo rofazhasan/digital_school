@@ -23,13 +23,8 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const all = url.searchParams.get('all');
     if (all === 'true' && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
-      const users = await prismadb.user.findMany({
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          phone: true,
-          role: true,
+      const users = await (prismadb.user as any).findMany({
+        include: {
           studentProfile: {
             select: {
               roll: true,
@@ -45,6 +40,9 @@ export async function GET(request: NextRequest) {
           email: u.email,
           phone: u.phone || '',
           role: u.role,
+          isActive: u.isActive,
+          emailVerified: u.emailVerified,
+          isApproved: u.isApproved,
           class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
           section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
           roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
@@ -87,11 +85,11 @@ export async function POST(request: NextRequest) {
 
         // Check if user exists (by email OR phone)
         if (email) {
-          const existingEmail = await prismadb.user.findUnique({ where: { email } });
+          const existingEmail = await (prismadb.user as any).findUnique({ where: { email } });
           if (existingEmail) throw new Error(`User with email ${email} already exists`);
         }
         if (phone) {
-          const existingPhone = await prismadb.user.findUnique({ where: { phone } });
+          const existingPhone = await (prismadb.user as any).findUnique({ where: { phone } });
           if (existingPhone) throw new Error(`User with phone ${phone} already exists`);
         }
         let classId = undefined;
@@ -106,13 +104,16 @@ export async function POST(request: NextRequest) {
           }
           classId = classRecord.id;
         }
-        const created = await prismadb.user.create({
+        const created = await (prismadb.user as any).create({
           data: {
             name,
             email,
             phone, // Add phone to user creation
             password: await bcrypt.hash(user.password || 'TempPass123!', 12), // Use provided password or default
             role,
+            isActive: true, // Direct admin addition bypasses verification
+            emailVerified: true,
+            isApproved: true,
             instituteId: authData.user.instituteId,
             studentProfile: role === 'STUDENT' && classId ? {
               create: {
@@ -184,7 +185,7 @@ export async function PATCH(request: NextRequest) {
     if (!id) return NextResponse.json({ error: 'User id is required' }, { status: 400 });
 
     // Check Permissions for Edit
-    const userToEdit = await prismadb.user.findUnique({ where: { id } });
+    const userToEdit = await (prismadb.user as any).findUnique({ where: { id } });
     if (!userToEdit) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
     if (authData.user.role === 'ADMIN') {
@@ -198,9 +199,15 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Update user
-    const updatedUser = await prismadb.user.update({
+    const updatedUser = await (prismadb.user as any).update({
       where: { id },
-      data: { name, email, role },
+      data: {
+        name,
+        email,
+        role,
+        isApproved: body.isApproved !== undefined ? body.isApproved : undefined,
+        isActive: body.isActive !== undefined ? body.isActive : undefined,
+      },
     });
     // If student, update class
     if (role === 'STUDENT' && className) {
@@ -257,7 +264,7 @@ export async function DELETE(request: NextRequest) {
     // Function to delete a single user
     const deleteSingleUser = async (targetId: string) => {
       // Fetch user
-      const userToDelete = await prismadb.user.findUnique({ where: { id: targetId } });
+      const userToDelete = await (prismadb.user as any).findUnique({ where: { id: targetId } });
       if (!userToDelete) throw new Error(`User ${targetId} not found`);
 
       // Check Permissions

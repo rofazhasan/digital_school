@@ -13,6 +13,8 @@ interface JWTPayload {
   email: string;
   role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
   instituteId?: string;
+  verified?: boolean;
+  approved?: boolean;
   iat: number;
   exp: number;
 }
@@ -28,13 +30,15 @@ const ROUTE_PERMISSIONS = {
     '/api/auth/login',
     '/api/auth/signup',
     '/api/auth/logout',
+    '/api/auth/verify-email',
     '/api/setup/super-user',
     '/favicon.ico',
     '/_next',
     '/api/webhooks',
     '/maintenance',
     '/forgot-password',
-    '/reset-password'
+    '/reset-password',
+    '/auth/pending'
   ],
 
   // Super User routes
@@ -301,6 +305,16 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
+  }
+
+  // Handle pending verification/approval
+  // Exclude Admins and Super Users from this check if needed, 
+  // but strictly speaking, even they should be verified if self-signed up.
+  // HOWEVER, the user said "admin/superuser can add user like previous with no code and nothing needed"
+  // which I handled by setting their flags to true on creation.
+  const isPending = userData.verified === false || userData.approved === false;
+  if (isPending && pathname !== '/auth/pending' && !pathname.startsWith('/api/')) {
+    return NextResponse.redirect(new URL('/auth/pending', request.url));
   }
 
   // Handle /dashboard route - redirect to role-specific dashboard

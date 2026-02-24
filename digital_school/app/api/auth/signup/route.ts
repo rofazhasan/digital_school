@@ -1,5 +1,6 @@
 // app/api/auth/signup/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
 import { signupSchema, UserRole } from '@/lib/schemas/auth';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
 
         // Check if user already exists by email (if email is provided)
         if (validatedData.email) {
-            const existingUserByEmail = await prismadb.user.findUnique({
+            const existingUserByEmail = await (prismadb.user as any).findUnique({
                 where: { email: validatedData.email }
             });
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
 
         // Check if user already exists by phone (if phone is provided)
         if (validatedData.phone) {
-            const existingUserByPhone = await prismadb.user.findUnique({
+            const existingUserByPhone = await (prismadb.user as any).findUnique({
                 where: { phone: validatedData.phone }
             });
 
@@ -52,11 +53,18 @@ export async function POST(request: NextRequest) {
         // Hash the password
         const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
+        // Generate verification token if email is provided
+        const verificationToken = validatedData.email ? crypto.randomUUID() : null;
+
         // Create user data
         const userData: Prisma.UserCreateInput = {
             name: validatedData.name,
             password: hashedPassword,
             role: validatedData.role,
+            isActive: false, // Default to inactive for self-signup until verified/approved
+            emailVerified: !validatedData.email, // If no email, mark as verified (or handled by approval)
+            isApproved: !validatedData.phone, // If no phone, mark as approved (or handled by verification)
+            verificationToken,
             institute: validatedData.instituteId ? { connect: { id: validatedData.instituteId } } : undefined,
         };
 
@@ -69,10 +77,11 @@ export async function POST(request: NextRequest) {
         }
 
         // Add student-specific fields if role is STUDENT
+        /* ... roll/reg logic same ... */
         if (validatedData.role === UserRole.STUDENT) {
             try {
                 // First, we need to find or create the class
-                let classRecord = await prismadb.class.findFirst({
+                let classRecord = await (prismadb.class as any).findFirst({
                     where: {
                         name: validatedData.class!,
                         section: validatedData.section!,
@@ -83,7 +92,7 @@ export async function POST(request: NextRequest) {
                     // Create a default institute if none exists
                     let institute = await prismadb.institute.findFirst();
                     if (!institute) {
-                        institute = await prismadb.institute.create({
+                        institute = await (prismadb.institute as any).create({
                             data: {
                                 name: "Default Institute",
                                 email: "default@institute.com",
@@ -91,7 +100,7 @@ export async function POST(request: NextRequest) {
                         });
                     }
 
-                    classRecord = await prismadb.class.create({
+                    classRecord = await (prismadb.class as any).create({
                         data: {
                             name: validatedData.class!,
                             section: validatedData.section!,
@@ -130,7 +139,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Create the user
-        const user = await prismadb.user.create({
+        const user = await (prismadb.user as any).create({
             data: userData,
             include: {
                 studentProfile: validatedData.role === UserRole.STUDENT,
@@ -142,13 +151,15 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
 
-        // Send Welcome Email if email is provided
-        if (user.email) {
+        // Send Verification Email if email is provided
+        if (user.email && verificationToken) {
             try {
+                const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${verificationToken}`;
+
                 // Fetch institute data if associated
                 let institute = undefined;
                 if (user.instituteId) {
-                    institute = await prismadb.institute.findUnique({
+                    institute = await (prismadb.institute as any).findUnique({
                         where: { id: user.instituteId },
                         select: { name: true, address: true, phone: true, logoUrl: true }
                     }) || undefined;
@@ -156,21 +167,23 @@ export async function POST(request: NextRequest) {
 
                 await sendEmail({
                     to: user.email,
-                    subject: `Welcome to ${institute?.name || 'Digital School'}`,
+                    subject: `Verify your email - ${institute?.name || 'Digital School'}`,
                     react: WelcomeEmail({
                         firstName: user.name.split(' ')[0],
-                        institute: institute as any
+                        institute: institute as any,
+                        verificationLink // Pass the link to the email template
                     }) as any,
                 });
             } catch (emailError) {
-                // Don't fail the signup if email fails, but log it
-                console.error('Failed to send welcome email:', emailError);
+                console.error('Failed to send verification email:', emailError);
             }
         }
 
         return NextResponse.json(
             {
-                message: 'User created successfully.',
+                message: 'Account created successfully. ' +
+                    (user.email ? 'Please check your email to verify your account. ' : '') +
+                    (user.phone ? 'Your account is pending admin approval.' : ''),
                 user: userWithoutPassword
             },
             { status: 201 }

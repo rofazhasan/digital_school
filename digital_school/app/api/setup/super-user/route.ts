@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
   try {
     // Log the request for debugging
     console.log('[SETUP API] Starting super user creation process');
-    
+
     const body = await request.json();
     const { name, email, password, institute } = body;
 
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // Create super user
     console.log('[SETUP API] Creating super user...');
-    const superUser = await prismadb.user.create({
+    const superUser = await (prismadb.user as any).create({
       data: {
         name,
         email,
@@ -109,6 +109,8 @@ export async function POST(request: NextRequest) {
         role: 'SUPER_USER',
         instituteId: createdInstitute.id,
         isActive: true,
+        emailVerified: true,
+        isApproved: true,
       },
       include: {
         institute: true,
@@ -130,6 +132,9 @@ export async function POST(request: NextRequest) {
       email: superUser.email || '',
       role: superUser.role as JWTPayload['role'],
       instituteId: superUser.instituteId || undefined,
+      sid: crypto.randomUUID(),
+      verified: true,
+      approved: true,
     });
     console.log('[SETUP API] JWT token created successfully');
 
@@ -158,7 +163,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('[SETUP API] Error during super user creation:', error);
-    
+
     // Provide more specific error messages
     if (error instanceof Error) {
       if (error.message.includes('DATABASE_URL')) {
@@ -192,7 +197,7 @@ export async function POST(request: NextRequest) {
         );
       }
     }
-    
+
     return NextResponse.json(
       { error: 'Internal server error. Please check the server logs for more details.' },
       { status: 500 }

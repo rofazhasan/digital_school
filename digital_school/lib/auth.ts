@@ -15,6 +15,8 @@ export interface JWTPayload {
   role: 'SUPER_USER' | 'ADMIN' | 'TEACHER' | 'STUDENT';
   instituteId?: string;
   sid: string;
+  verified?: boolean;
+  approved?: boolean;
   iat: number;
   exp: number;
 }
@@ -53,11 +55,9 @@ export async function validateSession(token: string) {
     // Defensive check for database query
     let user;
     try {
-      user = await prismadb.user.findUnique({
+      user = await (prismadb.user as any).findUnique({
         where: { id: payload.userId },
-        select: {
-          id: true, email: true, name: true, role: true, isActive: true,
-          activeSessionId: true, lastSessionInfo: true, instituteId: true,
+        include: {
           institute: { select: { id: true, name: true } },
           studentProfile: {
             select: {
@@ -75,8 +75,23 @@ export async function validateSession(token: string) {
       return { status: 'valid', user: { id: payload.userId, role: payload.role } as any };
     }
 
-    if (!user || !user.isActive) {
+    if (!user) {
       return { status: 'invalid' };
+    }
+
+    if (!user.isActive) {
+      // If user is inactive, we return invalid, UNLESS it's a pending state
+      // But user said "if login a page come verify", so we need to allow 'pending'
+      return { status: 'invalid' };
+    }
+
+    const isPending = !user.emailVerified || !user.isApproved;
+    if (isPending) {
+      return {
+        status: 'pending',
+        user: { ...user } as any,
+        reason: !user.emailVerified ? 'email' : 'approval'
+      };
     }
 
     // Single session validation

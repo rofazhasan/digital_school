@@ -25,6 +25,9 @@ type User = {
     section?: string;
     roll?: string;
     avatar?: string;
+    emailVerified?: boolean;
+    isApproved?: boolean;
+    isActive?: boolean;
 };
 
 const roleLabels: Record<User['role'], string> = {
@@ -301,6 +304,23 @@ export default function AdminUsersPage() {
         }
     };
 
+    const handleApproveUser = async (id: string) => {
+        try {
+            setLoading(true);
+            const res = await fetch('/api/user', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, isApproved: true, isActive: true })
+            });
+            if (!res.ok) throw new Error('Failed to approve user');
+            await refreshUsers();
+        } catch (err: any) {
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleDeleteUser = async (id: string) => {
         if (!confirm("Are you sure you want to delete this user?")) return;
         setLoading(true);
@@ -535,7 +555,7 @@ export default function AdminUsersPage() {
                                 <TableHead>User</TableHead>
                                 <TableHead>Role</TableHead>
                                 <TableHead>Contact</TableHead>
-                                <TableHead>Details</TableHead>
+                                <TableHead>Status</TableHead>
                                 <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -594,18 +614,33 @@ export default function AdminUsersPage() {
                                                 )}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-sm text-gray-600">
-                                            {user.role === 'STUDENT' ? (
-                                                <div className="flex items-center gap-2">
-                                                    <span className="bg-gray-100 px-2 py-0.5 rounded">Class {user.class} - {user.section}</span>
-                                                    <span className="text-xs text-gray-400">Roll: {user.roll}</span>
-                                                </div>
-                                            ) : (
-                                                <span className="text-gray-400 italic">N/A</span>
-                                            )}
+                                        <TableCell>
+                                            <div className="flex flex-col gap-1">
+                                                {user.email && (
+                                                    <Badge variant="outline" className={`${user.emailVerified ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'} text-[10px] px-1.5 h-4 w-fit`}>
+                                                        {user.emailVerified ? 'Email Verified' : 'Email Pending'}
+                                                    </Badge>
+                                                )}
+                                                {user.phone && (
+                                                    <Badge variant="outline" className={`${user.isApproved ? 'bg-green-50 text-green-700 border-green-200' : 'bg-amber-50 text-amber-700 border-amber-200'} text-[10px] px-1.5 h-4 w-fit`}>
+                                                        {user.isApproved ? 'Approved' : 'Pending Approval'}
+                                                    </Badge>
+                                                )}
+                                            </div>
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex justify-end gap-1">
+                                                {!user.isApproved && user.phone && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-8 w-8 text-green-600 hover:bg-green-50"
+                                                        onClick={() => handleApproveUser(user.id)}
+                                                        title="Approve User"
+                                                    >
+                                                        <CheckCircle className="h-4 w-4" />
+                                                    </Button>
+                                                )}
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"

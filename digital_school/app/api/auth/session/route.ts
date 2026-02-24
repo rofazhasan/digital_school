@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ authenticated: false, status: 'no_token' }, { status: 401 });
         }
 
-        const { status, user, lastSessionInfo } = await validateSession(sessionToken);
+        const sessionResult = await validateSession(sessionToken);
+        const { status, user, lastSessionInfo } = sessionResult;
 
         if (status === 'valid' && user) {
             const response = NextResponse.json({
@@ -19,6 +20,15 @@ export async function GET(req: NextRequest) {
             });
             response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
             return response;
+        }
+
+        if (status === 'pending') {
+            return NextResponse.json({
+                authenticated: true,
+                status: 'pending',
+                user: user,
+                reason: (sessionResult as any).reason
+            });
         }
 
         if (status === 'mismatch') {
