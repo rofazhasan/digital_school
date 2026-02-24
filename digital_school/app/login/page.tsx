@@ -13,6 +13,7 @@ import {
     FormLabel,
     FormMessage,
 } from '@/components/ui/form';
+import { useToast } from "@/components/ui/use-toast";
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,6 +43,7 @@ function LoginContent() {
     const [showPassword, setShowPassword] = useState(false);
     const [mounted, setMounted] = useState(false);
     const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
+    const { toast } = useToast();
 
     const [sessionAlert, setSessionAlert] = useState<{ device: string, ip: string, time: string } | null>(null);
     const searchParams = useSearchParams();
@@ -321,7 +323,7 @@ function LoginContent() {
                                         <FormItem>
                                             <div className="flex items-center justify-between">
                                                 <FormLabel className="text-foreground/80">Password</FormLabel>
-                                                <Link href="#" className="text-xs font-medium text-primary hover:underline">
+                                                <Link href="/forgot-password" title="Recover your account" className="text-xs font-medium text-primary hover:underline transition-all">
                                                     Forgot Password?
                                                 </Link>
                                             </div>
@@ -386,7 +388,7 @@ function LoginContent() {
                                     onClick={async () => {
                                         const success = await performBiometricAuth();
                                         if (success) {
-                                            toast.success('Biometric identity verified.');
+                                            toast({ title: 'Success', description: 'Biometric identity verified.' });
                                         }
                                     }}
                                 >

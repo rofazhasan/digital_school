@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getTokenFromRequest } from "@/lib/auth";
 import { getDatabaseClient } from "@/lib/db-init";
 import bcrypt from 'bcryptjs';
+import { sendEmail } from "@/lib/email";
+import { WelcomeEmail } from "@/components/emails/WelcomeEmail";
 
 export async function GET(request: NextRequest) {
   try {
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(body)) {
       return NextResponse.json({ error: 'Expected an array of users' }, { status: 400 });
     }
-    const results = [];
+    const results: { success: boolean, error?: string, user?: { id: string, name: string, email: string | null, role: any } }[] = [];
     for (const user of body) {
       try {
         const { name, email, phone, role, class: className, section } = user;
@@ -128,6 +130,38 @@ export async function POST(request: NextRequest) {
         results.push({ success: false, error: err.message, user });
       }
     }
+
+    // Proactive: Send Welcome Emails for successfully created users in background
+    const sendBulkWelcomeEmails = async () => {
+      try {
+        const institute = await prismadb.institute.findFirst({
+          select: { name: true, address: true, phone: true, logoUrl: true }
+        });
+
+        const emailPromises = results.filter(r => r.success && r.user?.email).map(async (res) => {
+          // Find the original user data to get the raw password (if any)
+          const originalUser = body.find(u => u.email === res.user?.email);
+          const tempPassword = originalUser?.password || 'TempPass123!';
+
+          return sendEmail({
+            to: res.user!.email!,
+            subject: `Welcome to ${institute?.name || 'Digital School'}`,
+            react: WelcomeEmail({
+              firstName: res.user!.name.split(' ')[0],
+              institute: institute as any,
+              temporaryPassword: tempPassword
+            }) as any
+          });
+        });
+
+        await Promise.allSettled(emailPromises);
+      } catch (err) {
+        console.error('Failed to send bulk welcome emails:', err);
+      }
+    };
+
+    sendBulkWelcomeEmails();
+
     return NextResponse.json({ results });
   } catch (error) {
     console.error('Bulk user add error:', error);

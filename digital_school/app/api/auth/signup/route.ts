@@ -4,6 +4,8 @@ import { signupSchema, UserRole } from '@/lib/schemas/auth';
 import prismadb from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { Prisma } from '@prisma/client';
+import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
+import { sendEmail } from '@/lib/email';
 
 /**
  * POST handler for production-ready user signup.
@@ -139,6 +141,32 @@ export async function POST(request: NextRequest) {
         // Remove password from response
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
+
+        // Send Welcome Email if email is provided
+        if (user.email) {
+            try {
+                // Fetch institute data if associated
+                let institute = undefined;
+                if (user.instituteId) {
+                    institute = await prismadb.institute.findUnique({
+                        where: { id: user.instituteId },
+                        select: { name: true, address: true, phone: true, logoUrl: true }
+                    }) || undefined;
+                }
+
+                await sendEmail({
+                    to: user.email,
+                    subject: `Welcome to ${institute?.name || 'Digital School'}`,
+                    react: WelcomeEmail({
+                        firstName: user.name.split(' ')[0],
+                        institute: institute as any
+                    }) as any,
+                });
+            } catch (emailError) {
+                // Don't fail the signup if email fails, but log it
+                console.error('Failed to send welcome email:', emailError);
+            }
+        }
 
         return NextResponse.json(
             {

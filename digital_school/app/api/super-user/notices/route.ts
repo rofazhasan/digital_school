@@ -1,6 +1,8 @@
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
+import { sendEmail } from "@/lib/email";
+import { NoticeEmail } from "@/components/emails/NoticeEmail";
 
 export async function POST(req: NextRequest) {
     try {
@@ -67,6 +69,65 @@ export async function POST(req: NextRequest) {
                 // priority is missing in schema, so cannot save it directly.
             }
         });
+
+
+        // Proactive: Send Notice Emails to relevant users in background
+        const sendNoticeAlerts = async () => {
+            try {
+                const institute = await prisma.institute.findFirst({
+                    select: { name: true, address: true, phone: true, logoUrl: true }
+                });
+
+                // Determine target users based on targetType and targetClassIds
+                let targetUsers: { id: string, name: string, email: string | null }[] = [];
+
+                if (targetType === 'ALL') {
+                    targetUsers = await prisma.user.findMany({
+                        where: { role: { in: ['STUDENT', 'TEACHER'] }, email: { not: null } },
+                        select: { id: true, name: true, email: true }
+                    });
+                } else if (targetType === 'STUDENTS') {
+                    targetUsers = await prisma.user.findMany({
+                        where: { role: 'STUDENT', email: { not: null } },
+                        select: { id: true, name: true, email: true }
+                    });
+                } else if (targetType === 'TEACHERS') {
+                    targetUsers = await prisma.user.findMany({
+                        where: { role: 'TEACHER', email: { not: null } },
+                        select: { id: true, name: true, email: true }
+                    });
+                } else if (targetType === 'SPECIFIC_CLASS' && targetClassIds) {
+                    targetUsers = await prisma.user.findMany({
+                        where: {
+                            studentProfile: { classId: { in: targetClassIds } },
+                            email: { not: null }
+                        },
+                        select: { id: true, name: true, email: true }
+                    });
+                }
+
+                const emailPromises = targetUsers.map(user => {
+                    return sendEmail({
+                        to: user.email!,
+                        subject: `Notice: ${title}`,
+                        react: NoticeEmail({
+                            title,
+                            description,
+                            postedBy: session.user.name,
+                            publishDate: new Date().toLocaleDateString(),
+                            priority: priority as any,
+                            institute: institute as any
+                        }) as any
+                    });
+                });
+
+                await Promise.allSettled(emailPromises);
+            } catch (err) {
+                console.error('Failed to send notice alerts:', err);
+            }
+        };
+
+        sendNoticeAlerts();
 
         return NextResponse.json({ notice });
     } catch (error) {
