@@ -39,7 +39,9 @@ import {
   ChevronDown,
   Target,
   Users,
-  CheckCircle
+  CheckCircle,
+  Lock,
+  ArrowLeft
 } from "lucide-react";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
@@ -49,9 +51,9 @@ const FocusMode = dynamic(() => import("@/components/dashboard/wonderspace/Focus
 const AmbientPlayer = dynamic(() => import("@/components/dashboard/wonderspace/AmbientPlayer").then(mod => mod.AmbientPlayer), { ssr: false });
 const MoodJournal = dynamic(() => import("@/components/dashboard/wonderspace/MoodJournal").then(mod => mod.MoodJournal), { ssr: false });
 
-// New AI Components
 import { AIAnalysisCard } from "@/components/dashboard/student/AIAnalysisCard";
 import { PerformancePredictor } from "@/components/dashboard/student/PerformancePredictor";
+import { SecuritySettings } from "@/components/dashboard/SecuritySettings";
 
 // Chart Components
 import {
@@ -399,7 +401,7 @@ export default function StudentDashboardPage() {
                     <Settings className="mr-2 h-4 w-4" />
                     <span>Settings</span>
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
+                  <DropdownMenuItem onClick={() => setActiveTab('settings')} className="rounded-lg cursor-pointer py-2.5 focus:bg-gray-100 dark:focus:bg-gray-800">
                     <User className="mr-2 h-4 w-4" />
                     <span>Change Password</span>
                   </DropdownMenuItem>
@@ -1048,7 +1050,39 @@ export default function StudentDashboardPage() {
 
               {activeTab === 'results' && <div className="p-4"><h1 className="text-2xl font-bold">Results Module</h1><p className="text-muted-foreground">Redirecting...</p>{/* Logic to redirect handled in nav */}</div>}
               {activeTab === 'analytics' && <StudentAnalyticsTab analytics={analytics} />}
-              {/* Other tabs placeholders */}
+              {activeTab === 'settings' && (
+                <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="mb-8 p-6 bg-gradient-to-r from-blue-600/10 to-indigo-600/10 rounded-3xl border border-blue-500/20">
+                    <h1 className="text-3xl font-bold mb-2">Account Settings</h1>
+                    <p className="text-muted-foreground">Manage your profile and security preferences</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                    <div className="md:col-span-1 space-y-2">
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 bg-primary text-primary-foreground hover:bg-primary/90 rounded-2xl h-12"
+                      >
+                        <Lock className="w-5 h-5" />
+                        <span className="font-semibold">Security</span>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start gap-3 rounded-2xl h-12 hover:bg-muted"
+                        onClick={() => setActiveTab('dashboard')}
+                      >
+                        <ArrowLeft className="w-5 h-5" />
+                        <span>Dashboard</span>
+                      </Button>
+                    </div>
+                    <Card className="md:col-span-3 border-border shadow-2xl shadow-primary/5 rounded-3xl overflow-hidden">
+                      <CardContent className="pt-8 pb-10">
+                        <SecuritySettings />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
+              )}
 
             </motion.div>
           </AnimatePresence>

@@ -28,7 +28,7 @@ export default function ForgotPasswordPage() {
     const form = useForm<TForgotPasswordSchema>({
         resolver: zodResolver(forgotPasswordSchema),
         defaultValues: {
-            email: '',
+            identifier: '',
         },
     });
 
@@ -48,7 +48,13 @@ export default function ForgotPasswordPage() {
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
                     triggerHaptic(ImpactStyle.Medium);
-                    setSuccess(true);
+                    if (result.type === 'phone' && result.token) {
+                        // For phone users, no email verification is needed as requested.
+                        // We redirect directly to the reset page.
+                        window.location.href = `/reset-password?token=${result.token}`;
+                    } else {
+                        setSuccess(true);
+                    }
                 }
             } catch {
                 triggerHaptic(ImpactStyle.Heavy);
@@ -117,7 +123,7 @@ export default function ForgotPasswordPage() {
                             >
                                 <div className="text-center lg:text-left">
                                     <h2 className="text-3xl font-bold tracking-tight text-foreground">Forgot Password?</h2>
-                                    <p className="mt-2 text-muted-foreground">Enter your email and we'll send you a recovery link.</p>
+                                    <p className="mt-2 text-muted-foreground">Enter your email or phone number and we'll help you recover your account.</p>
                                 </div>
 
                                 <Form {...form}>
@@ -131,15 +137,14 @@ export default function ForgotPasswordPage() {
 
                                         <FormField
                                             control={form.control}
-                                            name="email"
+                                            name="identifier"
                                             render={({ field }) => (
                                                 <FormItem>
-                                                    <FormLabel className="text-foreground/80">Email Address</FormLabel>
+                                                    <FormLabel className="text-foreground/80">Email or Phone</FormLabel>
                                                     <FormControl>
                                                         <div className="relative group">
                                                             <Input
-                                                                type="email"
-                                                                placeholder="name@example.com"
+                                                                placeholder="name@example.com or 01XXXXXXXXX"
                                                                 {...field}
                                                                 disabled={isPending}
                                                                 className="h-12 pl-10 bg-muted/30 border-input group-hover:border-primary/50 transition-colors"
@@ -183,9 +188,9 @@ export default function ForgotPasswordPage() {
                                 <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
                                 </div>
-                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Check your email</h2>
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Check your inbox</h2>
                                 <p className="text-muted-foreground leading-relaxed">
-                                    We've sent a password recovery link to **{form.getValues('email')}**.
+                                    We've sent a password recovery link to your registered email.
                                     Please check your inbox and follow the instructions.
                                 </p>
                                 <Button variant="outline" className="w-full h-12 rounded-xl" asChild>

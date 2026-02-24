@@ -18,6 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SecuritySettings } from "./SecuritySettings";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 
 // Redefine interfaces locally for simplicity
@@ -789,18 +790,10 @@ export function ProfileTab({ user }: { user: any }) {
             <Card>
                 <CardHeader>
                     <CardTitle>Security</CardTitle>
-                    <CardDescription>Update your password.</CardDescription>
+                    <CardDescription>Update your password and manage account security.</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid gap-2">
-                        <label className="text-sm font-medium">Current Password</label>
-                        <Input type="password" />
-                    </div>
-                    <div className="grid gap-2">
-                        <label className="text-sm font-medium">New Password</label>
-                        <Input type="password" />
-                    </div>
-                    <Button variant="outline">Change Password</Button>
+                <CardContent>
+                    <SecuritySettings />
                 </CardContent>
             </Card>
         </div>

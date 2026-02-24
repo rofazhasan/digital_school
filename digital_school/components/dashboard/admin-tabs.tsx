@@ -49,6 +49,8 @@ import {
     ArcElement,
 } from 'chart.js';
 
+import { SecuritySettings } from "./SecuritySettings";
+
 ChartJS.register(
     CategoryScale,
     LinearScale,
@@ -363,6 +365,9 @@ export function SecurityTab() {
                         <p className="text-sm text-muted-foreground">Require all users to reset password every 90 days</p>
                     </div>
                     <Switch />
+                </div>
+                <div className="pt-4 border-t">
+                    <SecuritySettings />
                 </div>
                 <div className="pt-4">
                     <Button variant="destructive">View Audit Logs</Button>
