@@ -1084,13 +1084,25 @@ export default function ExamsPage() {
                                     </span>
                                   </div>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
-                                >
-                                  Open
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                  {exam.type === 'ONLINE' && exam.endTime && new Date() > new Date(exam.endTime) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={(e) => { e.stopPropagation(); router.push(`/exams/practice/${exam.id}`); }}
+                                      className="h-8 rounded-full border-emerald-500 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all font-bold px-3 text-xs"
+                                    >
+                                      Practice
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
+                                  >
+                                    Open
+                                  </Button>
+                                </div>
                               </div>
                             </div>
                           </div>

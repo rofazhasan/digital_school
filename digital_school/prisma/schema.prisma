@@ -111,6 +111,7 @@ model StudentProfile {
   omrSheets        OMRSheet[]
   resultReviews    ResultReview[]
   results          Result[]
+  practiceResults  PracticeResult[]
   seatAllocations  SeatAllocation[]
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -201,6 +202,7 @@ model Exam {
   omrSheets             OMRSheet[]
   resultReviews         ResultReview[]
   results               Result[]
+  practiceResults       PracticeResult[]
   seatAllocations       SeatAllocation[]
 
   @@index([createdAt])
@@ -746,6 +748,23 @@ model SeatAllocation {
   @@unique([examId, studentId])
   @@index([examId, hallId])
   @@map("seat_allocations")
+}
+
+model PracticeResult {
+  id               String          @id @default(cuid())
+  studentId        String
+  examId           String
+  answers          Json            // Store student answers
+  score            Float           @default(0)
+  totalMarks       Int
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  student          StudentProfile  @relation(fields: [studentId], references: [id])
+  exam             Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([studentId])
+  @@map("practice_results")
 }
 
 model Notification {
