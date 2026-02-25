@@ -179,7 +179,7 @@ export function ExamContextProvider({
   // Server perspective: only sync periodically
   const saveAnswers = useCallback(async (answersToSave: any) => {
     if (Object.keys(answersToSave).length === 0) return;
-    if (exam.status === 'SUBMITTED') return; // Don't save if already submitted
+    if (exam.status === 'SUBMITTED' || exam.isPractice) return; // Don't save if already submitted or in practice
 
     try {
       setSaveStatus("saving");

@@ -34,36 +34,20 @@ export async function GET(
       return NextResponse.json({ error: 'Practice exam is only available after the exam has ended.' }, { status: 403 });
     }
 
-    // 3. Collect all questions from all exam sets
-    const allQuestions: any[] = [];
-    const questionIdsSet = new Set<string>();
-
-    for (const examSet of exam.examSets) {
-      const questions = examSet.questionsJson ? (
-        Array.isArray(examSet.questionsJson) 
-          ? examSet.questionsJson 
-          : JSON.parse(examSet.questionsJson as string)
-      ) : [];
-
-      for (const q of questions) {
-        if (!questionIdsSet.has(q.id)) {
-          questionIdsSet.add(q.id);
-          
-          const type = (q.type || q.questionType || '').toLowerCase();
-          const isObjective = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(type) || !['cq', 'sq', 'descriptive'].includes(type);
-          
-          if (isObjective) {
-            // Clean objective questions of answers for the frontend (if they exist)
-            // Regular online exam logic already shuffles and prepares them, but let's be safe
-            allQuestions.push(q);
-          } else {
-            // Creative/Short questions: Include the model answer for review
-            // Fetch from DB if not in questionsJson or just use what we have
-            allQuestions.push(q);
-          }
-        }
-      }
+    // 3. Select a random exam set if available
+    if (exam.examSets.length === 0) {
+      return NextResponse.json({ error: 'No exam sets found for this exam.' }, { status: 404 });
     }
+
+    const randomSetIndex = Math.floor(Math.random() * exam.examSets.length);
+    const selectedSet = exam.examSets[randomSetIndex];
+
+    // 4. Extract questions from the selected set
+    const allQuestions = selectedSet.questionsJson ? (
+      Array.isArray(selectedSet.questionsJson)
+        ? selectedSet.questionsJson
+        : JSON.parse(selectedSet.questionsJson as string)
+    ) : [];
 
     return NextResponse.json({
       exam: {
@@ -72,6 +56,7 @@ export async function GET(
         description: exam.description,
         totalMarks: exam.totalMarks,
         subject: (exam as any).subject || 'Academic Exam',
+        setName: (selectedSet as any).setName || (selectedSet as any).name || 'Default Set',
       },
       questions: allQuestions
     });

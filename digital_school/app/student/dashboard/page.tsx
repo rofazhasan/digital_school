@@ -1011,23 +1011,27 @@ export default function StudentDashboardPage() {
                                 {exam.type === 'ONLINE' && (
                                   (() => {
                                     const result = results.find((r: any) => r.examId === exam.id);
+                                    const isExpired = exam.endTime && new Date() > new Date(exam.endTime);
+
                                     if (result) {
                                       return (
-                                        <div className="flex gap-2">
-                                          <Button variant="outline" className="flex-1 rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
-                                            <BarChart3 className="h-4 w-4 mr-2" />
-                                            View Result
-                                          </Button>
-                                          {exam.endTime && new Date() > new Date(exam.endTime) && (
-                                            <Button variant="outline" className="flex-1 rounded-xl border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
-                                              <Sparkles className="h-4 w-4 mr-2" />
-                                              Practice
+                                        <div className="flex flex-col gap-2">
+                                          <div className="flex gap-2">
+                                            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
+                                              <BarChart3 className="h-4 w-4 mr-2" />
+                                              View Result
                                             </Button>
-                                          )}
+                                            {isExpired && (
+                                              <Button variant="outline" className="flex-1 rounded-xl border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
+                                                <Sparkles className="h-4 w-4 mr-2" />
+                                                Practice
+                                              </Button>
+                                            )}
+                                          </div>
                                         </div>
                                       );
                                     }
-                                    const isExpired = exam.endTime && new Date() > new Date(exam.endTime);
+
                                     if (isExpired) {
                                       return (
                                         <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/20" onClick={() => router.push(`/exams/practice/${exam.id}`)}>

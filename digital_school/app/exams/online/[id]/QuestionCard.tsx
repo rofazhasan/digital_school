@@ -5,7 +5,7 @@ import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Check, AlertCircle, Upload } from "lucide-react";
+import { X, Check, AlertCircle, Upload, Eye, VolumeX } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
@@ -593,6 +593,7 @@ DebouncedInput.displayName = 'DebouncedInput';
 
 function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) {
   const { exam, answers, setAnswers, navigation, setNavigation, saveStatus, markQuestion, setIsUploading, fontSize } = useExamContext();
+  const [showPracticeSolution, setShowPracticeSolution] = useState(false);
   const questions = exam.questions || [];
 
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
@@ -1595,7 +1596,7 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
           </div>
 
           {/* ── GLOBAL QUESTION SOLUTION / EXPLANATION ── */}
-          {submitted && question.explanation && (
+          {(submitted || (exam.isPractice && showPracticeSolution)) && question.explanation && (
             <div className="mt-8 p-6 bg-indigo-50/50 dark:bg-indigo-950/20 border-2 border-indigo-100/50 dark:border-indigo-900/30 rounded-3xl animate-in fade-in slide-in-from-bottom-2 duration-700">
               <div className="flex items-center gap-2 mb-3">
                 <div className="w-2 h-6 bg-indigo-500 rounded-full" />
@@ -1604,6 +1605,21 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
               <div className="text-base text-indigo-900 dark:text-indigo-100 leading-relaxed font-medium">
                 <UniversalMathJax dynamic>{question.explanation}</UniversalMathJax>
               </div>
+            </div>
+          )}
+
+          {/* Practice Toggle for Subjective Solution */}
+          {exam.isPractice && !submitted && (type === "cq" || type === "sq") && (
+            <div className="mt-6">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPracticeSolution(!showPracticeSolution)}
+                className="rounded-xl border-emerald-200 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-900/30 dark:text-emerald-400"
+              >
+                {showPracticeSolution ? <VolumeX className="w-4 h-4 mr-2" /> : <Eye className="w-4 h-4 mr-2" />}
+                {showPracticeSolution ? "Hide Model Answer" : "Show Model Answer"}
+              </Button>
             </div>
           )}
 

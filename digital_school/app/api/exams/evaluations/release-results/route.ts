@@ -4,6 +4,8 @@ import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { generateStudentScriptPDF } from "@/lib/script-pdf-generator";
+import path from "path";
+import fs from "fs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -117,13 +119,27 @@ export async function POST(req: NextRequest) {
 
     await Promise.all(updatePromises);
 
-    // Send Emails in background (don't block the response)
+    // Trigger email sending and AWAIT it
     const sendResultEmails = async () => {
       try {
         // Fetch institute data for branding
         const institute = await prisma.institute.findFirst({
           select: { name: true, address: true, phone: true, logoUrl: true }
         });
+
+        // Pre-load fonts once for efficiency
+        let fonts = undefined;
+        try {
+          const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
+          const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
+
+          fonts = {
+            regular: fs.existsSync(fontPath) ? fs.readFileSync(fontPath).toString('base64') : undefined,
+            bold: fs.existsSync(fontBoldPath) ? fs.readFileSync(fontBoldPath).toString('base64') : undefined
+          };
+        } catch (fontErr) {
+          console.error("Failed to pre-load fonts:", fontErr);
+        }
 
         const emailPromises = resultsWithRanks.map(result => {
           if (!result.student.user.email) return Promise.resolve();
@@ -173,7 +189,7 @@ export async function POST(req: NextRequest) {
                   answers: studentSubmission.answers as any,
                   evaluatorNotes: studentSubmission.evaluatorNotes || undefined
                 } : undefined
-              });
+              }, fonts);
 
               return sendEmail({
                 to: result.student.user.email!,
@@ -211,8 +227,7 @@ export async function POST(req: NextRequest) {
       }
     };
 
-    // Trigger email sending
-    sendResultEmails();
+    await sendResultEmails();
 
     const updatedResults = { count: resultsWithRanks.length };
 

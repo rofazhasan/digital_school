@@ -31,7 +31,12 @@ interface StudentScriptPDFData {
     };
 }
 
-export async function generateStudentScriptPDF(data: StudentScriptPDFData): Promise<Buffer> {
+interface FontData {
+    regular?: string;
+    bold?: string;
+}
+
+export async function generateStudentScriptPDF(data: StudentScriptPDFData, fonts?: FontData): Promise<Buffer> {
     const doc = new jsPDF({
         orientation: 'p',
         unit: 'mm',
@@ -40,22 +45,43 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
 
     // --- Font Setup ---
     try {
-        const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
-        const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
+        let regularBase64 = fonts?.regular;
+        let boldBase64 = fonts?.bold;
 
-        if (fs.existsSync(fontPath)) {
-            const fontBase64 = fs.readFileSync(fontPath).toString('base64');
-            doc.addFileToVFS('NotoSansBengali-Regular.ttf', fontBase64);
-            doc.addFont('NotoSansBengali-Regular.ttf', 'Bengali', 'normal');
+        if (!regularBase64 || !boldBase64) {
+            const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
+            const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
+
+            if (!regularBase64 && fs.existsSync(fontPath)) {
+                regularBase64 = fs.readFileSync(fontPath).toString('base64');
+            }
+
+            if (!boldBase64 && fs.existsSync(fontBoldPath)) {
+                boldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
+            }
         }
 
-        if (fs.existsSync(fontBoldPath)) {
-            const fontBoldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
-            doc.addFileToVFS('NotoSansBengali-Bold.ttf', fontBoldBase64);
-            doc.addFont('NotoSansBengali-Bold.ttf', 'Bengali', 'bold');
+        if (regularBase64) {
+            doc.addFileToVFS('Bengali-Regular.ttf', regularBase64);
+            doc.addFont('Bengali-Regular.ttf', 'Bengali', 'normal');
         }
 
-        doc.setFont('Bengali', 'normal');
+        if (boldBase64) {
+            doc.addFileToVFS('Bengali-Bold.ttf', boldBase64);
+            doc.addFont('Bengali-Bold.ttf', 'Bengali', 'bold');
+        }
+
+        // Set default font
+        try {
+            if (regularBase64) {
+                doc.setFont('Bengali', 'normal');
+            } else {
+                doc.setFont('helvetica', 'normal');
+            }
+        } catch (fontErr) {
+            console.warn('[PDF] Failed to set Bengali font, falling back to helvetica');
+            doc.setFont('helvetica', 'normal');
+        }
     } catch (e) {
         console.error('Error loading fonts for PDF:', e);
         doc.setFont('helvetica', 'normal');
@@ -65,6 +91,25 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
     const pageHeight = 297;
     const margin = 20;
     let y = 25;
+
+    // --- Helper for safe text drawing ---
+    const drawText = (text: string, x: number, yPos: number, options?: any) => {
+        try {
+            doc.text(text || '', x, yPos, options);
+        } catch (e) {
+            console.warn(`[PDF] Error drawing text "${text}":`, e);
+            // Fallback to helvetica and try again
+            const currentFont = doc.getFont();
+            doc.setFont('helvetica', currentFont.fontStyle || 'normal');
+            try {
+                doc.text(text || '', x, yPos, options);
+            } catch (e2) {
+                console.error('[PDF] Critical error drawing text even with fallback:', e2);
+            }
+            // Restore previous font if possible (though it's likely causing issues)
+            try { doc.setFont(currentFont.fontName, currentFont.fontStyle); } catch (e3) { }
+        }
+    };
 
     // --- Helper for drawing lines ---
     const drawLine = (yPos: number, color = [200, 200, 200]) => {
@@ -77,7 +122,11 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
             doc.addPage();
             y = 20;
             // Re-apply font on new page
-            doc.setFont('Bengali', 'normal');
+            try {
+                doc.setFont('Bengali', 'normal');
+            } catch (e) {
+                doc.setFont('helvetica', 'normal');
+            }
             return true;
         }
         return false;
@@ -89,28 +138,28 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
 
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(20);
-    doc.setFont('Bengali', 'bold');
-    doc.text(data.institute.name.toUpperCase(), pageWidth / 2, 20, { align: 'center' });
+    try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
+    drawText(data.institute.name.toUpperCase(), pageWidth / 2, 20, { align: 'center' });
 
     doc.setFontSize(9);
-    doc.setFont('Bengali', 'normal');
+    try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
     doc.setTextColor(200, 200, 200);
     if (data.institute.address) {
-        doc.text(data.institute.address, pageWidth / 2, 27, { align: 'center' });
+        drawText(data.institute.address, pageWidth / 2, 27, { align: 'center' });
     }
 
     doc.setFontSize(14);
-    doc.setFont('Bengali', 'bold');
+    try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
     doc.setTextColor(56, 189, 248); // Sky 400
-    doc.text('OFFICIAL ANSWER SCRIPT', pageWidth / 2, 42, { align: 'center' });
+    drawText('OFFICIAL ANSWER SCRIPT', pageWidth / 2, 42, { align: 'center' });
 
     y = 65;
 
     // --- Student Info ---
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
-    doc.setFont('Bengali', 'bold');
-    doc.text('STUDENT & EXAM INFORMATION', margin, y);
+    try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
+    drawText('STUDENT & EXAM INFORMATION', margin, y);
     y += 5;
     drawLine(y, [30, 41, 59]);
     y += 10;
@@ -121,17 +170,17 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
         ['Class:', data.className, 'Date:', data.examDate]
     ];
 
-    doc.setFont('Bengali', 'normal');
+    try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
     infoRows.forEach(row => {
-        doc.setFont('Bengali', 'bold');
-        doc.text(row[0], margin, y);
-        doc.setFont('Bengali', 'normal');
-        doc.text(String(row[1]), margin + 30, y);
+        try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
+        drawText(row[0], margin, y);
+        try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
+        drawText(String(row[1]), margin + 30, y);
 
-        doc.setFont('Bengali', 'bold');
-        doc.text(row[2], pageWidth / 2 + 10, y);
-        doc.setFont('Bengali', 'normal');
-        doc.text(String(row[3]), pageWidth / 2 + 40, y);
+        try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
+        drawText(row[2], pageWidth / 2 + 10, y);
+        try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
+        drawText(String(row[3]), pageWidth / 2 + 40, y);
         y += 8;
     });
 
@@ -140,19 +189,19 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
     // --- Summary Box ---
     doc.setFillColor(241, 245, 249);
     doc.roundedRect(margin, y, pageWidth - margin * 2, 20, 2, 2, 'F');
-    doc.setFont('Bengali', 'bold');
+    try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
     doc.setFontSize(11);
     doc.setTextColor(30, 41, 59);
-    doc.text(`RESULT SUMMARY: ${data.results.total} / ${data.results.totalMarks} (Rank #${data.results.rank || 'N/A'})`, pageWidth / 2, y + 12, { align: 'center' });
+    drawText(`RESULT SUMMARY: ${data.results.total} / ${data.results.totalMarks} (Rank #${data.results.rank || 'N/A'})`, pageWidth / 2, y + 12, { align: 'center' });
 
     y += 35;
 
     // --- Detailed Script ---
     if (data.questions && data.questions.length > 0 && data.submission) {
-        doc.setFont('Bengali', 'bold');
+        try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
         doc.setFontSize(12);
         doc.setTextColor(30, 41, 59);
-        doc.text('ANSWER SCRIPT DETAILS', margin, y);
+        drawText('ANSWER SCRIPT DETAILS', margin, y);
         y += 5;
         drawLine(y, [30, 41, 59]);
         y += 10;
@@ -163,15 +212,21 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
 
             checkPageBreak(30);
 
-            doc.setFont('Bengali', 'bold');
+            try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
             doc.setFontSize(10);
-            doc.text(`${idx + 1}. ${q.questionText || q.text}`, margin, y, { maxWidth: pageWidth - margin * 2 });
+            drawText(`${idx + 1}. ${q.questionText || q.text}`, margin, y, { maxWidth: pageWidth - margin * 2 });
 
-            // Calculate height taken by question text
-            const textLines = doc.splitTextToSize(`${idx + 1}. ${q.questionText || q.text}`, pageWidth - margin * 2);
+            // Calculate height taken by question text - Safely measure text
+            let textLines = [];
+            try {
+                textLines = doc.splitTextToSize(`${idx + 1}. ${q.questionText || q.text}`, pageWidth - margin * 2);
+            } catch (e) {
+                console.warn('[PDF] Error splitting text, using fallback');
+                textLines = [String(`${idx + 1}. ${q.questionText || q.text}`)];
+            }
             y += (textLines.length * 5) + 2;
 
-            doc.setFont('Bengali', 'normal');
+            try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
             doc.setFontSize(9);
             doc.setTextColor(71, 85, 105);
 
@@ -184,19 +239,24 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
                     checkPageBreak(8);
                     const prefix = oIdx === selectedIdx ? '[X] ' : '[ ] ';
                     const suffix = oIdx === correctIdx ? ' (Correct)' : '';
-                    doc.text(`${prefix}${opt.text}${suffix}`, margin + 5, y);
+                    drawText(`${prefix}${opt.text}${suffix}`, margin + 5, y);
                     y += 6;
                 });
             } else {
-                doc.text(`Answer: ${answer || 'No answer provided'}`, margin + 5, y, { maxWidth: pageWidth - margin * 2.5 });
-                const ansLines = doc.splitTextToSize(`Answer: ${answer || 'No answer provided'}`, pageWidth - margin * 2.5);
+                drawText(`Answer: ${answer || 'No answer provided'}`, margin + 5, y, { maxWidth: pageWidth - margin * 2.5 });
+                let ansLines = [];
+                try {
+                    ansLines = doc.splitTextToSize(`Answer: ${answer || 'No answer provided'}`, pageWidth - margin * 2.5);
+                } catch (e) {
+                    ansLines = [String(`Answer: ${answer || 'No answer provided'}`)];
+                }
                 y += (ansLines.length * 5) + 2;
             }
 
             if (marks !== undefined) {
-                doc.setFont('Bengali', 'bold');
+                try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
                 doc.setTextColor(16, 185, 129); // Emerald 600
-                doc.text(`Marks Obtained: ${marks} / ${q.marks}`, margin + 5, y);
+                drawText(`Marks Obtained: ${marks} / ${q.marks}`, margin + 5, y);
                 y += 10;
             } else {
                 y += 5;
@@ -209,17 +269,17 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
     if (data.submission?.evaluatorNotes) {
         checkPageBreak(25);
         y += 5;
-        doc.setFont('Bengali', 'bold');
-        doc.text('EVALUATOR NOTES:', margin, y);
+        try { doc.setFont('Bengali', 'bold'); } catch (e) { doc.setFont('helvetica', 'bold'); }
+        drawText('EVALUATOR NOTES:', margin, y);
         y += 6;
-        doc.setFont('Bengali', 'normal');
-        doc.text(data.submission.evaluatorNotes, margin, y, { maxWidth: pageWidth - margin * 2 });
+        try { doc.setFont('Bengali', 'normal'); } catch (e) { doc.setFont('helvetica', 'normal'); }
+        drawText(data.submission.evaluatorNotes, margin, y, { maxWidth: pageWidth - margin * 2 });
     }
 
     // --- Footer ---
     doc.setTextColor(148, 163, 184);
     doc.setFontSize(8);
-    doc.text(`Generated on ${new Date().toLocaleString()} | Digital School Academic System`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    drawText(`Generated on ${new Date().toLocaleString()} | Digital School Academic System`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
     return Buffer.from(doc.output('arraybuffer'));
 }

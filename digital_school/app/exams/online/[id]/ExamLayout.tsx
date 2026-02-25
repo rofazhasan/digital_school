@@ -7,7 +7,7 @@ import Timer from "./Timer";
 import Navigator from "./Navigator";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckCircle, AlertCircle, Menu, ShieldAlert, Maximize2, Eye, EyeOff, X, Check, BookOpen } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Badge } from "@/components/ui/badge";
 import { useProctoring } from "@/hooks/useProctoring";
@@ -178,6 +178,7 @@ export default function ExamLayout() {
 
   const instituteName = instituteSettings?.instituteName || "Digital School";
   const instituteLogo = instituteSettings?.logoUrl || "/logo.png";
+  const isPractice = !!exam.isPractice;
 
   const handleSubmit = useCallback(async (forced: boolean = false) => {
     let confirmed = false;
@@ -185,37 +186,47 @@ export default function ExamLayout() {
       confirmed = true;
     } else {
       confirmed = await nativeConfirm(
-        "Submit Assessment?",
-        "You are about to submit your answers. This action cannot be undone."
+        isPractice ? "Submit Practice Assessment?" : "Submit Assessment?",
+        isPractice
+          ? "You are about to submit your practice answers. You can view your performance immediately."
+          : "You are about to submit your answers. This action cannot be undone."
       );
     }
 
     if (confirmed) {
       setIsSubmitting(true);
-      if (forced) {
+      if (forced && !isPractice) {
         toast.error(`${activeSection === 'objective' ? 'Objective' : 'Exam'} auto-submitted due to time limit.`);
       }
       try {
-        const response = await fetch(`/api/exams/${exam.id}/submit`, {
+        const endpoint = isPractice
+          ? `/api/exams/${exam.id}/practice/submit`
+          : `/api/exams/${exam.id}/submit`;
+
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             answers: answers,
-            section: activeSection
+            section: isPractice ? undefined : activeSection
           }),
         });
 
         if (response.ok) {
           const resData = await response.json();
 
-          if (activeSection === 'objective' && hasCqSq) {
+          if (!isPractice && activeSection === 'objective' && hasCqSq) {
             // Objective submitted, now show transition overlay
             setTransitionState('objective_submitted');
             toast.success("Objective answers saved. Proceed to Subjective section.");
           } else {
             // Re-allow sleep after exam
             setKeepAwake(false);
-            window.location.href = `/exams/results/${exam.id}`;
+            if (isPractice) {
+              window.location.href = `/exams/practice/${exam.id}/results?resultId=${resData.resultId}`;
+            } else {
+              window.location.href = `/exams/results/${exam.id}`;
+            }
           }
         } else {
           const errorData = await response.json();
@@ -225,7 +236,7 @@ export default function ExamLayout() {
         console.error('Submit error:', error);
         const errorMessage = (error as Error).message;
 
-        if (forced || errorMessage.includes('time limit') || errorMessage.includes('submitted')) {
+        if (!isPractice && (forced || errorMessage.includes('time limit') || errorMessage.includes('submitted'))) {
           toast.warning("Time limit processed. Redirecting...");
           setKeepAwake(false);
           if (activeSection === 'objective' && hasCqSq) {
@@ -242,7 +253,7 @@ export default function ExamLayout() {
         setShowSubmitConfirm(false);
       }
     }
-  }, [exam, answers, activeSection, hasCqSq]);
+  }, [exam, answers, activeSection, hasCqSq, isPractice]);
 
 
   // Combined Violation Handler
@@ -259,11 +270,11 @@ export default function ExamLayout() {
     return type === 'cq' || type === 'sq';
   });
 
-  // Browser/Tab Proctoring - Re-enabled for all exams
+  // Browser/Tab Proctoring - DISABLED FOR PRACTICE
   const { isFullscreen, warnings, enterFullscreen, isTabActive } = useProctoring({
     onViolation,
     maxWarnings: 4,
-    isExamActive: isExamActive && activeSection !== 'cqsq',
+    isExamActive: isExamActive && activeSection !== 'cqsq' && !isPractice,
     isUploading: isUploading, // Pass context state
     externalWarnings: contextWarnings,
     setExternalWarnings: setContextWarnings
@@ -366,7 +377,8 @@ export default function ExamLayout() {
   // --------------- BLOCKING MODAL FOR PROCTORING (Overlay) ---------------
   // Moved up to be available for keyboard navigation useEffect
   // Added gracePeriod check to prevent instant block on start
-  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive) && !transitionState;
+  // DISABLED FOR PRACTICE
+  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive) && !transitionState && !isPractice;
 
   // Keyboard Navigation
   useEffect(() => {
@@ -747,11 +759,34 @@ export default function ExamLayout() {
 
             {/* Question Card Container */}
             <div className={cn("transition-all duration-500", illusionMode ? "scale-[1.02]" : "")}>
-              <QuestionCard
-                questionIdx={navigation.current}
-                questionOverride={currentQuestion}
-                disabled={isSubmitting}
-              />
+              {(() => {
+                const qType = (currentQuestion?.type || currentQuestion?.questionType || "").toLowerCase();
+                const isSubjective = ['cq', 'sq', 'descriptive'].includes(qType);
+
+                return (
+                  <div className="space-y-4">
+                    {isPractice && isSubjective && (
+                      <div className="bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/30 p-4 rounded-2xl flex gap-3 items-start animate-in slide-in-from-top-2 duration-300">
+                        <div className="p-2 bg-emerald-100 dark:bg-emerald-900/40 rounded-lg">
+                          <BookOpen className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-emerald-900 dark:text-emerald-100 italic">Practice Mode</h3>
+                          <p className="text-sm text-emerald-800/80 dark:text-emerald-200/80">
+                            You can type your answers and upload images for this subjective question. Feel free to practice your writing skills!
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    <QuestionCard
+                      questionIdx={navigation.current}
+                      questionOverride={currentQuestion}
+                      disabled={isSubmitting}
+                      submitted={false} // Allow interaction even in practice
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
             {/* --- FLOATING CONTROLS (Illusion Mode) --- */}
