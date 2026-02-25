@@ -43,13 +43,18 @@ export async function validateSession(token: string) {
         where: { id: payload.userId },
         select: {
           id: true,
+          name: true,
+          phone: true,
           email: true,
           role: true,
+          avatar: true,
           isActive: true,
           emailVerified: true,
           isApproved: true,
           activeSessionId: true,
           lastSessionInfo: true,
+          createdAt: true,
+          updatedAt: true,
           institute: { select: { id: true, name: true } },
           studentProfile: {
             select: {
