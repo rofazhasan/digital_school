@@ -1,5 +1,6 @@
 import { jsPDF } from 'jspdf';
-import { toBengaliNumerals } from '@/utils/numeralConverter';
+import path from 'path';
+import fs from 'fs';
 
 interface StudentScriptPDFData {
     studentName: string;
@@ -23,6 +24,11 @@ interface StudentScriptPDFData {
         address?: string;
         logoUrl?: string;
     };
+    questions?: any[];
+    submission?: {
+        answers: Record<string, any>;
+        evaluatorNotes?: string;
+    };
 }
 
 export async function generateStudentScriptPDF(data: StudentScriptPDFData): Promise<Buffer> {
@@ -31,6 +37,29 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
         unit: 'mm',
         format: 'a4'
     });
+
+    // --- Font Setup ---
+    try {
+        const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
+        const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
+
+        if (fs.existsSync(fontPath)) {
+            const fontBase64 = fs.readFileSync(fontPath).toString('base64');
+            doc.addFileToVFS('NotoSansBengali-Regular.ttf', fontBase64);
+            doc.addFont('NotoSansBengali-Regular.ttf', 'Bengali', 'normal');
+        }
+
+        if (fs.existsSync(fontBoldPath)) {
+            const fontBoldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
+            doc.addFileToVFS('NotoSansBengali-Bold.ttf', fontBoldBase64);
+            doc.addFont('NotoSansBengali-Bold.ttf', 'Bengali', 'bold');
+        }
+
+        doc.setFont('Bengali', 'normal');
+    } catch (e) {
+        console.error('Error loading fonts for PDF:', e);
+        doc.setFont('helvetica', 'normal');
+    }
 
     const pageWidth = 210;
     const pageHeight = 297;
@@ -43,181 +72,154 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData): Prom
         doc.line(margin, yPos, pageWidth - margin, yPos);
     };
 
+    const checkPageBreak = (neededHeight: number) => {
+        if (y + neededHeight > pageHeight - 20) {
+            doc.addPage();
+            y = 20;
+            // Re-apply font on new page
+            doc.setFont('Bengali', 'normal');
+            return true;
+        }
+        return false;
+    };
+
     // --- Header Section ---
-    // Background for header
     doc.setFillColor(30, 41, 59); // Slate 800
-    doc.rect(0, 0, pageWidth, 60, 'F');
+    doc.rect(0, 0, pageWidth, 55, 'F');
 
-    // Institute Name
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(22);
-    doc.setFont('helvetica', 'bold');
-    doc.text(data.institute.name.toUpperCase(), pageWidth / 2, 25, { align: 'center' });
+    doc.setFontSize(20);
+    doc.setFont('Bengali', 'bold');
+    doc.text(data.institute.name.toUpperCase(), pageWidth / 2, 20, { align: 'center' });
 
-    // Institute Address
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setFont('Bengali', 'normal');
     doc.setTextColor(200, 200, 200);
     if (data.institute.address) {
-        doc.text(data.institute.address, pageWidth / 2, 32, { align: 'center' });
+        doc.text(data.institute.address, pageWidth / 2, 27, { align: 'center' });
     }
 
-    // Title
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('Bengali', 'bold');
     doc.setTextColor(56, 189, 248); // Sky 400
-    doc.text('OFFICIAL ACADEMIC TRANSCRIPT', pageWidth / 2, 45, { align: 'center' });
+    doc.text('OFFICIAL ANSWER SCRIPT', pageWidth / 2, 42, { align: 'center' });
 
-    y = 75;
+    y = 65;
 
-    // --- Student Info Grid ---
+    // --- Student Info ---
     doc.setTextColor(30, 41, 59);
     doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('STUDENT INFORMATION', margin, y);
+    doc.setFont('Bengali', 'bold');
+    doc.text('STUDENT & EXAM INFORMATION', margin, y);
     y += 5;
     drawLine(y, [30, 41, 59]);
     y += 10;
 
     const infoRows = [
-        ['Student Name:', data.studentName, 'Examination:', data.examName],
+        ['Student Name:', data.studentName, 'Exam:', data.examName],
         ['Roll Number:', data.studentRoll, 'Subject:', data.subject],
         ['Class:', data.className, 'Date:', data.examDate]
     ];
 
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('Bengali', 'normal');
     infoRows.forEach(row => {
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('Bengali', 'bold');
         doc.text(row[0], margin, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('Bengali', 'normal');
         doc.text(String(row[1]), margin + 30, y);
 
-        doc.setFont('helvetica', 'bold');
+        doc.setFont('Bengali', 'bold');
         doc.text(row[2], pageWidth / 2 + 10, y);
-        doc.setFont('helvetica', 'normal');
+        doc.setFont('Bengali', 'normal');
         doc.text(String(row[3]), pageWidth / 2 + 40, y);
         y += 8;
     });
 
     y += 10;
 
-    // --- Performance Summary Cards ---
-    doc.setFont('helvetica', 'bold');
-    doc.text('PERFORMANCE SUMMARY', margin, y);
-    y += 5;
-    drawLine(y, [30, 41, 59]);
-    y += 10;
-
-    // Draw 3 boxes
-    const boxWidth = (pageWidth - (margin * 2) - 10) / 3;
-    const boxHeight = 25;
-
-    // Total Score Box
-    doc.setFillColor(248, 250, 252); // Slate 50
-    doc.setDrawColor(226, 232, 240); // Slate 200
-    doc.roundedRect(margin, y, boxWidth, boxHeight, 3, 3, 'FD');
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
-    doc.text('TOTAL SCORE', margin + boxWidth / 2, y + 8, { align: 'center' });
-    doc.setTextColor(79, 70, 229); // Indigo 600
-    doc.setFontSize(16);
-    doc.text(`${data.results.total} / ${data.results.totalMarks}`, margin + boxWidth / 2, y + 18, { align: 'center' });
-
-    // Grade Box
-    doc.roundedRect(margin + boxWidth + 5, y, boxWidth, boxHeight, 3, 3, 'FD');
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
-    doc.text('FINAL GRADE', margin + boxWidth + 5 + boxWidth / 2, y + 8, { align: 'center' });
-    doc.setTextColor(16, 185, 129); // Emerald 600
-    doc.setFontSize(16);
-    doc.text(data.results.grade, margin + boxWidth + 5 + boxWidth / 2, y + 18, { align: 'center' });
-
-    // Rank Box
-    doc.roundedRect(margin + (boxWidth + 5) * 2, y, boxWidth, boxHeight, 3, 3, 'FD');
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(8);
-    doc.text('POSITION / RANK', margin + (boxWidth + 5) * 2 + boxWidth / 2, y + 8, { align: 'center' });
-    doc.setTextColor(245, 158, 11); // Amber 600
-    doc.setFontSize(16);
-    doc.text(data.results.rank ? `#${data.results.rank}` : 'N/A', margin + (boxWidth + 5) * 2 + boxWidth / 2, y + 18, { align: 'center' });
-
-    y += boxHeight + 20;
-
-    // --- Component Breakdown ---
-    doc.setTextColor(30, 41, 59);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('COMPONENT BREAKDOWN', margin, y);
-    y += 5;
-    drawLine(y, [30, 41, 59]);
-    y += 10;
-
-    const breakdownHeaders = ['Component', 'Type', 'Score Obtained'];
-    const componentWidths = [60, 60, 50];
-
-    // Draw Header Table
+    // --- Summary Box ---
     doc.setFillColor(241, 245, 249);
-    doc.rect(margin, y, pageWidth - margin * 2, 10, 'F');
-    doc.setTextColor(71, 85, 105);
-    doc.setFontSize(9);
-
-    let curX = margin + 5;
-    breakdownHeaders.forEach((h, i) => {
-        doc.text(h, curX, y + 7);
-        curX += componentWidths[i];
-    });
-
-    y += 10;
-
+    doc.roundedRect(margin, y, pageWidth - margin * 2, 20, 2, 2, 'F');
+    doc.setFont('Bengali', 'bold');
+    doc.setFontSize(11);
     doc.setTextColor(30, 41, 59);
-    doc.setFont('helvetica', 'normal');
+    doc.text(`RESULT SUMMARY: ${data.results.total} / ${data.results.totalMarks} (Rank #${data.results.rank || 'N/A'})`, pageWidth / 2, y + 12, { align: 'center' });
 
-    const components = [
-        { name: 'Multiple Choice Questions', type: 'Objective', score: data.results.mcqMarks },
-        { name: 'Short Questions', type: 'Subjective', score: data.results.sqMarks },
-        { name: 'Creative Questions', type: 'Subjective', score: data.results.cqMarks }
-    ].filter(c => c.score !== undefined);
+    y += 35;
 
-    components.forEach((comp, i) => {
-        curX = margin + 5;
-        doc.text(comp.name, curX, y + 7);
-        curX += componentWidths[0];
-        doc.text(comp.type, curX, y + 7);
-        curX += componentWidths[1];
-        doc.setFont('helvetica', 'bold');
-        doc.text(String(comp.score), curX, y + 7);
-        doc.setFont('helvetica', 'normal');
-
+    // --- Detailed Script ---
+    if (data.questions && data.questions.length > 0 && data.submission) {
+        doc.setFont('Bengali', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(30, 41, 59);
+        doc.text('ANSWER SCRIPT DETAILS', margin, y);
+        y += 5;
+        drawLine(y, [30, 41, 59]);
         y += 10;
-        drawLine(y, [241, 245, 249]);
-    });
 
-    y += 20;
+        data.questions.forEach((q, idx) => {
+            const answer = data.submission?.answers[q.id];
+            const marks = data.submission?.answers[`${q.id}_marks`];
 
-    // --- Remarks ---
-    doc.setFont('helvetica', 'bold');
-    doc.text('OFFICIAL SEAL & REMARKS', margin, y);
-    y += 5;
-    drawLine(y, [30, 41, 59]);
-    y += 10;
+            checkPageBreak(30);
 
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(100, 116, 139);
-    doc.setFontSize(9);
-    doc.text('This is a digitally generated document and does not require a physical signature.', margin, y);
-    y += 15;
+            doc.setFont('Bengali', 'bold');
+            doc.setFontSize(10);
+            doc.text(`${idx + 1}. ${q.questionText || q.text}`, margin, y, { maxWidth: pageWidth - margin * 2 });
 
-    // Placeholder for signature/seal
-    doc.setDrawColor(200, 200, 200);
-    doc.line(pageWidth - margin - 40, y + 10, pageWidth - margin, y + 10);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.text('Authorized Signature', pageWidth - margin - 20, y + 15, { align: 'center' });
+            // Calculate height taken by question text
+            const textLines = doc.splitTextToSize(`${idx + 1}. ${q.questionText || q.text}`, pageWidth - margin * 2);
+            y += (textLines.length * 5) + 2;
+
+            doc.setFont('Bengali', 'normal');
+            doc.setFontSize(9);
+            doc.setTextColor(71, 85, 105);
+
+            if (q.type === 'MCQ' || q.type === 'MC') {
+                const options = Array.isArray(q.options) ? q.options : (typeof q.options === 'string' ? JSON.parse(q.options) : []);
+                const selectedIdx = typeof answer === 'number' ? answer : (options.findIndex((o: any) => o.text === answer));
+                const correctIdx = options.findIndex((o: any) => o.isCorrect);
+
+                options.forEach((opt: any, oIdx: number) => {
+                    checkPageBreak(8);
+                    const prefix = oIdx === selectedIdx ? '[X] ' : '[ ] ';
+                    const suffix = oIdx === correctIdx ? ' (Correct)' : '';
+                    doc.text(`${prefix}${opt.text}${suffix}`, margin + 5, y);
+                    y += 6;
+                });
+            } else {
+                doc.text(`Answer: ${answer || 'No answer provided'}`, margin + 5, y, { maxWidth: pageWidth - margin * 2.5 });
+                const ansLines = doc.splitTextToSize(`Answer: ${answer || 'No answer provided'}`, pageWidth - margin * 2.5);
+                y += (ansLines.length * 5) + 2;
+            }
+
+            if (marks !== undefined) {
+                doc.setFont('Bengali', 'bold');
+                doc.setTextColor(16, 185, 129); // Emerald 600
+                doc.text(`Marks Obtained: ${marks} / ${q.marks}`, margin + 5, y);
+                y += 10;
+            } else {
+                y += 5;
+            }
+
+            doc.setTextColor(30, 41, 59);
+        });
+    }
+
+    if (data.submission?.evaluatorNotes) {
+        checkPageBreak(25);
+        y += 5;
+        doc.setFont('Bengali', 'bold');
+        doc.text('EVALUATOR NOTES:', margin, y);
+        y += 6;
+        doc.setFont('Bengali', 'normal');
+        doc.text(data.submission.evaluatorNotes, margin, y, { maxWidth: pageWidth - margin * 2 });
+    }
 
     // --- Footer ---
     doc.setTextColor(148, 163, 184);
     doc.setFontSize(8);
-    doc.text(`Generated on ${new Date().toLocaleString()} | Digital School Academic System`, pageWidth / 2, pageHeight - 15, { align: 'center' });
+    doc.text(`Generated on ${new Date().toLocaleString()} | Digital School Academic System`, pageWidth / 2, pageHeight - 10, { align: 'center' });
 
     return Buffer.from(doc.output('arraybuffer'));
 }

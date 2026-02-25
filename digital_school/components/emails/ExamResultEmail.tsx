@@ -31,6 +31,8 @@ interface ExamResultEmailProps {
     semester?: string;
     section?: string;
     examDate?: string;
+    examId?: string;
+    studentId?: string;
 }
 
 export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
@@ -46,6 +48,8 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     semester = '2026 Academic Session',
     section = 'A',
     examDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
+    examId,
+    studentId,
     remarks
 }) => {
     // Determine status colors
@@ -55,6 +59,9 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     const dangerColor = '#ef4444'; // Red 500
 
     const scoreColor = totalPercentage >= 80 ? successColor : totalPercentage >= 40 ? primaryColor : dangerColor;
+    const scriptUrl = (examId && studentId)
+        ? `${baseUrl}/exams/evaluations/${examId}/print/${studentId}`
+        : `${baseUrl}/student/results`;
 
     return (
         <div style={{
@@ -238,7 +245,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
                             border: '2px dashed rgba(255,255,255,0.1)'
                         }}>
                             <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 12px 0' }}>Your detailed answer script is attached as a PDF.</p>
-                            <a href={`${baseUrl}/exams/evaluations`} style={{
+                            <a href={scriptUrl} style={{
                                 display: 'inline-block',
                                 backgroundColor: primaryColor,
                                 color: '#ffffff',
@@ -249,7 +256,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
                                 textDecoration: 'none',
                                 boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                             }}>
-                                View Online Portal
+                                View Detailed Script
                             </a>
                         </div>
                     )}

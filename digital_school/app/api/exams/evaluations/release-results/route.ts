@@ -23,7 +23,21 @@ export async function POST(req: NextRequest) {
       where: { id: examId },
       include: {
         results: true,
-        class: true
+        class: true,
+        examSets: {
+          include: {
+            questions: true
+          }
+        },
+        examSubmissions: {
+          include: {
+            student: {
+              include: {
+                user: true
+              }
+            }
+          }
+        }
       }
     });
 
@@ -127,13 +141,16 @@ export async function POST(req: NextRequest) {
 
           return (async () => {
             try {
+              // Find the specific submission for this student to get answers and notes
+              const studentSubmission = exam.examSubmissions.find(s => s.studentId === result.studentId);
+
               // Generate PDF Attachment
               const pdfBuffer = await generateStudentScriptPDF({
                 studentName: result.student.user.name,
                 studentRoll: result.student.roll,
                 examName: exam.name,
                 examDate: exam.date.toLocaleDateString(),
-                subject: exam.name, // Assuming exam name has subject or using a placeholder
+                subject: exam.name,
                 className: (exam as any).class?.name || "N/A",
                 results: {
                   total: result.total,
@@ -149,7 +166,13 @@ export async function POST(req: NextRequest) {
                   name: institute?.name || "Digital School",
                   address: institute?.address || undefined,
                   logoUrl: institute?.logoUrl || undefined
-                }
+                },
+                // Pass questions and student answers
+                questions: exam.examSets.flatMap(set => set.questions),
+                submission: studentSubmission ? {
+                  answers: studentSubmission.answers as any,
+                  evaluatorNotes: studentSubmission.evaluatorNotes || undefined
+                } : undefined
               });
 
               return sendEmail({
@@ -165,6 +188,8 @@ export async function POST(req: NextRequest) {
                   institute: institute as any,
                   examDate: exam.date.toLocaleDateString(),
                   remarks: result.comment || undefined,
+                  examId: exam.id,
+                  studentId: result.studentId
                 }) as any,
                 attachments: [
                   {

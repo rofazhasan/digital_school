@@ -98,6 +98,7 @@ const ROUTE_PERMISSIONS = {
     '/exams/online/*',
     '/exams/results',
     '/exams/results/*',
+    '/exams/evaluations/*/print/*',
   ],
 
   // Shared routes (accessible by authenticated users)
