@@ -41,12 +41,10 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
     const mathRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
-        if (typeof window !== 'undefined' && window.MathJax && window.MathJax.typesetPromise && mathRef.current) {
-            window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
-        } else if (content !== contentWithDiagrams && mathRef.current && window.MathJax && window.MathJax.typesetPromise) {
-            // Fallback for diagram parser specifically if the above general one didn't catch it (though the first one should cover both)
-            window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
+        if (typeof window === 'undefined' || !window.MathJax || !window.MathJax.typesetPromise || !mathRef.current) {
+            return;
         }
+        window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
     }, [content, contentWithDiagrams]);
 
     if (content !== contentWithDiagrams) {
