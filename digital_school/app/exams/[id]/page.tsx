@@ -855,10 +855,13 @@ export default function ExamBuilderPage() {
   }
 
   const mathJaxConfig = {
-    loader: { load: ["input/tex", "output/chtml"] },
+    loader: { load: ["input/tex", "input/mml", "output/chtml"] },
     tex: {
       inlineMath: [["$", "$"], ["\\(", "\\)"]],
       displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+    },
+    options: {
+      enableEnrichment: false
     }
   };
 

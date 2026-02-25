@@ -3,6 +3,7 @@ import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
+import { generateStudentScriptPDF } from "@/lib/script-pdf-generator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,7 +22,8 @@ export async function POST(req: NextRequest) {
     const exam = await prisma.exam.findUnique({
       where: { id: examId },
       include: {
-        results: true
+        results: true,
+        class: true
       }
     });
 
@@ -112,29 +114,70 @@ export async function POST(req: NextRequest) {
         const emailPromises = resultsWithRanks.map(result => {
           if (!result.student.user.email) return Promise.resolve();
 
-          // Simplified mapping for accuracy: Show Overall Performance
+          // Map complete breakdown for accuracy
           const breakdown = [{
-            subject: 'Overall Examination',
+            subject: exam.name,
             marks: result.total,
             totalMarks: exam.totalMarks,
-            grade: result.grade || 'N/A'
+            grade: result.grade || 'N/A',
+            mcqMarks: result.mcqMarks,
+            sqMarks: result.sqMarks,
+            cqMarks: result.cqMarks
           }];
 
-          return sendEmail({
-            to: result.student.user.email,
-            subject: `Exam Result: ${exam.name}`,
-            react: ExamResultEmail({
-              studentName: result.student.user.name,
-              examName: exam.name,
-              results: breakdown,
-              totalPercentage: result.percentage || 0,
-              finalGrade: result.grade || 'N/A',
-              rank: result.rank,
-              institute: institute as any,
-              examDate: exam.date.toLocaleDateString(),
-              remarks: result.comment || undefined,
-            }) as any
-          });
+          return (async () => {
+            try {
+              // Generate PDF Attachment
+              const pdfBuffer = await generateStudentScriptPDF({
+                studentName: result.student.user.name,
+                studentRoll: result.student.roll,
+                examName: exam.name,
+                examDate: exam.date.toLocaleDateString(),
+                subject: exam.name, // Assuming exam name has subject or using a placeholder
+                className: (exam as any).class?.name || "N/A",
+                results: {
+                  total: result.total,
+                  totalMarks: exam.totalMarks,
+                  grade: result.grade || 'N/A',
+                  rank: result.rank || undefined,
+                  mcqMarks: result.mcqMarks,
+                  sqMarks: result.sqMarks,
+                  cqMarks: result.cqMarks,
+                  percentage: result.percentage || 0
+                },
+                institute: {
+                  name: institute?.name || "Digital School",
+                  address: institute?.address || undefined,
+                  logoUrl: institute?.logoUrl || undefined
+                }
+              });
+
+              return sendEmail({
+                to: result.student.user.email!,
+                subject: `Exam Result Released: ${exam.name}`,
+                react: ExamResultEmail({
+                  studentName: result.student.user.name,
+                  examName: exam.name,
+                  results: breakdown,
+                  totalPercentage: result.percentage || 0,
+                  finalGrade: result.grade || 'N/A',
+                  rank: result.rank || undefined,
+                  institute: institute as any,
+                  examDate: exam.date.toLocaleDateString(),
+                  remarks: result.comment || undefined,
+                }) as any,
+                attachments: [
+                  {
+                    filename: `${result.student.user.name.replace(/\s+/g, '_')}_Result.pdf`,
+                    content: pdfBuffer
+                  }
+                ]
+              });
+            } catch (err) {
+              console.error(`Failed to send email to ${result.student.user.email}:`, err);
+              return Promise.resolve();
+            }
+          })();
         });
 
         await Promise.allSettled(emailPromises);

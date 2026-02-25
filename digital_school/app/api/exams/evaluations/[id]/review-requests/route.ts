@@ -9,7 +9,7 @@ export async function GET(
   try {
     const { id: examId } = await params;
     const token = await getTokenFromRequest(request);
-    
+
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -58,15 +58,41 @@ export async function GET(
       }
     });
 
-    // Transform the data to include student name
-    const transformedRequests = reviewRequests.map((request: any) => ({
-      ...request,
-      student: {
-        ...request.student,
-        name: request.student.user.name,
-        email: request.student.user.email
+    // Transform the data to include student name safely
+    const transformedRequests = reviewRequests.map((request: any) => {
+      try {
+        if (!request.student || !request.student.user) {
+          console.warn(`Review request ${request.id} has missing student or user data`);
+          return {
+            ...request,
+            student: {
+              ...(request.student || {}),
+              name: 'Unknown Student',
+              email: 'N/A'
+            }
+          };
+        }
+
+        return {
+          ...request,
+          student: {
+            ...request.student,
+            name: request.student.user.name,
+            email: request.student.user.email
+          }
+        };
+      } catch (err) {
+        console.error(`Error transforming review request ${request.id}:`, err);
+        return {
+          ...request,
+          student: {
+            ...(request.student || {}),
+            name: 'Error Loading Name',
+            email: 'N/A'
+          }
+        };
       }
-    }));
+    });
 
     return NextResponse.json({
       reviewRequests: transformedRequests

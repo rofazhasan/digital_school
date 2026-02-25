@@ -309,8 +309,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <img src={examInfo.logoUrl} alt="Logo" className="h-20 w-auto object-contain" />
                         </div>
                     )}
-                    <h1 className="text-3xl font-black uppercase tracking-tight text-slate-900">{examInfo.schoolName}</h1>
-                    <p className="text-sm font-medium text-slate-600 uppercase tracking-widest mt-1">{examInfo.schoolAddress}</p>
+                    <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight text-slate-900">{examInfo.schoolName}</h1>
+                    <p className="text-[10px] md:text-sm font-medium text-slate-600 uppercase tracking-widest mt-1">{examInfo.schoolAddress}</p>
 
                     <div className="mt-6 inline-block bg-slate-900 text-white px-6 py-1 rounded-full text-sm font-bold uppercase tracking-tighter">
                         {examInfo.title}
@@ -320,35 +320,35 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         {/* Decorative background element for print */}
                         <div className="absolute top-0 left-0 w-2 h-full bg-slate-900"></div>
 
-                        <div className="text-left space-y-2">
+                        <div className="text-left space-y-2 md:text-left text-center">
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Candidate Name</label>
-                                <p className="text-lg font-bold text-slate-900">{submission.student.name}</p>
+                                <p className="text-base md:text-lg font-bold text-slate-900">{submission.student.name}</p>
                             </div>
                             <div>
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">ID / Roll Number</label>
-                                <p className="text-sm font-bold text-slate-600">{submission.student.roll}</p>
+                                <p className="text-xs md:text-sm font-bold text-slate-600">{submission.student.roll}</p>
                             </div>
                         </div>
 
-                        <div className="flex flex-col items-center">
+                        <div className="flex flex-col items-center py-2">
                             <div className="relative">
-                                <div className="text-4xl font-black border-[6px] border-slate-900 rounded-full w-28 h-28 flex items-center justify-center bg-white shadow-xl z-10 relative">
+                                <div className="text-2xl md:text-4xl font-black border-[4px] md:border-[6px] border-slate-900 rounded-full w-20 h-20 md:w-28 md:h-28 flex items-center justify-center bg-white shadow-xl z-10 relative">
                                     {Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}
                                 </div>
-                                <div className="absolute -bottom-2 bg-slate-900 text-white px-4 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest z-20">
+                                <div className="absolute -bottom-2 bg-slate-900 text-white px-3 md:px-4 py-0.5 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest z-20 whitespace-nowrap">
                                     Total Score
                                 </div>
                             </div>
                         </div>
 
-                        <div className="text-right space-y-3">
-                            <div className="flex flex-col items-end">
+                        <div className="text-center md:text-right space-y-3">
+                            <div className="flex flex-col items-center md:items-end">
                                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 block">Performance Summary</label>
                                 <div className="flex items-baseline gap-1 mt-1">
-                                    <span className="text-2xl font-black text-slate-900">{Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}</span>
+                                    <span className="text-xl md:text-2xl font-black text-slate-900">{Number(submission.result?.total || 0).toFixed(2).replace(/\.00$/, '')}</span>
                                     <span className="text-slate-400 font-bold">/</span>
-                                    <span className="text-lg font-bold text-slate-500">{examInfo.totalMarks}</span>
+                                    <span className="text-base md:text-lg font-bold text-slate-500">{examInfo.totalMarks}</span>
                                 </div>
                                 {totalDeducted > 0 && (
                                     <span className="text-rose-600 font-black text-xs uppercase tracking-tight bg-rose-50 px-2 py-0.5 rounded mt-1 border border-rose-100">
@@ -434,8 +434,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         </div>
 
                                                         {/* Options Grid */}
-                                                        <div className="ml-6 mt-1">
-                                                            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                                        <div className="ml-2 md:ml-6 mt-1">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs">
                                                                 {(q.options || []).map((opt: any, oidx: number) => {
                                                                     const isCorrectOpt = opt.isCorrect || (q.correct && q.correct.includes(oidx));
                                                                     const isSelected = ans?.selectedOptions?.includes(oidx);

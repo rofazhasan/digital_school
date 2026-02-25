@@ -7,20 +7,30 @@ let transporter: any = null;
 
 function getTransporter() {
     if (!transporter) {
-        const user = process.env.GMAIL_USER;
-        const pass = process.env.GMAIL_APP_PASSWORD;
+        const host = process.env.SMTP_HOST;
+        const port = Number(process.env.SMTP_PORT) || 587;
+        const user = process.env.SMTP_USER || process.env.GMAIL_USER;
+        const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
 
         if (!user || !pass) {
-            console.warn('⚠️ GMAIL_USER or GMAIL_APP_PASSWORD not defined. Email sending will fail.');
+            console.warn('⚠️ SMTP credentials not defined. Email sending will fail.');
         }
 
-        transporter = nodemailer.createTransport({
-            service: 'gmail',
-            auth: {
-                user,
-                pass,
-            },
-        });
+        // If host is explicitly provided, use generic SMTP (e.g., Brevo)
+        if (host) {
+            transporter = nodemailer.createTransport({
+                host,
+                port,
+                secure: port === 465,
+                auth: { user, pass },
+            });
+        } else {
+            // Fallback to Gmail service if no host is provided
+            transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: { user, pass },
+            });
+        }
     }
     return transporter;
 }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { useReactToPrint } from 'react-to-print';
 import { MathJaxContext } from 'better-react-mathjax';
-import { Loader2, Printer, ArrowLeft } from 'lucide-react';
+import { Loader2, Printer, ArrowLeft, Download } from 'lucide-react';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { Button } from '@/components/ui/button';
 
@@ -104,11 +104,14 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
     } as any);
 
     const mathJaxConfig = {
-        loader: { load: ["input/tex", "output/chtml"] },
+        loader: { load: ["input/tex", "input/mml", "output/chtml"] },
         tex: {
             inlineMath: [['$', '$'], ['\\(', '\\)']],
             displayMath: [['$$', '$$'], ['\\[', '\\]']],
             packages: { '[+]': ['ams'] }
+        },
+        options: {
+            enableEnrichment: false // Disable enrichment to avoid SRE errors if not strictly needed for speech
         },
         startup: {
             pageReady: () => {
@@ -198,33 +201,115 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
 
     return (
         <MathJaxContext config={mathJaxConfig}>
-            <div className="min-h-screen bg-slate-50 p-4 md:p-8 dark:bg-slate-950 print:p-0 print:bg-white text-slate-900 dark:text-slate-100">
-                {/* Controls - Hidden in Print */}
-                <div className="mb-6 flex justify-between items-center max-w-5xl mx-auto print:hidden">
-                    <Button variant="outline" onClick={() => router.back()}>
-                        <ArrowLeft className="mr-2 h-4 w-4" /> Back
-                    </Button>
-                    <div className="flex gap-2">
-                        <Button onClick={handlePrint} disabled={isPrinting}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            {isPrinting ? "Preparing..." : "Print Script"}
-                        </Button>
+            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 font-sans">
+                {/* Header / Controls - Responsive and Sticky */}
+                <div className="sticky top-0 z-[100] bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-b border-slate-200 dark:border-slate-800 px-4 py-3 md:px-8 print:hidden shadow-sm">
+                    <div className="max-w-6xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+                        <div className="flex items-center gap-4 w-full sm:w-auto">
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => router.back()}
+                                className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            >
+                                <ArrowLeft className="h-5 w-5" />
+                            </Button>
+                            <div className="min-w-0">
+                                <h1 className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+                                    {submission?.student?.name || 'Student'}'s Answer Script
+                                </h1>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                                        {examData?.name || 'Evaluation'}
+                                    </span>
+                                    <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                                    <span className="text-[10px] text-blue-600 font-bold uppercase">
+                                        Class {examData?.class?.name || 'N/A'}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handlePrint}
+                                disabled={isPrinting}
+                                className="flex-1 sm:flex-none border-slate-200 dark:border-slate-700 font-bold"
+                            >
+                                <Printer className="mr-2 h-4 w-4" />
+                                {isPrinting ? "Wait..." : "Print Script"}
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="flex-1 sm:flex-none bg-slate-900 dark:bg-slate-50 text-white dark:text-slate-900 font-bold"
+                                onClick={() => window.print()}
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Save as PDF
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Printable Area */}
-                <div className="max-w-5xl mx-auto print:max-w-none">
-                    <MarkedQuestionPaper
-                        ref={printRef}
-                        examInfo={examInfo}
-                        questions={questions}
-                        submission={submission}
-                        rank={rank}
-                        totalStudents={examData.submissions.length}
-                        qrData={qrData}
-                    />
-                </div>
+                {/* Main Content Area */}
+                <main className="max-w-6xl mx-auto p-4 md:p-8 lg:p-12">
+                    {/* Brief Performance Summary for Web View */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8 print:hidden">
+                        {[
+                            { label: 'Total Mark', value: submission?.result?.total, sub: `/ ${examData?.totalMarks}`, color: 'text-slate-900 dark:text-white' },
+                            { label: 'Rank', value: rank ? `#${rank}` : 'N/A', sub: `of ${examData?.submissions?.length}`, color: 'text-amber-600' },
+                            { label: 'Grade', value: submission?.result?.grade || 'N/A', sub: 'Performance', color: 'text-emerald-600' },
+                            { label: 'Highest', value: highestMark, sub: 'In Class', color: 'text-blue-600' }
+                        ].map((stat, i) => (
+                            <div key={i} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">{stat.label}</p>
+                                <div className="flex items-baseline gap-1">
+                                    <span className={`text-xl font-black ${stat.color}`}>{stat.value}</span>
+                                    <span className="text-xs text-slate-400 font-medium">{stat.sub}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* The Actual Script */}
+                    <div className="bg-white dark:bg-white rounded-[2rem] shadow-2xl shadow-slate-200 dark:shadow-none overflow-hidden ring-1 ring-slate-100 print:ring-0 print:shadow-none print:rounded-none">
+                        <div className="p-0 sm:p-2 md:p-4">
+                            <MarkedQuestionPaper
+                                ref={printRef}
+                                examInfo={examInfo}
+                                questions={questions}
+                                submission={submission}
+                                rank={rank}
+                                totalStudents={examData.submissions.length}
+                                qrData={qrData}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Footer / Disclaimer for Web View */}
+                    <div className="mt-12 text-center pb-12 print:hidden">
+                        <p className="text-xs text-slate-400 font-medium uppercase tracking-widest">
+                            © 2026 DIGITAL SCHOOL • SECURE ACADEMIC RECORD
+                        </p>
+                    </div>
+                </main>
             </div>
+
+            {/* Print Styles Injection */}
+            <style jsx global>{`
+                @media print {
+                    @page {
+                        margin: 10mm;
+                        size: A4;
+                    }
+                    body {
+                        background: white !important;
+                    }
+                }
+            `}</style>
         </MathJaxContext>
     );
 }
+

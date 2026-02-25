@@ -112,18 +112,20 @@ export default function PrintExamPage() {
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
-    loader: { load: ["[tex]/ams"] },
+    loader: { load: ["input/tex", "input/mml", "output/chtml"] },
     tex: {
-      packages: { '[+]': ['ams'] },
       inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']]
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      packages: { '[+]': ['ams'] }
+    },
+    options: {
+      enableEnrichment: false
     },
     startup: {
-      // This function runs after MathJax has processed the page.
       pageReady: () => {
         setIsMathJaxReady(true);
-        // Use a global flag as a fallback for the promise in handlePrint
         (window as any).__IS_MATHJAX_READY = true;
+        return (window as any).MathJax.startup.defaultPageReady();
       }
     }
   };

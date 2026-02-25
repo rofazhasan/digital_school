@@ -99,8 +99,8 @@ export async function POST(
           total: totalScore,
           mcqMarks: mcqMarks,
           cqMarks: cqMarks,
-          sqMarks: sqMarks,
-          isPublished: false
+          sqMarks: sqMarks
+          // isPublished status is preserved from existing record
         },
         create: {
           studentId,
