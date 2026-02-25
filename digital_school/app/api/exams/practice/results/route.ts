@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { DatabaseClient } from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
 
-export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest) {
     try {
-        const { id: examId } = await params;
         const { searchParams } = new URL(request.url);
         const resultId = searchParams.get('resultId');
 
@@ -31,7 +27,11 @@ export async function GET(
                         class: true
                     }
                 },
-                student: true
+                student: {
+                    include: {
+                        user: true
+                    }
+                }
             }
         });
 
@@ -47,7 +47,7 @@ export async function GET(
         const questionIdsSet = new Set<string>();
 
         for (const examSet of exam.examSets) {
-            let qList = [];
+            let qList: any[] = [];
             if (examSet.questionsJson) {
                 if (Array.isArray(examSet.questionsJson)) {
                     qList = examSet.questionsJson;
@@ -58,8 +58,7 @@ export async function GET(
                     } catch (e) {
                         console.error('Failed to parse questionsJson for examSet', examSet.id);
                     }
-                } else if (typeof examSet.questionsJson === 'object') {
-                    // Some objects might be saved like a map, convert to array if possible, else ignore
+                } else if (typeof examSet.questionsJson === 'object' && examSet.questionsJson !== null) {
                     qList = Object.values(examSet.questionsJson);
                 }
             }
@@ -80,25 +79,25 @@ export async function GET(
             let isCorrect = false;
             let awardedMarks = 0;
 
-            if (studentAnswer) {
-                if (type === 'MCQ') {
+            if (studentAnswer !== undefined && studentAnswer !== null) {
+                if (type === 'MCQ' || type === 'MC' || type === 'AR') {
                     const normalize = (s: any) => String(s || '').trim().toLowerCase().normalize();
                     const userAns = normalize(studentAnswer);
 
                     if (q.options && Array.isArray(q.options)) {
-                        const correctOption = q.options.find((opt: any) => opt.isCorrect);
+                        const correctOption = q.options.find((opt: any) => opt && opt.isCorrect);
                         if (correctOption) {
                             const correctOptionText = normalize(correctOption.text || String(correctOption));
                             isCorrect = userAns === correctOptionText;
                         }
                     }
+
                     if (!isCorrect && (q.correctAnswer || q.correct)) {
                         isCorrect = userAns === normalize(String(q.correctAnswer || q.correct));
                     }
+
                     if (isCorrect) awardedMarks = q.marks || 0;
                 }
-                // Add more evaluation logic if needed (similar to regular results API)
-                // For now, focusing on MCQ/Objective as practice is mainly for those
             }
 
             return {
@@ -109,7 +108,7 @@ export async function GET(
             };
         });
 
-        // Calculate statistics for THIS specific practice result vs other practice results of same exam
+        // Calculate statistics
         const statsAggregation = await prisma.practiceResult.aggregate({
             where: { examId: exam.id },
             _avg: { score: true },
@@ -125,6 +124,10 @@ export async function GET(
             }
         });
 
+        const percentage = practiceResult.totalMarks > 0
+            ? (practiceResult.score / practiceResult.totalMarks) * 100
+            : 0;
+
         return NextResponse.json({
             exam: {
                 ...exam,
@@ -132,8 +135,8 @@ export async function GET(
                 className: exam.class?.name || 'Academic'
             },
             student: {
-                name: (practiceResult.student as any).name || 'Student',
-                roll: (practiceResult.student as any).roll || 'N/A'
+                name: (practiceResult.student.user as any)?.name || 'Student',
+                roll: practiceResult.student.roll || 'N/A'
             },
             submission: {
                 id: practiceResult.id,
@@ -143,7 +146,7 @@ export async function GET(
             result: {
                 total: practiceResult.score,
                 rank: rankCount + 1,
-                percentage: practiceResult.totalMarks ? (practiceResult.score / practiceResult.totalMarks) * 100 : 0,
+                percentage: isNaN(percentage) ? 0 : percentage,
                 isPractice: true
             },
             questions: processedQuestions,
