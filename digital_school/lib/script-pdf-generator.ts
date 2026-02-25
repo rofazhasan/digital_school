@@ -49,15 +49,36 @@ export async function generateStudentScriptPDF(data: StudentScriptPDFData, fonts
         let boldBase64 = fonts?.bold;
 
         if (!regularBase64 || !boldBase64) {
-            const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
-            const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
+            // Try multiple paths to find the fonts regardless of how Next.js is running
+            const pathsToTry = [
+                path.join(process.cwd(), 'public/fonts'),
+                path.join(__dirname, '../../../../public/fonts'),
+                path.join(__dirname, '../../../public/fonts')
+            ];
 
-            if (!regularBase64 && fs.existsSync(fontPath)) {
-                regularBase64 = fs.readFileSync(fontPath).toString('base64');
+            let fontDir = '';
+            for (const p of pathsToTry) {
+                if (fs.existsSync(p)) {
+                    fontDir = p;
+                    break;
+                }
             }
 
-            if (!boldBase64 && fs.existsSync(fontBoldPath)) {
-                boldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
+            if (fontDir) {
+                const fontPath = path.join(fontDir, 'NotoSansBengali-Regular.ttf');
+                const fontBoldPath = path.join(fontDir, 'NotoSansBengali-Bold.ttf');
+
+                if (!regularBase64 && fs.existsSync(fontPath)) {
+                    regularBase64 = fs.readFileSync(fontPath).toString('base64');
+                    console.log('[PDF] Loaded Bengali Regular font from disk.');
+                }
+
+                if (!boldBase64 && fs.existsSync(fontBoldPath)) {
+                    boldBase64 = fs.readFileSync(fontBoldPath).toString('base64');
+                    console.log('[PDF] Loaded Bengali Bold font from disk.');
+                }
+            } else {
+                console.warn('[PDF] Could not find public/fonts directory for Bengali fonts.');
             }
         }
 

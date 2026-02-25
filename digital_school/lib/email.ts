@@ -66,17 +66,22 @@ export async function sendEmail({
         // Render the React component to HTML
         const html = await render(react as React.ReactElement);
 
+        console.log(`[EMAIL] Attempting to send email to ${to} with ${attachments?.length || 0} attachments.`);
+
         const info = await mailer.sendMail({
             from,
             to: Array.isArray(to) ? to.join(', ') : to,
             subject,
             html,
             replyTo,
-            attachments: attachments?.map(att => ({
-                filename: att.filename,
-                content: att.content,
-                path: att.path
-            }))
+            attachments: attachments?.map(att => {
+                const attachment: any = { filename: att.filename };
+                if (att.content) {
+                    attachment.content = att.content; // Can be Buffer or string
+                }
+                if (att.path) attachment.path = att.path;
+                return attachment;
+            })
         });
 
         console.log('[EMAIL] Email sent successfully via Gmail:', info.messageId);

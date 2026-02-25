@@ -346,24 +346,38 @@ function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress
 
                   <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-700">
                     {submitted ? (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="text-center p-2 bg-slate-50 dark:bg-slate-900 rounded-xl">
-                            <div className="text-xs text-slate-500">Score</div>
-                            <div className="font-bold text-slate-900 dark:text-white">{result?.total ?? '-'}</div>
-                          </div>
-                          <Button asChild variant="outline" className="h-full rounded-xl border-slate-200">
-                            <a href={`/exams/results/${exam.id}`}>View Result</a>
-                          </Button>
+                      <div className="flex flex-wrap items-center gap-2 mt-2">
+                        <div className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1.5 flex items-center gap-1.5 shadow-sm">
+                          <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                            Score: {result?.total ?? '-'}
+                          </span>
                         </div>
+                        <Button
+                          asChild
+                          size="sm"
+                          variant="outline"
+                          className="h-8 rounded-full border-blue-500 text-blue-600 hover:bg-blue-600 hover:text-white transition-all font-bold px-3"
+                        >
+                          <Link href={`/exams/results/${exam.id}`}>View Result</Link>
+                        </Button>
                         {status === 'finished' && (
-                          <Button asChild className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg h-11 text-base font-semibold">
-                            <a href={`/exams/practice/${exam.id}`}>Take Practice Session</a>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-full border-emerald-500 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all font-bold px-3"
+                          >
+                            <Link href={`/exams/practice/${exam.id}`}>Practice</Link>
                           </Button>
                         )}
                         {exam.allowRetake && status === 'active' && (
-                          <Button asChild className="w-full rounded-xl bg-amber-600 hover:bg-amber-700 text-white shadow-lg h-11 text-base font-semibold">
-                            <a href={`/exams/online/${exam.id}?action=start`}>🔄 Retake Exam</a>
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-full border-amber-500 text-amber-600 hover:bg-amber-600 hover:text-white transition-all font-bold px-3"
+                          >
+                            <Link href={`/exams/online/${exam.id}?action=start`}>🔄 Retake</Link>
                           </Button>
                         )}
                       </div>
@@ -380,9 +394,16 @@ function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress
                           Not Started
                         </Button>
                       ) : (
-                        <Button asChild className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none h-11 text-base font-semibold">
-                          <a href={`/exams/practice/${exam.id}`}>Take Practice Session</a>
-                        </Button>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            className="h-8 rounded-full border-emerald-500 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all font-bold px-3"
+                          >
+                            <Link href={`/exams/practice/${exam.id}`}>Practice</Link>
+                          </Button>
+                        </div>
                       )
                     )}
                   </div>

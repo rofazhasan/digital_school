@@ -1105,65 +1105,13 @@ export default function ExamsPage() {
                                   </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
-                                  {(() => {
-                                    const result = results.find(r => r.examId === exam.id);
-                                    const examEnd = exam.endTime ? new Date(exam.endTime) : null;
-                                    const isExpired = examEnd && new Date() > examEnd;
-                                    const isOnline = exam.type === 'ONLINE' || (exam as any).type === 'HYBRID';
-
-                                    const buttons = [];
-
-                                    if (result && userRole === 'STUDENT') {
-                                      buttons.push(
-                                        <div key="score" className="bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-800 rounded-full px-3 py-1 flex items-center gap-1.5 shadow-sm">
-                                          <Award className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                                          <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                                            {result.total} / {exam.totalMarks}
-                                          </span>
-                                        </div>
-                                      );
-                                      buttons.push(
-                                        <Button
-                                          key="view-result"
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={(e) => { e.stopPropagation(); router.push(`/exams/results/${exam.id}`); }}
-                                          className="h-8 rounded-full border-blue-500 text-blue-600 hover:bg-blue-600 hover:text-white transition-all font-bold px-3 text-xs"
-                                        >
-                                          View Result
-                                        </Button>
-                                      );
-                                    }
-
-                                    if (isExpired && isOnline) {
-                                      buttons.push(
-                                        <Button
-                                          key="practice"
-                                          size="sm"
-                                          variant="outline"
-                                          onClick={(e) => { e.stopPropagation(); router.push(`/exams/practice/${exam.id}`); }}
-                                          className="h-8 rounded-full border-emerald-500 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all font-bold px-3 text-xs"
-                                        >
-                                          Practice
-                                        </Button>
-                                      );
-                                    }
-
-                                    if (buttons.length === 0) {
-                                      buttons.push(
-                                        <Button
-                                          key="open"
-                                          size="sm"
-                                          variant="outline"
-                                          className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
-                                        >
-                                          Open
-                                        </Button>
-                                      );
-                                    }
-
-                                    return buttons;
-                                  })()}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-8 rounded-full hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all font-bold px-4 text-xs"
+                                  >
+                                    Open
+                                  </Button>
                                 </div>
                               </div>
                             </div>

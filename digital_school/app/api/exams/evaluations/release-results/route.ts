@@ -191,6 +191,11 @@ export async function POST(req: NextRequest) {
                 } : undefined
               }, fonts);
 
+              // Determine base URL dynamically
+              const protocol = req.headers.get("x-forwarded-proto") || "http";
+              const host = req.headers.get("host") || "localhost:3000";
+              const baseUrl = `${protocol}://${host}`;
+
               return sendEmail({
                 to: result.student.user.email!,
                 subject: `Exam Result Released: ${exam.name}`,
@@ -205,7 +210,8 @@ export async function POST(req: NextRequest) {
                   examDate: exam.date.toLocaleDateString(),
                   remarks: result.comment || undefined,
                   examId: exam.id,
-                  studentId: result.studentId
+                  studentId: result.studentId,
+                  baseUrl: baseUrl
                 }) as any,
                 attachments: [
                   {

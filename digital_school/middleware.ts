@@ -98,6 +98,9 @@ const ROUTE_PERMISSIONS = {
     '/exams/online/*',
     '/exams/results',
     '/exams/results/*',
+    '/exams/practice',
+    '/exams/practice/',
+    '/exams/practice/*',
     '/exams/evaluations/*/print/*',
   ],
 
