@@ -25,7 +25,7 @@ function PracticeExamContent({ params }: { params: Promise<{ id: string }> }) {
 
                 const data = await res.json();
 
-                // Construct a mock exam object for the context
+                const fallbackDuration = data.exam.duration || 60; // 60 minutes
                 const mockExam = {
                     ...data.exam,
                     questions: data.questions,
@@ -35,9 +35,11 @@ function PracticeExamContent({ params }: { params: Promise<{ id: string }> }) {
                     isPractice: true, // Flag for UI differences
                     title: data.exam.name,
                     className: data.exam.subject || 'Academic',
-                    duration: data.exam.duration || 3600, // Fallback duration
+                    duration: fallbackDuration,
+                    objectiveTime: data.exam.objectiveTime || fallbackDuration,
+                    cqSqTime: data.exam.cqSqTime || fallbackDuration,
                     startTime: new Date().toISOString(),
-                    endTime: new Date(Date.now() + 3600000).toISOString(),
+                    endTime: new Date(Date.now() + fallbackDuration * 60000).toISOString(),
                 };
 
                 setExam(mockExam);

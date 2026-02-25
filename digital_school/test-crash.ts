@@ -1,26 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { DatabaseClient } from '@/lib/db';
-import { getTokenFromRequest } from '@/lib/auth';
+import { PrismaClient } from '@prisma/client';
 
-export async function GET(
-    request: NextRequest,
-    { params }: { params: Promise<{ id: string }> }
-) {
+const prisma = new PrismaClient();
+
+async function test() {
     try {
-        const { id: examId } = await params;
-        const { searchParams } = new URL(request.url);
-        const resultId = searchParams.get('resultId');
-
-        if (!resultId) {
-            return NextResponse.json({ error: 'Result ID is required' }, { status: 400 });
-        }
-
-        const tokenData = await getTokenFromRequest(request);
-        if (!tokenData || !tokenData.user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-        }
-
-        const prisma = await DatabaseClient.getInstance();
+        const resultId = 'cmm1y5s900001ycp91w323dzh';
+        console.log('Fetching practice result...', resultId);
 
         const practiceResult = await prisma.practiceResult.findUnique({
             where: { id: resultId },
@@ -36,44 +21,33 @@ export async function GET(
         });
 
         if (!practiceResult) {
-            return NextResponse.json({ error: 'Practice result not found' }, { status: 404 });
+            console.log('Practice result not found');
+            return;
         }
+
+        console.log('Got result, exam:', practiceResult.exam.name);
 
         const exam = practiceResult.exam;
         const studentAnswers = practiceResult.answers as any || {};
 
-        // Collect all objective questions from all sets to match with answers
         const allQuestions: any[] = [];
         const questionIdsSet = new Set<string>();
 
         for (const examSet of exam.examSets) {
-            let qList = [];
-            if (examSet.questionsJson) {
-                if (Array.isArray(examSet.questionsJson)) {
-                    qList = examSet.questionsJson;
-                } else if (typeof examSet.questionsJson === 'string') {
-                    try {
-                        const parsed = JSON.parse(examSet.questionsJson);
-                        if (Array.isArray(parsed)) qList = parsed;
-                    } catch (e) {
-                        console.error('Failed to parse questionsJson for examSet', examSet.id);
-                    }
-                } else if (typeof examSet.questionsJson === 'object') {
-                    // Some objects might be saved like a map, convert to array if possible, else ignore
-                    qList = Object.values(examSet.questionsJson);
-                }
-            }
-            if (!Array.isArray(qList)) qList = [];
+            const qList = examSet.questionsJson ? (
+                Array.isArray(examSet.questionsJson)
+                    ? examSet.questionsJson
+                    : JSON.parse(examSet.questionsJson as string)
+            ) : [];
 
             for (const q of qList) {
-                if (q && q.id && !questionIdsSet.has(q.id)) {
+                if (!questionIdsSet.has(q.id)) {
                     allQuestions.push(q);
                     questionIdsSet.add(q.id);
                 }
             }
         }
 
-        // Process questions with student answers
         const processedQuestions = allQuestions.map((q: any) => {
             const studentAnswer = studentAnswers[q.id];
             const type = (q.type || q.questionType || '').toUpperCase();
@@ -97,8 +71,6 @@ export async function GET(
                     }
                     if (isCorrect) awardedMarks = q.marks || 0;
                 }
-                // Add more evaluation logic if needed (similar to regular results API)
-                // For now, focusing on MCQ/Objective as practice is mainly for those
             }
 
             return {
@@ -109,7 +81,6 @@ export async function GET(
             };
         });
 
-        // Calculate statistics for THIS specific practice result vs other practice results of same exam
         const statsAggregation = await prisma.practiceResult.aggregate({
             where: { examId: exam.id },
             _avg: { score: true },
@@ -125,7 +96,7 @@ export async function GET(
             }
         });
 
-        return NextResponse.json({
+        const responseObj = {
             exam: {
                 ...exam,
                 subject: (exam as any).subject || 'Academic',
@@ -143,7 +114,7 @@ export async function GET(
             result: {
                 total: practiceResult.score,
                 rank: rankCount + 1,
-                percentage: practiceResult.totalMarks ? (practiceResult.score / practiceResult.totalMarks) * 100 : 0,
+                percentage: (practiceResult.score / practiceResult.totalMarks) * 100,
                 isPractice: true
             },
             questions: processedQuestions,
@@ -153,10 +124,18 @@ export async function GET(
                 highestScore: statsAggregation._max.score || 0,
                 lowestScore: statsAggregation._min.score || 0
             }
-        });
+        };
 
-    } catch (error) {
-        console.error('GET /api/exams/practice/results Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+        // Try to JSON stringify to catch Next.js serialization issues
+        JSON.stringify(responseObj);
+        console.log('Successfully completed without throwing!');
+
+    } catch (e) {
+        console.error('CRASHED!');
+        console.error(e);
+    } finally {
+        await prisma.$disconnect();
     }
 }
+
+test();
