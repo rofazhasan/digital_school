@@ -988,6 +988,12 @@ export default function ExamsPage() {
                                         <BarChart3 className="w-4 h-4 text-emerald-500" />
                                         <span>View Results</span>
                                       </DropdownMenuItem>
+                                      {(exam.type === 'ONLINE' || (exam as any).type === 'HYBRID') && exam.endTime && new Date() > new Date(exam.endTime) && (
+                                        <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
+                                          <Monitor className="w-4 h-4 text-purple-500" />
+                                          <span>Take Practice</span>
+                                        </DropdownMenuItem>
+                                      )}
                                       <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => handleToggleActive(exam.id, exam.isActive)}>
                                         {exam.isActive ? (
                                           <>
@@ -1085,7 +1091,7 @@ export default function ExamsPage() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                  {exam.type === 'ONLINE' && exam.endTime && new Date() > new Date(exam.endTime) && (
+                                  {(exam.type === 'ONLINE' || (exam as any).type === 'HYBRID') && exam.endTime && new Date() > new Date(exam.endTime) && (
                                     <Button
                                       size="sm"
                                       variant="outline"

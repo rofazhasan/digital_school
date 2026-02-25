@@ -370,9 +370,13 @@ function ExamGrid({ exams, getExamStatus, getResult, hasSubmitted, hasInProgress
                         <Button asChild className="w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 dark:shadow-none h-11 text-base font-semibold">
                           <a href={`/exams/online/${exam.id}`}>{inProgress ? '▶️ Resume Exam' : 'Start Exam'}</a>
                         </Button>
-                      ) : (
+                      ) : status === 'upcoming' ? (
                         <Button disabled className="w-full rounded-xl opacity-50 bg-slate-100 text-slate-400 dark:bg-slate-800 h-11">
-                          {status === 'upcoming' ? 'Not Started' : 'Expired'}
+                          Not Started
+                        </Button>
+                      ) : (
+                        <Button asChild className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none h-11 text-base font-semibold">
+                          <a href={`/exams/practice/${exam.id}`}>Take Practice Session</a>
                         </Button>
                       )
                     )}
