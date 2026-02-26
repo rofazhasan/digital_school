@@ -70,7 +70,7 @@ export const useProctoring = ({
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
         return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-    }, [isExamActive, triggerViolation]);
+    }, [isExamActive, triggerViolation, isUploading]);
 
     // Handle Window Blur (Alt+Tab or clicking outside)
     useEffect(() => {

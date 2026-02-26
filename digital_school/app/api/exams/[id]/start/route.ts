@@ -55,12 +55,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       examSetId: examStudentMap?.examSetId || null
     };
 
+    // Find existing submission FIRST so we don't overwrite timestamps on resume
+    const existingSubmission = await prisma.examSubmission.findUnique({
+      where: { studentId_examId: { studentId, examId } }
+    });
+
     if (section === 'objective') {
       dataToUpdate.objectiveStatus = 'IN_PROGRESS';
-      dataToUpdate.objectiveStartedAt = now;
+      // Only set startedAt if not already set — preserves timer when resuming
+      if (!existingSubmission?.objectiveStartedAt) {
+        dataToUpdate.objectiveStartedAt = now;
+      }
     } else if (section === 'cqsq') {
       dataToUpdate.cqSqStatus = 'IN_PROGRESS';
-      dataToUpdate.cqSqStartedAt = now;
+      // Only set startedAt if not already set — preserves timer when resuming
+      if (!existingSubmission?.cqSqStartedAt) {
+        dataToUpdate.cqSqStartedAt = now;
+      }
     }
 
     const submission = await prisma.examSubmission.upsert({
