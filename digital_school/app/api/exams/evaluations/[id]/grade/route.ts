@@ -54,11 +54,45 @@ export async function POST(
       return NextResponse.json({ error: "Submission not found" }, { status: 404 });
     }
 
+    // Find the student's assigned exam set to check question type
+    const studentExamMap = await prisma.examStudentMap.findFirst({
+      where: { examId, studentId }
+    });
+
+    const examSet = await prisma.examSet.findUnique({
+      where: { id: studentExamMap?.examSetId || exam.examSets[0]?.id }
+    });
+
+    const questions = typeof examSet?.questionsJson === 'string'
+      ? JSON.parse(examSet?.questionsJson)
+      : examSet?.questionsJson;
+
+    const targetQuestion = (questions || []).find((q: any) => q.id === questionId);
+    const isManualType = ['CQ', 'SQ', 'DESCRIPTIVE'].includes(targetQuestion?.type?.toUpperCase());
+
     // Update the submission with new marks and notes
+    const { subIndex } = await req.json().catch(() => ({ subIndex: undefined }));
     const updatedAnswers = {
       ...(submission.answers as Record<string, unknown>),
-      [`${questionId}_marks`]: marks
     };
+
+    if (subIndex !== undefined) {
+      // Update specific sub-question mark
+      updatedAnswers[`${questionId}_sub_${subIndex}_marks`] = marks;
+
+      // For manual types, sum up all sub-marks to update the main question mark
+      if (isManualType && targetQuestion?.subQuestions) {
+        let questionTotal = 0;
+        targetQuestion.subQuestions.forEach((_: any, idx: number) => {
+          const m = updatedAnswers[`${questionId}_sub_${idx}_marks`];
+          if (typeof m === 'number') questionTotal += m;
+        });
+        updatedAnswers[`${questionId}_marks`] = questionTotal;
+      }
+    } else {
+      // Update main question mark directly
+      updatedAnswers[`${questionId}_marks`] = marks;
+    }
 
     // Use centralized evaluation logic to recalculate total score and marks by type
     const { evaluateSubmission } = await import("@/lib/exam-logic");
@@ -76,7 +110,7 @@ export async function POST(
         }
       },
       data: {
-        answers: updatedAnswers,
+        answers: updatedAnswers as any,
         evaluatorNotes: notes || submission.evaluatorNotes,
         score: totalScore
       }

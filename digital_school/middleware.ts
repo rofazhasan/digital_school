@@ -90,6 +90,7 @@ const ROUTE_PERMISSIONS = {
     '/student/attendance',
     '/student/profile',
     '/student/chat',
+    '/student/notices',
     '/student/prac-perfect',
     '/student/prac-perfect/*',
     '/exams',

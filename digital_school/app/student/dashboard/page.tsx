@@ -156,12 +156,21 @@ export default function StudentDashboardPage() {
   const [results, setResults] = useState<Result[]>([]);
   const [attendance, setAttendance] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
   const [analytics, setAnalytics] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isFocusModeOpen, setIsFocusModeOpen] = useState(false);
   const router = useRouter();
 
+
+  // Fetch user, exams, results, and attendance from API
+  useEffect(() => {
+    // Fetch unread notice count
+    fetch('/api/notices').then(res => res.ok ? res.json() : null).then(data => {
+      if (data) setUnreadNoticeCount(data.unreadCount || 0);
+    }).catch(() => { });
+  }, []);
 
   // Fetch user, exams, results, and attendance from API
   useEffect(() => {
@@ -351,7 +360,7 @@ export default function StudentDashboardPage() {
                     { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
                     { id: 'analytics', label: 'Analytics', icon: TrendingUp },
                     { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
-                    { id: 'notices', label: 'Notices', icon: Bell }
+                    { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -370,7 +379,14 @@ export default function StudentDashboardPage() {
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                         }`}
                     >
-                      <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-blue-500' : ''}`} />
+                      <div className="relative">
+                        <item.icon className={`h-4 w-4 ${activeTab === item.id ? 'text-blue-500' : ''}`} />
+                        {(item as any).badge > 0 && (
+                          <span className="absolute -top-1.5 -right-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white leading-none">
+                            {(item as any).badge > 9 ? '9+' : (item as any).badge}
+                          </span>
+                        )}
+                      </div>
                       <span>{item.label}</span>
                     </button>
                   ))}
@@ -429,7 +445,7 @@ export default function StudentDashboardPage() {
                 { id: 'results', label: 'Results', icon: BarChart3, href: '/exams/results' },
                 { id: 'analytics', label: 'Analytics', icon: TrendingUp },
                 { id: 'focus', label: 'Focus', icon: Target, action: () => setIsFocusModeOpen(true) },
-                { id: 'notices', label: 'Notices', icon: Bell }
+                { id: 'notices', label: 'Notices', icon: Bell, href: '/student/notices', badge: unreadNoticeCount }
               ].map((item: any) => (
                 <button
                   key={item.id}
@@ -448,7 +464,14 @@ export default function StudentDashboardPage() {
                     : 'bg-card text-muted-foreground border-border hover:border-primary/50'
                     }`}
                 >
-                  <item.icon className="h-3.5 w-3.5" />
+                  <div className="relative">
+                    <item.icon className="h-3.5 w-3.5" />
+                    {item.badge > 0 && (
+                      <span className="absolute -top-1.5 -right-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[8px] font-bold text-white leading-none">
+                        {item.badge > 9 ? '9+' : item.badge}
+                      </span>
+                    )}
+                  </div>
                   <span>{item.label}</span>
                 </button>
               ))}

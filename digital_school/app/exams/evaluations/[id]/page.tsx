@@ -1145,6 +1145,30 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     }
   }, [currentStudent?.student?.id]);
 
+  // Keyboard navigation for questions (Arrow keys)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore navigation if user is typing in an input, textarea, or contentEditable element
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === 'ArrowRight') {
+        if (currentQuestionIndex < (filteredQuestions?.length || 0) - 1) {
+          setCurrentQuestionIndex(prev => prev + 1);
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentQuestionIndex > 0) {
+          setCurrentQuestionIndex(prev => prev - 1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentQuestionIndex, filteredQuestions?.length]);
+
   // Helper function to get the correct image URL (annotated if exists, original otherwise)
   const getImageUrl = (originalUrl: string, questionId: string, imageIndex: number) => {
     const key = `${questionId}_${imageIndex}`;
@@ -1326,7 +1350,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    const marksKey = subIndex !== undefined ? `${questionId}_desc_${subIndex}_marks` : `${questionId}_marks`;
+    const marksKey = subIndex !== undefined ? `${questionId}_sub_${subIndex}_marks` : `${questionId}_marks`;
 
     // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
     const previousMarks = currentStudent?.answers?.[marksKey] || 0;
@@ -2427,8 +2451,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     }>
                                       {(currentQuestion?.type || "unknown").toUpperCase()}
                                     </Badge>
-                                    <div className="text-sm text-muted-foreground">
-                                      {currentQuestion?.marks} mark{currentQuestion?.marks > 1 ? 's' : ''}
+                                    <div className="flex flex-col items-end gap-1">
+                                      <div className="text-sm text-muted-foreground">
+                                        {currentQuestion?.marks} mark{currentQuestion?.marks > 1 ? 's' : ''}
+                                      </div>
+                                      {['cq', 'sq'].includes(currentQuestion?.type?.toLowerCase() || '') && (
+                                        <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">
+                                          Awarded: {(() => {
+                                            const qId = currentQuestion?.id;
+                                            let total = 0;
+                                            (currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).forEach((_: any, i: number) => {
+                                              total += Number(currentStudent?.answers?.[`${qId}_sub_${i}_marks`] || 0);
+                                            });
+                                            return total;
+                                          })()} / {currentQuestion?.marks}
+                                        </Badge>
+                                      )}
                                     </div>
                                   </div>
                                   <div className="text-base md:text-lg mb-4">
