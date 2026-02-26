@@ -2931,8 +2931,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               const subKey = `${currentQuestion?.id}_sub_${idx}`;
                                               const subText = currentStudent?.answers?.[subKey];
                                               const subImg = currentStudent?.answers?.[`${subKey}_image`];
+                                              const subImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
 
-                                              if (!subText && !subImg) return (
+                                              if (!subText && !subImg && (!subImgs || subImgs.length === 0)) return (
                                                 <div key={idx} className="text-sm text-gray-400 italic pl-2 border-l-2 border-transparent">
                                                   (Sub-question {idx + 1} not answered)
                                                 </div>
