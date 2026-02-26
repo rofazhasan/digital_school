@@ -36,13 +36,19 @@ function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
 }
 
 export function ExamContextProvider({
-  exam,
+  exam: examProp,
   children
 }: {
   exam: any;
   children: React.ReactNode;
 }) {
-  const [answers, setAnswers] = useState<any>(exam.savedAnswers || {});
+  // Keep exam as state so we can patch timestamps after start API returns
+  const [exam, setExamState] = useState<any>(examProp);
+  const patchExam = useCallback((patch: Partial<any>) => {
+    setExamState((prev: any) => ({ ...prev, ...patch }));
+  }, []);
+
+  const [answers, setAnswers] = useState<any>(examProp.savedAnswers || {});
   const [navigation, setNavigation] = useState<any>({ current: 0, marked: {} });
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [fontSize, setFontSize] = useState<'md' | 'lg' | 'xl'>('md');
@@ -267,6 +273,7 @@ export function ExamContextProvider({
   // Optimized Context Value to prevent unnecessary re-renders in consumers
   const contextValue = useMemo(() => ({
     exam,
+    patchExam,
     answers,
     setAnswers,
     navigation,
@@ -295,6 +302,7 @@ export function ExamContextProvider({
     groupedQuestions
   }), [
     exam,
+    patchExam,
     answers,
     navigation,
     saveStatus,

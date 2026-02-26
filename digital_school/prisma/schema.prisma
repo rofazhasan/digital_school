@@ -425,19 +425,27 @@ model Badge {
 }
 
 model Notice {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   title          String
   description    String
   targetClassIds String[]
   targetType     NoticeTarget
-  isActive       Boolean      @default(true)
+  priority       NoticePriority  @default(MEDIUM)
+  category       String?         @default("General")
+  links          Json?           // Array of { label: string, url: string }
+  attachments    Json?           // Array of { name: string, url: string }
+  readBy         String[]        // Array of user IDs who have read this notice
+  isActive       Boolean         @default(true)
   expiresAt      DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
   postedById     String
-  postedBy       User         @relation(fields: [postedById], references: [id])
-  targetClasses  Class[]      @relation("NoticeToClasses")
+  postedBy       User            @relation(fields: [postedById], references: [id])
+  targetClasses  Class[]         @relation("NoticeToClasses")
 
+  @@index([priority])
+  @@index([createdAt])
+  @@index([targetType])
   @@map("notices")
 }
 
@@ -976,7 +984,15 @@ enum NoticeTarget {
   STUDENTS
   TEACHERS
   ADMINS
+  TEACHERS_AND_ADMINS
   SPECIFIC_CLASS
+}
+
+enum NoticePriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
 }
 
 enum ActionType {

@@ -131,6 +131,7 @@ SectionTransitionOverlay.displayName = 'SectionTransitionOverlay';
 export default function ExamLayout() {
   const {
     exam,
+    patchExam,
     answers, // Use live answers state
     navigation,
     navigateToQuestion,
@@ -302,16 +303,14 @@ export default function ExamLayout() {
       setIsStarting(true);
       setGracePeriod(true); // Enable grace period
 
-      // 1. Enter Fullscreen FIRST — only for Objective (MCQ) section, not CQ/SQ
-      if (sectionToStart === 'objective') {
-        try {
-          await Promise.race([
-            enterFullscreen(),
-            new Promise((resolve) => setTimeout(() => resolve("timeout"), 1000))
-          ]);
-        } catch (e) {
-          console.warn("Fullscreen attempt timed out or failed, proceeding anyway.");
-        }
+      // 1. Enter Fullscreen FIRST (with timeout to prevent hanging)
+      try {
+        await Promise.race([
+          enterFullscreen(),
+          new Promise((resolve) => setTimeout(() => resolve("timeout"), 1000))
+        ]);
+      } catch (e) {
+        console.warn("Fullscreen attempt timed out or failed, proceeding anyway.");
       }
 
       // Just in case Promise.race doesn't behave as expected in all envs (e.g. resolve vs reject logic above)
@@ -326,6 +325,15 @@ export default function ExamLayout() {
       });
 
       if (!res.ok) throw new Error("Failed to start exam session");
+
+      // ✅ Patch the exam context with the new startedAt so Timer picks it up immediately
+      // Record the time BEFORE awaiting anything else — closest to the true server time
+      const startedNow = new Date().toISOString();
+      if (sectionToStart === 'objective') {
+        patchExam({ objectiveStartedAt: startedNow, objectiveStatus: 'IN_PROGRESS' });
+      } else if (sectionToStart === 'cqsq') {
+        patchExam({ cqSqStartedAt: startedNow, cqSqStatus: 'IN_PROGRESS' });
+      }
 
       // 3. Update local state to show exam
       // Reset navigation index to 0 BEFORE showing exam to prevent out-of-bounds loading state

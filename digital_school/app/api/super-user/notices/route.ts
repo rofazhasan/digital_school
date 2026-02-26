@@ -4,134 +4,169 @@ import { getTokenFromRequest } from "@/lib/auth";
 import { sendEmail } from "@/lib/email";
 import { NoticeEmail } from "@/components/emails/NoticeEmail";
 
+const ADMIN_ROLES = ['SUPER_USER', 'ADMIN'];
+
+// GET — list all notices (admin/super-user management panel)
+export async function GET(req: NextRequest) {
+    try {
+        const auth = await getTokenFromRequest(req);
+        if (!auth || !auth.user || !ADMIN_ROLES.includes(auth.user.role)) {
+            return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+        }
+
+        const notices = await prisma.notice.findMany({
+            include: {
+                postedBy: { select: { id: true, name: true, role: true, avatar: true } },
+                targetClasses: { select: { id: true, name: true, section: true } },
+            },
+            orderBy: [
+                // URGENT first, then by date
+                { createdAt: 'desc' }
+            ]
+        });
+
+        return NextResponse.json({ notices });
+    } catch (error) {
+        console.error("Error fetching notices:", error);
+        return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+    }
+}
+
+// POST — create a new notice
 export async function POST(req: NextRequest) {
     try {
         const auth = await getTokenFromRequest(req);
-        if (!auth || !auth.user || auth.user.role !== 'SUPER_USER') {
+        if (!auth || !auth.user || !ADMIN_ROLES.includes(auth.user.role)) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
-        const session = { user: auth.user }; // Mapping for compatibility
+        const session = { user: auth.user };
 
         const body = await req.json();
-        const { title, description, targetType, priority, targetClassIds } = body;
+        const {
+            title,
+            description,
+            targetType,
+            priority = 'MEDIUM',
+            category = 'General',
+            targetClassIds,
+            expiresAt,
+            links,
+            attachments
+        } = body;
 
         if (!title || !description || !targetType) {
-            return NextResponse.json({ message: "Missing required fields" }, { status: 400 });
+            return NextResponse.json({ message: "Missing required fields: title, description, targetType" }, { status: 400 });
         }
 
-        const noticeConnection: any = {};
-        if (targetType === 'SPECIFIC_CLASS' && targetClassIds && Array.isArray(targetClassIds)) {
-            noticeConnection.targetClasses = {
+        const noticeData: Record<string, unknown> = {
+            title,
+            description,
+            targetType,
+            priority,
+            category,
+            postedById: session.user.id,
+        };
+
+        if (links && Array.isArray(links) && links.length > 0) {
+            noticeData.links = links;
+        }
+        if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+            noticeData.attachments = attachments;
+        }
+        if (expiresAt) {
+            noticeData.expiresAt = new Date(expiresAt);
+        }
+
+        if (targetType === 'SPECIFIC_CLASS' && targetClassIds && Array.isArray(targetClassIds) && targetClassIds.length > 0) {
+            noticeData.targetClassIds = targetClassIds;
+            (noticeData as any).targetClasses = {
                 connect: targetClassIds.map((id: string) => ({ id }))
             };
         }
 
-        // Since 'priority' is not in the schema for Notice model based on the viewed schema.prisma,
-        // I need to check if I can add it or if it exists.
-        // Looking at schema.prisma provided earlier:
-        // model Notice {
-        //   id             String       @id @default(cuid())
-        //   title          String
-        //   description    String
-        //   targetClassIds String[]
-        //   targetType     NoticeTarget
-        //   isActive       Boolean      @default(true)
-        //   expiresAt      DateTime?
-        //   createdAt      DateTime     @default(now())
-        //   updatedAt      DateTime     @updatedAt
-        //   postedById     String
-        //   postedBy       User         @relation(fields: [postedById], references: [id])
-        //   targetClasses  Class[]      @relation("NoticeToClasses")
-        // }
-        // It seems 'priority' is missing from the Notice model in the schema! 
-        // The user's dashboard mock data uses 'priority'.
-        // I should probably add it to the schema or ignore it. 
-        // For now, I will omit it if it's not in schema or default to something in logic.
-        // Wait, let me re-read the schema carefully.
-        // Line 386: model Notice ...
-        // It DOES NOT have priority.
-        // I should update the schema to include priority to match the frontend requirements.
+        const notice = await prisma.notice.create({ data: noticeData as any });
 
-        // For now, I'll create it without priority and note that schema update is needed to fully support it.
-        // Actually, I can't easily run migrations if DATABASE_URL is an issue (as mentioned in previous turn summary).
-        // The user summary said: "The DATABASE_URL environment variable is still missing, preventing prisma db push".
-        // So I CANNOT update the schema.
-        // I must stick to the existing schema. I will put priority in the description or just ignore it for now.
-        // Or I can return a mock priority in the GET endpoint for now to keep the UI happy.
+        // Send email notifications in background (non-blocking)
+        sendNoticeEmailsAsync({ title, description, priority, targetType, targetClassIds, postedByName: session.user.name });
 
-        const notice = await prisma.notice.create({
-            data: {
-                title,
-                description,
-                targetType,
-                postedById: session.user.id,
-                ...noticeConnection,
-                // priority is missing in schema, so cannot save it directly.
-            }
+        return NextResponse.json({ notice }, { status: 201 });
+    } catch (error: any) {
+        console.error("Error creating notice:", error);
+        return NextResponse.json({ message: "Internal Server Error", error: error?.message }, { status: 500 });
+    }
+}
+
+async function sendNoticeEmailsAsync({
+    title,
+    description,
+    priority,
+    targetType,
+    targetClassIds,
+    postedByName
+}: {
+    title: string;
+    description: string;
+    priority: string;
+    targetType: string;
+    targetClassIds?: string[];
+    postedByName: string;
+}) {
+    try {
+        const institute = await prisma.institute.findFirst({
+            select: { name: true, address: true, phone: true, logoUrl: true }
         });
 
+        let targetUsers: { id: string, name: string, email: string | null }[] = [];
 
-        // Proactive: Send Notice Emails to relevant users in background
-        const sendNoticeAlerts = async () => {
-            try {
-                const institute = await prisma.institute.findFirst({
-                    select: { name: true, address: true, phone: true, logoUrl: true }
-                });
+        if (targetType === 'ALL') {
+            targetUsers = await prisma.user.findMany({
+                where: { role: { in: ['STUDENT', 'TEACHER'] }, email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        } else if (targetType === 'STUDENTS') {
+            targetUsers = await prisma.user.findMany({
+                where: { role: 'STUDENT', email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        } else if (targetType === 'TEACHERS') {
+            targetUsers = await prisma.user.findMany({
+                where: { role: 'TEACHER', email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        } else if (targetType === 'TEACHERS_AND_ADMINS') {
+            targetUsers = await prisma.user.findMany({
+                where: { role: { in: ['TEACHER', 'ADMIN', 'SUPER_USER'] }, email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        } else if (targetType === 'ADMINS') {
+            targetUsers = await prisma.user.findMany({
+                where: { role: { in: ['ADMIN', 'SUPER_USER'] }, email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        } else if (targetType === 'SPECIFIC_CLASS' && targetClassIds?.length) {
+            targetUsers = await prisma.user.findMany({
+                where: { studentProfile: { classId: { in: targetClassIds } }, email: { not: null }, isActive: true },
+                select: { id: true, name: true, email: true }
+            });
+        }
 
-                // Determine target users based on targetType and targetClassIds
-                let targetUsers: { id: string, name: string, email: string | null }[] = [];
+        const emailPromises = targetUsers.filter(u => u.email).map(user =>
+            sendEmail({
+                to: user.email!,
+                subject: `[${priority}] Notice: ${title}`,
+                react: NoticeEmail({
+                    title,
+                    description,
+                    postedBy: postedByName,
+                    publishDate: new Date().toLocaleDateString('en-BD'),
+                    priority: priority as any,
+                    institute: institute as any
+                }) as any
+            })
+        );
 
-                if (targetType === 'ALL') {
-                    targetUsers = await prisma.user.findMany({
-                        where: { role: { in: ['STUDENT', 'TEACHER'] }, email: { not: null } },
-                        select: { id: true, name: true, email: true }
-                    });
-                } else if (targetType === 'STUDENTS') {
-                    targetUsers = await prisma.user.findMany({
-                        where: { role: 'STUDENT', email: { not: null } },
-                        select: { id: true, name: true, email: true }
-                    });
-                } else if (targetType === 'TEACHERS') {
-                    targetUsers = await prisma.user.findMany({
-                        where: { role: 'TEACHER', email: { not: null } },
-                        select: { id: true, name: true, email: true }
-                    });
-                } else if (targetType === 'SPECIFIC_CLASS' && targetClassIds) {
-                    targetUsers = await prisma.user.findMany({
-                        where: {
-                            studentProfile: { classId: { in: targetClassIds } },
-                            email: { not: null }
-                        },
-                        select: { id: true, name: true, email: true }
-                    });
-                }
-
-                const emailPromises = targetUsers.map(user => {
-                    return sendEmail({
-                        to: user.email!,
-                        subject: `Notice: ${title}`,
-                        react: NoticeEmail({
-                            title,
-                            description,
-                            postedBy: session.user.name,
-                            publishDate: new Date().toLocaleDateString(),
-                            priority: priority as any,
-                            institute: institute as any
-                        }) as any
-                    });
-                });
-
-                await Promise.allSettled(emailPromises);
-            } catch (err) {
-                console.error('Failed to send notice alerts:', err);
-            }
-        };
-
-        sendNoticeAlerts();
-
-        return NextResponse.json({ notice });
-    } catch (error) {
-        console.error("Error creating notice:", error);
-        return NextResponse.json({ message: "Internal Server Error" }, { status: 500 });
+        await Promise.allSettled(emailPromises);
+    } catch (err) {
+        console.error('Failed to send notice emails:', err);
     }
 }
