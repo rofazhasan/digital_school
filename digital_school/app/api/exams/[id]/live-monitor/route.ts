@@ -32,7 +32,7 @@ export async function GET(
                             }
                         }
                     },
-                    orderBy: { submittedAt: 'asc' }
+                    orderBy: { objectiveSubmittedAt: 'asc' }
                 },
                 class: {
                     select: { name: true }
@@ -167,7 +167,7 @@ export async function GET(
                     totalQuestions: totalQuestions,
                     score: Math.max(0, parseFloat(score.toFixed(2))),
                     maxScore,
-                    lastActive: (submission as any).updatedAt,
+                    lastActive: submission.evaluatedAt || submission.cqSqSubmittedAt || submission.objectiveSubmittedAt || null,
                     answers: answers
                 };
             })

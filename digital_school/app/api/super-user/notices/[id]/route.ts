@@ -5,15 +5,16 @@ import { getTokenFromRequest } from "@/lib/auth";
 const ADMIN_ROLES = ['SUPER_USER', 'ADMIN'];
 
 // GET /api/super-user/notices/[id] — get single notice
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const auth = await getTokenFromRequest(req);
         if (!auth || !auth.user || !ADMIN_ROLES.includes(auth.user.role)) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
         const notice = await prisma.notice.findUnique({
-            where: { id: params.id },
+            where: { id },
             include: {
                 postedBy: { select: { id: true, name: true, role: true, avatar: true } },
                 targetClasses: { select: { id: true, name: true, section: true } },
@@ -32,8 +33,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 }
 
 // PUT /api/super-user/notices/[id] — update notice
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const auth = await getTokenFromRequest(req);
         if (!auth || !auth.user || !ADMIN_ROLES.includes(auth.user.role)) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
@@ -68,12 +70,12 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         if (targetClassIds !== undefined) {
             updateData.targetClassIds = targetClassIds;
             (updateData as any).targetClasses = {
-                set: targetClassIds.map((id: string) => ({ id }))
+                set: targetClassIds.map((classId: string) => ({ id: classId }))
             };
         }
 
         const notice = await prisma.notice.update({
-            where: { id: params.id },
+            where: { id },
             data: updateData as any,
             include: {
                 postedBy: { select: { id: true, name: true } },
@@ -89,14 +91,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 }
 
 // DELETE /api/super-user/notices/[id] — delete notice
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id } = await params;
         const auth = await getTokenFromRequest(req);
         if (!auth || !auth.user || !ADMIN_ROLES.includes(auth.user.role)) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
-        await prisma.notice.delete({ where: { id: params.id } });
+        await prisma.notice.delete({ where: { id } });
 
         return NextResponse.json({ message: "Notice deleted successfully" });
     } catch (error) {

@@ -3,15 +3,15 @@ import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
 
 // POST /api/notices/[id]/read — mark a notice as read by the current user
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
+        const { id: noticeId } = await params;
         const auth = await getTokenFromRequest(req);
         if (!auth || !auth.user) {
             return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
         }
 
         const userId = auth.user.id;
-        const noticeId = params.id;
 
         // Check if already read to avoid duplicates
         const notice = await prisma.notice.findUnique({
