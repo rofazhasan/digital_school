@@ -1,15 +1,16 @@
-/**
- * INT (Integer Type) Question Evaluation Logic
- * Evaluates integer answer questions with exact match
- */
+// INT (Integer Type) Question Evaluation Logic
+// Evaluates integer answer questions with exact match
 
 interface INTQuestion {
-    modelAnswer?: string;
+    modelAnswer?: string | number;
+    correctAnswer?: string | number;
+    correct?: string | number;
+    answer?: string | number;
     marks: number;
 }
 
 interface INTAnswer {
-    answer: number;
+    answer: number | string;
 }
 
 interface INTEvaluationResult {
@@ -28,11 +29,15 @@ export function evaluateINTQuestion(
     question: INTQuestion,
     studentAnswer: INTAnswer
 ): INTEvaluationResult {
-    // Check multiple possible fields for correct answer due to schema inconsistencies
-    const correctVal = question.modelAnswer || (question as any).correctAnswer || (question as any).answer;
-    const correctAnswer = parseInt(String(correctVal || '0'));
-    const studentAns = parseInt(String(studentAnswer.answer || '0'));
-    const marks = question.marks;
+    // Try to find correct answer in various possible fields
+    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
+    const correctAnswer = parseInt(String(rawCorrect).trim()) || 0;
+
+    const studentAnsRaw = studentAnswer?.answer ?? studentAnswer;
+    const studentAns = typeof studentAnsRaw === 'object' ? 0 : (parseInt(String(studentAnsRaw).trim()) || 0);
+
+    const marks = Number(question.marks) || 0;
+
 
     // Check if answer is correct (exact match)
     const isCorrect = studentAns === correctAnswer;
@@ -50,10 +55,7 @@ export function evaluateINTQuestion(
 }
 
 /**
- * Evaluate multiple INT questions
- * @param questions - Array of INT questions
- * @param answers - Array of student answers
- * @returns Array of evaluation results
+ * Evaluate multiple INT questions (Legacy or batch support)
  */
 export function evaluateINTQuestions(
     questions: INTQuestion[],
@@ -67,27 +69,28 @@ export function evaluateINTQuestions(
 
 /**
  * Get detailed feedback for INT question
- * @param question - The INT question
- * @param studentAnswer - The student's answer
- * @param score - The score obtained
- * @returns Detailed feedback object
  */
 export function getINTFeedback(
     question: INTQuestion,
     studentAnswer: INTAnswer,
     score: number
 ) {
-    const correctAnswer = parseInt(question.modelAnswer || '0');
-    const isCorrect = studentAnswer.answer === correctAnswer;
+    const rawCorrect = question.modelAnswer ?? question.correctAnswer ?? question.correct ?? question.answer ?? '0';
+    const correctAnswer = parseInt(String(rawCorrect).trim()) || 0;
+
+    const studentAnsRaw = studentAnswer?.answer ?? studentAnswer;
+    const studentAns = typeof studentAnsRaw === 'object' ? 0 : (parseInt(String(studentAnsRaw).trim()) || 0);
+
+    const isCorrect = studentAns === correctAnswer;
 
     return {
         isCorrect,
         score,
         maxScore: question.marks,
         correctAnswer,
-        studentAnswer: studentAnswer.answer,
+        studentAnswer: studentAns,
         feedback: isCorrect
             ? 'Your answer is correct!'
-            : `Your answer (${studentAnswer.answer}) is incorrect. The correct answer is ${correctAnswer}.`
+            : `Your answer (${studentAns}) is incorrect. The correct answer is ${correctAnswer}.`
     };
 }

@@ -194,20 +194,51 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       options: Array.isArray(q.options) ? q.options.map((opt: any) => typeof opt === 'string' ? { text: opt } : opt) : [],
     }));
 
-    const int = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'INT' || (q.type || "").toUpperCase() === 'NUMERIC').map((q: any) => ({
-      ...q,
-      q: q.questionText,
-    }));
+    const int = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'INT' || (q.type || "").toUpperCase() === 'NUMERIC').map((q: any) => {
+      const modelAnswer = q.modelAnswer || q.correctAnswer || q.correct || q.answer || '0';
+      return {
+        ...q,
+        q: q.questionText,
+        answer: modelAnswer,
+        modelAnswer: modelAnswer,
+      };
+    });
 
-    const ar = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'AR').map((q: any) => ({
-      ...q,
-      q: q.questionText || q.assertion,
-    }));
+    const ar = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'AR').map((q: any) => {
+      const correctOption = Number(q.correctOption || q.correct || 0);
+      return {
+        ...q,
+        q: q.questionText || q.assertion,
+        assertion: q.assertion || q.questionText,
+        reason: q.reason || "",
+        correct: correctOption,
+        correctOption: correctOption,
+      };
+    });
 
-    const mtf = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MTF').map((q: any) => ({
-      ...q,
-      q: q.questionText,
-    }));
+    const mtf = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MTF').map((q: any) => {
+      let leftColumn = q.leftColumn || [];
+      let rightColumn = q.rightColumn || [];
+      let matches = q.matches || {};
+
+      // Handle legacy pairs
+      if (leftColumn.length === 0 && Array.isArray(q.pairs)) {
+        leftColumn = (q.pairs as any[]).map((p, i) => ({ id: i.toString(), text: p.left }));
+        rightColumn = (q.pairs as any[]).map((p, i) => ({ id: i.toString(), text: p.right }));
+        matches = (q.pairs as any[]).reduce((acc, p, i) => {
+          acc[i.toString()] = i.toString();
+          return acc;
+        }, {});
+      }
+
+      return {
+        ...q,
+        q: q.questionText,
+        leftColumn,
+        rightColumn,
+        matches,
+      };
+    });
 
     // Process CQ questions with subsection-aware shuffling
     let cq = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'CQ');

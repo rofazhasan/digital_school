@@ -17,36 +17,43 @@ export interface MTFResult {
 
 export function evaluateMTFQuestion(
     question: any,
-    studentMatches: Record<string, string>
+    studentMatches: any
 ): MTFResult {
     const correctMatches = (question.matches || {}) as Record<string, string>;
     const totalLeftItems = question.leftColumn?.length || 0;
-    const marksPerMatch = totalLeftItems > 0 ? (question.marks || 1) / totalLeftItems : 0;
+    const marksPerMatch = totalLeftItems > 0 ? (Number(question.marks) || 1) / totalLeftItems : 0;
 
     let correctCount = 0;
 
     // Normalize student matches: Ensure we have a Record<string, string> of IDs
     let normalizedStudentMatches: Record<string, string> = {};
-    if (studentMatches && !Array.isArray(studentMatches) && typeof studentMatches === 'object' && studentMatches.matches === undefined) {
-        // Direct ID-based map: { "A": "1", "B": "2" }
-        normalizedStudentMatches = studentMatches;
-    } else if (studentMatches && studentMatches.matches && Array.isArray(studentMatches.matches)) {
-        // Index-based matches: { matches: [{ leftIndex: 0, rightIndex: 2 }, ...] }
-        studentMatches.matches.forEach((m: any) => {
-            const leftItem = question.leftColumn?.[m.leftIndex];
-            const rightItem = question.rightColumn?.[m.rightIndex];
-            if (leftItem && rightItem) {
-                normalizedStudentMatches[leftItem.id] = rightItem.id;
+
+    const rawMatches = studentMatches?.matches ?? (typeof studentMatches === 'object' ? studentMatches : {});
+
+    if (Array.isArray(rawMatches)) {
+        // [{leftId: "1", rightId: "A"}, ...] or [{leftIndex: 0, rightIndex: 2}, ...]
+        rawMatches.forEach((m: any) => {
+            if (m.leftId && m.rightId) {
+                normalizedStudentMatches[m.leftId] = m.rightId;
+            } else if (m.leftIndex !== undefined && m.rightIndex !== undefined) {
+                const leftItem = question.leftColumn?.[m.leftIndex];
+                const rightItem = question.rightColumn?.[m.rightIndex];
+                if (leftItem && rightItem) {
+                    normalizedStudentMatches[leftItem.id] = rightItem.id;
+                }
             }
         });
+    } else if (typeof rawMatches === 'object') {
+        // Direct ID-based map: { "A": "1", "B": "2" }
+        normalizedStudentMatches = rawMatches;
     }
 
     const matchesDetails = (question.leftColumn || []).map((item: any) => {
         const correctRightId = correctMatches[item.id];
         const studentRightId = normalizedStudentMatches[item.id] || null;
-        const isMatchedCorrectly = correctRightId === studentRightId;
+        const isMatchedCorrectly = correctRightId && studentRightId && correctRightId === studentRightId;
 
-        if (isMatchedCorrectly && studentRightId !== null) {
+        if (isMatchedCorrectly) {
             correctCount++;
         }
 
@@ -54,12 +61,12 @@ export function evaluateMTFQuestion(
             leftId: item.id,
             correctRightId,
             studentRightId,
-            isCorrect: isMatchedCorrectly
+            isCorrect: !!isMatchedCorrectly
         };
     });
 
     const score = correctCount * marksPerMatch;
-    const isCorrect = correctCount === totalLeftItems;
+    const isCorrect = totalLeftItems > 0 && correctCount === totalLeftItems;
 
     let feedback = `Correctly matched ${correctCount} out of ${totalLeftItems} pairs.`;
     if (isCorrect) {

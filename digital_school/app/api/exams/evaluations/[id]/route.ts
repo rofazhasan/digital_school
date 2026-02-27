@@ -3,6 +3,8 @@ import { getTokenFromRequest } from "@/lib/auth";
 import prisma from "@/lib/db";
 import { evaluateMCQuestion } from "@/lib/evaluation/mcEvaluation";
 import { evaluateMTFQuestion } from "@/lib/evaluation/mtfEvaluation";
+import { evaluateARQuestion } from "@/lib/evaluation/arEvaluation";
+import { evaluateINTQuestion } from "@/lib/evaluation/intEvaluation";
 
 export async function GET(
   req: NextRequest,

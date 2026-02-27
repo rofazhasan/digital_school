@@ -116,21 +116,23 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             let questionScore = 0;
             if (type === 'MCQ') {
                 if (!studentAnswer) continue;
-                const normalize = (s: any) => String(s || '').trim().toLowerCase().normalize();
+
+                // Use a simplified version of MC evaluation for MCQ or just direct check
+                // For MCQ (single choice), it's stored as a string or index
+                const normalize = (s: any) => String(s || '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
                 if (question.options && Array.isArray(question.options)) {
                     const correctOption = question.options.find((opt: any) => opt.isCorrect);
                     if (correctOption) {
-                        const correctOptionText = normalize(correctOption.text || String(correctOption));
+                        const correctOptionText = normalize(correctOption.text);
                         isCorrect = userAns === correctOptionText;
                     }
                 }
 
                 if (!isCorrect && (question.correctAnswer || question.correct)) {
-                    const correct = question.correctAnswer || question.correct;
-                    isCorrect = userAns === normalize(String(correct));
+                    isCorrect = userAns === normalize(String(question.correctAnswer || question.correct));
                 }
 
                 if (isCorrect) {
@@ -141,37 +143,28 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             } else if (type === 'MC') {
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
-                questionScore = Number(evaluateMCQuestion(question, studentAnswer, {
+                questionScore = evaluateMCQuestion(question, studentAnswer, {
                     negativeMarking: exam.mcqNegativeMarking || 0,
-                    partialMarking: true
-                })) || 0;
+                    partialMarking: true,
+                    hasAttempted: true
+                });
             } else if (type === 'INT' || type === 'NUMERIC') {
-                const isAnswered = studentAnswer && (studentAnswer.answer !== undefined && studentAnswer.answer !== null && studentAnswer.answer !== "");
-                if (!isAnswered) continue;
-                const result = evaluateINTQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                const res = evaluateINTQuestion(question, studentAnswer);
+                questionScore = res.score;
+                if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             } else if (type === 'AR') {
-                const isAnswered = studentAnswer && studentAnswer.selectedOption > 0;
-                if (!isAnswered) continue;
-                const result = evaluateARQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                const res = evaluateARQuestion(question, studentAnswer);
+                questionScore = res.score;
+                if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             } else if (type === 'MTF') {
-                const hasMatches = studentAnswer && (
-                    (studentAnswer.matches && Array.isArray(studentAnswer.matches) && studentAnswer.matches.length > 0) ||
-                    (Object.keys(studentAnswer).length > 0 && !studentAnswer.matches)
-                );
-                if (!hasMatches) continue;
-                const result = evaluateMTFQuestion(question, studentAnswer);
-                questionScore = Number(result.score) || 0;
-                if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore -= (Number(question.marks || 0) * exam.mcqNegativeMarking) / 100;
-                }
+                const res = evaluateMTFQuestion(question, studentAnswer);
+                questionScore = res.score;
+                // For MTF, we usually don't apply negative marking if it's partial, 
+                // but let's stick to the current logic of the codebase if any
             }
 
             mcqMarks += questionScore;

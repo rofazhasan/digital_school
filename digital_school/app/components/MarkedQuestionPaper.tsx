@@ -38,6 +38,7 @@ interface AR {
     reason: string;
     marks: number;
     correct: number;
+    correctOption?: number;
 }
 
 interface MTF {
@@ -56,6 +57,7 @@ interface INT {
     marks: number;
     answer: number | string;
     correctAnswer?: number | string;
+    modelAnswer?: number | string;
 }
 interface SQ {
     id?: string;
@@ -194,19 +196,22 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
 
         const getARMark = (q: AR, userAnswer: any) => {
-            if (!userAnswer || userAnswer.selectedOption === undefined) return 0;
-            const selected = Number(userAnswer.selectedOption);
-            const correct = Number(q.correct || 0);
+            const selected = Number(userAnswer?.selectedOption ?? (typeof userAnswer === 'number' ? userAnswer : 0));
+            const correct = Number(q.correct || q.correctOption || 0);
+            if (selected === 0 || correct === 0) return 0;
             if (selected === correct) return q.marks || 1;
             return -((q.marks || 1) * negativeRate);
         };
 
         const getINTMark = (q: INT, userAnswer: any) => {
-            const val = userAnswer?.answer !== undefined ? userAnswer.answer : userAnswer;
-            if (val === undefined || val === null || val === '') return 0;
-            const correctAns = q.correctAnswer !== undefined ? q.correctAnswer : q.answer;
-            const isCorrect = String(val).trim() === String(correctAns).trim();
-            if (isCorrect) return q.marks || 1;
+            const studentValRaw = userAnswer?.answer !== undefined ? userAnswer.answer : userAnswer;
+            if (studentValRaw === undefined || studentValRaw === null || studentValRaw === '') return 0;
+            const studentVal = parseInt(String(studentValRaw).trim());
+            const correctVal = parseInt(String(q.answer || q.correctAnswer || q.modelAnswer || '0').trim());
+
+            if (isNaN(studentVal)) return 0;
+            if (studentVal === correctVal) return q.marks || 1;
+
             return -((q.marks || 1) * negativeRate);
         };
 

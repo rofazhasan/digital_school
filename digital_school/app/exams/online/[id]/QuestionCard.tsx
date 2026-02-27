@@ -740,9 +740,10 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
               <div className="grid grid-cols-1 gap-3">
                 {(question.options || []).map((opt: any, i: number) => {
                   const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
+                  const correctVal = question.correctAnswer || question.correct;
                   const isCorrect = opt.originalIndex !== undefined
-                    ? Number(question.correct) === opt.originalIndex
-                    : (question.correct === i || String(question.correct) === String(i));
+                    ? Number(correctVal) === opt.originalIndex
+                    : (correctVal === i || String(correctVal) === String(i) || (typeof opt === 'object' && opt.isCorrect));
                   const isSelected = String(userAnswer).trim() === label.trim();
                   return (
                     <MCQOption
@@ -796,8 +797,8 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
               <div className="grid grid-cols-1 gap-3">
                 {arOptionLabels.map((lbl, i) => {
                   const val = i + 1;
-                  const isCorrect = question.correctOption === val;
-                  const isSelected = userAnswer?.selectedOption === val;
+                  const isCorrect = Number(question.correctOption || question.correct) === val;
+                  const isSelected = (userAnswer?.selectedOption || userAnswer) === val;
                   return (
                     <MCQOption
                       key={i}
@@ -1141,14 +1142,25 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
             )}
 
             {(type === "int" || type === "numeric") && (
-              <Input
-                type="number"
-                value={userAnswer?.answer || ""}
-                onChange={(e) => handleAnswerChange({ answer: parseInt(e.target.value) || 0 })}
-                disabled={disabled || submitted}
-                className="w-full max-w-xs text-xl font-bold p-8 border-2 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all"
-                placeholder="Type Number..."
-              />
+              <div className="space-y-4">
+                <Input
+                  type="number"
+                  value={userAnswer?.answer ?? userAnswer ?? ""}
+                  onChange={(e) => handleAnswerChange({ answer: parseInt(e.target.value) || 0 })}
+                  disabled={disabled || submitted}
+                  className={cn(
+                    "w-full max-w-xs text-xl font-bold p-8 border-2 rounded-2xl focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all",
+                    showResult && (Number(userAnswer?.answer ?? userAnswer) === Number(question.correctAnswer || question.modelAnswer || question.correct || question.answer) ? "border-emerald-500 bg-emerald-50 text-emerald-900" : "border-rose-500 bg-rose-50 text-rose-900")
+                  )}
+                  placeholder="Enter integer answer..."
+                />
+                {showResult && (
+                  <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800">
+                    <Check className="w-5 h-5 flex-shrink-0" />
+                    <span className="font-bold">Correct Answer: {question.correctAnswer || question.modelAnswer || question.correct || question.answer}</span>
+                  </div>
+                )}
+              </div>
             )}
 
             {type === "descriptive" && (() => {

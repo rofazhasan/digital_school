@@ -1230,18 +1230,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       if (type === 'ar') {
         const selected = Number(answer?.selectedOption);
         const correct = Number(question?.correct || (question as any)?.correctOption || 0);
-        if (selected === correct) return question?.marks || 0;
+        if (selected === correct && correct > 0) return question?.marks || 0;
         // Apply negative marking for wrong AR answers
         const negPct = exam?.mcqNegativeMarking;
-        if (negPct && negPct > 0) return -((question?.marks || 0) * negPct) / 100;
+        if (negPct && negPct > 0 && selected > 0) return -((question?.marks || 0) * negPct) / 100;
         return 0;
       }
 
       if (type === 'int' || type === 'numeric') {
-        const studentVal = Number(answer?.answer);
-        const correctVal = Number(question?.correct || (question as any)?.answer || 0);
-        // Use epsilon for float comparison if needed, currently strict equality
-        return !isNaN(studentVal) && !isNaN(correctVal) && studentVal === correctVal ? (question?.marks || 0) : 0;
+        const rawCorrect = (question as any).correctAnswer ?? question.modelAnswer ?? question.correct ?? (question as any).answer ?? '0';
+        const correctVal = parseInt(String(rawCorrect).trim()) || 0;
+        const studentVal = parseInt(String(answer?.answer ?? 0).trim()) || 0;
+
+        if (isNaN(studentVal)) return 0;
+        if (studentVal === correctVal) return question?.marks || 0;
+
+        // Apply negative marking for wrong INT answers
+        const negPct = exam?.mcqNegativeMarking;
+        if (negPct && negPct > 0 && answer?.answer !== undefined && answer?.answer !== '') {
+          return -((question?.marks || 0) * negPct) / 100;
+        }
+        return 0;
       }
 
       if (type === 'mtf') {
@@ -1263,7 +1272,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               score += marksPerPair;
             }
           });
-          return Math.floor(score); // Return floor to avoid partial decimals if preferred, or generic rounding
+          return Math.round(score);
         }
 
         // Strategy 2: Legacy Array-based matches
@@ -1275,7 +1284,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               score += marksPerPair;
             }
           });
-          return Math.floor(score);
+          return Math.round(score);
         }
       }
     } catch (e) {

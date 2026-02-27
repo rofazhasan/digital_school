@@ -1,7 +1,8 @@
 interface ARQuestion {
     assertion: string;
     reason: string;
-    correctOption: number; // 1-5
+    correctOption?: number; // 1-5
+    correct?: number; // 1-5
     marks: number;
 }
 
@@ -13,8 +14,11 @@ export function evaluateARQuestion(
     question: ARQuestion,
     studentAnswer: ARAnswer
 ): { score: number; isCorrect: boolean; feedback: string } {
-    const isCorrect = studentAnswer.selectedOption === question.correctOption;
-    const score = isCorrect ? question.marks : 0;
+    const correctOption = Number(question.correctOption ?? question.correct ?? 0);
+    const studentOption = Number(studentAnswer?.selectedOption ?? (typeof studentAnswer === 'number' ? studentAnswer : 0));
+
+    const isCorrect = studentOption === correctOption && correctOption > 0;
+    const score = isCorrect ? (Number(question.marks) || 0) : 0;
 
     const optionLabels = [
         "Both Assertion (A) and Reason (R) are true, and R is the correct explanation of A",
@@ -25,8 +29,8 @@ export function evaluateARQuestion(
     ];
 
     const feedback = isCorrect
-        ? `Correct! Option ${question.correctOption}: ${optionLabels[question.correctOption - 1]}`
-        : `Incorrect. You selected option ${studentAnswer.selectedOption}, but the correct answer is option ${question.correctOption}: ${optionLabels[question.correctOption - 1]}`;
+        ? `Correct! Option ${correctOption}: ${optionLabels[correctOption - 1]}`
+        : `Incorrect. You selected option ${studentOption}, but the correct answer is option ${correctOption}: ${optionLabels[correctOption - 1] || 'Unknown'}`;
 
     return { score, isCorrect, feedback };
 }

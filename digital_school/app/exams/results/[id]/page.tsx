@@ -270,19 +270,24 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         assertion: (q as any).assertion || q.questionText,
         reason: (q as any).reason || "",
         marks: q.marks,
-        correct: Number((q as any).correct || (q as any).correctOption || 0)
+        correct: Number((q as any).correct || (q as any).correctOption || 0),
+        correctOption: Number((q as any).correctOption || (q as any).correct || 0)
       })),
       mtf: result.questions.filter(q => (q.type || "").toLowerCase() === 'mtf').map(q => ({
         id: q.id,
         q: q.questionText,
         marks: q.marks,
-        pairs: (q as any).pairs || []
+        leftColumn: (q as any).leftColumn || [],
+        rightColumn: (q as any).rightColumn || [],
+        matches: (q as any).matches || {}
       })),
       int: result.questions.filter(q => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric').map(q => ({
         id: q.id,
         q: q.questionText,
         marks: q.marks,
-        answer: (q as any).answer || (q as any).correct || 0
+        answer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || 0,
+        correctAnswer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || 0,
+        modelAnswer: (q as any).modelAnswer || (q as any).correctAnswer || (q as any).answer || (q as any).correct || 0
       })),
       cq: result.questions.filter(q => q.type?.toUpperCase() === 'CQ').map(q => ({
         id: q.id,

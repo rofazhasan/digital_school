@@ -198,10 +198,16 @@ export async function GET(
     }
 
 
+    // For students, if result is not published, we might want to hide details
+    const isTeacher = token.user.role !== 'STUDENT';
+    const hideDetails = !isTeacher && result && !result.isPublished;
+
     // Process questions with student answers and marking details
     const processedQuestions = questions.map((question: any) => {
       const questionId = question.id;
       const studentAnswer = studentAnswers[questionId];
+
+      // ... (existing image logic)
 
       // Collect all image URLs for this question
       // Images can be stored as:
@@ -616,7 +622,7 @@ export async function GET(
         cqSqStartedAt: submission.cqSqStartedAt,
         cqSqSubmittedAt: submission.cqSqSubmittedAt,
       },
-      result: result ? {
+      result: (result && (result.isPublished || token.user.role !== 'STUDENT')) ? {
         id: result.id,
         mcqMarks: mcqMarks,
         cqMarks: cqMarks,
@@ -630,7 +636,7 @@ export async function GET(
         publishedAt: result.publishedAt,
         status: isSuspended ? 'SUSPENDED' : (result as any).status,
         suspensionReason: isSuspended ? 'Student answered more questions than allowed' : (result as any).suspensionReason
-      } : null,
+      } : (result ? { isPublished: false, status: (result as any).status } : null),
       reviewRequest: reviewRequest ? {
         id: reviewRequest.id,
         status: (result as any)?.status || 'PUBLISHED',
@@ -644,7 +650,7 @@ export async function GET(
           name: reviewRequest.reviewer.name
         } : null
       } : null,
-      questions: processedQuestions,
+      questions: hideDetails ? [] : processedQuestions,
       statistics: {
         totalStudents,
         averageScore,

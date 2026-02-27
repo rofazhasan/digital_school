@@ -12,7 +12,7 @@ const createPrismaClient = () => {
     if (!process.env.DATABASE_URL) {
         console.warn('⚠️ DATABASE_URL is missing. Using dummy connection string for build.');
     }
-    return new PrismaClient({
+    const prisma = new PrismaClient({
         datasources: {
             db: {
                 url: url,
@@ -21,6 +21,11 @@ const createPrismaClient = () => {
         // Connection pooling settings for better performance
         log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
     });
+
+    // NOTE: Sentry Prisma instrumentation is automatically enabled via @sentry/nextjs
+    // if the prisma package is installed.
+
+    return prisma;
 };
 
 // Create a singleton instance
