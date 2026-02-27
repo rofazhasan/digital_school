@@ -392,7 +392,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-green-700">সঠিক উত্তর:</span>
-                            <span className="font-bold text-green-800">{q.modelAnswer}</span>
+                            <span className="text-xl font-bold text-green-800">{q.answer || q.modelAnswer || q.correctAnswer || ''}</span>
                           </div>
                         </div>
                         {q.explanation && (
@@ -428,13 +428,20 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
                           <div className="flex items-center gap-2">
                             <span className="font-bold text-green-700">সঠিক বিকল্প:</span>
-                            <span className="font-bold text-green-800">{isEn ? q.correctOption : toBengaliNumerals(q.correctOption)}</span>
-                            <span className="text-green-600">
-                              ({q.correctOption === 1 ? (isEn ? 'A & R are true, R is correct explanation of A' : 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা') :
-                                q.correctOption === 2 ? (isEn ? 'A & R are true, R is not correct explanation of A' : 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা নয়') :
-                                  q.correctOption === 3 ? (isEn ? 'A is true, R is false' : 'A সত্য, R মিথ্যা') :
-                                    q.correctOption === 4 ? (isEn ? 'A is false, R is true' : 'A মিথ্যা, R সত্য') : (isEn ? 'Both are false' : 'উভয়ই মিথ্যা')})
-                            </span>
+                            {(() => {
+                              const cOpt = Number(q.correct || q.correctOption || 0);
+                              return (
+                                <>
+                                  <span className="text-xl font-bold text-green-800">{toBengaliNumerals(cOpt)}</span>
+                                  <span className="text-sm text-green-600">
+                                    ({cOpt === 1 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা' :
+                                      cOpt === 2 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা নয়' :
+                                        cOpt === 3 ? 'A সত্য, R মিথ্যা' :
+                                          cOpt === 4 ? 'A মিথ্যা, R সত্য' : 'উভয়ই মিথ্যা'})
+                                  </span>
+                                </>
+                              );
+                            })()}
                           </div>
                         </div>
                         {q.explanation && (

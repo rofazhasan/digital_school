@@ -1831,86 +1831,83 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
 
                       {/* CQ Section */}
-                      {result.questions.filter(q => {
-                        if (q.type?.toUpperCase() !== 'CQ') return false;
-                        // Filter Logic
-                        const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                        const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      {(() => {
+                        const filteredQuestions = result.questions.filter(q => {
+                          if (q.type?.toUpperCase() !== 'CQ') return false;
+                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
+                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
 
-                        switch (filterStatus) {
-                          case 'CORRECT': return isCorrect;
-                          case 'WRONG': return hasAnswer && !isCorrect;
-                          case 'UNANSWERED': return !hasAnswer;
-                          default: return true;
-                        }
-                      }).length > 0 && (
-                          <div>
+                          switch (filterStatus) {
+                            case 'CORRECT': return isCorrect;
+                            case 'WRONG': return hasAnswer && !isCorrect;
+                            case 'UNANSWERED': return !hasAnswer;
+                            default: return true;
+                          }
+                        });
+
+                        if (filteredQuestions.length === 0) return null;
+
+                        const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
+                        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+                        return (
+                          <div id="creative-questions-section">
                             <div className="flex items-center gap-3 mb-6">
                               <div className="w-8 h-8 bg-green-500/10 dark:bg-green-500/20 rounded-full flex items-center justify-center">
                                 <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
                               </div>
                               <h3 className="text-xl sm:text-2xl font-bold text-foreground">Creative Questions (CQ)</h3>
                               <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none text-[10px] sm:text-xs">
-                                {result.questions.filter(q => q.type?.toUpperCase() === 'CQ').length} Questions
+                                {filteredQuestions.length} Questions
                               </Badge>
                             </div>
                             <div className="space-y-6">
-                              {result.questions
-                                .filter(q => {
-                                  if (q.type?.toUpperCase() !== 'CQ') return false;
-                                  // Filter Logic
-                                  const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                                  const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                              {paginatedQuestions.map((question, index) => {
+                                const globalIndex = startIndex + index;
+                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
+                                const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
 
-                                  switch (filterStatus) {
-                                    case 'CORRECT': return isCorrect;
-                                    case 'WRONG': return hasAnswer && !isCorrect;
-                                    case 'UNANSWERED': return !hasAnswer;
-                                    default: return true;
-                                  }
-                                })
-                                .map((question, index) => (
+                                return (
                                   <motion.div
                                     key={question.id}
                                     initial={{ opacity: 0, x: -20 }}
                                     animate={{ opacity: 1, x: 0 }}
                                     transition={{ delay: 0.1 * index }}
-                                    className="border rounded-lg p-6 bg-emerald-500/5 dark:bg-emerald-500/10 border-emerald-500/20"
+                                    className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300
+                                          ${isCorrect
+                                        ? 'bg-green-500/5 border-green-500/20 dark:bg-green-500/10'
+                                        : hasAnswer
+                                          ? 'bg-red-500/5 border-red-500/20 dark:bg-red-500/10'
+                                          : 'bg-muted/30 border-border opacity-90'}`}
                                   >
-                                    {/* Question Header */}
                                     <div className="flex items-center justify-between mb-4">
                                       <div className="flex items-center gap-3">
-                                        <Badge className="bg-green-100 text-green-800">
-                                          CQ
-                                        </Badge>
-                                        <span className="text-sm text-gray-600">Question {index + 1}</span>
+                                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none">CQ</Badge>
+                                        <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-600">Marks:</span>
-                                        <Badge variant="secondary">
-                                          {question.awardedMarks}/{question.marks}
+                                        <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
+                                          {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
                                         </Badge>
                                       </div>
                                     </div>
 
-                                    {/* Question Text */}
                                     <div className="mb-4">
-                                      <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                      <div className="text-gray-700">
+                                      <div className="text-lg font-medium text-foreground">
                                         <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                       </div>
                                     </div>
 
-                                    {/* Student Answer */}
                                     <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
-                                      {question.studentAnswer ? (
-                                        <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                          <p className="text-gray-700">{question.studentAnswer}</p>
+                                      <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Your Answer:</h4>
+                                      {hasAnswer ? (
+                                        <div className="p-3 rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/10">
+                                          <p className="text-gray-700 dark:text-gray-300">{question.studentAnswer}</p>
                                         </div>
                                       ) : (
-                                        <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
-                                          <p className="text-gray-500 italic">No answer provided</p>
+                                        <div className="p-3 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/10">
+                                          <p className="text-gray-500 dark:text-gray-400 italic">No answer provided</p>
                                         </div>
                                       )}
                                     </div>
@@ -1920,53 +1917,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <div className="mb-4">
                                         <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
                                         <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <Camera className="h-4 w-4 text-green-600" />
-                                            <span className="text-sm font-medium text-green-800">
-                                              Images you uploaded during the exam
-                                            </span>
-                                          </div>
                                           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.studentAnswerImages.map((imageUrl: string, index: number) => (
+                                            {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
                                               <div
-                                                key={index}
+                                                key={imgIdx}
                                                 className="relative group cursor-pointer"
                                                 onClick={() => {
                                                   setZoomedImage(imageUrl);
-                                                  setZoomedImageTitle(`Your Answer Image ${index + 1}`);
+                                                  setZoomedImageTitle(`Your Answer Image ${imgIdx + 1}`);
                                                   setShowZoomModal(true);
                                                 }}
                                               >
-                                                <img
-                                                  src={imageUrl}
-                                                  alt={`Your answer image ${index + 1}`}
-                                                  crossOrigin="anonymous"
-                                                  className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
-                                                  onLoad={() => {
-                                                    console.log('Student answer image loaded successfully:', imageUrl);
-                                                  }}
-                                                  onError={(e) => {
-                                                    console.error('Student answer image failed to load:', imageUrl);
-                                                    // Show error placeholder
-                                                    e.currentTarget.style.display = 'none';
-                                                    const parent = e.currentTarget.parentElement;
-                                                    if (parent) {
-                                                      const errorDiv = document.createElement('div');
-                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
-                                                      errorDiv.innerHTML = `
-                                                  <div class="text-center">
-                                                    <div class="mb-1">📷</div>
-                                                    <div>Image not available</div>
-                                                    <div class="text-xs mt-1">URL: ${imageUrl.substring(0, 50)}...</div>
-                                                  </div>
-                                                `;
-                                                      parent.appendChild(errorDiv);
-                                                    }
-                                                  }}
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </div>
+                                                <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
                                               </div>
                                             ))}
                                           </div>
@@ -1974,248 +1936,104 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     )}
 
-                                    {/* Evaluator's Drawing Feedback */}
-                                    {question.allDrawings && question.allDrawings.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Evaluator&apos;s Feedback:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
-                                          <div className="flex items-center gap-2 mb-2">
-                                            <MessageSquare className="h-4 w-4 text-orange-600" />
-                                            <span className="text-sm font-medium text-orange-800">
-                                              Teacher&apos;s annotations on your answer
-                                            </span>
-                                          </div>
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.allDrawings.map((drawing, index) => (
-                                              <div
-                                                key={index}
-                                                className="relative group cursor-pointer"
-                                                onClick={() => {
-                                                  setZoomedImage(drawing.imageData);
-                                                  setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
-                                                  setShowZoomModal(true);
-                                                }}
-                                              >
-                                                <img
-                                                  src={drawing.imageData}
-                                                  alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                                  crossOrigin="anonymous"
-                                                  className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
-                                                  onError={(e) => {
-                                                    console.error('Annotated image failed to load:', drawing.imageData);
-                                                    // Show error placeholder
-                                                    e.currentTarget.style.display = 'none';
-                                                    const parent = e.currentTarget.parentElement;
-                                                    if (parent) {
-                                                      const errorDiv = document.createElement('div');
-                                                      errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
-                                                      errorDiv.innerHTML = `
-                                                  <div class="text-center">
-                                                    <div class="mb-1">📷</div>
-                                                    <div>Annotated image not available</div>
-                                                  </div>
-                                                `;
-                                                      parent.appendChild(errorDiv);
-                                                    }
-                                                  }}
-                                                />
-                                                <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                  <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Model Answer */}
-                                    {question.modelAnswer && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Model Answer:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                          <div className="text-gray-700">
-                                            <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Sub Questions Breakdown - CQ */}
+                                    {/* Sub-questions breakdown for CQ */}
                                     {(question.subQuestions || question.sub_questions) && (question.subQuestions || question.sub_questions || []).length > 0 && (
-                                      <div className="space-y-6 mt-6">
-                                        <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
-                                        {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
-                                          <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
-                                            {/* Sub-question Header */}
-                                            <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-start gap-3">
-                                              <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                                                {toBengaliAlphabets(idx)}
-                                              </span>
-                                              <div className="flex-grow pt-1">
-                                                {subQ.text || subQ.questionText || subQ.question ? (
-                                                  <div className="text-foreground font-medium leading-relaxed">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question)}</UniversalMathJax>
-                                                  </div>
-                                                ) : (
-                                                  <span className="text-muted-foreground italic">Sub-question {toBengaliAlphabets(idx)}</span>
-                                                )}
+                                      <div className="space-y-4 mt-4 ps-4 border-s-2 border-indigo-500/20">
+                                        {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                          <div key={subIdx} className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20">
+                                            <div className="flex items-start gap-2">
+                                              <span className="shrink-0 font-bold text-indigo-600 dark:text-indigo-400">{subIdx + 1}.</span>
+                                              <div className="text-sm font-medium">
+                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question)}</UniversalMathJax>
                                               </div>
-                                              {subQ.marks && (
-                                                <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase tracking-tighter">
-                                                  {subQ.marks} Point{Number(subQ.marks) !== 1 && 's'}
-                                                </Badge>
-                                              )}
+                                              <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>
-
-                                            <div className="p-4 space-y-4">
-                                              {/* Model Answer */}
-                                              {(subQ.modelAnswer || subQ.answer) && (
-                                                <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
-                                                  <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm uppercase tracking-wide">
-                                                    <CheckCircle className="w-4 h-4" />
-                                                    Model Answer
-                                                  </div>
-                                                  <div className="text-foreground/90 leading-relaxed font-sans">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                              {/* Student Answer */}
-                                              <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/10">
-                                                <div className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide mb-2">
-                                                  Your Answer
-                                                </div>
-                                                {subQ.studentAnswer ? (
-                                                  <div className="text-foreground/90 leading-relaxed font-sans">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
-                                                  </div>
-                                                ) : (
-                                                  <p className="text-muted-foreground italic text-sm">No text answer provided</p>
-                                                )}
-                                              </div>
-
-                                              {/* Attachments & Feedback */}
-                                              {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
-                                                <div className="mt-4 pt-4 border-t border-gray-100">
-                                                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                    <Camera className="w-4 h-4" />
-                                                    Attachments & Feedback
-                                                  </div>
-                                                  <div className="flex flex-wrap gap-4">
-                                                    {(() => {
-                                                      const images = subQ.studentImages || [];
-                                                      return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
-                                                        const globalIdx = idx * 100 + imgK;
-                                                        const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
-                                                        const displayUrl = drawing ? drawing.imageData : imgUrl;
-                                                        const isAnnotated = !!drawing;
-
-                                                        return (
-                                                          <div
-                                                            key={imgK}
-                                                            className="relative group cursor-pointer perspective-1000"
-                                                            onClick={() => {
-                                                              setZoomedImage(displayUrl);
-                                                              setZoomedImageTitle(`Sub-question ${toBengaliAlphabets(idx)} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
-                                                              setShowZoomModal(true);
-                                                            }}
-                                                          >
-                                                            <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
-                                                              <img
-                                                                src={displayUrl}
-                                                                alt={`Sub ${toBengaliAlphabets(idx)} Img ${imgK + 1}`}
-                                                                className="w-32 h-32 object-cover bg-gray-50"
-                                                                loading="lazy"
-                                                              />
-                                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                                <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
-                                                              </div>
-                                                              {isAnnotated && (
-                                                                <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
-                                                                  <MessageSquare className="w-3 h-3" />
-                                                                  Feedback
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                        );
-                                                      }) : null;
-                                                    })()}
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                              {/* Manual Marks for Sub-question */}
-                                              {subQ.awardedMarks !== undefined && (
-                                                <div className="mt-2 flex justify-end">
-                                                  <Badge variant="outline" className="text-xs font-bold">
-                                                    Marks: {subQ.awardedMarks}/{subQ.marks || '?'}
-                                                  </Badge>
-                                                </div>
-                                              )}
-                                            </div>
+                                            {subQ.studentAnswer && <div className="text-xs text-muted-foreground mt-1 ps-4">Your Answer: {subQ.studentAnswer}</div>}
                                           </div>
                                         ))}
                                       </div>
                                     )}
 
-                                    {/* Feedback */}
-                                    {question.feedback && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-gray-800 mb-2">Feedback:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-yellow-200 bg-yellow-50">
-                                          <p className="text-gray-700">{question.feedback}</p>
+                                    {/* Explanation Section */}
+                                    {(question.explanation || (question as any).explanationImage) && (
+                                      <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                                        <div className="flex items-center gap-2 mb-2 text-yellow-600 dark:text-yellow-400 font-bold text-sm">
+                                          <Star className="h-4 w-4" /> Explanation
+                                        </div>
+                                        <div className="text-sm text-foreground/90 pl-6">
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
                                         </div>
                                       </div>
                                     )}
                                   </motion.div>
-                                ))}
+                                );
+                              })}
                             </div>
+
+                            {/* Pagination */}
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-center gap-2 mt-8">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setCurrentPage(curr => Math.max(1, curr - 1));
+                                    document.getElementById('creative-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                  }}
+                                  disabled={currentPage === 1}
+                                >
+                                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                </Button>
+                                <span className="text-sm mx-4">Page {currentPage} of {totalPages}</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setCurrentPage(curr => Math.min(totalPages, curr + 1));
+                                    document.getElementById('creative-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                  }}
+                                  disabled={currentPage === totalPages}
+                                >
+                                  Next <ChevronRight className="h-4 w-4 ml-1" />
+                                </Button>
+                              </div>
+                            )}
                           </div>
-                        )}
+                        );
+                      })()}
 
                       {/* SQ Section */}
-                      {result.questions.filter(q => {
-                        if (q.type?.toUpperCase() !== 'SQ') return false;
-                        // Filter Logic
-                        const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                        const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                      {(() => {
+                        const filteredQuestions = result.questions.filter(q => {
+                          if (q.type?.toUpperCase() !== 'SQ') return false;
+                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
+                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
 
-                        switch (filterStatus) {
-                          case 'CORRECT': return isCorrect;
-                          case 'WRONG': return hasAnswer && !isCorrect;
-                          case 'UNANSWERED': return !hasAnswer;
-                          default: return true;
-                        }
-                      }).length > 0 && (
-                          <div>
+                          switch (filterStatus) {
+                            case 'CORRECT': return isCorrect;
+                            case 'WRONG': return hasAnswer && !isCorrect;
+                            case 'UNANSWERED': return !hasAnswer;
+                            default: return true;
+                          }
+                        });
+
+                        if (filteredQuestions.length === 0) return null;
+
+                        return (
+                          <div id="short-questions-section">
                             <div className="flex items-center gap-3 mb-6">
                               <div className="w-8 h-8 bg-amber-500/10 dark:bg-amber-500/20 rounded-full flex items-center justify-center">
                                 <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                               </div>
                               <h3 className="text-xl sm:text-2xl font-bold text-foreground">Short Questions (SQ)</h3>
                               <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none text-[10px] sm:text-xs">
-                                {result.questions.filter(q => q.type?.toUpperCase() === 'SQ').length} Questions
+                                {filteredQuestions.length} Questions
                               </Badge>
                             </div>
                             <div className="space-y-6">
-                              {result.questions
-                                .filter(q => {
-                                  if (q.type?.toUpperCase() !== 'SQ') return false;
-                                  // Filter Logic
-                                  const hasAnswer = q.studentAnswer && q.studentAnswer.trim() !== '' && q.studentAnswer !== 'No answer provided';
-                                  const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
-
-                                  switch (filterStatus) {
-                                    case 'CORRECT': return isCorrect;
-                                    case 'WRONG': return hasAnswer && !isCorrect;
-                                    case 'UNANSWERED': return !hasAnswer;
-                                    default: return true;
-                                  }
-                                })
-                                .map((question, index) => (
+                              {filteredQuestions.map((question, index) => {
+                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
+                                return (
                                   <motion.div
                                     key={question.id}
                                     initial={{ opacity: 0, x: -20 }}
@@ -2223,355 +2041,81 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     transition={{ delay: 0.1 * index }}
                                     className="border rounded-lg p-6 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20"
                                   >
-                                    {/* Question Header */}
                                     <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center gap-3">
-                                        <Badge className="bg-yellow-100 text-yellow-800">
-                                          SQ
-                                        </Badge>
-                                        <span className="text-sm text-gray-600">Question {index + 1}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-sm text-gray-600">Marks:</span>
-                                        <Badge variant="outline">
-                                          {question.awardedMarks}/{question.marks}
-                                        </Badge>
-                                      </div>
+                                      <Badge className="bg-yellow-100 text-yellow-800">SQ</Badge>
+                                      <Badge variant="outline">{question.awardedMarks}/{question.marks}</Badge>
                                     </div>
-
-                                    {/* Question Text */}
                                     <div className="mb-4">
-                                      <h3 className="text-lg font-semibold text-gray-800 mb-2">Question:</h3>
-                                      <div className="text-gray-700">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                      </div>
+                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                     </div>
-
-                                    {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ') && (question.subQuestions || question.sub_questions) ? (
-                                      <div className="space-y-8 mt-6">
-                                        <h4 className="font-bold text-gray-900 border-b-2 border-indigo-100 pb-3 text-lg">Detailed Answer Breakdown</h4>
-                                        {(question.subQuestions || question.sub_questions || []).map((subQ: any, idx: number) => (
-                                          <div key={idx} className="relative rounded-xl border border-border bg-card shadow-sm overflow-hidden transition-all hover:shadow-md">
-                                            {/* Sub-question Header */}
-                                            <div className="bg-muted/50 px-4 py-3 border-b border-border flex items-start gap-3">
-                                              <span className="flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 font-bold text-sm">
-                                                {toBengaliAlphabets(idx)}
-                                              </span>
-                                              <div className="flex-grow pt-1">
-                                                {subQ.text ? (
-                                                  <div className="text-foreground font-medium leading-relaxed">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text)}</UniversalMathJax>
-                                                  </div>
-                                                ) : (
-                                                  <span className="text-muted-foreground italic">Sub-question {toBengaliAlphabets(idx)}</span>
-                                                )}
-                                              </div>
-                                            </div>
-
-                                            <div className="p-4 space-y-4">
-                                              {/* Model Answer (Prominent) */}
-                                              {(subQ.modelAnswer || subQ.answer) && (
-                                                <div className="bg-emerald-500/10 rounded-lg p-4 border border-emerald-500/20">
-                                                  <div className="flex items-center gap-2 mb-2 text-emerald-600 dark:text-emerald-400 font-semibold text-sm uppercase tracking-wide">
-                                                    <CheckCircle className="w-4 h-4" />
-                                                    Model Answer
-                                                  </div>
-                                                  <div className="text-foreground/90 leading-relaxed font-sans">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer || subQ.answer)}</UniversalMathJax>
-                                                  </div>
-                                                </div>
-                                              )}
-
-                                              {/* Student Answer */}
-                                              <div className="bg-blue-500/10 rounded-lg p-4 border border-blue-500/10">
-                                                <div className="text-blue-600 dark:text-blue-400 font-semibold text-sm uppercase tracking-wide mb-2">
-                                                  Your Answer
-                                                </div>
-                                                {subQ.studentAnswer ? (
-                                                  <div className="text-foreground/90 leading-relaxed font-sans">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.studentAnswer)}</UniversalMathJax>
-                                                  </div>
-                                                ) : (
-                                                  <p className="text-muted-foreground italic text-sm">No text answer provided</p>
-                                                )}
-                                              </div>
-
-                                              {/* Attachments & Feedback */}
-                                              {((subQ.studentImages && subQ.studentImages.length > 0) || (subQ.drawings && subQ.drawings.length > 0)) && (
-                                                <div className="mt-4 pt-4 border-t border-gray-100">
-                                                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-                                                    <Camera className="w-4 h-4" />
-                                                    Attachments & Feedback
-                                                  </div>
-                                                  <div className="flex flex-wrap gap-4">
-                                                    {(() => {
-                                                      const images = subQ.studentImages || [];
-                                                      return images.length > 0 ? images.map((imgUrl: string, imgK: number) => {
-                                                        const globalIdx = idx * 100 + imgK;
-                                                        const drawing = subQ.drawings?.find((d: any) => d.imageIndex === globalIdx);
-                                                        const displayUrl = drawing ? drawing.imageData : imgUrl;
-                                                        const isAnnotated = !!drawing;
-
-                                                        return (
-                                                          <div
-                                                            key={imgK}
-                                                            className="relative group cursor-pointer perspective-1000"
-                                                            onClick={() => {
-                                                              setZoomedImage(displayUrl);
-                                                              setZoomedImageTitle(`Sub-question ${toBengaliAlphabets(idx)} - Image ${imgK + 1}${isAnnotated ? ' (Annotated)' : ''}`);
-                                                              setShowZoomModal(true);
-                                                            }}
-                                                          >
-                                                            <div className={`relative rounded-lg overflow-hidden shadow-sm transition-all duration-200 group-hover:shadow-md group-hover:scale-105 ${isAnnotated ? 'ring-2 ring-orange-400' : 'ring-1 ring-gray-200'}`}>
-                                                              <img
-                                                                src={displayUrl}
-                                                                alt={`Sub ${toBengaliAlphabets(idx)} Img ${imgK + 1}`}
-                                                                className="w-32 h-32 object-cover bg-gray-50"
-                                                                loading="lazy"
-                                                              />
-                                                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                                                <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-md" />
-                                                              </div>
-                                                              {isAnnotated && (
-                                                                <div className="absolute top-0 right-0 bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-bl-lg font-bold shadow-sm flex items-center gap-1">
-                                                                  <MessageSquare className="w-3 h-3" />
-                                                                  Feedback
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                        );
-                                                      }) : null;
-                                                    })()}
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          </div>
-                                        ))}
+                                    {question.studentAnswer && (
+                                      <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-900">
+                                        <p className="text-sm">{question.studentAnswer}</p>
                                       </div>
-                                    ) : (
-                                      <>
-                                        {/* Student Answer */}
-                                        <div className="mb-4">
-                                          <h4 className="font-medium text-gray-800 mb-2">Your Answer:</h4>
-                                          {question.studentAnswer ? (
-                                            <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50">
-                                              <p className="text-gray-700">{question.studentAnswer}</p>
-                                            </div>
-                                          ) : (
-                                            <div className="p-3 rounded-lg border-2 border-gray-200 bg-gray-50">
-                                              <p className="text-gray-500 italic">No answer provided</p>
-                                            </div>
-                                          )}
-                                        </div>
-
-                                        {/* Student Answer Images */}
-                                        {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
-                                          <div className="mb-4">
-                                            <h4 className="font-medium text-gray-800 mb-2">Your Uploaded Images:</h4>
-                                            <div className="p-3 rounded-lg border-2 border-green-200 bg-green-50">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <Camera className="h-4 w-4 text-green-600" />
-                                                <span className="text-sm font-medium text-green-800">
-                                                  Images you uploaded during the exam
-                                                </span>
-                                              </div>
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {question.studentAnswerImages.map((imageUrl: string, index: number) => (
-                                                  <div
-                                                    key={index}
-                                                    className="relative group cursor-pointer"
-                                                    onClick={() => {
-                                                      setZoomedImage(imageUrl);
-                                                      setZoomedImageTitle(`Your Answer Image ${index + 1}`);
-                                                      setShowZoomModal(true);
-                                                    }}
-                                                  >
-                                                    <img
-                                                      src={imageUrl}
-                                                      alt={`Your answer image ${index + 1}`}
-                                                      className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50 transition-transform group-hover:scale-105"
-                                                      onError={(e) => {
-                                                        console.error('Student answer image failed to load:', imageUrl);
-                                                        e.currentTarget.style.display = 'none';
-                                                        const parent = e.currentTarget.parentElement;
-                                                        if (parent) {
-                                                          const errorDiv = document.createElement('div');
-                                                          errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-green-300 flex items-center justify-center text-gray-500 text-sm';
-                                                          errorDiv.innerHTML = `
-                                                      <div class="text-center">
-                                                        <div class="mb-1">📷</div>
-                                                        <div>Image not available</div>
-                                                      </div>
-                                                    `;
-                                                          parent.appendChild(errorDiv);
-                                                        }
-                                                      }}
-                                                    />
-                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-
-                                        {/* Evaluator's Drawing Feedback */}
-                                        {question.allDrawings && question.allDrawings.length > 0 && (
-                                          <div className="mb-4">
-                                            <h4 className="font-medium text-gray-800 mb-2">Evaluator&apos;s Feedback:</h4>
-                                            <div className="p-3 rounded-lg border-2 border-orange-200 bg-orange-50">
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <MessageSquare className="h-4 w-4 text-orange-600" />
-                                                <span className="text-sm font-medium text-orange-800">
-                                                  Teacher&apos;s annotations on your answer
-                                                </span>
-                                              </div>
-                                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                                {question.allDrawings.map((drawing, index) => (
-                                                  <div
-                                                    key={index}
-                                                    className="relative group cursor-pointer"
-                                                    onClick={() => {
-                                                      setZoomedImage(drawing.imageData);
-                                                      setZoomedImageTitle(`Teacher's Annotations - Image ${drawing.imageIndex + 1}`);
-                                                      setShowZoomModal(true);
-                                                    }}
-                                                  >
-                                                    <img
-                                                      src={drawing.imageData}
-                                                      alt={`Teacher's annotations on answer ${drawing.imageIndex + 1}`}
-                                                      className="w-full h-32 object-contain rounded-lg border-2 border-orange-500/30 bg-muted/50 transition-transform group-hover:scale-105"
-                                                      onError={(e) => {
-                                                        console.error('Annotated image failed to load:', drawing.imageData);
-                                                        e.currentTarget.style.display = 'none';
-                                                        const parent = e.currentTarget.parentElement;
-                                                        if (parent) {
-                                                          const errorDiv = document.createElement('div');
-                                                          errorDiv.className = 'w-full h-32 bg-gray-200 rounded-lg border-2 border-orange-300 flex items-center justify-center text-gray-500 text-sm';
-                                                          errorDiv.innerHTML = `
-                                                      <div class="text-center">
-                                                        <div class="mb-1">📷</div>
-                                                        <div>Annotated image not available</div>
-                                                      </div>
-                                                    `;
-                                                          parent.appendChild(errorDiv);
-                                                        }
-                                                      }}
-                                                    />
-                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
-                                                      <Eye className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                    </div>
-                                                  </div>
-                                                ))}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </>
                                     )}
-
-                                    {/* Model Answer */}
                                     {question.modelAnswer && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-2">Model Answer:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-blue-500/20 bg-blue-500/5">
-                                          <div className="text-foreground/90">
-                                            <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Sub Questions */}
-                                    {question.subQuestions && question.subQuestions.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-2">Sub Questions:</h4>
-                                        <div className="space-y-2">
-                                          {question.subQuestions.map((subQ, subIndex) => (
-                                            <div key={subIndex} className="p-3 rounded-lg border border-border bg-card">
-                                              <div className="mb-2">
-                                                <div className="text-foreground font-medium">
-                                                  {subQ.questionText || subQ.text || subQ.question || ''}
-                                                </div>
-                                              </div>
-                                              {subQ.modelAnswer && (
-                                                <div className="mt-2 p-2 rounded bg-blue-50 border border-blue-200">
-                                                  <p className="text-sm text-gray-600 font-medium mb-1">Model Answer:</p>
-                                                  <p className="text-foreground/90">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.modelAnswer)}</UniversalMathJax>
-                                                  </p>
-                                                </div>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Feedback */}
-                                    {question.feedback && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-2">Feedback:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-yellow-500/20 bg-yellow-500/5">
-                                          <p className="text-foreground/90">{question.feedback}</p>
-                                        </div>
+                                      <div className="mt-4 p-3 rounded-lg border-2 border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900">
+                                        <p className="text-xs font-bold text-green-600 mb-1">Model Answer:</p>
+                                        <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
                                       </div>
                                     )}
                                   </motion.div>
-                                ))}
+                                );
+                              })}
                             </div>
                           </div>
-                        )}
+                        );
+                      })()}
                     </div>
                   </CardContent>
                 </Card>
               </motion.div>
-            )
-          }
-
-          {/* Action Buttons */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.9 }}
-            className="flex flex-col sm:flex-row justify-center gap-4"
-          >
-            {result.exam.allowRetake && !(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
-              <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
-                <Link href={`/exams/online/${result.exam.id}`}>
-                  <BookOpen className="h-5 w-5 mr-2" />
-                  Retake Exam
-                </Link>
-              </Button>
             )}
-            <Button
-              size="lg"
-              variant="outline"
-              onClick={() => setShowReviewModal(true)}
-              disabled={(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')}
-              className={`${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
-                ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
-                }`}
-            >
-              <MessageSquare className="h-5 w-5 mr-2" />
-              {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
-                ? 'Review Not Available (Suspended)'
-                : 'Request Review'
-              }
-            </Button>
-            <Button asChild variant="outline" size="lg">
-              <Link href="/exams/online">
-                <ArrowLeft className="h-5 w-5 mr-2" />
-                Back to Exams
+        </div>
+
+        {/* Action Buttons */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.9 }}
+          className="flex flex-col sm:flex-row justify-center gap-4 mt-12"
+        >
+          {result.exam.allowRetake && !(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED') && (
+            <Button asChild size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+              <Link href={`/exams/online/${result.exam.id}`}>
+                <BookOpen className="h-5 w-5 mr-2" />
+                Retake Exam
               </Link>
             </Button>
-          </motion.div>
+          )}
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => setShowReviewModal(true)}
+            disabled={(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')}
+            className={`${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
+              ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+              : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+              }`}
+          >
+            <MessageSquare className="h-5 w-5 mr-2" />
+            {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
+              ? 'Review Not Available (Suspended)'
+              : 'Request Review'
+            }
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link href="/exams/online">
+              <ArrowLeft className="h-5 w-5 mr-2" />
+              Back to Exams
+            </Link>
+          </Button>
+        </motion.div>
+      </div>
 
+      {/* Modals and Print Utility */}
+      {result && (
+        <>
           {/* Review Request Modal */}
           <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
             <DialogContent className="max-w-md">
@@ -2669,12 +2213,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             const errorDiv = document.createElement('div');
                             errorDiv.className = 'flex items-center justify-center w-full h-full bg-gray-100 rounded-lg';
                             errorDiv.innerHTML = `
-                            <div class="text-center text-gray-500">
-                              <div class="text-4xl mb-2">📷</div>
-                              <div class="text-sm">Image failed to load</div>
-                              <div class="text-xs mt-1">Please try again</div>
-                            </div>
-                          `;
+                                <div class="text-center text-gray-500">
+                                  <div class="text-4xl mb-2">📷</div>
+                                  <div class="text-sm">Image failed to load</div>
+                                  <div class="text-xs mt-1">Please try again</div>
+                                </div>
+                              `;
                             parent.appendChild(errorDiv);
                           }
                         }
@@ -2693,27 +2237,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </div>
             </DialogContent>
           </Dialog>
-        </div >
-        {/* Hidden Print Component */}
-        < div style={{ display: 'none' }}>
-          {printData && (
-            <MarkedQuestionPaper
-              ref={printRef}
-              examInfo={printData.examInfo}
-              questions={printData.questions}
-              submission={printData.submission}
-              rank={result.result?.rank}
-              totalStudents={result.statistics.totalStudents}
-              qrData={{
-                id: result.submission.id,
-                student: result.student.name,
-                exam: result.exam.name,
-                score: result.submission.score
-              }}
-            />
-          )}
-        </div >
-      </div >
-    </MathJaxContext >
+
+          {/* Hidden Print Component */}
+          <div style={{ display: 'none' }}>
+            {printData && (
+              <MarkedQuestionPaper
+                ref={printRef}
+                examInfo={printData.examInfo}
+                questions={printData.questions}
+                submission={printData.submission}
+                rank={result.result?.rank}
+                totalStudents={result.statistics.totalStudents}
+                qrData={{
+                  id: result.submission.id,
+                  student: result.student.name,
+                  exam: result.exam.name,
+                  score: result.submission.score
+                }}
+              />
+            )}
+          </div>
+        </>
+      )}
+    </MathJaxContext>
   );
 }
