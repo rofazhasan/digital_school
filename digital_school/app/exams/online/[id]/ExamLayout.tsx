@@ -303,14 +303,16 @@ export default function ExamLayout() {
       setIsStarting(true);
       setGracePeriod(true); // Enable grace period
 
-      // 1. Enter Fullscreen FIRST (with timeout to prevent hanging)
-      try {
-        await Promise.race([
-          enterFullscreen(),
-          new Promise((resolve) => setTimeout(() => resolve("timeout"), 1000))
-        ]);
-      } catch (e) {
-        console.warn("Fullscreen attempt timed out or failed, proceeding anyway.");
+      // 1. Enter Fullscreen FIRST (Objective ONLY)
+      if (sectionToStart === 'objective') {
+        try {
+          await Promise.race([
+            enterFullscreen(),
+            new Promise((resolve) => setTimeout(() => resolve("timeout"), 1000))
+          ]);
+        } catch (e) {
+          console.warn("Fullscreen attempt timed out or failed, proceeding anyway.");
+        }
       }
 
       // Just in case Promise.race doesn't behave as expected in all envs (e.g. resolve vs reject logic above)
@@ -388,7 +390,13 @@ export default function ExamLayout() {
   // Moved up to be available for keyboard navigation useEffect
   // Added gracePeriod check to prevent instant block on start
   // DISABLED FOR PRACTICE
-  const isBlocked = isExamActive && !gracePeriod && (!isFullscreen || !isTabActive) && !transitionState && !isPractice;
+  const isBlocked = isExamActive &&
+    !gracePeriod &&
+    (!isFullscreen || !isTabActive) &&
+    !transitionState &&
+    !isPractice &&
+    activeSection !== 'cqsq' &&
+    !isUploading;
 
   // Keyboard Navigation
   useEffect(() => {

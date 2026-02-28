@@ -1949,6 +1949,32 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>
                                             {subQ.studentAnswer && <div className="text-xs text-muted-foreground mt-1 ps-4">Your Answer: {subQ.studentAnswer}</div>}
+
+                                            {/* Sub-question Images */}
+                                            {subQ.studentImages && subQ.studentImages.length > 0 && (
+                                              <div className="mt-2 ps-4">
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                  {subQ.studentImages.map((imageUrl: string, imgIdx: number) => (
+                                                    <div
+                                                      key={imgIdx}
+                                                      className="relative group cursor-pointer"
+                                                      onClick={() => {
+                                                        setZoomedImage(imageUrl);
+                                                        setZoomedImageTitle(`Sub-question ${subIdx + 1} Image ${imgIdx + 1}`);
+                                                        setShowZoomModal(true);
+                                                      }}
+                                                    >
+                                                      <img
+                                                        src={imageUrl}
+                                                        alt={`Sub ${subIdx + 1} Img ${imgIdx + 1}`}
+                                                        crossOrigin="anonymous"
+                                                        className="w-full h-20 object-contain rounded-lg border border-indigo-200 bg-white dark:bg-slate-900"
+                                                      />
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
