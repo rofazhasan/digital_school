@@ -22,7 +22,8 @@ const ROUTE_PERMISSIONS = {
     '/maintenance',
     '/forgot-password',
     '/reset-password',
-    '/auth/pending'
+    '/auth/pending',
+    '/internal/print-script/*'
   ],
 
   // Super User routes
@@ -136,8 +137,11 @@ const ROUTE_PERMISSIONS = {
 
 // Helper function to check if a path matches any route pattern
 function pathMatches(pattern: string, path: string): boolean {
-  if (pattern.endsWith('*')) {
-    return path.startsWith(pattern.slice(0, -1));
+  if (pattern.includes('*')) {
+    // Replace '*' with '.*' to create a valid regex for matching wildcards anywhere
+    const regexPattern = '^' + pattern.replace(/\*/g, '.*') + '$';
+    const regex = new RegExp(regexPattern);
+    return regex.test(path);
   }
   return path === pattern;
 }

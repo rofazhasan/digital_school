@@ -735,6 +735,44 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       </div>
                                     )}
 
+                                    {part.subType === 'short_answer' && (
+                                      <div>
+                                        <div className="font-bold text-xs text-blue-700 mb-2">{isEn ? 'Short Answers:' : 'সংক্ষিপ্ত উত্তর (Short Answers):'}</div>
+                                        <div className="space-y-2">
+                                          {(part.answers || []).map((ans: string, aIdx: number) => (
+                                            <div key={aIdx} className="flex gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                              <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
+                                              <span className="flex-1 text-red-700 font-medium">
+                                                <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              </span>
+                                            </div>
+                                          ))}
+                                          {!(part.answers && part.answers.length > 0) && (
+                                            <div className="text-gray-500 italic text-xs">{isEn ? 'No answers provided.' : 'কোনো উত্তর দেওয়া হয়নি।'}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'error_correction' && (
+                                      <div>
+                                        <div className="font-bold text-xs text-blue-700 mb-2">{isEn ? 'Corrected Sentences:' : 'সঠিক বাক্য (Corrected Sentences):'}</div>
+                                        <div className="space-y-2">
+                                          {(part.answers || []).map((ans: string, aIdx: number) => (
+                                            <div key={aIdx} className="flex gap-2 text-sm bg-white p-2 rounded border border-green-100 shadow-sm">
+                                              <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
+                                              <span className="flex-1 text-emerald-700 font-bold">
+                                                <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              </span>
+                                            </div>
+                                          ))}
+                                          {!(part.answers && part.answers.length > 0) && (
+                                            <div className="text-gray-500 italic text-xs">{isEn ? 'No solutions provided.' : 'কোনো সমাধান দেওয়া হয়নি।'}</div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    )}
+
                                     {part.subType === 'fill_in' && (
                                       <div>
                                         <div className="font-bold text-xs text-blue-700 mb-1">{isEn ? 'Fill-in Answers:' : 'শূন্যস্থান পূরণ (Fill-in Answers):'}</div>

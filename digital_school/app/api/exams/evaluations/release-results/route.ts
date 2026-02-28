@@ -160,41 +160,18 @@ export async function POST(req: NextRequest) {
               // Find the specific submission for this student to get answers and notes
               const studentSubmission = exam.examSubmissions.find(s => s.studentId === result.studentId);
 
-              // Generate PDF Attachment
-              const pdfBuffer = await generateStudentScriptPDF({
-                studentName: result.student.user.name,
-                studentRoll: result.student.roll,
-                examName: exam.name,
-                examDate: exam.date.toLocaleDateString(),
-                subject: exam.name,
-                className: (exam as any).class?.name || "N/A",
-                results: {
-                  total: result.total,
-                  totalMarks: exam.totalMarks,
-                  grade: result.grade || 'N/A',
-                  rank: result.rank || undefined,
-                  mcqMarks: result.mcqMarks,
-                  sqMarks: result.sqMarks,
-                  cqMarks: result.cqMarks,
-                  percentage: result.percentage || 0
-                },
-                institute: {
-                  name: institute?.name || "Digital School",
-                  address: institute?.address || undefined,
-                  logoUrl: institute?.logoUrl || undefined
-                },
-                // Pass questions and student answers
-                questions: exam.examSets.flatMap(set => set.questions),
-                submission: studentSubmission ? {
-                  answers: studentSubmission.answers as any,
-                  evaluatorNotes: studentSubmission.evaluatorNotes || undefined
-                } : undefined
-              }, fonts);
-
-              // Determine base URL dynamically
+              // Determine base URL dynamically needed for puppeteer
               const protocol = req.headers.get("x-forwarded-proto") || "http";
               const host = req.headers.get("host") || "localhost:3000";
               const baseUrl = `${protocol}://${host}`;
+
+              // Generate PDF Attachment
+              const pdfBuffer = await generateStudentScriptPDF({
+                examId: exam.id,
+                studentId: result.studentId,
+                baseUrl: baseUrl
+              });
+
 
               return sendEmail({
                 to: result.student.user.email!,

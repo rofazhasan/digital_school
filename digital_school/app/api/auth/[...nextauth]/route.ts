@@ -5,7 +5,7 @@ import bcrypt from "bcryptjs";
 import { v4 as uuidv4 } from "uuid";
 import { socketService } from "@/lib/socket";
 
-export const authOptions: NextAuthOptions = {
+const authOptions: NextAuthOptions = {
     providers: [
         CredentialsProvider({
             name: "Credentials",

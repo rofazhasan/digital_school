@@ -5,7 +5,7 @@ import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { X, Check, AlertCircle, Upload, Eye, VolumeX } from "lucide-react";
+import { X, Check, AlertCircle, Upload, Eye, VolumeX, XCircle, CheckCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cleanupMath } from "@/lib/utils";
@@ -1419,6 +1419,82 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                                   })}
                                 </div>
                               )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ── SHORT ANSWER ── */}
+                        {part.subType === 'short_answer' && (
+                          <div className="space-y-6 mt-4">
+                            {part.instructions && (
+                              <div className="text-sm italic text-muted-foreground bg-muted/30 p-3 rounded-xl border border-border/50">
+                                {part.instructions}
+                              </div>
+                            )}
+                            {(part.questions || []).map((q: string, qi: number) => (
+                              <div key={qi} className="group p-5 bg-white/50 dark:bg-gray-800/30 border border-border/60 rounded-3xl hover:border-primary/40 transition-all duration-300 shadow-sm">
+                                <div className="flex items-start gap-3 mb-4">
+                                  <span className="shrink-0 w-8 h-8 bg-indigo-50/80 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-800/50 flex items-center justify-center rounded-xl text-sm font-black shadow-sm">{qi + 1}</span>
+                                  <div className="flex-1 pt-1">
+                                    <p className="text-base font-semibold text-foreground/90 leading-relaxed"><UniversalMathJax dynamic>{q}</UniversalMathJax></p>
+                                  </div>
+                                </div>
+                                <div className="ml-11 relative">
+                                  <div className="absolute top-3 left-4 text-[10px] font-black text-primary/30 uppercase tracking-widest pointer-events-none group-focus-within:text-primary/60 transition-colors z-10">Your Answer</div>
+                                  <DebouncedTextarea
+                                    value={getAns(qi) as string}
+                                    onChange={(val) => setAns(qi, val)}
+                                    disabled={!!(disabled || submitted)}
+                                    rows={3}
+                                    placeholder="Start typing..."
+                                    className="w-full bg-background/80 border-border/80 focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all rounded-2xl pt-8 pb-3 px-4 text-sm md:text-base font-medium shadow-inner resize-none relative"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* ── ERROR CORRECTION ── */}
+                        {part.subType === 'error_correction' && (
+                          <div className="space-y-6 mt-4">
+                            {part.instructions && (
+                              <div className="text-sm text-rose-700/80 dark:text-rose-400/80 bg-rose-50/50 dark:bg-rose-950/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/30 font-medium">
+                                <span className="font-bold uppercase text-[10px] tracking-widest block mb-1">Task</span>
+                                {part.instructions}
+                              </div>
+                            )}
+                            <div className="grid grid-cols-1 gap-4">
+                              {(part.sentences || []).map((sentence: string, si: number) => (
+                                <div key={si} className="p-5 bg-white/40 dark:bg-gray-800/40 border-2 border-dashed border-rose-200/50 dark:border-rose-900/40 rounded-3xl group focus-within:border-rose-400/80 transition-all duration-300">
+                                  <div className="flex flex-col md:flex-row gap-4">
+                                    {/* Incorrect sentence display */}
+                                    <div className="flex-1">
+                                      <div className="text-[10px] font-black text-rose-500/60 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                        <XCircle className="w-3 h-3" /> Incorrect Sentence {si + 1}
+                                      </div>
+                                      <div className="text-base font-medium text-foreground/80 line-through decoration-rose-400/50 decoration-2 pl-2 border-l-2 border-rose-200">
+                                        <UniversalMathJax dynamic>{sentence}</UniversalMathJax>
+                                      </div>
+                                    </div>
+
+                                    {/* Corrected input */}
+                                    <div className="flex-1 relative">
+                                      <div className="text-[10px] font-black text-emerald-500/60 uppercase tracking-widest flex items-center gap-2 mb-2">
+                                        <CheckCircle className="w-3 h-3" /> Corrected Version
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={getAns(si) as string}
+                                        onChange={(e) => setAns(si, e.target.value)}
+                                        disabled={disabled || submitted}
+                                        className="w-full bg-background/80 border-b-2 border-emerald-200 focus:border-emerald-500 transition-all focus:outline-none focus:bg-emerald-50/50 px-3 py-2 text-sm md:text-base font-semibold rounded-t-xl"
+                                        placeholder="Rewrite correctly..."
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         )}

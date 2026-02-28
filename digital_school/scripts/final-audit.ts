@@ -78,7 +78,7 @@ async function testTemplates() {
                 firstName: 'Rafiu',
                 verificationCode: '884291',
                 institute: institute as any
-            })
+            } as any)
         }
     ];
 

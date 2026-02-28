@@ -695,6 +695,35 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                       </div>
                                     )}
 
+                                    {part.subType === 'short_answer' && (
+                                      <div className="space-y-3 mt-2">
+                                        {(part.questions || []).map((q: string, qi: number) => (
+                                          <div key={qi} className="flex gap-2 items-start text-sm">
+                                            <span className="font-bold flex-shrink-0">{isEn ? (qi + 1) : toBengaliNumerals(qi + 1)}.</span>
+                                            <div className="flex-1 w-full">
+                                              <UniversalMathJax dynamic>{q}</UniversalMathJax>
+                                              <div className="border-b-2 border-dotted border-gray-400 w-full mt-6 mb-2"></div>
+                                              <div className="border-b-2 border-dotted border-gray-400 w-full mb-2"></div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'error_correction' && (
+                                      <div className="space-y-2 mt-2 ml-4">
+                                        {(part.sentences || []).map((s: string, si: number) => (
+                                          <div key={si} className="flex items-start gap-2 mb-3 max-w-2xl">
+                                            <span className="font-bold flex-shrink-0 w-6">({isEn ? String.fromCharCode(97 + si) : BENGALI_SUB_LABELS[si]})</span>
+                                            <div className="flex-1">
+                                              <UniversalMathJax dynamic>{s}</UniversalMathJax>
+                                              <div className="border-b border-black w-full mt-4"></div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
                                     {part.subType === 'fill_in' && (
                                       <div className="space-y-2">
                                         {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (

@@ -4,17 +4,17 @@ const prisma = new PrismaClient();
 async function main() {
     const sets = await prisma.examSet.findMany({
         where: {
-            NOT: { questionsJson: null }
+            NOT: { questionsJson: { equals: null } } as any
         },
         take: 10
     });
 
     console.log(`Checking ${sets.length} ExamSets...`);
-    sets.forEach(set => {
+    sets.forEach((set: any) => {
         console.log(`\nExamSet: ${set.name} (examId: ${set.examId})`);
         const qJson = set.questionsJson;
         if (qJson && Array.isArray(qJson)) {
-            const sample = qJson[0];
+            const sample = qJson[0] as any;
             if (sample) {
                 console.log('Sample question keys:', Object.keys(sample));
                 if (sample.negativeMarking !== undefined || sample.negativeMarks !== undefined) {

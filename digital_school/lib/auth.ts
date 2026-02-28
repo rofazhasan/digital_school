@@ -2,8 +2,10 @@ import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 import { NextRequest } from 'next/server';
 import prismadb from './db';
-import { getJwtSecretKey, JWT_ALGORITHM, JWTPayload } from './auth-config';
+import { getJwtSecretKey, JWT_ALGORITHM } from './auth-config';
+import type { JWTPayload } from './auth-config';
 
+export type { JWTPayload };
 // Create JWT token
 export async function createToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): Promise<string> {
   const token = await new SignJWT(payload)
@@ -140,6 +142,16 @@ export async function getTokenFromRequest(req: NextRequest): Promise<{
   token: string;
 } | null> {
   try {
+    // INTERNAL BYPASS: Allow headless browsers (like Puppeteer) without a session cookie
+    // to access protected APIs if they provide the valid internal secret.
+    const internalSecret = req.headers.get('x-internal-secret');
+    if (internalSecret && internalSecret === process.env.JWT_SECRET) {
+      return {
+        user: { id: "internal-system", role: "SUPER_USER", name: "System" },
+        token: "internal-bypass-token"
+      };
+    }
+
     // Check for JWT token in Authorization header
     const authHeader = req.headers.get('authorization');
     if (authHeader?.startsWith('Bearer ')) {

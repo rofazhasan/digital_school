@@ -43,7 +43,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     finalGrade,
     rank,
     hasAttachment = true,
-    institute = { name: 'Digital School' },
+    institute = { name: 'institute.name' },
     baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitalschool.netlify.app',
     semester = '2026 Academic Session',
     section = 'A',
@@ -59,8 +59,8 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     const dangerColor = '#ef4444'; // Red 500
 
     const scoreColor = totalPercentage >= 80 ? successColor : totalPercentage >= 40 ? primaryColor : dangerColor;
-    const scriptUrl = (examId && studentId)
-        ? `${baseUrl}/exams/evaluations/${examId}/print/${studentId}`
+    const scriptUrl = examId
+        ? `${baseUrl}/exams/results/${examId}`
         : `${baseUrl}/student/results`;
 
     // Inline simple CSS for clients that support it
@@ -217,7 +217,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
                                 <div style={{ textAlign: 'center', padding: '24px', backgroundColor: 'rgba(255,255,255,0.02)', borderRadius: '20px', border: '2px dashed rgba(255,255,255,0.1)' }}>
                                     <p style={{ fontSize: '13px', color: '#94a3b8', margin: '0 0 12px 0' }}>Your detailed answer script is attached as a PDF.</p>
                                     <a href={scriptUrl} style={{ display: 'inline-block', backgroundColor: primaryColor, color: '#ffffff', padding: '12px 24px', borderRadius: '12px', fontWeight: '700', fontSize: '14px', textDecoration: 'none' }}>
-                                        View Detailed Script
+                                        View Detailed Script(Login Required)
                                     </a>
                                 </div>
                             )}
@@ -246,7 +246,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
             </table>
 
             <div style={{ textAlign: 'center', marginTop: '20px' }}>
-                <p style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.2em' }}>© 2026 DIGITAL SCHOOL • SECURE DOCUMENT</p>
+                <p style={{ fontSize: '10px', color: '#475569', textTransform: 'uppercase', letterSpacing: '0.2em' }}>© 2026 {institute.name} • SECURE DOCUMENT</p>
             </div>
         </div>
     );

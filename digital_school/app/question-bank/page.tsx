@@ -47,7 +47,7 @@ import { Capacitor } from "@capacitor/core";
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 
 // DESCRIPTIVE sub-type definitions
-type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram';
+type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction';
 type WritingType = 'paragraph' | 'letter' | 'essay' | 'summary' | 'expansion' | 'translation' | 'story' | 'dialogue' | 'composition' | 'report' | 'application' | 'email';
 type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question' | 'prepositions' | 'articles';
 type CompAnswerType = 'stem_mcq' | 'qa';
@@ -89,6 +89,9 @@ interface DescPart {
   // label_diagram
   imageUrl?: string;
   labels?: { text: string; x: number; y: number }[];
+  // short_answer & error_correction
+  answers?: string[];
+  sentences?: string[];
 }
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
@@ -1458,6 +1461,8 @@ function DescriptiveQuestionForm({
                 <SelectItem value="label_diagram">🖼️ Label Diagram</SelectItem>
                 <SelectItem value="rearranging">🔄 Rearranging</SelectItem>
                 <SelectItem value="matching">🧩 Matching</SelectItem>
+                <SelectItem value="short_answer">📝 Short Answer</SelectItem>
+                <SelectItem value="error_correction">❌ Error Correction</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-[10px] text-amber-700/60 mt-1 italic leading-tight">
@@ -1469,6 +1474,8 @@ function DescriptiveQuestionForm({
               {part.subType === 'label_diagram' && "Image identification using coordinate-based markers."}
               {part.subType === 'rearranging' && "Contextual ordering of jumbled sentences or fragments."}
               {part.subType === 'matching' && "Pairing items from two columns (e.g., Column A vs Column B)."}
+              {part.subType === 'short_answer' && "Direct short answer questions."}
+              {part.subType === 'error_correction' && "Provide incorrect sentences and have students rewrite them correctly."}
             </p>
           </div>
 
@@ -1766,6 +1773,124 @@ function DescriptiveQuestionForm({
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── SHORT ANSWER ── */}
+          {part.subType === 'short_answer' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Instructions (Optional)</Label>
+                <Input
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  placeholder="e.g. Answer the following questions in one or two sentences."
+                />
+              </div>
+              <div className="space-y-2 mt-2">
+                <Label className="text-xs">Questions & Answers</Label>
+                {Math.max((part.questions || []).length, (part.answers || []).length) === 0 ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => updatePart(idx, { questions: [''], answers: [''] })}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Q&A
+                  </Button>
+                ) : (
+                  (part.questions || ['']).map((q: string, qi: number) => (
+                    <div key={qi} className="border p-2 rounded bg-white dark:bg-gray-900 space-y-2 relative">
+                      <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => {
+                          const qs = [...(part.questions || [])]; qs.splice(qi, 1);
+                          const as = [...(part.answers || [])]; as.splice(qi, 1);
+                          updatePart(idx, { questions: qs, answers: as });
+                        }}>
+                        <X className="h-3 w-3 text-red-500" />
+                      </Button>
+                      <div>
+                        <Label className="text-[10px] text-gray-500">Question {qi + 1}</Label>
+                        <Input value={q} onChange={e => {
+                          const qs = [...(part.questions || [])]; qs[qi] = e.target.value;
+                          updatePart(idx, { questions: qs });
+                        }} placeholder="Enter the question..." className="h-7 text-xs" />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-green-600">Expected Answer / Key</Label>
+                        <Input value={(part.answers || [])[qi] || ''} onChange={e => {
+                          const as = [...(part.answers || [])]; as[qi] = e.target.value;
+                          updatePart(idx, { answers: as });
+                        }} placeholder="Enter the expected answer key..." className="h-7 text-xs border-green-200" />
+                      </div>
+                    </div>
+                  ))
+                )}
+                {(part.questions || []).length > 0 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    updatePart(idx, {
+                      questions: [...(part.questions || []), ''],
+                      answers: [...(part.answers || []), '']
+                    });
+                  }}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Q&A
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── ERROR CORRECTION ── */}
+          {part.subType === 'error_correction' && (
+            <div className="space-y-2">
+              <div>
+                <Label className="text-xs">Task Instructions</Label>
+                <Input
+                  value={part.instructions || ''}
+                  onChange={e => updatePart(idx, { instructions: e.target.value })}
+                  placeholder="e.g. Find the errors and rewrite the sentences correctly."
+                />
+              </div>
+              <div className="space-y-2 mt-2">
+                <Label className="text-xs">Incorrect Sentences & Corrections</Label>
+                {Math.max((part.sentences || []).length, (part.answers || []).length) === 0 ? (
+                  <Button type="button" variant="outline" size="sm" onClick={() => updatePart(idx, { sentences: [''], answers: [''] })}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Sentence
+                  </Button>
+                ) : (
+                  (part.sentences || ['']).map((s: string, si: number) => (
+                    <div key={si} className="border border-rose-100 p-2 rounded bg-rose-50/10 dark:bg-rose-900/10 space-y-2 relative">
+                      <Button type="button" variant="ghost" size="icon" className="absolute top-1 right-1 h-6 w-6"
+                        onClick={() => {
+                          const ss = [...(part.sentences || [])]; ss.splice(si, 1);
+                          const as = [...(part.answers || [])]; as.splice(si, 1);
+                          updatePart(idx, { sentences: ss, answers: as });
+                        }}>
+                        <X className="h-3 w-3 text-red-500" />
+                      </Button>
+                      <div>
+                        <Label className="text-[10px] text-rose-500">Sentence {si + 1} (With Errors)</Label>
+                        <Input value={s} onChange={e => {
+                          const ss = [...(part.sentences || [])]; ss[si] = e.target.value;
+                          updatePart(idx, { sentences: ss });
+                        }} placeholder="e.g. He go to school everyday." className="h-7 text-xs border-rose-200" />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] text-emerald-600">Corrected Version</Label>
+                        <Input value={(part.answers || [])[si] || ''} onChange={e => {
+                          const as = [...(part.answers || [])]; as[si] = e.target.value;
+                          updatePart(idx, { answers: as });
+                        }} placeholder="e.g. He goes to school every day." className="h-7 text-xs border-emerald-200" />
+                      </div>
+                    </div>
+                  ))
+                )}
+                {(part.sentences || []).length > 0 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => {
+                    updatePart(idx, {
+                      sentences: [...(part.sentences || []), ''],
+                      answers: [...(part.answers || []), '']
+                    });
+                  }}>
+                    <PlusCircle className="mr-1 h-3 w-3" /> Add Sentence
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

@@ -13,9 +13,9 @@ export interface PDFOptions {
 }
 
 // Use Omit to avoid conflict with base Question type
-export interface ExtendedQuestion extends Omit<Question, 'tags' | 'options' | 'subQuestions'> {
+export interface ExtendedQuestion extends Omit<Question, 'tags' | 'options' | 'subQuestions' | 'correctOption'> {
   stem?: string;
-  correctOption?: number;
+  correctOption?: number | null;
   chapter?: string;
   tags?: string | string[]; // Allow string (JSON) or string[]
   options?: any;
