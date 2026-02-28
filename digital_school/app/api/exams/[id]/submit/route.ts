@@ -148,7 +148,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (exam.sqRequiredQuestions && sqAnswered > exam.sqRequiredQuestions) exceededQuestionLimit = true;
 
     // Check if there is a CQ/SQ section to follow
-    const hasCqSqSection = (exam.cqTotalQuestions || 0) > 0 || (exam.sqTotalQuestions || 0) > 0;
+    const hasCqSqSection = (exam.cqTotalQuestions || 0) > 0 ||
+      (exam.sqTotalQuestions || 0) > 0 ||
+      Array.from(questionTypeMap.values()).some(t => ['cq', 'sq', 'descriptive'].includes(t));
     const isFinalSubmission = isCqSq || (!hasCqSqSection && isObjective);
 
     const updateData: any = {

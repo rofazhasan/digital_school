@@ -806,7 +806,13 @@ export default function ExamLayout() {
                   <ChevronLeft className="w-6 h-6" />
                 </Button>
                 <span className="text-sm font-mono opacity-80 mx-2">{navigation.current + 1} / {totalQuestions}</span>
-                <Button variant="ghost" size="icon" onClick={handleNext} disabled={navigation.current === totalQuestions - 1} className="text-white hover:bg-white/20 rounded-full h-10 w-10">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={navigation.current === totalQuestions - 1 ? () => handleSubmit(false) : handleNext}
+                  disabled={isSubmitting}
+                  className="text-white hover:bg-white/20 rounded-full h-10 w-10"
+                >
                   <ChevronRight className="w-6 h-6" />
                 </Button>
                 <div className="w-px h-6 bg-white/20 mx-2" />
@@ -837,11 +843,19 @@ export default function ExamLayout() {
 
                 <Button
                   size="lg"
-                  onClick={handleNext}
-                  disabled={navigation.current === totalQuestions - 1 || isSubmitting}
-                  className="rounded-full px-8 bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20"
+                  onClick={navigation.current === totalQuestions - 1 ? () => handleSubmit(false) : handleNext}
+                  disabled={isSubmitting}
+                  className={cn(
+                    "rounded-full px-8 transition-all shadow-lg shadow-primary/20",
+                    navigation.current === totalQuestions - 1
+                      ? (activeSection === 'objective' && hasCqSq ? "bg-indigo-600 hover:bg-indigo-700" : "bg-emerald-600 hover:bg-emerald-700")
+                      : "bg-primary hover:bg-primary/90 text-primary-foreground"
+                  )}
                 >
-                  Next <ChevronRight className="w-4 h-4 ml-2" />
+                  {navigation.current === totalQuestions - 1
+                    ? (activeSection === 'objective' && hasCqSq ? "Proceed to Subjective" : "Submit Exam")
+                    : "Next"}
+                  <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             )}
