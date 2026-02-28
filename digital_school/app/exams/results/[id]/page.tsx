@@ -421,6 +421,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       const originalImg = new Image();
       const annotationImg = new Image();
 
+      // Fix "Tainted Canvas" security error by allowing CORS
+      originalImg.crossOrigin = "anonymous";
+      annotationImg.crossOrigin = "anonymous";
+
       let imagesLoaded = 0;
 
       const checkBothLoaded = () => {
@@ -2093,12 +2097,26 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               </div>
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>
-                                            {subQ.studentAnswer && <div className="text-xs text-muted-foreground mt-1 ps-4">Your Answer: {subQ.studentAnswer}</div>}
 
-                                            {/* Sub-question Images */}
+                                            {/* Sub-question Text Answer */}
+                                            {subQ.studentAnswer ? (
+                                              <div className="mt-2 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm text-sm">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
+                                                </div>
+                                                <div className="text-foreground whitespace-pre-wrap">{subQ.studentAnswer}</div>
+                                              </div>
+                                            ) : (
+                                              <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No text response provided.</div>
+                                            )}
+
+                                            {/* Sub-question Uploaded Images */}
                                             {subQ.studentImages && subQ.studentImages.length > 0 && (
-                                              <div className="mt-2 ps-4">
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                              <div className="mt-3 ps-4">
+                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Visual Evidence
+                                                </div>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                   {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
                                                     const annotation = question.allDrawings?.find(d =>
                                                       d.originalImagePath === imageUrl || (d.imageIndex === imgIdx && (question.type === 'CQ' || question.type === 'SQ'))
