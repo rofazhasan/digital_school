@@ -31,6 +31,7 @@ export async function GET() {
             ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
             ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields, and 'Sub-Question Explanation' for each part."],
+            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-5 including 'Option A-D' and 'Correct Option' for each part."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'."],
             ["DESCRIPTIVE", "Flexible format. Use 'Sub 1 Text', 'Sub 1 Type', etc. Use 'Sub 1 Explanation' for per-part notes."],
             ["Sub-Type Delimiters:", "Use '|' to separate items. For matching/mtf, use '|' for columns and '-' for mapping (e.g. 1-A). For labels: 'Text:x:y|Text:x:y'."],
@@ -54,10 +55,10 @@ export async function GET() {
         const refSheet = workbook.addWorksheet('Valid Classes Reference');
         // Retrieve classes
         const classes = await prisma.class.findMany({ select: { name: true, section: true } });
-        const classNames = classes.map(c => c.section ? `${c.name} - ${c.section}` : c.name);
+        const classNames = classes.map((c: any) => c.section ? `${c.name} - ${c.section}` : c.name);
 
         refSheet.columns = [{ header: 'Valid Classes', key: 'class', width: 50 }];
-        refSheet.addRows(classNames.map(c => [c]));
+        refSheet.addRows(classNames.map((c: string) => [c]));
 
         // Hide it so users don't mess with it, but keep it available for validation logic
         refSheet.state = 'hidden';
@@ -98,20 +99,53 @@ export async function GET() {
             { header: "Model Answer", key: "modelAnswer", width: 20 },
             { header: "Sub-Question 1 Text", key: "sq1Text", width: 25 },
             { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 12 },
+            { header: "Sub-Question 1 Option A", key: "sq1A", width: 15 },
+            { header: "Sub-Question 1 Option B", key: "sq1B", width: 15 },
+            { header: "Sub-Question 1 Option C", key: "sq1C", width: 15 },
+            { header: "Sub-Question 1 Option D", key: "sq1D", width: 15 },
+            { header: "Sub-Question 1 Correct Option", key: "sq1Correct", width: 15 },
             { header: "Sub-Question 1 Model Answer", key: "sq1ModelAnswer", width: 25 },
             { header: "Sub-Question 1 Explanation", key: "sq1Explanation", width: 25 },
+
             { header: "Sub-Question 2 Text", key: "sq2Text", width: 25 },
             { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 12 },
+            { header: "Sub-Question 2 Option A", key: "sq2A", width: 15 },
+            { header: "Sub-Question 2 Option B", key: "sq2B", width: 15 },
+            { header: "Sub-Question 2 Option C", key: "sq2C", width: 15 },
+            { header: "Sub-Question 2 Option D", key: "sq2D", width: 15 },
+            { header: "Sub-Question 2 Correct Option", key: "sq2Correct", width: 15 },
             { header: "Sub-Question 2 Model Answer", key: "sq2ModelAnswer", width: 25 },
             { header: "Sub-Question 2 Explanation", key: "sq2Explanation", width: 25 },
+
             { header: "Sub-Question 3 Text", key: "sq3Text", width: 25 },
             { header: "Sub-Question 3 Marks", key: "sq3Marks", width: 12 },
+            { header: "Sub-Question 3 Option A", key: "sq3A", width: 15 },
+            { header: "Sub-Question 3 Option B", key: "sq3B", width: 15 },
+            { header: "Sub-Question 3 Option C", key: "sq3C", width: 15 },
+            { header: "Sub-Question 3 Option D", key: "sq3D", width: 15 },
+            { header: "Sub-Question 3 Correct Option", key: "sq3Correct", width: 15 },
             { header: "Sub-Question 3 Model Answer", key: "sq3ModelAnswer", width: 25 },
             { header: "Sub-Question 3 Explanation", key: "sq3Explanation", width: 25 },
+
             { header: "Sub-Question 4 Text", key: "sq4Text", width: 25 },
             { header: "Sub-Question 4 Marks", key: "sq4Marks", width: 12 },
+            { header: "Sub-Question 4 Option A", key: "sq4A", width: 15 },
+            { header: "Sub-Question 4 Option B", key: "sq4B", width: 15 },
+            { header: "Sub-Question 4 Option C", key: "sq4C", width: 15 },
+            { header: "Sub-Question 4 Option D", key: "sq4D", width: 15 },
+            { header: "Sub-Question 4 Correct Option", key: "sq4Correct", width: 15 },
             { header: "Sub-Question 4 Model Answer", key: "sq4ModelAnswer", width: 25 },
             { header: "Sub-Question 4 Explanation", key: "sq4Explanation", width: 25 },
+
+            { header: "Sub-Question 5 Text", key: "sq5Text", width: 25 },
+            { header: "Sub-Question 5 Marks", key: "sq5Marks", width: 12 },
+            { header: "Sub-Question 5 Option A", key: "sq5A", width: 15 },
+            { header: "Sub-Question 5 Option B", key: "sq5B", width: 15 },
+            { header: "Sub-Question 5 Option C", key: "sq5C", width: 15 },
+            { header: "Sub-Question 5 Option D", key: "sq5D", width: 15 },
+            { header: "Sub-Question 5 Correct Option", key: "sq5Correct", width: 15 },
+            { header: "Sub-Question 5 Model Answer", key: "sq5ModelAnswer", width: 25 },
+            { header: "Sub-Question 5 Explanation", key: "sq5Explanation", width: 25 },
             // Descriptive Dynamic Sub-fields (Prefixes used in loop below)
             { header: "Sub 1 Explanation", key: "s1Explanation", width: 20 },
             { header: "Sub 2 Explanation", key: "s2Explanation", width: 20 },
@@ -140,10 +174,10 @@ export async function GET() {
             row.getCell(1).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ,DESCRIPTIVE"'],
+                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"'],
                 showErrorMessage: true,
                 errorTitle: 'Invalid Type',
-                error: 'Select: MCQ, MC, INT, AR, MTF, CQ, SQ'
+                error: 'Select: MCQ, MC, INT, AR, MTF, CQ, SQ, SMCQ'
             };
 
             // Class Name Dropdown (Col 2)
@@ -181,6 +215,7 @@ export async function GET() {
         templateSheet.addRow(["INT", sampleClass, "Math", "Algebra", "EASY", 2, "2+2=?", "", "", "", "", "", "", "4"]);
         templateSheet.addRow(["AR", sampleClass, "History", "Events", "MEDIUM", 1, "", "", "", "", "", "", "1", "", "S1 is true", "S2 is reason"]);
         templateSheet.addRow(["MTF", sampleClass, "GK", "Capitals", "MEDIUM", 5, "Match capitals:", "", "", "", "", "", "", "", "", "", "India", "USA", "France", "", "", "Delhi", "Washington", "Paris", "", "", "1-A, 2-B, 3-C"]);
+        templateSheet.addRow(["SMCQ", sampleClass, "Physics", "Thermodynamics", "HARD", 5, "Consider a heat engine...", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Explanation for stem", "", "What is efficiency?", 1, "0.5", "0.5", "0.3", "0.2", "A", "", "Efficiency formula..."]);
         templateSheet.addRow(["DESCRIPTIVE", sampleClass, "Bangla 2nd", "Grammar", "MEDIUM", 10, "Writing & Grammar Part", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Various sub-parts..."]);
 
         // Detailed Descriptive samples are usually easier via JSON, but we can add more specific columns if we expand the template.

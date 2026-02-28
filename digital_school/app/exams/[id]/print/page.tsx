@@ -218,7 +218,8 @@ export default function PrintExamPage() {
                       cq: set.cq || [],
                       sq: set.sq || [],
                       mtf: set.mtf || [],
-                      descriptive: set.descriptive || []
+                      descriptive: set.descriptive || [],
+                      smcq: set.smcq || []
                     }}
                     qrData={set.qrData}
                     fontSize={objectiveFontSize}
@@ -250,7 +251,8 @@ export default function PrintExamPage() {
                     cq: set.cq || [],
                     sq: set.sq || [],
                     mtf: set.mtf || [],
-                    descriptive: set.descriptive || []
+                    descriptive: set.descriptive || [],
+                    smcq: set.smcq || []
                   }}
                   qrData={set.qrData}
                   fontSize={objectiveFontSize}

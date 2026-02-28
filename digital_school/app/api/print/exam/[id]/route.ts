@@ -47,11 +47,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
 
   // Extract subject from questions - get the most common subject or first available
   let examSubject = '';
-  const allQuestions = exam.examSets.flatMap(set => set.questions);
+  const allQuestions = exam.examSets.flatMap((set: any) => set.questions);
   if (allQuestions.length > 0) {
     // Get the most common subject from questions
     const subjectCounts: { [key: string]: number } = {};
-    allQuestions.forEach(q => {
+    allQuestions.forEach((q: any) => {
       if (q.subject) {
         subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
       }
@@ -111,7 +111,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   // Collect all question IDs to fetch fresh difficultyDetail/explanation
   const questionIds = new Set<string>();
 
-  exam.examSets.forEach(set => {
+  exam.examSets.forEach((set: any) => {
     let questionsArr: any[] = [];
     if (set['questionsJson'] && Array.isArray(set['questionsJson'])) {
       questionsArr = set['questionsJson'];
@@ -142,7 +142,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         }
       });
 
-      dbQuestions.forEach(q => {
+      dbQuestions.forEach((q: any) => {
 
       });
     } catch (error) {
@@ -151,7 +151,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   }
 
   // For each set, use questionsJson if present, else fallback to questions relation
-  const sets = exam.examSets.map((set) => {
+  const sets = exam.examSets.map((set: any) => {
     let questionsArr: any[] = [];
     if (set['questionsJson'] && Array.isArray(set['questionsJson'])) {
       questionsArr = set['questionsJson'];
@@ -288,6 +288,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       ...q,
     }));
 
+    const smcq = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'SMCQ').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+      subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions : [],
+    }));
+
     return {
       setId: set.id,
       setName: set.name,
@@ -299,10 +305,11 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       cq,
       sq,
       descriptive,
+      smcq,
       qrData: { examId, setId: set.id, classId: exam.classId },
       barcode: `${examId}|${set.id}|${exam.classId}`,
     };
-  }).filter(set =>
+  }).filter((set: any) =>
     set.mcq?.length ||
     set.mc?.length ||
     set.int?.length ||
@@ -310,7 +317,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     set.mtf?.length ||
     set.cq?.length ||
     set.sq?.length ||
-    set.descriptive?.length
+    set.descriptive?.length ||
+    set.smcq?.length
   );
 
   return NextResponse.json({ examInfo, sets });

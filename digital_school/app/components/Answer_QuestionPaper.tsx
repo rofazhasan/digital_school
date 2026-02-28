@@ -96,6 +96,7 @@ interface AnswerQuestionPaperProps {
     cq: CQ[];
     sq: SQ[];
     descriptive: DESCRIPTIVE[];
+    smcq?: any[];
   };
   qrData: any;
   fontSize?: number;
@@ -255,7 +256,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
       ...(mcs.map(q => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
       ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
       ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
-      ...(mtfs.map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() })))
+      ...(mtfs.map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
+      ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' }))
     ];
 
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
@@ -325,190 +327,252 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               </div>
 
               <div className="mcq-container">
-                {allObjective.map((q: any, idx) => {
-                  const qNum = isEn ? (idx + 1) : toBengaliNumerals(idx + 1);
+                {(() => {
+                  let questionCounter = 1;
+                  return allObjective.map((q: any, idx) => {
+                    const startNum = questionCounter;
+                    if (q.type?.toUpperCase() === 'SMCQ') {
+                      questionCounter += (q.subQuestions?.length || 0);
+                    } else {
+                      questionCounter++;
+                    }
+                    const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
-                  if (q.type === 'MCQ' || q.type === 'MC') {
-                    const totalOptionsLength = (q.options || []).reduce((acc: number, opt: any) => acc + (opt.text || '').length, 0);
-                    let gridClass = "options-grid-4";
-                    if (totalOptionsLength > 60) gridClass = "options-grid-1";
-                    else if (totalOptionsLength > 30) gridClass = "options-grid-2";
+                    if (q.type === 'MCQ' || q.type === 'MC') {
+                      const totalOptionsLength = (q.options || []).reduce((acc: number, opt: any) => acc + (opt.text || '').length, 0);
+                      let gridClass = "options-grid-4";
+                      if (totalOptionsLength > 60) gridClass = "options-grid-1";
+                      else if (totalOptionsLength > 30) gridClass = "options-grid-2";
 
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex items-start">
-                          <span className="font-bold mr-2">
-                            {qNum}.{q.type === 'MC' ? '*' : ''}
-                          </span>
-                          <div className="flex-1">
-                            <div className="mb-1 text-black">
-                              <span className="font-bold text-gray-800">প্রশ্ন: </span>
-                              <Text>{q.q || q.questionText || ''}</Text>
-                            </div>
-                            <div className={`mb-2 ${gridClass} gap-y-1`}>
-                              {(q.options || []).map((opt: any, oidx: number) => (
-                                <div key={oidx} className={`option-item flex items-start gap-1 ${q.type === 'MC' && opt.isCorrect ? 'bg-green-100 border-2 border-green-500 font-bold text-green-800' : ''}`}>
-                                  {q.type === 'MC' && <span>{opt.isCorrect ? '☑' : '☐'}</span>}
-                                  <Text>{`${isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]} ${opt.text}`}</Text>
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex items-start">
+                            <span className="font-bold mr-2">
+                              {qNum}.{q.type === 'MC' ? '*' : ''}
+                            </span>
+                            <div className="flex-1">
+                              <div className="mb-1 text-black">
+                                <span className="font-bold text-gray-800">প্রশ্ন: </span>
+                                <Text>{q.q || q.questionText || ''}</Text>
+                              </div>
+                              <div className={`mb-2 ${gridClass} gap-y-1`}>
+                                {(q.options || []).map((opt: any, oidx: number) => (
+                                  <div key={oidx} className={`option-item flex items-start gap-1 ${q.type === 'MC' && opt.isCorrect ? 'bg-green-100 border-2 border-green-500 font-bold text-green-800' : ''}`}>
+                                    {q.type === 'MC' && <span>{opt.isCorrect ? '☑' : '☐'}</span>}
+                                    <Text>{`${isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]} ${opt.text}`}</Text>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mb-1">
+                                <span className="text-gray-600 font-medium">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)} {isEn ? 'Marks' : 'নম্বর'}]</span>
+                              </div>
+                              <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mb-1">
+                                <span className="text-red-700 font-bold">
+                                  উত্তর: {isEn ? (q.type === 'MCQ' ? (MCQ_LABELS_EN[MCQ_LABELS_BN.indexOf(normalizeAnswer(q.correctAnswer))] || normalizeAnswer(q.correctAnswer)) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_EN[q.options.indexOf(o)]).join(', ')) : (q.type === 'MCQ' ? normalizeAnswer(q.correctAnswer) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_BN[q.options.indexOf(o)]).join(', '))}
+                                </span>
+                              </div>
+                              {q.explanation && (
+                                <div className="mt-1 text-black bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                                  <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
+                                  <UniversalMathJax inline dynamic>
+                                    {cleanupMath(renderDynamicExplanation(
+                                      q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                      q.options,
+                                      q.type
+                                    ))}
+                                  </UniversalMathJax>
                                 </div>
-                              ))}
+                              )}
                             </div>
-                            <div className="mb-1">
-                              <span className="text-gray-600 font-medium">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)} {isEn ? 'Marks' : 'নম্বর'}]</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type === 'INT' || q.type === 'NUMERIC') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <span className="font-bold">{qNum}. </span>
+                              <UniversalMathJax inline>{q.q || q.questionText || ''}</UniversalMathJax>
                             </div>
-                            <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mb-1">
-                              <span className="text-red-700 font-bold">
-                                উত্তর: {isEn ? (q.type === 'MCQ' ? (MCQ_LABELS_EN[MCQ_LABELS_BN.indexOf(normalizeAnswer(q.correctAnswer))] || normalizeAnswer(q.correctAnswer)) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_EN[q.options.indexOf(o)]).join(', ')) : (q.type === 'MCQ' ? normalizeAnswer(q.correctAnswer) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_BN[q.options.indexOf(o)]).join(', '))}
-                              </span>
+                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-green-700">সঠিক উত্তর:</span>
+                              <span className="text-xl font-bold text-green-800">{q.answer || q.modelAnswer || q.correctAnswer || ''}</span>
                             </div>
-                            {q.explanation && (
-                              <div className="mt-1 text-black bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
+                              <p className="font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
+                              <div className="text-blue-900">
                                 <UniversalMathJax inline dynamic>
                                   {cleanupMath(renderDynamicExplanation(
-                                    q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
-                                    q.options,
+                                    q.explanation,
+                                    null,
                                     q.type
                                   ))}
                                 </UniversalMathJax>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  if (q.type === 'INT' || q.type === 'NUMERIC') {
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <span className="font-bold">{qNum}. </span>
-                            <UniversalMathJax inline>{q.q || q.questionText || ''}</UniversalMathJax>
+                    if (q.type === 'AR') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 space-y-1">
+                              <span className="font-bold">{qNum}. </span>
+                              <span className="font-semibold">{isEn ? '(A):' : '(A):'}</span> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
+                              <br />
+                              <span className="font-semibold ml-5">{isEn ? '(R):' : '(R):'}</span> <UniversalMathJax inline>{q.reason}</UniversalMathJax>
+                            </div>
+                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
-                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                        <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-green-700">সঠিক উত্তর:</span>
-                            <span className="text-xl font-bold text-green-800">{q.answer || q.modelAnswer || q.correctAnswer || ''}</span>
-                          </div>
-                        </div>
-                        {q.explanation && (
-                          <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
-                            <p className="font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
-                            <div className="text-blue-900">
-                              <UniversalMathJax inline dynamic>
-                                {cleanupMath(renderDynamicExplanation(
-                                  q.explanation,
-                                  null,
-                                  q.type
-                                ))}
-                              </UniversalMathJax>
+                          <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-green-700">সঠিক বিকল্প:</span>
+                              {(() => {
+                                const cOpt = Number(q.correct || q.correctOption || 0);
+                                return (
+                                  <>
+                                    <span className="text-xl font-bold text-green-800">{toBengaliNumerals(cOpt)}</span>
+                                    <span className="text-sm text-green-600">
+                                      ({cOpt === 1 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা' :
+                                        cOpt === 2 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা নয়' :
+                                          cOpt === 3 ? 'A সত্য, R মিথ্যা' :
+                                            cOpt === 4 ? 'A মিথ্যা, R সত্য' : 'উভয়ই মিথ্যা'})
+                                    </span>
+                                  </>
+                                );
+                              })()}
                             </div>
                           </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  if (q.type === 'AR') {
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1 space-y-1">
-                            <span className="font-bold">{qNum}. </span>
-                            <span className="font-semibold">{isEn ? '(A):' : '(A):'}</span> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
-                            <br />
-                            <span className="font-semibold ml-5">{isEn ? '(R):' : '(R):'}</span> <UniversalMathJax inline>{q.reason}</UniversalMathJax>
-                          </div>
-                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                        <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
-                          <div className="flex items-center gap-2">
-                            <span className="font-bold text-green-700">সঠিক বিকল্প:</span>
-                            {(() => {
-                              const cOpt = Number(q.correct || q.correctOption || 0);
-                              return (
-                                <>
-                                  <span className="text-xl font-bold text-green-800">{toBengaliNumerals(cOpt)}</span>
-                                  <span className="text-sm text-green-600">
-                                    ({cOpt === 1 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা' :
-                                      cOpt === 2 ? 'A ও R সত্য, R হলো A এর সঠিক ব্যাখ্যা নয়' :
-                                        cOpt === 3 ? 'A সত্য, R মিথ্যা' :
-                                          cOpt === 4 ? 'A মিথ্যা, R সত্য' : 'উভয়ই মিথ্যা'})
-                                  </span>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                        {q.explanation && (
-                          <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
-                            <p className="font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
-                            <div className="text-blue-900">
-                              <UniversalMathJax inline dynamic>
-                                {cleanupMath(renderDynamicExplanation(
-                                  q.explanation,
-                                  null,
-                                  q.type
-                                ))}
-                              </UniversalMathJax>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  if (q.type === 'MTF') {
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-bold">{qNum}. {isEn ? 'Match the Columns:' : 'স্তম্ভদ্বয় মিল করো:'}</span>
-                          <span className="font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                        <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
-                          {((q.leftColumn || []) as any[]).map((leftItem: any, lIdx: number) => {
-                            const rightId = (q.matches || {})[leftItem.id];
-                            const rightIdx = (q.rightColumn || []).findIndex((r: any) => r.id === rightId);
-                            const rightItem = (q.rightColumn || [])[rightIdx];
-
-                            // Visual labels
-                            const vLeftLabel = isEn ? (lIdx + 1) : toBengaliNumerals(lIdx + 1);
-                            const vRightLabel = rightIdx !== -1 ? String.fromCharCode(65 + rightIdx) : '?';
-
-                            return (
-                              <div key={lIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
-                                <span className="font-bold text-green-700">{vLeftLabel}</span>
-                                <span>→</span>
-                                <span className="text-black font-medium">
-                                  (<UniversalMathJax inline>{leftItem?.text || ''}</UniversalMathJax> - <UniversalMathJax inline>{rightItem?.text || ''}</UniversalMathJax>)
-                                </span>
+                          {q.explanation && (
+                            <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
+                              <p className="font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
+                              <div className="text-blue-900">
+                                <UniversalMathJax inline dynamic>
+                                  {cleanupMath(renderDynamicExplanation(
+                                    q.explanation,
+                                    null,
+                                    q.type
+                                  ))}
+                                </UniversalMathJax>
                               </div>
-                            );
-                          })}
+                            </div>
+                          )}
                         </div>
-                        {q.explanation && (
-                          <div className="mt-2 ml-6 p-2 bg-blue-50 border border-blue-100 rounded">
-                            <span className="font-bold text-blue-700">ব্যাখ্যা:</span>{" "}
-                            <UniversalMathJax inline dynamic>
-                              {cleanupMath(renderDynamicExplanation(
-                                q.explanation,
-                                null,
-                                q.type,
-                                q.rightColumn
-                              ))}
-                            </UniversalMathJax>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  return null;
-                })}
+                    if (q.type === 'MTF') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold">{qNum}. {isEn ? 'Match the Columns:' : 'স্তম্ভদ্বয় মিল করো:'}</span>
+                            <span className="font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-6 grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {((q.leftColumn || []) as any[]).map((leftItem: any, lIdx: number) => {
+                              const rightId = (q.matches || {})[leftItem.id];
+                              const rightIdx = (q.rightColumn || []).findIndex((r: any) => r.id === rightId);
+                              const rightItem = (q.rightColumn || [])[rightIdx];
+
+                              // Visual labels
+                              const vLeftLabel = isEn ? (lIdx + 1) : toBengaliNumerals(lIdx + 1);
+                              const vRightLabel = rightIdx !== -1 ? String.fromCharCode(65 + rightIdx) : '?';
+
+                              return (
+                                <div key={lIdx} className="flex items-center gap-2 p-2 bg-green-50 border border-green-200 rounded">
+                                  <span className="font-bold text-green-700">{vLeftLabel}</span>
+                                  <span>→</span>
+                                  <span className="text-black font-medium">
+                                    (<UniversalMathJax inline>{leftItem?.text || ''}</UniversalMathJax> - <UniversalMathJax inline>{rightItem?.text || ''}</UniversalMathJax>)
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 ml-6 p-2 bg-blue-50 border border-blue-100 rounded">
+                              <span className="font-bold text-blue-700">ব্যাখ্যা:</span>{" "}
+                              <UniversalMathJax inline dynamic>
+                                {cleanupMath(renderDynamicExplanation(
+                                  q.explanation,
+                                  null,
+                                  q.type,
+                                  q.rightColumn
+                                ))}
+                              </UniversalMathJax>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'SMCQ') {
+                      const endNum = questionCounter - 1;
+                      const rangeStr = startNum === endNum ? qNum : (isEn ? `${startNum}-${endNum}` : `${toBengaliNumerals(startNum)}-${toBengaliNumerals(endNum)}`);
+                      return (
+                        <div key={idx} className="mb-6 question-block break-inside-avoid">
+                          <div className="bg-gray-50 p-2 border-l-4 border-black mb-3 italic text-sm">
+                            <p className="font-bold mb-1">{isEn ? `Stem for questions ${rangeStr}:` : `${rangeStr} নং প্রশ্নের উদ্দীপক:`}</p>
+                            <div className="not-italic">
+                              <Text>{q.q || q.questionText || q.stem || ''}</Text>
+                            </div>
+                          </div>
+                          <div className="space-y-4">
+                            {(q.subQuestions || []).map((sub: any, sIdx: number) => {
+                              const subNum = startNum + sIdx;
+                              const subNumStr = isEn ? String(subNum) : toBengaliNumerals(subNum);
+
+                              let correctAns = sub.correctAnswer;
+                              if (correctAns === undefined && Array.isArray(sub.options)) {
+                                const correctIdx = sub.options.findIndex((o: any) => o.isCorrect);
+                                if (correctIdx !== -1) {
+                                  correctAns = isEn ? MCQ_LABELS_EN[correctIdx] : MCQ_LABELS_BN[correctIdx];
+                                }
+                              }
+                              correctAns = normalizeAnswer(correctAns);
+                              if (isEn) {
+                                const idxL = MCQ_LABELS_BN.indexOf(correctAns);
+                                if (idxL !== -1) correctAns = MCQ_LABELS_EN[idxL];
+                              }
+
+                              return (
+                                <div key={sIdx} className="mb-4 text-left border-l-2 border-red-200 pl-3">
+                                  <div className="flex items-start">
+                                    <span className="font-bold mr-2">{subNumStr}.</span>
+                                    <div className="flex-1">
+                                      <div className="mb-1"><Text>{sub.questionText || sub.question || sub.text || ''}</Text></div>
+                                      <div className="bg-green-50 p-1 border-l-4 border-green-600 inline-block">
+                                        <span className="text-green-700 font-bold">উত্তর: {correctAns}</span>
+                                      </div>
+                                      {sub.explanation && (
+                                        <div className="mt-1 text-xs text-gray-600 bg-gray-50 p-1 rounded italic">
+                                          <span className="font-bold">ব্যাখ্যা:</span> <Text>{sub.explanation}</Text>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  });
+                })()}
               </div>
             </div>
           )}

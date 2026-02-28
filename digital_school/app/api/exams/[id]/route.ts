@@ -174,6 +174,18 @@ export async function PUT(
         return rest;
       }
 
+      // 3. Shuffle sub-questions and their options for SMCQ
+      if (processedQuestion.type === 'SMCQ' && processedQuestion.subQuestions && Array.isArray(processedQuestion.subQuestions)) {
+        processedQuestion.subQuestions = processedQuestion.subQuestions.map((sq: any, idx: number) => ({
+          ...sq,
+          originalIndex: idx,
+          options: sq.options && Array.isArray(sq.options)
+            ? shuffleArray(sq.options.map((opt: any, oidx: number) => ({ ...opt, originalIndex: oidx })))
+            : sq.options
+        }));
+        processedQuestion.subQuestions = shuffleArray(processedQuestion.subQuestions);
+      }
+
       return processedQuestion;
     });
 
@@ -266,6 +278,18 @@ export async function POST(
           }));
           processedQuestion.rightColumn = shuffleArray(processedQuestion.rightColumn);
         }
+      }
+
+      // 3. Shuffle sub-questions and their options for SMCQ
+      if (processedQuestion.type === 'SMCQ' && processedQuestion.subQuestions && Array.isArray(processedQuestion.subQuestions)) {
+        processedQuestion.subQuestions = processedQuestion.subQuestions.map((sq: any, idx: number) => ({
+          ...sq,
+          originalIndex: idx,
+          options: sq.options && Array.isArray(sq.options)
+            ? shuffleArray(sq.options.map((opt: any, oidx: number) => ({ ...opt, originalIndex: oidx })))
+            : sq.options
+        }));
+        processedQuestion.subQuestions = shuffleArray(processedQuestion.subQuestions);
       }
 
       if (processedQuestion.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {

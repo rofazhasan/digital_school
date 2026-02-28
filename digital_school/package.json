@@ -175,12 +175,13 @@
     "zod": "^3.25.67"
   },
   "optionalDependencies": {
+    "@img/sharp-libvips-linux-x64": "1.2.4",
     "@next/swc-linux-x64-gnu": "15.5.12",
-    "@next/swc-linux-x64-musl": "15.5.12",
-    "@img/sharp-libvips-linux-x64": "1.2.4"
+    "@next/swc-linux-x64-musl": "15.5.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@netlify/plugin-nextjs": "5.15.8",
     "@testing-library/jest-dom": "6.6.4",
     "@types/lodash.debounce": "^4.0.9",
     "@types/nodemailer": "7.0.11",

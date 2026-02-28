@@ -5,7 +5,7 @@ import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 // Helper to separate validation logic
@@ -33,7 +33,7 @@ const getValue = (row: any, keys: string[]) => {
 async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
-    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'DESCRIPTIVE'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
+    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
     const diffRaw = s(getValue(row, ["Difficulty", "Level", "Diff"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';
@@ -61,7 +61,7 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
     };
 
     try {
-        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'DESCRIPTIVE'].includes(typeRaw)) {
+        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE'].includes(typeRaw)) {
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
@@ -185,6 +185,39 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             }
 
             if (data.subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
+        } else if (data.type === 'SMCQ') {
+            data.subQuestions = [];
+            for (let i = 1; i <= 5; i++) {
+                const q = s(getValue(row, [`Sub-Question ${i} Text`, `Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
+                if (!q) continue;
+
+                const m = n(getValue(row, [`Sub-Question ${i} Marks`, `SQ${i} Marks`])) || 1;
+                const optA = s(getValue(row, [`Sub-Question ${i} Option A`, `SQ${i}A`, `Sub ${i} A`]));
+                const optB = s(getValue(row, [`Sub-Question ${i} Option B`, `SQ${i}B`, `Sub ${i} B`]));
+                const optC = s(getValue(row, [`Sub-Question ${i} Option C`, `SQ${i}C`, `Sub ${i} C`]));
+                const optD = s(getValue(row, [`Sub-Question ${i} Option D`, `SQ${i}D`, `Sub ${i} D`]));
+
+                const correctOptRaw = s(getValue(row, [`Sub-Question ${i} Correct Option`, `SQ${i} Correct`, `Sub ${i} Ans`])).toUpperCase();
+                let correctIdx = -1;
+                if (/^[A-D]$/.test(correctOptRaw)) {
+                    correctIdx = ['A', 'B', 'C', 'D'].indexOf(correctOptRaw);
+                } else {
+                    correctIdx = n(correctOptRaw) - 1;
+                }
+
+                if (correctIdx < 0 || correctIdx > 3) throw new Error(`SMCQ Sub-Question ${i} requires a correct option (A-D or 1-4)`);
+
+                const options = [
+                    { text: optA, isCorrect: correctIdx === 0 },
+                    { text: optB, isCorrect: correctIdx === 1 },
+                ];
+                if (optC) options.push({ text: optC, isCorrect: correctIdx === 2 });
+                if (optD) options.push({ text: optD, isCorrect: correctIdx === 3 });
+
+                data.subQuestions.push({ question: q, marks: m, options });
+            }
+
+            if (data.subQuestions.length === 0) throw new Error("SMCQ requires at least one Sub-Question");
         } else if (data.type === 'DESCRIPTIVE') {
             data.subQuestions = [];
             for (let i = 1; i <= 10; i++) {
@@ -387,7 +420,10 @@ export async function POST(req: NextRequest) {
                             /\\/.test(q.assertion || '') ||
                             /\\/.test(q.reason || '') ||
                             (q.options ? q.options.some((o: any) => /\\/.test(o.text)) : false) ||
-                            (q.subQuestions ? q.subQuestions.some((sq: any) => /\\/.test(sq.question)) : false)
+                            (q.subQuestions ? q.subQuestions.some((sq: any) =>
+                                /\\/.test(sq.question) ||
+                                (sq.options ? sq.options.some((o: any) => /\\/.test(o.text)) : false)
+                            ) : false)
                         )
                     });
                 } catch (err: any) {

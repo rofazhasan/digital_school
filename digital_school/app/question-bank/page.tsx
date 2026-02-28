@@ -44,7 +44,7 @@ import { Capacitor } from "@capacitor/core";
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram';
@@ -1138,6 +1138,37 @@ const QuestionCard: React.FC<{
             </div>
           )}
 
+          {/* SMCQ Sub questions */}
+          {question.type === 'SMCQ' && (
+            <div className="space-y-3 mt-2">
+              {((question.subQuestions || [])).map((sq: any, i: number) => (
+                <div key={i} className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-800/50 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-3 flex-1">
+                      <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-600 text-white flex items-center justify-center text-[10px] font-black mt-0.5">
+                        {i + 1}
+                      </span>
+                      <div className="text-sm font-bold text-gray-800 dark:text-gray-200">
+                        <UniversalMathJax>{sq.question || ''}</UniversalMathJax>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[10px] font-black">{sq.marks}M</Badge>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 pl-8">
+                    {(sq.options || []).map((opt: any, oi: number) => (
+                      <div key={oi} className={`text-[11px] p-2 rounded-lg border flex items-center gap-2 ${opt.isCorrect ? 'bg-green-50/50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-white dark:bg-gray-900/20 border-gray-100 dark:border-gray-800'}`}>
+                        <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold ${opt.isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                          {String.fromCharCode(65 + oi)}
+                        </span>
+                        <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* SQ Model Answer */}
           {question.type === 'SQ' && question.modelAnswer && (
             <div className="mt-3">
@@ -2030,6 +2061,11 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         { subType: 'writing', label: '১. অনুচ্ছেদ রচনা', marks: 10, writingType: 'paragraph', instructions: 'নিচের যেকোনো একটি বিষয়ে অনুচ্ছেদ লেখো:' },
       ]
   );
+  const [smcqQuestions, setSmcqQuestions] = useState<{ question: string; marks: number; options: { text: string; isCorrect: boolean }[]; image?: string }[]>(
+    type === 'SMCQ' && initialData?.subQuestions
+      ? (initialData.subQuestions as any)
+      : [{ question: '', marks: 1, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }] }]
+  );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState<number>(initialData?.modelAnswer ? parseInt(initialData.modelAnswer) : 0);
   const [assertion, setAssertion] = useState(initialData?.assertion || '');
@@ -2075,9 +2111,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       subQuestions,
       modelAnswer,
       images,
+      smcqQuestions: smcqQuestions.length,
       classes: classes.length
     });
-  }, [type, questionText, subject, topic, marks, difficulty, classId, questionBankIds, options, subQuestions, modelAnswer, images, classes.length]);
+  }, [type, questionText, subject, topic, marks, difficulty, classId, questionBankIds, options, subQuestions, modelAnswer, images, smcqQuestions, classes.length]);
 
   const handleInsertSymbol = useCallback((symbol: string) => {
     if (!activeTextarea || !activeTextarea.setter) return;
@@ -2294,6 +2331,14 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         marks: Number(sq.marks),
         modelAnswer: sq.modelAnswer?.trim() || undefined,
         image: sq.image || undefined
+      })) : type === 'SMCQ' ? smcqQuestions.map(sq => ({
+        question: sq.question.trim(),
+        marks: Number(sq.marks),
+        options: sq.options.map(opt => ({
+          text: opt.text.trim(),
+          isCorrect: opt.isCorrect
+        })),
+        image: sq.image || undefined
       })) : type === 'DESCRIPTIVE' ? descriptiveParts : null,
       modelAnswer: type === 'SQ' && modelAnswer.trim() !== '' ? modelAnswer.trim() :
         type === 'INT' ? correctAnswer.toString() : null,
@@ -2358,7 +2403,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>
@@ -2706,6 +2751,66 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 ))}
                 <Button type="button" variant="outline" size="sm" onClick={() => setSubQuestions([...(subQuestions || []), { question: '', marks: 5, modelAnswer: '', image: '' }])}>
                   <PlusCircle className="mr-2 h-4 w-4" />Add Sub-question
+                </Button>
+              </div>
+            )}
+            {type === 'SMCQ' && (
+              <div className="space-y-4">
+                <Label className="text-sm font-bold text-indigo-700 dark:text-indigo-400">SMCQ Sub-questions (Multiple Choice)</Label>
+                {(smcqQuestions || []).map((sq, i) => (
+                  <div key={i} className="space-y-3 p-4 border rounded-md bg-white dark:bg-gray-900 shadow-sm">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-bold text-gray-500 uppercase">Question {i + 1}</Label>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => setSmcqQuestions(smcqQuestions.filter((_, idx) => i !== idx))}>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                    <MathToolbar onInsert={handleInsertSymbol} />
+                    <Textarea
+                      ref={el => { textareaRefs.current[`smcq-q-${i}`] = el; }}
+                      onFocus={makeFocusHandler(`smcq-q-${i}`, (newText) => { const newSQs = [...smcqQuestions]; newSQs[i].question = newText; setSmcqQuestions(newSQs); })}
+                      value={sq.question}
+                      onChange={e => { const newSQs = [...smcqQuestions]; newSQs[i].question = e.target.value; setSmcqQuestions(newSQs); }}
+                      placeholder="Enter sub-question text..."
+                      rows={2}
+                      className="text-sm"
+                    />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                      {sq.options.map((opt, oi) => (
+                        <div key={oi} className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 p-2 rounded-md border border-gray-100 dark:border-gray-800">
+                          <Checkbox checked={opt.isCorrect} onCheckedChange={() => {
+                            const newSQs = [...smcqQuestions];
+                            newSQs[i].options = newSQs[i].options.map((o, idx) => ({ ...o, isCorrect: oi === idx }));
+                            setSmcqQuestions(newSQs);
+                          }} />
+                          <Input
+                            value={opt.text}
+                            onChange={e => {
+                              const newSQs = [...smcqQuestions];
+                              newSQs[i].options[oi].text = e.target.value;
+                              setSmcqQuestions(newSQs);
+                            }}
+                            placeholder={`Option ${String.fromCharCode(65 + oi)}`}
+                            className="h-8 text-xs border-none bg-transparent focus-visible:ring-0 px-0"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-4 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <div className="flex items-center gap-2">
+                        <Label className="text-[10px] uppercase text-gray-400">Marks</Label>
+                        <Input
+                          type="number"
+                          value={sq.marks}
+                          onChange={e => { const newSQs = [...smcqQuestions]; newSQs[i].marks = Number(e.target.value); setSmcqQuestions(newSQs); }}
+                          className="w-16 h-7 text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" className="w-full border-dashed" onClick={() => setSmcqQuestions([...(smcqQuestions || []), { question: '', marks: 1, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }] }])}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Sub-question
                 </Button>
               </div>
             )}

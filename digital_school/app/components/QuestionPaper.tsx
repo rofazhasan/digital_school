@@ -89,6 +89,7 @@ interface QuestionPaperProps {
     cq: CQ[];
     sq: SQ[];
     descriptive: DESCRIPTIVE[];
+    smcq?: any[];
   };
   qrData: any;
   fontSize?: number;
@@ -243,7 +244,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
       ...(mcs.map(q => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
       ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
       ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
-      ...(questions.mtf || []).map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))
+      ...(questions.mtf || []).map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() })),
+      ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' }))
     ];
 
     const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
@@ -337,117 +339,178 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
             <div style={{ fontSize: fontSize ? `${fontSize}%` : '100%' }}>
 
               <div className="mcq-container">
-                {allObjective.map((q: any, idx) => {
-                  const qNum = isEn ? String(idx + 1) : toBengaliNumerals(idx + 1);
+                {(() => {
+                  let questionCounter = 1;
+                  return allObjective.map((q: any, idx) => {
+                    const startNum = questionCounter;
+                    if (q.type?.toUpperCase() === 'SMCQ') {
+                      questionCounter += (q.subQuestions?.length || 0);
+                    } else {
+                      questionCounter++;
+                    }
+                    const qNum = isEn ? String(startNum) : toBengaliNumerals(startNum);
 
-                  if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
-                    // Column count based on max single option length (Bengali chars ~2x wider)
-                    // 4-col: all options very short (≤4 chars) - single syllable words
-                    // 2-col: options up to 15 chars - most standard MCQ options
-                    // 1-col: options longer than 15 chars - phrases/sentences
-                    const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
-                    let gridClass = "options-grid-2"; // default: 2-col (standard BD exam format)
-                    if (maxOptLen <= 4) gridClass = "options-grid-4";  // very short: 4-col
-                    else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
+                    if (q.type?.toUpperCase() === 'MCQ' || q.type?.toUpperCase() === 'MC') {
+                      // Column count based on max single option length (Bengali chars ~2x wider)
+                      // 4-col: all options very short (≤4 chars) - single syllable words
+                      // 2-col: options up to 15 chars - most standard MCQ options
+                      // 1-col: options longer than 15 chars - phrases/sentences
+                      const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
+                      let gridClass = "options-grid-2"; // default: 2-col (standard BD exam format)
+                      if (maxOptLen <= 4) gridClass = "options-grid-4";  // very short: 4-col
+                      else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
 
-                    return (
-                      <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
-                        <div className="flex items-start">
-                          <span className="font-bold mr-2">
-                            {qNum}.{q.type?.toUpperCase() === 'MC' ? '*' : ''}
-                          </span>
-                          <div className="flex-1">
-                            <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
-                            {q.type?.toUpperCase() === 'MC' && <div className="text-blue-700 font-bold mb-1">{isEn ? '[Select all correct answers]' : '[সকল সঠিক উত্তর নির্বাচন করো]'}</div>}
-                            <div className={`mt-1 ${gridClass}`}>
-                              {(q.options || []).map((opt: any, oidx: number) => (
-                                <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
-                                  {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
-                                  <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
-                                  <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
+                      return (
+                        <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
+                          <div className="flex items-start">
+                            <span className="font-bold mr-2">
+                              {qNum}.{q.type?.toUpperCase() === 'MC' ? '*' : ''}
+                            </span>
+                            <div className="flex-1">
+                              <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
+                              {q.type?.toUpperCase() === 'MC' && <div className="text-blue-700 font-bold mb-1">{isEn ? '[Select all correct answers]' : '[সকল সঠিক উত্তর নির্বাচন করো]'}</div>}
+                              <div className={`mt-1 ${gridClass}`}>
+                                {(q.options || []).map((opt: any, oidx: number) => (
+                                  <div key={oidx} className="option-item flex items-start gap-0.5" style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                                    {q.type?.toUpperCase() === 'MC' && <span className="flex-shrink-0">☐</span>}
+                                    <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
+                                    <span className="flex-1" style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'INT' || q.type?.toUpperCase() === 'NUMERIC') {
+                      return (
+                        <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <span className="font-bold">{qNum}. </span>
+                              <UniversalMathJax inline>{q.q || q.questionText || ''}</UniversalMathJax>
+                              <div className="mt-2 ml-6 flex items-center gap-2">
+                                <span className="font-bold text-gray-800">{isEn ? 'Answer:' : 'উত্তর:'} </span>
+                                <div className="border border-black w-12 h-8 flex items-center justify-center font-bold"></div>
+                              </div>
+                            </div>
+                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'AR') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start mb-2">
+                            <div className="flex-1 space-y-1">
+                              <span className="font-bold">{qNum}. </span>
+                              <strong>{isEn ? 'Assertion:' : 'নিশ্চয়তা (Assertion):'}</strong> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
+                              <br />
+                              <span className="ml-6"><strong>{isEn ? 'Reason:' : 'কারণ (Reason):'}</strong> <UniversalMathJax inline>{q.reason}</UniversalMathJax></span>
+                            </div>
+                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-6 grid grid-cols-1 gap-1 border-l-2 border-gray-200 pl-3">
+                            <div>{isEn ? 'a Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'কAssertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।'}</div>
+                            <div>{isEn ? 'b Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'খAssertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।'}</div>
+                            <div>{isEn ? 'c Assertion is true but Reason is false.' : 'গAssertion সত্য কিন্তু Reason মিথ্যা।'}</div>
+                            <div>{isEn ? 'd Assertion is false but Reason is true.' : 'ঘAssertion মিথ্যা কিন্তু Reason সত্য।'}</div>
+                            <div>{isEn ? 'e Both Assertion and Reason are false.' : 'ঙAssertion ও Reason উভয়ই মিথ্যা।'}</div>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'MTF') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="font-bold">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
+                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
+                            <div className="border-r border-black pr-2">
+                              <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column A' : 'স্তম্ভ ক'}</p>
+                              {(q.leftColumn || []).map((item: any, i: number) => (
+                                <div key={i} className="flex gap-1">
+                                  <span className="font-bold">{toBengaliNumerals(i + 1)}</span>
+                                  <UniversalMathJax inline>{item.text}</UniversalMathJax>
+                                </div>
+                              ))}
+                            </div>
+                            <div>
+                              <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column B' : 'স্তম্ভ খ'}</p>
+                              {(q.rightColumn || []).map((item: any, i: number) => (
+                                <div key={i} className="flex gap-1">
+                                  <span className="font-bold">{String.fromCharCode(65 + i)}</span>
+                                  <UniversalMathJax inline>{item.text}</UniversalMathJax>
                                 </div>
                               ))}
                             </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  if (q.type?.toUpperCase() === 'INT' || q.type?.toUpperCase() === 'NUMERIC') {
-                    return (
-                      <div key={idx} className="mb-4 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <span className="font-bold">{qNum}. </span>
-                            <UniversalMathJax inline>{q.q || q.questionText || ''}</UniversalMathJax>
-                            <div className="mt-2 ml-6 flex items-center gap-2">
-                              <span className="font-bold text-gray-800">{isEn ? 'Answer:' : 'উত্তর:'} </span>
-                              <div className="border border-black w-12 h-8 flex items-center justify-center font-bold"></div>
+                    if (q.type?.toUpperCase() === 'SMCQ') {
+                      const endNum = questionCounter - 1;
+                      const rangeStr = startNum === endNum ? qNum : (isEn ? `${startNum}-${endNum}` : `${toBengaliNumerals(startNum)}-${toBengaliNumerals(endNum)}`);
+                      return (
+                        <div key={idx} className="mb-6 question-block break-inside-avoid">
+                          <div className="bg-gray-50 p-2 border-l-4 border-black mb-3 italic text-sm">
+                            <p className="font-bold mb-2">
+                              {isEn ? `Read the following stem and answer questions ${rangeStr}:` : `নিচের উদ্দীপকটি পড়ো এবং ${rangeStr} নং প্রশ্নের উত্তর দাও:`}
+                            </p>
+                            <div className="not-italic font-normal">
+                              <Text>{q.q || q.questionText || q.stem || ''}</Text>
+                              {q.image && (
+                                <div className="mt-2 text-center">
+                                  <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />
+                                </div>
+                              )}
                             </div>
                           </div>
-                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                      </div>
-                    );
-                  }
+                          <div className="space-y-4">
+                            {(q.subQuestions || []).map((sub: any, sIdx: number) => {
+                              const subNum = startNum + sIdx;
+                              const subNumStr = isEn ? String(subNum) : toBengaliNumerals(subNum);
 
-                  if (q.type?.toUpperCase() === 'AR') {
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start mb-2">
-                          <div className="flex-1 space-y-1">
-                            <span className="font-bold">{qNum}. </span>
-                            <strong>{isEn ? 'Assertion:' : 'নিশ্চয়তা (Assertion):'}</strong> <UniversalMathJax inline>{q.assertion}</UniversalMathJax>
-                            <br />
-                            <span className="ml-6"><strong>{isEn ? 'Reason:' : 'কারণ (Reason):'}</strong> <UniversalMathJax inline>{q.reason}</UniversalMathJax></span>
-                          </div>
-                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                        <div className="ml-6 grid grid-cols-1 gap-1 border-l-2 border-gray-200 pl-3">
-                          <div>{isEn ? 'a Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'কAssertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।'}</div>
-                          <div>{isEn ? 'b Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'খAssertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।'}</div>
-                          <div>{isEn ? 'c Assertion is true but Reason is false.' : 'গAssertion সত্য কিন্তু Reason মিথ্যা।'}</div>
-                          <div>{isEn ? 'd Assertion is false but Reason is true.' : 'ঘAssertion মিথ্যা কিন্তু Reason সত্য।'}</div>
-                          <div>{isEn ? 'e Both Assertion and Reason are false.' : 'ঙAssertion ও Reason উভয়ই মিথ্যা।'}</div>
-                        </div>
-                      </div>
-                    );
-                  }
+                              const maxOptLen = (sub.options || []).reduce((max: number, opt: any) => Math.max(max, (typeof opt === 'string' ? opt : opt.text || opt || '').length), 0);
+                              let gridClass = "options-grid-2";
+                              if (maxOptLen <= 4) gridClass = "options-grid-4";
+                              else if (maxOptLen > 15) gridClass = "options-grid-1";
 
-                  if (q.type?.toUpperCase() === 'MTF') {
-                    return (
-                      <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                        <div className="flex justify-between items-start mb-2">
-                          <span className="font-bold">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
-                          <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
-                          <div className="border-r border-black pr-2">
-                            <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column A' : 'স্তম্ভ ক'}</p>
-                            {(q.leftColumn || []).map((item: any, i: number) => (
-                              <div key={i} className="flex gap-1">
-                                <span className="font-bold">{toBengaliNumerals(i + 1)}</span>
-                                <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                              </div>
-                            ))}
-                          </div>
-                          <div>
-                            <p className="font-bold text-center border-b border-black mb-1">{isEn ? 'Column B' : 'স্তম্ভ খ'}</p>
-                            {(q.rightColumn || []).map((item: any, i: number) => (
-                              <div key={i} className="flex gap-1">
-                                <span className="font-bold">{String.fromCharCode(65 + i)}</span>
-                                <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                              </div>
-                            ))}
+                              return (
+                                <div key={sIdx} className="mb-4 text-left break-inside-avoid">
+                                  <div className="flex items-start">
+                                    <span className="font-bold mr-2">{subNumStr}.</span>
+                                    <div className="flex-1">
+                                      <Text>{`${sub.questionText || sub.question || sub.text || ''} [${toBengaliNumerals(sub.marks || 1)}]`}</Text>
+                                      <div className={`mt-1 ${gridClass}`}>
+                                        {(sub.options || []).map((opt: any, oidx: number) => (
+                                          <div key={oidx} className="option-item flex items-start gap-0.5">
+                                            <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
+                                            <span className="flex-1"><Text>{typeof opt === 'string' ? opt : opt.text}</Text></span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
-                      </div>
-                    );
-                  }
+                      );
+                    }
 
-                  return null;
-                })}
+                    return null;
+                  });
+                })()}
               </div>
             </div>
           )}

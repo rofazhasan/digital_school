@@ -30,7 +30,7 @@ export function isMCQOnlyExam(exam: any, examSets: any[] = []): boolean {
 
             const hasNonMCQ = questions.some((q: any) => {
                 const type = (q.type || q.questionType || '').toUpperCase();
-                return type === 'CQ' || type === 'SQ';
+                return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
             });
 
             if (hasNonMCQ) return false;
@@ -162,6 +162,44 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
+            } else if (type === 'SMCQ') {
+                if (!question.subQuestions) continue;
+                let smcqScore = 0;
+                question.subQuestions.forEach((subQ: any, sIdx: number) => {
+                    const subAnswer = answers[`${question.id}_sub_${sIdx}`];
+                    if (!subAnswer) return;
+
+                    const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                    const userAns = normalize(subAnswer);
+                    let isCorrect = false;
+
+                    if (subQ.options && Array.isArray(subQ.options)) {
+                        const correctOption = subQ.options.find((opt: any) => opt.isCorrect);
+                        if (correctOption) {
+                            const correctOptionText = normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
+                            isCorrect = userAns === correctOptionText;
+                        }
+                    }
+
+                    if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+                        const correctIndex = Number(subQ.correctAnswer);
+                        if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
+                            const opt = subQ.options[correctIndex];
+                            const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
+                            isCorrect = userAns === correctText;
+                        } else {
+                            isCorrect = userAns === normalize(subQ.correctAnswer);
+                        }
+                    }
+
+                    if (isCorrect) {
+                        smcqScore += Number(subQ.marks) || 1;
+                    } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                        smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+                    }
+                });
+                mcqMarks += smcqScore;
+                totalScore += smcqScore;
             } else if (type === 'MTF') {
                 const hasMatchSet = studentAnswer && (Array.isArray(studentAnswer.matches) ? studentAnswer.matches.length > 0 : Object.keys(studentAnswer).length > 0);
                 if (!hasMatchSet) continue;

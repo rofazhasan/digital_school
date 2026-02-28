@@ -116,7 +116,7 @@ interface StudentSubmission {
 
 interface Question {
   id: string;
-  type: 'mcq' | 'cq' | 'sq' | 'mc' | 'ar' | 'mtf' | 'int' | 'numeric' | 'descriptive';
+  type: 'mcq' | 'smcq' | 'cq' | 'sq' | 'mc' | 'ar' | 'mtf' | 'int' | 'numeric' | 'descriptive';
   text: string;
   marks: number;
   correct?: any;
@@ -194,7 +194,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive'>('all');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive'>('all');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -893,6 +893,67 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   )
                                 })}
                               </div>}
+
+                              {/* Show options if SMCQ */}
+                              {(q?.type || "").toLowerCase() === 'smcq' && q?.subQuestions && (
+                                <div className="mt-4 space-y-4">
+                                  {(q.subQuestions || []).map((sub: any, si: number) => {
+                                    const subAns = selectedLiveStudent?.answers?.[`${q.id}_sub_${si}`];
+                                    const hasSubAns = subAns !== undefined && subAns !== null && subAns !== "";
+
+                                    // Quick correctness check for UI
+                                    let isSubCorrect = false;
+                                    if (sub.options && Array.isArray(sub.options)) {
+                                      const correctOpt = sub.options.find((opt: any) => opt.isCorrect);
+                                      if (correctOpt) {
+                                        const correctText = String(typeof correctOpt === 'object' ? correctOpt.text : correctOpt).trim().toLowerCase();
+                                        if (String(subAns || "").trim().toLowerCase() === correctText) isSubCorrect = true;
+                                      }
+                                    }
+                                    if (!isSubCorrect && sub.correctAnswer !== undefined) {
+                                      if (String(subAns || "").trim().toLowerCase() === String(sub.correctAnswer).trim().toLowerCase()) isSubCorrect = true;
+                                    }
+
+                                    return (
+                                      <div key={si} className="pl-3 border-l-2 border-primary/20 space-y-2">
+                                        <div className="text-xs font-semibold flex items-center justify-between">
+                                          <div className="flex items-center gap-2">
+                                            <span className="bg-muted px-1.5 py-0.5 rounded text-[10px]">{si + 1}</span>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(sub.text || sub.questionText || '')}</UniversalMathJax>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {hasSubAns && (isSubCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : <XCircle className="h-3 w-3 text-red-600" />)}
+                                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{sub.marks || 1} M</span>
+                                          </div>
+                                        </div>
+                                        {hasSubAns && (
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                            {(sub.options || []).map((opt: any, oi: number) => {
+                                              const optText = typeof opt === 'object' ? opt.text : opt;
+                                              const isSelected = String(subAns || "") === String(optText);
+                                              const isCorrect = opt.isCorrect || (sub.correctAnswer !== undefined && (String(sub.correctAnswer) === String(optText) || Number(sub.correctAnswer) === oi));
+
+                                              if (!isSelected && !isCorrect) return null;
+
+                                              return (
+                                                <div key={oi} className={`text-[10px] p-1.5 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') :
+                                                  isCorrect ? 'bg-green-50 border-green-200' : 'bg-muted/30'
+                                                  }`}>
+                                                  <div className="flex items-center gap-1 overflow-hidden">
+                                                    <span className="font-bold text-gray-500 shrink-0">{MCQ_LABELS?.[oi]}.</span>
+                                                    <div className="truncate"><UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax></div>
+                                                  </div>
+                                                  {isSelected && (isCorrect ? <CheckCircle className="h-2.5 w-2.5 text-green-600" /> : <XCircle className="h-2.5 w-2.5 text-red-600" />)}
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              )}
                             </div>
                             <div className="flex-shrink-0 text-right">
                               <span className="text-xs font-bold text-gray-500">{q?.marks} Marks</span>
@@ -1185,8 +1246,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     currentAnswer = currentStudent?.answers?.[`${currentQuestion?.id}_images`];
   }
 
-  const getAutoScore = (question: Question, answer: any) => {
-    if (!answer) return 0;
+  const getAutoScore = (question: Question, allAnswers: any) => {
+    const answer = allAnswers?.[question?.id];
+    if (!answer && question?.type?.toLowerCase() !== 'smcq') return 0;
     const type = (question?.type || '').toLowerCase();
 
     try {
@@ -1215,6 +1277,45 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         const negPct = exam?.mcqNegativeMarking;
         if (negPct && negPct > 0) return -((question?.marks || 0) * negPct) / 100;
         return 0;
+      }
+
+      if (type === 'smcq') {
+        if (!question.subQuestions) return 0;
+        let smcqScore = 0;
+        question.subQuestions.forEach((subQ: any, sIdx: number) => {
+          const subAnswer = allAnswers[`${question.id}_sub_${sIdx}`];
+          if (!subAnswer) return;
+
+          const normalize = (s: any) => String(s || "").trim().toLowerCase();
+          const userAns = normalize(subAnswer);
+          let isCorrect = false;
+
+          if (subQ.options && Array.isArray(subQ.options)) {
+            const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
+            if (correctOpt) {
+              const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
+              isCorrect = userAns === correctText;
+            }
+          }
+
+          if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+            const correctIndex = Number(subQ.correctAnswer);
+            if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
+              const opt = subQ.options[correctIndex];
+              const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
+              isCorrect = userAns === correctText;
+            } else {
+              isCorrect = userAns === normalize(subQ.correctAnswer);
+            }
+          }
+
+          if (isCorrect) {
+            smcqScore += Number(subQ.marks) || 1;
+          } else if (exam?.mcqNegativeMarking && exam?.mcqNegativeMarking > 0) {
+            smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+          }
+        });
+        return smcqScore;
       }
 
       if (type === 'mc') {
@@ -2093,7 +2194,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <span className="text-sm font-medium text-muted-foreground">Filter by type:</span>
                     <div className="flex flex-wrap gap-2">
-                      {(['all', 'mcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive'] as const).map((type) => (
+                      {(['all', 'mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'cq', 'sq', 'descriptive'] as const).map((type) => (
                         <Button
                           key={type}
                           variant={questionTypeFilter === type ? 'default' : 'outline'}
@@ -2137,14 +2238,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 {(() => {
                                   const dbMcqMarks = currentStudent?.result?.mcqMarks;
                                   const calculatedMcqMarks = exam?.questions
-                                    ?.filter(q => ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))
-                                    ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers?.[q?.id]), 0) ?? 0;
+                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))
+                                    ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers), 0) ?? 0;
 
                                   return dbMcqMarks != null ? dbMcqMarks : calculatedMcqMarks;
                                 })()}
                               </div>
                               <div className="text-xs text-blue-600">
-                                / {exam?.questions?.filter(q => ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
+                                / {exam?.questions?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))?.reduce((total, q) => total + (q?.marks || 0), 0) || 0}
                               </div>
                             </div>
                           </div>
@@ -2222,8 +2323,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                   // Recalculate if result not present
                                   const mcq = exam?.questions
-                                    ?.filter(q => ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))
-                                    ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers?.[q?.id]), 0) || 0;
+                                    ?.filter(q => ['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(q?.type?.toLowerCase() || ''))
+                                    ?.reduce((total, q) => total + getAutoScore(q, currentStudent?.answers), 0) || 0;
 
                                   const cqScores = exam?.questions
                                     ?.filter(q => q?.type?.toLowerCase() === 'cq')
@@ -2516,22 +2617,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <div>
                                   <h4 className="font-semibold mb-2">Student Answer:</h4>
                                   <div className="bg-muted/50 p-4 rounded-lg border border-border">
-                                    {['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
+                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="space-y-4">
-                                        {currentAnswer ? (
+                                        {(currentAnswer || currentQuestion?.type?.toLowerCase() === 'smcq') ? (
                                           <div className="space-y-3">
                                             {/* Auto-Score Header */}
                                             <div className="flex items-center gap-2 mb-2">
-                                              {getAutoScore(currentQuestion, currentAnswer) > 0 ? (
+                                              {getAutoScore(currentQuestion, currentStudent?.answers) > 0 ? (
                                                 <CheckCircle className="h-5 w-5 text-green-600" />
-                                              ) : getAutoScore(currentQuestion, currentAnswer) === 0 ? (
+                                              ) : getAutoScore(currentQuestion, currentStudent?.answers) === 0 ? (
                                                 <XCircle className="h-5 w-5 text-orange-500" />
                                               ) : (
                                                 <XCircle className="h-5 w-5 text-red-600" />
                                               )}
-                                              <span className={`font-semibold ${getAutoScore(currentQuestion, currentAnswer) > 0 ? 'text-green-700' : getAutoScore(currentQuestion, currentAnswer) < 0 ? 'text-red-700' : 'text-gray-700'}`}>
-                                                Auto-calculated Score: {getAutoScore(currentQuestion, currentAnswer)} / {currentQuestion?.marks}
-                                                {getAutoScore(currentQuestion, currentAnswer) < 0 && <span className="ml-2 text-xs font-normal text-red-500">(negative marking applied)</span>}
+                                              <span className={`font-semibold ${getAutoScore(currentQuestion, currentStudent?.answers) > 0 ? 'text-green-700' : getAutoScore(currentQuestion, currentStudent?.answers) < 0 ? 'text-red-700' : 'text-gray-700'}`}>
+                                                Auto-calculated Score: {getAutoScore(currentQuestion, currentStudent?.answers)} / {currentQuestion?.marks}
+                                                {getAutoScore(currentQuestion, currentStudent?.answers) < 0 && <span className="ml-2 text-xs font-normal text-red-500">(negative marking applied)</span>}
                                               </span>
                                             </div>
 
@@ -2556,6 +2657,71 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       </div>
                                                       {isSelected && (isCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />)}
                                                       {!isSelected && isCorrect && <span className="text-xs font-semibold text-green-600">(Missed)</span>}
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            )}
+
+                                            {currentQuestion?.type?.toLowerCase() === 'smcq' && (
+                                              <div className="space-y-4">
+                                                {(currentQuestion?.subQuestions || []).map((subQ: any, sIdx: number) => {
+                                                  const subAns = currentStudent?.answers?.[`${currentQuestion.id}_sub_${sIdx}`];
+
+                                                  const normalize = (s: any) => String(s || "").trim().toLowerCase();
+                                                  const userAns = normalize(subAns);
+                                                  let isSubCorrect = false;
+
+                                                  if (subQ.options && Array.isArray(subQ.options)) {
+                                                    const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
+                                                    if (correctOpt) {
+                                                      const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
+                                                      isSubCorrect = userAns === correctText;
+                                                    }
+                                                  }
+
+                                                  if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+                                                    const correctIndex = Number(subQ.correctAnswer);
+                                                    if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
+                                                      const opt = subQ.options[correctIndex];
+                                                      const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
+                                                      isSubCorrect = userAns === correctText;
+                                                    } else {
+                                                      isSubCorrect = userAns === normalize(subQ.correctAnswer);
+                                                    }
+                                                  }
+
+                                                  return (
+                                                    <div key={sIdx} className="p-3 bg-card rounded border border-border">
+                                                      <div className="flex items-center justify-between mb-3">
+                                                        <div className="text-sm font-semibold text-indigo-700">
+                                                          Part {toBengaliNumerals(sIdx + 1)}: <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || '')}</UniversalMathJax>
+                                                        </div>
+                                                        {subAns ? (
+                                                          isSubCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />
+                                                        ) : (
+                                                          <Badge variant="outline" className="text-xs font-normal">Not Answered</Badge>
+                                                        )}
+                                                      </div>
+                                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                        {(subQ.options || []).map((opt: any, oIdx: number) => {
+                                                          const optText = typeof opt === 'object' ? opt.text : opt;
+                                                          const isSelected = normalize(subAns) === normalize(optText);
+                                                          const isCorrect = opt.isCorrect || (subQ.correctAnswer !== undefined && (normalize(subQ.correctAnswer) === normalize(optText) || Number(subQ.correctAnswer) === oIdx));
+
+                                                          return (
+                                                            <div key={oIdx} className={`text-xs p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') :
+                                                              isCorrect ? 'bg-green-50 border-green-200 opacity-80' : 'bg-muted/30 border-border opacity-60'
+                                                              }`}>
+                                                              <div className="flex items-center gap-2">
+                                                                <span className="font-bold text-gray-500">{MCQ_LABELS?.[oIdx]}.</span>
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                              </div>
+                                                              {isSelected && (isCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : <XCircle className="h-3 w-3 text-red-600" />)}
+                                                            </div>
+                                                          )
+                                                        })}
+                                                      </div>
                                                     </div>
                                                   );
                                                 })}

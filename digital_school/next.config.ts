@@ -33,7 +33,7 @@ const nextConfig = withPWA({
   // Ensure proper client-side navigation
   trailingSlash: false,
   // Netlify specific optimizations
-  output: 'standalone',
+
   // Disable image optimization for Netlify (handled by Netlify's image optimization)
   images: {
     unoptimized: true,
