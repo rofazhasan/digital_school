@@ -1153,160 +1153,186 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-5 gap-10">
-                  {/* Score Breakdown Section */}
-                  <div className="xl:col-span-3 space-y-8">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
-                        <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
-                        Score Breakdown
-                      </h4>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {objectiveQuestions.length > 0 && (
-                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 sm:p-3 rounded-2xl bg-blue-500/10 text-blue-600">
-                              <Target className="h-5 w-5 sm:h-6 sm:w-6" />
-                            </div>
-                            <Badge variant="outline" className="rounded-full border-blue-200 text-blue-600 bg-blue-50/50 text-[10px] px-2">Objective</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
-                              {result.result?.mcqMarks}
-                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalObjectiveMarks}</span>
-                            </div>
-                            {result.result?.mcqMarks! < 0 && (
-                              <p className="text-[8px] sm:text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full inline-block mt-1">Negative Marking Applied</p>
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {cqQuestions.length > 0 && (
-                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 sm:p-3 rounded-2xl bg-emerald-500/10 text-emerald-600">
-                              <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
-                            </div>
-                            <Badge variant="outline" className="rounded-full border-emerald-200 text-emerald-600 bg-emerald-50/50 text-[10px] px-2">Creative</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
-                              {result.result?.cqMarks}
-                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalCqMarks}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {sqQuestions.length > 0 && (
-                        <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
-                          <div className="flex items-center justify-between mb-4">
-                            <div className="p-2 sm:p-3 rounded-2xl bg-amber-500/10 text-amber-600">
-                              <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
-                            </div>
-                            <Badge variant="outline" className="rounded-full border-amber-200 text-amber-600 bg-amber-50/50 text-[10px] px-2">Short Questions</Badge>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
-                            <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
-                              {result.result?.sqMarks}
-                              <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalSqMarks}</span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="sm:col-span-1 p-4 sm:p-6 rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/20 border-b-4 border-indigo-800 text-white flex flex-col justify-between overflow-hidden">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Total Aggregate</p>
-                        <div className="mt-2 text-center sm:text-left">
-                          <div className="text-3xl sm:text-5xl font-black flex items-baseline justify-center sm:justify-start flex-wrap leading-none">
-                            {result.result?.total}
-                            <span className="text-lg sm:text-xl text-indigo-300 ml-1 sm:ml-2">/{result.exam.totalMarks}</span>
-                          </div>
-                          {(() => {
-                            const negativeTotal = (result.questions || []).reduce((sum, q: any) => {
-                              if (q.awardedMarks < 0) return sum + Math.abs(q.awardedMarks);
-                              return sum;
-                            }, 0);
-                            if (negativeTotal > 0) {
-                              return (
-                                <p className="text-[10px] font-bold text-indigo-100 bg-white/10 px-2 py-0.5 rounded-full inline-block mt-2 backdrop-blur-sm">
-                                  Deducted: {negativeTotal.toFixed(2).replace(/\.00$/, '')}
-                                </p>
-                              );
-                            }
-                            return null;
-                          })()}
-                        </div>
+                {!result.result?.isPublished ? (
+                  /* Unpublished State Banner */
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="flex flex-col items-center justify-center p-12 text-center rounded-[2.5rem] bg-gradient-to-br from-indigo-50/50 to-purple-50/50 dark:from-indigo-950/20 dark:to-purple-950/20 border border-indigo-100 dark:border-indigo-900 shadow-inner"
+                  >
+                    <div className="relative mb-6">
+                      <div className="absolute inset-0 bg-indigo-500 blur-2xl opacity-20 animate-pulse rounded-full"></div>
+                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-xl relative z-10 border border-indigo-100 dark:border-indigo-900">
+                        <Lock className="h-12 w-12 text-indigo-500" strokeWidth={1.5} />
                       </div>
                     </div>
-                  </div>
+                    <h3 className="text-2xl sm:text-3xl font-black text-slate-800 dark:text-white mb-3">
+                      Hang Tight! 🚀
+                    </h3>
+                    <p className="text-slate-500 dark:text-slate-400 max-w-lg mb-8 text-lg">
+                      Your answers have been securely submitted. The detailed results and score breakdown will be unlocked as soon as the evaluation is officially published.
+                    </p>
+                    <div className="flex items-center gap-3 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-6 py-3 rounded-full border border-indigo-100 dark:border-indigo-500/20">
+                      <Clock className="w-4 h-4 animate-spin-slow" /> Awaiting Teacher Publication
+                    </div>
+                  </motion.div>
+                ) : (
+                  /* Published Score Breakdown */
+                  <div className="grid grid-cols-1 xl:grid-cols-5 gap-10">
+                    {/* Score Breakdown Section */}
+                    <div className="xl:col-span-3 space-y-8">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
+                          <div className="w-2 h-8 bg-blue-600 rounded-full"></div>
+                          Score Breakdown
+                        </h4>
+                      </div>
 
-                  {/* Summary Section */}
-                  <div className="xl:col-span-2 space-y-8">
-                    <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
-                      <div className="w-2 h-8 bg-purple-600 rounded-full"></div>
-                      Final Analysis
-                    </h4>
-
-                    <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-2xl relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-10 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/10 transition-colors duration-500"></div>
-                      <div className="relative z-10 flex flex-col items-center text-center space-y-6">
-                        <div className="relative">
-                          <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-40 animate-pulse"></div>
-                          <div className={`text-5xl sm:text-7xl font-black drop-shadow-2xl ${result.result?.grade === 'A+' ? 'text-yellow-400' :
-                            result.result?.grade?.startsWith('A') ? 'text-blue-400' :
-                              'text-white'
-                            }`}>
-                            {result.result?.grade || 'N/A'}
-                          </div>
-                          <p className="text-[10px] uppercase tracking-[0.3em] font-black text-slate-400 mt-2">Overall Grade</p>
-                        </div>
-
-                        <div className="w-full space-y-2">
-                          <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-400">
-                            <span>Accuracy</span>
-                            <span className="text-blue-400">{result.exam.totalMarks > 0 && result.result?.total !== undefined ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%</span>
-                          </div>
-                          <Progress
-                            value={result.exam.totalMarks > 0 && result.result?.total !== undefined ? (result.result.total / result.exam.totalMarks) * 100 : 0}
-                            className="h-3 bg-white/10 rounded-full overflow-hidden"
-                          />
-                        </div>
-
-                        {result.result?.comment && (
-                          <div className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-sm italic text-slate-300 leading-relaxed font-medium">
-                            " {result.result.comment} "
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {objectiveQuestions.length > 0 && (
+                          <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="p-2 sm:p-3 rounded-2xl bg-blue-500/10 text-blue-600">
+                                <Target className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <Badge variant="outline" className="rounded-full border-blue-200 text-blue-600 bg-blue-50/50 text-[10px] px-2">Objective</Badge>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
+                              <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
+                                {result.result?.mcqMarks}
+                                <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalObjectiveMarks}</span>
+                              </div>
+                              {result.result?.mcqMarks! < 0 && (
+                                <p className="text-[8px] sm:text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full inline-block mt-1">Negative Marking Applied</p>
+                              )}
+                            </div>
                           </div>
                         )}
 
-                        <div className="flex gap-4 w-full">
-                          <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Accuracy</p>
-                            <p className="text-lg font-black">
-                              {(() => {
-                                const answered = result.questions.filter(q => q.studentAnswer && q.studentAnswer !== 'No answer provided').length;
-                                const correct = result.questions.filter(q => q.isCorrect).length;
-                                return answered > 0 ? ((correct / answered) * 100).toFixed(0) : '0';
-                              })()}%
-                            </p>
+                        {cqQuestions.length > 0 && (
+                          <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="p-2 sm:p-3 rounded-2xl bg-emerald-500/10 text-emerald-600">
+                                <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <Badge variant="outline" className="rounded-full border-emerald-200 text-emerald-600 bg-emerald-50/50 text-[10px] px-2">Creative</Badge>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
+                              <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
+                                {result.result?.cqMarks}
+                                <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalCqMarks}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
-                            <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Status</p>
-                            <p className={`text-lg font-black ${result.result?.grade === 'F' ? 'text-rose-400' : 'text-emerald-400'}`}>
-                              {result.result?.grade === 'F' ? 'FAILED' : 'PASSED'}
-                            </p>
+                        )}
+
+                        {sqQuestions.length > 0 && (
+                          <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
+                            <div className="flex items-center justify-between mb-4">
+                              <div className="p-2 sm:p-3 rounded-2xl bg-amber-500/10 text-amber-600">
+                                <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6" />
+                              </div>
+                              <Badge variant="outline" className="rounded-full border-amber-200 text-amber-600 bg-amber-50/50 text-[10px] px-2">Short Questions</Badge>
+                            </div>
+                            <div className="space-y-1">
+                              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
+                              <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
+                                {result.result?.sqMarks}
+                                <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalSqMarks}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="sm:col-span-1 p-4 sm:p-6 rounded-[2rem] bg-indigo-600 shadow-xl shadow-indigo-600/20 border-b-4 border-indigo-800 text-white flex flex-col justify-between overflow-hidden">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Total Aggregate</p>
+                          <div className="mt-2 text-center sm:text-left">
+                            <div className="text-3xl sm:text-5xl font-black flex items-baseline justify-center sm:justify-start flex-wrap leading-none">
+                              {result.result?.total}
+                              <span className="text-lg sm:text-xl text-indigo-300 ml-1 sm:ml-2">/{result.exam.totalMarks}</span>
+                            </div>
+                            {(() => {
+                              const negativeTotal = (result.questions || []).reduce((sum, q: any) => {
+                                if (q.awardedMarks < 0) return sum + Math.abs(q.awardedMarks);
+                                return sum;
+                              }, 0);
+                              if (negativeTotal > 0) {
+                                return (
+                                  <p className="text-[10px] font-bold text-indigo-100 bg-white/10 px-2 py-0.5 rounded-full inline-block mt-2 backdrop-blur-sm">
+                                    Deducted: {negativeTotal.toFixed(2).replace(/\.00$/, '')}
+                                  </p>
+                                );
+                              }
+                              return null;
+                            })()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Section */}
+                    <div className="xl:col-span-2 space-y-8">
+                      <h4 className="text-lg font-black text-slate-800 dark:text-slate-200 uppercase tracking-widest flex items-center gap-2">
+                        <div className="w-2 h-8 bg-purple-600 rounded-full"></div>
+                        Final Analysis
+                      </h4>
+
+                      <div className="p-8 rounded-[2.5rem] bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-10 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl group-hover:bg-white/10 transition-colors duration-500"></div>
+                        <div className="relative z-10 flex flex-col items-center text-center space-y-6">
+                          <div className="relative">
+                            <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-40 animate-pulse"></div>
+                            <div className={`text-5xl sm:text-7xl font-black drop-shadow-2xl ${result.result?.grade === 'A+' ? 'text-yellow-400' :
+                              result.result?.grade?.startsWith('A') ? 'text-blue-400' :
+                                'text-white'
+                              }`}>
+                              {result.result?.grade || 'N/A'}
+                            </div>
+                            <p className="text-[10px] uppercase tracking-[0.3em] font-black text-slate-400 mt-2">Overall Grade</p>
+                          </div>
+
+                          <div className="w-full space-y-2">
+                            <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-400">
+                              <span>Accuracy</span>
+                              <span className="text-blue-400">{result.exam.totalMarks > 0 && result.result?.total !== undefined ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%</span>
+                            </div>
+                            <Progress
+                              value={result.exam.totalMarks > 0 && result.result?.total !== undefined ? (result.result.total / result.exam.totalMarks) * 100 : 0}
+                              className="h-3 bg-white/10 rounded-full overflow-hidden"
+                            />
+                          </div>
+
+                          {result.result?.comment && (
+                            <div className="w-full p-4 rounded-2xl bg-white/5 border border-white/10 text-sm italic text-slate-300 leading-relaxed font-medium">
+                              " {result.result.comment} "
+                            </div>
+                          )}
+
+                          <div className="flex gap-4 w-full">
+                            <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
+                              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Accuracy</p>
+                              <p className="text-lg font-black">
+                                {(() => {
+                                  const answered = result.questions.filter(q => q.studentAnswer && q.studentAnswer !== 'No answer provided').length;
+                                  const correct = result.questions.filter(q => q.isCorrect).length;
+                                  return answered > 0 ? ((correct / answered) * 100).toFixed(0) : '0';
+                                })()}%
+                              </p>
+                            </div>
+                            <div className="flex-1 p-3 rounded-2xl bg-white/5 border border-white/10">
+                              <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Status</p>
+                              <p className={`text-lg font-black ${result.result?.grade === 'F' ? 'text-rose-400' : 'text-emerald-400'}`}>
+                                {result.result?.grade === 'F' ? 'FAILED' : 'PASSED'}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </motion.div>

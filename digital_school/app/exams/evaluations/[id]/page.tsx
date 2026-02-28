@@ -2580,7 +2580,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                     </div>
                                   </div>
                                   <div className="text-base md:text-lg mb-4">
-                                    <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.text)}</UniversalMathJax>
+                                    <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.questionText || currentQuestion?.text || '')}</UniversalMathJax>
                                   </div>
 
                                   {/* Subquestions */}
