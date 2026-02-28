@@ -1185,10 +1185,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         <div className="relative">
                           <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-40 animate-pulse"></div>
                           <div className={`text-5xl sm:text-7xl font-black drop-shadow-2xl ${result.result?.grade === 'A+' ? 'text-yellow-400' :
-                            result.result?.grade.startsWith('A') ? 'text-blue-400' :
+                            result.result?.grade?.startsWith('A') ? 'text-blue-400' :
                               'text-white'
                             }`}>
-                            {result.result?.grade}
+                            {result.result?.grade || 'N/A'}
                           </div>
                           <p className="text-[10px] uppercase tracking-[0.3em] font-black text-slate-400 mt-2">Overall Grade</p>
                         </div>
@@ -1196,10 +1196,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         <div className="w-full space-y-2">
                           <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-400">
                             <span>Accuracy</span>
-                            <span className="text-blue-400">{result.exam.totalMarks > 0 ? ((result.result?.total! / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%</span>
+                            <span className="text-blue-400">{result.exam.totalMarks > 0 && result.result?.total !== undefined ? ((result.result.total / result.exam.totalMarks) * 100).toFixed(1) : '0.0'}%</span>
                           </div>
                           <Progress
-                            value={result.exam.totalMarks > 0 ? (result.result?.total! / result.exam.totalMarks) * 100 : 0}
+                            value={result.exam.totalMarks > 0 && result.result?.total !== undefined ? (result.result.total / result.exam.totalMarks) * 100 : 0}
                             className="h-3 bg-white/10 rounded-full overflow-hidden"
                           />
                         </div>
