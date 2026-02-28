@@ -10,6 +10,7 @@
   NEXT_PUBLIC_APPWRITE_PROJECT_ID = "68aa7b51002070dd9a73"
   NEXT_PUBLIC_APPWRITE_PROJECT_NAME = "digitalsch"
   NEXT_PUBLIC_APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1"
+  NODE_OPTIONS = "--max_old_space_size=4096"
 
 # Next.js plugin for proper API route handling
 [[plugins]]
