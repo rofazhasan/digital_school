@@ -149,18 +149,23 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                     hasAttempted: true
                 });
             } else if (type === 'INT' || type === 'NUMERIC') {
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
                 const res = evaluateINTQuestion(question, studentAnswer);
                 questionScore = res.score;
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             } else if (type === 'AR') {
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
                 const res = evaluateARQuestion(question, studentAnswer);
                 questionScore = res.score;
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             } else if (type === 'MTF') {
+                const hasMatchSet = studentAnswer && (Array.isArray(studentAnswer.matches) ? studentAnswer.matches.length > 0 : Object.keys(studentAnswer).length > 0);
+                if (!hasMatchSet) continue;
+
                 const res = evaluateMTFQuestion(question, studentAnswer);
                 questionScore = res.score;
                 // For MTF, we usually don't apply negative marking if it's partial, 
@@ -242,18 +247,18 @@ export async function releaseExamResults(examId: string) {
     });
 
     // Calculate ranks
-    const resultsWithRanks = allResults.map((result, index) => {
-        const sameCount = allResults.filter(r => r.total === result.total).length;
+    const resultsWithRanks = allResults.map((result: any, index: number) => {
+        const sameCount = allResults.filter((r: any) => r.total === result.total).length;
         let rank = index + 1;
         if (sameCount > 1) {
-            const firstIndex = allResults.findIndex(r => r.total === result.total);
+            const firstIndex = allResults.findIndex((r: any) => r.total === result.total);
             rank = firstIndex + 1;
         }
         return { id: result.id, rank };
     });
 
     // Bulk update
-    await Promise.all(resultsWithRanks.map(item =>
+    await Promise.all(resultsWithRanks.map((item: any) =>
         prisma.result.update({
             where: { id: item.id },
             data: {
@@ -298,8 +303,8 @@ export async function releaseExamResults(examId: string) {
         const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
 
         const emailPromises = resultsWithUsers
-            .filter(res => res.student.user.email) // Only send if student has email
-            .map(async (res) => {
+            .filter((res: any) => res.student.user.email) // Only send if student has email
+            .map(async (res: any) => {
                 // Map results to ResultItem format for email
                 // Note: The current result schema might not store per-subject marks in a way that maps perfectly to "results" prop in ExamResultEmail
                 // For now, we'll provide the overall summary and a generic entry for the exam subject

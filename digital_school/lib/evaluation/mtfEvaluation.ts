@@ -50,7 +50,7 @@ export function evaluateMTFQuestion(
 
     const matchesDetails = (question.leftColumn || []).map((item: any) => {
         const correctRightId = correctMatches[item.id];
-        const studentRightId = normalizedStudentMatches[item.id] || null;
+        const studentRightId = normalizedStudentMatches ? normalizedStudentMatches[item.id] || null : null;
         const isMatchedCorrectly = correctRightId && studentRightId && correctRightId === studentRightId;
 
         if (isMatchedCorrectly) {
