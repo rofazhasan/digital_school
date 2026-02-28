@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import {
   Trophy,
@@ -204,6 +204,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [downloading, setDownloading] = useState(false);
   const [settings, setSettings] = useState<any>(null);
   const [isPrinting, setIsPrinting] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [isApplyingDrawing, setIsApplyingDrawing] = useState(false);
 
   const handleShare = async () => {
     if (!result) return;
@@ -408,12 +410,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   }, [filterStatus]);
 
   // Function to combine original image with annotations
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const combineImageWithAnnotations = async (originalImageSrc: string, annotationImageSrc: string): Promise<string> => {
+    setIsApplyingDrawing(true);
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) {
+        setIsApplyingDrawing(false);
         reject(new Error('Could not get canvas context'));
         return;
       }
@@ -430,50 +433,64 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       const checkBothLoaded = () => {
         imagesLoaded++;
         if (imagesLoaded === 2) {
-          // Set canvas size to match original image
-          canvas.width = originalImg.naturalWidth;
-          canvas.height = originalImg.naturalHeight;
+          try {
+            // Set canvas size to match original image
+            canvas.width = originalImg.naturalWidth;
+            canvas.height = originalImg.naturalHeight;
 
-          // Draw original image first
-          ctx.drawImage(originalImg, 0, 0);
+            // Draw original image first
+            ctx.drawImage(originalImg, 0, 0);
 
-          // Draw annotations on top
-          ctx.drawImage(annotationImg, 0, 0);
+            // Draw annotations on top
+            ctx.drawImage(annotationImg, 0, 0);
 
-          // Get combined image
-          const combinedDataURL = canvas.toDataURL('image/png');
-          resolve(combinedDataURL);
+            // Get combined image
+            const combinedDataURL = canvas.toDataURL('image/png');
+            setIsApplyingDrawing(false);
+            resolve(combinedDataURL);
+          } catch (err) {
+            setIsApplyingDrawing(false);
+            reject(err);
+          }
         }
       };
 
       originalImg.onload = checkBothLoaded;
-      originalImg.onerror = () => reject(new Error('Failed to load original image'));
+      originalImg.onerror = () => {
+        setIsApplyingDrawing(false);
+        reject(new Error('Failed to load original image'));
+      };
 
       annotationImg.onload = checkBothLoaded;
-      annotationImg.onerror = () => reject(new Error('Failed to load annotation image'));
+      annotationImg.onerror = () => {
+        setIsApplyingDrawing(false);
+        reject(new Error('Failed to load annotation image'));
+      };
 
       originalImg.src = originalImageSrc;
       annotationImg.src = annotationImageSrc;
     });
   };
 
-  const handleImageZoom = async (originalUrl: string, title: string, annotationData?: any) => {
+  const handleImageZoom = async (imageUrl: string, title: string, annotation?: any) => {
     setZoomedImageTitle(title);
-    setShowZoomModal(true);
+    setOriginalImageFallback(imageUrl);
+    setShowComparison(false);
     setAnnotatedImageFailed(false);
-    setOriginalImageFallback(originalUrl);
+    setShowZoomModal(true);
 
-    if (annotationData && annotationData.imageData) {
+    if (annotation && annotation.imageData) {
       try {
-        const combined = await combineImageWithAnnotations(originalUrl, annotationData.imageData);
+        const combined = await combineImageWithAnnotations(imageUrl, annotation.imageData);
         setZoomedImage(combined);
-      } catch (err) {
-        console.error("Failed to combine image with annotations", err);
-        setZoomedImage(originalUrl);
+        setShowComparison(true); // Enable comparison if annotation exists
+      } catch (error) {
+        console.error('Failed to combine image with annotations:', error);
         setAnnotatedImageFailed(true);
+        setZoomedImage(imageUrl);
       }
     } else {
-      setZoomedImage(originalUrl);
+      setZoomedImage(imageUrl);
     }
   };
 
@@ -2272,7 +2289,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 key={imgIdx}
                                                 className="relative group cursor-pointer aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl hover:shadow-2xl transition-all duration-500 scale-100 hover:scale-[1.05] z-10"
                                                 onClick={() => {
-                                                  const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+                                                  const annotation = question.allDrawings?.find(d =>
+                                                    d.originalImagePath === imageUrl || d.imageIndex === imgIdx
+                                                  );
                                                   handleImageZoom(imageUrl, `Short Question ${index + 1} - Image ${imgIdx + 1}`, annotation);
                                                 }}
                                               >
@@ -2413,15 +2432,46 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
           {/* Zoom Modal */}
           <Dialog open={showZoomModal} onOpenChange={setShowZoomModal}>
-            <DialogContent className="max-w-4xl w-[95vw] h-[90vh] flex items-center justify-center p-2">
-              <DialogHeader className="sr-only">
-                <DialogTitle>{zoomedImageTitle}</DialogTitle>
-              </DialogHeader>
-              <div className="relative w-full h-full flex flex-col">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium text-foreground truncate max-w-[70%]">
-                    {annotatedImageFailed ? `${zoomedImageTitle} (Original Image - Annotations Failed)` : zoomedImageTitle}
-                  </h3>
+            <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-950/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-[2.5rem]">
+              <DialogHeader className="p-6 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
+                <div className="flex flex-col gap-1">
+                  <DialogTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                    <Eye className="w-5 h-5 text-indigo-400" />
+                    {zoomedImageTitle}
+                  </DialogTitle>
+                  <DialogDescription className="text-[10px] text-white/40 uppercase font-black tracking-[0.2em] flex items-center gap-2">
+                    Result Explorer <Search className="w-2.5 h-2.5" /> Subjective Detail
+                  </DialogDescription>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {showComparison && (
+                    <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant={!annotatedImageFailed ? "secondary" : "ghost"}
+                        onClick={() => setAnnotatedImageFailed(false)}
+                        className={cn(
+                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                          !annotatedImageFailed ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-600" : "text-white/60 hover:text-white"
+                        )}
+                      >
+                        <Zap className="w-3.5 h-3.5 mr-2 fill-current" /> Teacher Feedback
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={annotatedImageFailed ? "secondary" : "ghost"}
+                        onClick={() => setAnnotatedImageFailed(true)}
+                        className={cn(
+                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                          annotatedImageFailed ? "bg-slate-700 text-white shadow-lg" : "text-white/60 hover:text-white"
+                        )}
+                      >
+                        <User className="w-3.5 h-3.5 mr-2" /> Original Response
+                      </Button>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => {
                       setShowZoomModal(false);
@@ -2430,54 +2480,81 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       setAnnotatedImageFailed(false);
                       setOriginalImageFallback('');
                     }}
-                    className="p-2 bg-black bg-opacity-50 text-white rounded-full hover:bg-opacity-70 transition-colors"
+                    className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all border border-white/10 group"
                     aria-label="Close zoom"
                   >
-                    <XCircle className="h-5 w-5" />
+                    <XCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
                   </button>
                 </div>
-                <div className="flex-1 flex items-center justify-center relative">
-                  {zoomedImage && (
+              </DialogHeader>
+
+              <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
+                {isApplyingDrawing ? (
+                  <div className="flex flex-col items-center gap-4 text-white/60">
+                    <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                    <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
+                  </div>
+                ) : (
+                  <div className="relative max-w-full max-h-full">
+                    {/* Floating Hint */}
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
+                    >
+                      Pinch or scroll to zoom • Click and drag to pan
+                    </motion.div>
+
                     <img
                       src={annotatedImageFailed ? originalImageFallback : zoomedImage}
-                      alt={annotatedImageFailed ? `${zoomedImageTitle} (Original Image)` : zoomedImageTitle}
-                      className="max-w-full max-h-full object-contain rounded-lg bg-card shadow-lg"
-                      onError={(e) => {
-                        console.error('Modal image failed to load:', zoomedImage);
-
+                      alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
+                      className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
+                      onError={() => {
                         if (!annotatedImageFailed && originalImageFallback) {
-                          // Try original image as fallback
                           setAnnotatedImageFailed(true);
-                          e.currentTarget.src = originalImageFallback;
-                          e.currentTarget.alt = `${zoomedImageTitle} (Original Image)`;
-                        } else {
-                          // Both failed, show error
-                          e.currentTarget.style.display = 'none';
-                          const parent = e.currentTarget.parentElement;
-                          if (parent) {
-                            const errorDiv = document.createElement('div');
-                            errorDiv.className = 'flex items-center justify-center w-full h-full bg-gray-100 rounded-lg';
-                            errorDiv.innerHTML = `
-                                <div class="text-center text-gray-500">
-                                  <div class="text-4xl mb-2">📷</div>
-                                  <div class="text-sm">Image failed to load</div>
-                                  <div class="text-xs mt-1">Please try again</div>
-                                </div>
-                              `;
-                            parent.appendChild(errorDiv);
-                          }
                         }
                       }}
-                      onLoad={() => {
-                        // Image loaded successfully
-                      }}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain'
-                      }}
                     />
-                  )}
+
+                    {/* Badge Overlay */}
+                    <div className="absolute top-6 left-6 pointer-events-none">
+                      <div className={cn(
+                        "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
+                        annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
+                      )}>
+                        {annotatedImageFailed ? (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
+                          </>
+                        ) : (
+                          <>
+                            <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
+                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                    <Camera className="w-5 h-5 text-indigo-400" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase tracking-wider">Submission Quality</div>
+                    <div className="text-[10px] text-white/40 flex items-center gap-2">
+                      Verified by System <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-right">
+                  <div className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">Exam Reference</div>
+                  <div className="text-xs font-mono text-indigo-300">#{id.slice(-8).toUpperCase()}</div>
                 </div>
               </div>
             </DialogContent>
