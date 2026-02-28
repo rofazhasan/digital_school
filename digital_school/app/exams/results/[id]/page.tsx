@@ -37,7 +37,12 @@ import {
   Camera,
   ChevronLeft,
   ChevronRight,
-  Star
+  Star,
+  Layers,
+  Sparkles,
+  Search,
+  Zap,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -46,7 +51,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
-import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -448,6 +453,26 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     });
   };
 
+  const handleImageZoom = async (originalUrl: string, title: string, annotationData?: any) => {
+    setZoomedImageTitle(title);
+    setShowZoomModal(true);
+    setAnnotatedImageFailed(false);
+    setOriginalImageFallback(originalUrl);
+
+    if (annotationData && annotationData.imageData) {
+      try {
+        const combined = await combineImageWithAnnotations(originalUrl, annotationData.imageData);
+        setZoomedImage(combined);
+      } catch (err) {
+        console.error("Failed to combine image with annotations", err);
+        setZoomedImage(originalUrl);
+        setAnnotatedImageFailed(true);
+      }
+    } else {
+      setZoomedImage(originalUrl);
+    }
+  };
+
   const fetchNotifications = async () => {
     try {
       const response = await fetch('/api/notifications', {
@@ -822,36 +847,65 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
 
-            <div className="text-center relative">
+            <div className="text-center relative mb-16">
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                className="inline-flex items-center justify-center p-2 mb-8"
+                className="inline-flex items-center justify-center p-2 mb-4"
               >
                 <div className="relative group">
-                  <div className="absolute inset-0 bg-yellow-400 blur-2xl opacity-20 group-hover:opacity-40 transition-opacity duration-500"></div>
-                  <div className="relative p-4 rounded-3xl bg-gradient-to-br from-yellow-400 to-orange-500 shadow-2xl shadow-orange-500/20 border-b-4 border-orange-600 active:translate-y-1 transition-all">
-                    <Trophy className="h-10 w-10 text-white" />
+                  <div className="absolute inset-0 bg-yellow-400 blur-3xl opacity-30 group-hover:opacity-50 transition-opacity duration-500 animate-pulse"></div>
+                  <div className="relative p-6 rounded-[2.5rem] bg-gradient-to-br from-yellow-400 via-orange-500 to-rose-500 shadow-2xl shadow-orange-500/40 border-b-8 border-orange-700 active:translate-y-2 transition-all">
+                    <Trophy className="h-16 w-16 text-white filter drop-shadow-lg" />
                   </div>
                 </div>
               </motion.div>
 
-              <div className="max-w-4xl mx-auto space-y-4">
-                <h1 className="text-4xl md:text-5xl lg:text-7xl font-black bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-200 dark:to-white bg-clip-text text-transparent tracking-tighter break-words">
-                  Performance Report
+              <div className="max-w-5xl mx-auto space-y-6">
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="inline-flex items-center gap-2 px-4 py-1 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2 border border-blue-500/20"
+                >
+                  <Sparkles className="h-3 w-3" /> Official Assessment Report
+                </motion.div>
+
+                <h1 className="text-5xl md:text-7xl lg:text-9xl font-black leading-[0.85] tracking-tighter break-words">
+                  <span className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent">
+                    Academic Review.
+                  </span>
                 </h1>
-                <h2 className="text-xl md:text-3xl font-bold text-blue-600 dark:text-blue-400 drop-shadow-sm break-words">
+
+                <h2 className="text-2xl md:text-4xl font-black text-blue-600 dark:text-blue-400 tracking-tight break-words uppercase">
                   {result.exam.name}
                 </h2>
-                <div className="flex flex-wrap items-center justify-center gap-2 mt-4 max-w-full">
-                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1 text-[10px] sm:text-xs">
-                    {new Date(result.exam.startTime).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                  </Badge>
-                  <div className="w-1 h-1 rounded-full bg-slate-300 dark:bg-slate-700"></div>
-                  <Badge variant="outline" className="rounded-lg bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm px-3 py-1 text-slate-600 dark:text-slate-400 font-medium text-[10px] sm:text-xs">
-                    {result.exam.duration} Minutes Duration
-                  </Badge>
+
+                <div className="flex flex-wrap items-center justify-center gap-4 mt-8">
+                  <div className="px-6 py-2 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-white dark:border-slate-800 shadow-xl flex items-center gap-3 group hover:scale-105 transition-transform duration-300">
+                    <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 group-hover:bg-blue-500 group-hover:text-white transition-colors">
+                      <Calendar className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[8px] uppercase font-black text-slate-400 leading-none">Exam Date</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                        {new Date(result.exam.startTime).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="px-6 py-2 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-white dark:border-slate-800 shadow-xl flex items-center gap-3 group hover:scale-105 transition-transform duration-300">
+                    <div className="p-2 rounded-xl bg-purple-500/10 text-purple-600 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                      <Clock className="h-4 w-4" />
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[8px] uppercase font-black text-slate-400 leading-none">Time Allowance</p>
+                      <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-slate-200 leading-tight">
+                        {result.exam.duration} Minutes
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1419,7 +1473,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     <div className="space-y-12">
                       {/* Unified Objective Section */}
                       {(() => {
-                        const objectiveTypes = ['MCQ', 'MC', 'AR', 'MTF', 'INT', 'NUMERIC'];
+                        const objectiveTypes = ['MCQ', 'MC', 'AR', 'MTF', 'INT', 'NUMERIC', 'SMCQ'];
                         const filteredQuestions = result.questions.filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
@@ -1486,6 +1540,98 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </Badge>
                                       </div>
                                     </div>
+
+                                    {/* SMCQ Specific Rendering */}
+                                    {type === 'SMCQ' && (
+                                      <div className="mb-8 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                                        <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[2.5rem] border border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
+                                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                            <Layers className="h-20 w-20 text-indigo-500" />
+                                          </div>
+                                          <div className="relative z-10">
+                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-4 border border-indigo-500/30">
+                                              <Sparkles className="h-3 w-3" /> Scenario Context
+                                            </div>
+                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
+                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="space-y-10 pl-2 md:pl-10 border-l-4 border-dashed border-indigo-500/20">
+                                          {(question.subQuestions || []).map((subQ: any, subIdx: number) => (
+                                            <div key={subIdx} className="relative space-y-6 group">
+                                              {/* connector dot */}
+                                              <div className="absolute -left-12 top-2 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-4 border-indigo-500 shadow-lg shadow-indigo-500/50 z-10" />
+
+                                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                                                <div className="flex-1 space-y-3">
+                                                  <div className="flex items-center gap-3">
+                                                    <span className="text-2xl font-black text-indigo-600/30 dark:text-indigo-400/20 italic tabular-nums">
+                                                      PART {String(subIdx + 1).padStart(2, '0')}
+                                                    </span>
+                                                    <Badge variant="outline" className="rounded-full px-3 py-0.5 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[10px] uppercase font-black tracking-tighter text-slate-500">
+                                                      {subQ.marks} Point{subQ.marks !== 1 ? 's' : ''}
+                                                    </Badge>
+                                                  </div>
+                                                  <div className="text-lg font-bold text-slate-700 dark:text-slate-200 leading-snug">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+
+                                                {subQ.studentAnswer && (
+                                                  <div className={cn(
+                                                    "px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border whitespace-nowrap",
+                                                    subQ.isCorrect
+                                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                                      : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                                                  )}>
+                                                    {subQ.isCorrect ? "Perfectly Correct" : "Incorrect Response"}
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {(subQ.options || []).map((opt: any, oi: number) => {
+                                                  const optText = typeof opt === 'object' ? opt.text : opt;
+                                                  const isSelected = String(subQ.studentAnswer) === String(optText);
+                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && (String(subQ.correctAnswer) === String(optText) || Number(subQ.correctAnswer) === oi)));
+
+                                                  let style = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
+                                                  let icon = null;
+
+                                                  if (isSelected && isCorrectOpt) {
+                                                    style = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 grayscale-0 scale-[1.02]";
+                                                    icon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
+                                                  } else if (isSelected && !isCorrectOpt) {
+                                                    style = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-100 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10 grayscale-0";
+                                                    icon = <XCircle className="h-4 w-4 text-rose-600" />;
+                                                  } else if (!isSelected && isCorrectOpt) {
+                                                    style = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed grayscale-0";
+                                                    icon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
+                                                  }
+
+                                                  return (
+                                                    <div key={oi} className={`relative p-4 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${style}`}>
+                                                      <span className={cn(
+                                                        "w-9 h-9 flex items-center justify-center rounded-xl text-xs font-black shadow-sm transition-colors",
+                                                        isSelected ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                                                      )}>
+                                                        {String.fromCharCode(0x0995 + oi)}
+                                                      </span>
+                                                      <span className="flex-1 text-sm font-bold tracking-tight">
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                      </span>
+                                                      <div className="flex-shrink-0">{icon}</div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
 
                                     {/* AR Specific Rendering */}
                                     {type === 'AR' ? (
@@ -1923,9 +2069,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 key={imgIdx}
                                                 className="relative group cursor-pointer"
                                                 onClick={() => {
-                                                  setZoomedImage(imageUrl);
-                                                  setZoomedImageTitle(`Your Answer Image ${imgIdx + 1}`);
-                                                  setShowZoomModal(true);
+                                                  const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+                                                  handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, annotation);
                                                 }}
                                               >
                                                 <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
@@ -1954,24 +2099,29 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             {subQ.studentImages && subQ.studentImages.length > 0 && (
                                               <div className="mt-2 ps-4">
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                                  {subQ.studentImages.map((imageUrl: string, imgIdx: number) => (
-                                                    <div
-                                                      key={imgIdx}
-                                                      className="relative group cursor-pointer"
-                                                      onClick={() => {
-                                                        setZoomedImage(imageUrl);
-                                                        setZoomedImageTitle(`Sub-question ${subIdx + 1} Image ${imgIdx + 1}`);
-                                                        setShowZoomModal(true);
-                                                      }}
-                                                    >
-                                                      <img
-                                                        src={imageUrl}
-                                                        alt={`Sub ${subIdx + 1} Img ${imgIdx + 1}`}
-                                                        crossOrigin="anonymous"
-                                                        className="w-full h-20 object-contain rounded-lg border border-indigo-200 bg-white dark:bg-slate-900"
-                                                      />
-                                                    </div>
-                                                  ))}
+                                                  {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
+                                                    const annotation = question.allDrawings?.find(d =>
+                                                      d.originalImagePath === imageUrl || (d.imageIndex === imgIdx && (question.type === 'CQ' || question.type === 'SQ'))
+                                                    );
+                                                    return (
+                                                      <div
+                                                        key={imgIdx}
+                                                        className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-md hover:shadow-xl transition-all"
+                                                        onClick={() => {
+                                                          handleImageZoom(imageUrl, `Question ${index + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, annotation);
+                                                        }}
+                                                      >
+                                                        <img src={imageUrl} alt={`Sub-Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                        {annotation && (
+                                                          <div className="absolute top-2 right-2">
+                                                            <div className="bg-emerald-500 rounded-full p-1 shadow-lg ring-2 ring-white animate-pulse">
+                                                              <Zap className="h-3 w-3 text-white fill-white" />
+                                                            </div>
+                                                          </div>
+                                                        )}
+                                                      </div>
+                                                    );
+                                                  })}
                                                 </div>
                                               </div>
                                             )}
@@ -2075,8 +2225,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
                                     </div>
                                     {question.studentAnswer && (
-                                      <div className="p-3 rounded-lg border-2 border-blue-200 bg-blue-50 dark:bg-blue-900/10 dark:border-blue-900">
-                                        <p className="text-sm">{question.studentAnswer}</p>
+                                      <div className="p-4 rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 dark:bg-indigo-900/10 dark:border-indigo-900/50 shadow-inner">
+                                        <p className="text-sm font-medium leading-relaxed">{question.studentAnswer}</p>
+                                      </div>
+                                    )}
+
+                                    {/* SQ Student Images and Annotations */}
+                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
+                                      <div className="mt-6">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                          {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => {
+                                            const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+
+                                            return (
+                                              <div
+                                                key={imgIdx}
+                                                className="relative group cursor-pointer aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl hover:shadow-2xl transition-all duration-500 scale-100 hover:scale-[1.05] z-10"
+                                                onClick={() => {
+                                                  const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+                                                  handleImageZoom(imageUrl, `Short Question ${index + 1} - Image ${imgIdx + 1}`, annotation);
+                                                }}
+                                              >
+                                                <img
+                                                  src={imageUrl}
+                                                  alt={`Response ${imgIdx + 1}`}
+                                                  crossOrigin="anonymous"
+                                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                                />
+                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                                                  <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Page {imgIdx + 1}</span>
+                                                </div>
+                                                {annotation && (
+                                                  <div className="absolute top-3 right-3">
+                                                    <Badge className="bg-emerald-600/90 backdrop-blur-md text-white border-none shadow-lg flex items-center gap-1 py-1 px-3 rounded-full animate-bounce">
+                                                      <Zap className="w-3 h-3 fill-white" /> Annotated
+                                                    </Badge>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
                                       </div>
                                     )}
                                     {question.modelAnswer && (
