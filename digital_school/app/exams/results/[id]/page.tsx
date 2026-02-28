@@ -2110,6 +2110,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No text response provided.</div>
                                             )}
 
+                                            {/* Sub-question Model Answer (Correct Answer) */}
+                                            {(subQ.answer || subQ.modelAnswer) && (
+                                              <div className="mt-2 p-3 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 shadow-sm text-sm">
+                                                <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                                  <CheckCircle className="h-3 w-3" /> Model Answer / Explanation
+                                                </div>
+                                                <div className="text-foreground italic font-medium">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.answer || subQ.modelAnswer)}</UniversalMathJax>
+                                                </div>
+                                              </div>
+                                            )}
+
                                             {/* Sub-question Uploaded Images */}
                                             {subQ.studentImages && subQ.studentImages.length > 0 && (
                                               <div className="mt-3 ps-4">
