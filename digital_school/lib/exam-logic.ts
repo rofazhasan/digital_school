@@ -340,12 +340,17 @@ export async function releaseExamResults(examId: string) {
         });
         const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
 
-        const emailPromises = resultsWithUsers
-            .filter((res: any) => res.student.user.email) // Only send if student has email
-            .map(async (res: any) => {
-                // Map results to ResultItem format for email
-                // Note: The current result schema might not store per-subject marks in a way that maps perfectly to "results" prop in ExamResultEmail
-                // For now, we'll provide the overall summary and a generic entry for the exam subject
+        // Sequential email sending for stability
+        let sentCount = 0;
+        let failCount = 0;
+
+        for (let i = 0; i < resultsWithUsers.length; i++) {
+            const res = resultsWithUsers[i];
+            if (!res.student.user.email) continue;
+
+            console.log(`[EMAIL] Processing ${i + 1}/${resultsWithUsers.length}: ${res.student.user.email}`);
+
+            try {
                 const resultItems = [{
                     subject: (exam as any).subject || exam?.name || "General",
                     marks: res.total,
@@ -353,7 +358,7 @@ export async function releaseExamResults(examId: string) {
                     grade: res.grade || "F"
                 }];
 
-                return sendEmail({
+                await sendEmail({
                     to: res.student.user.email!,
                     subject: `Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
                     react: ExamResultEmail({
@@ -368,10 +373,20 @@ export async function releaseExamResults(examId: string) {
                         examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined
                     }) as any
                 });
-            });
+                sentCount++;
 
-        await Promise.allSettled(emailPromises);
-        console.log(`✉️ Sent result emails to ${emailPromises.length} students.`);
+                // Short cooldown for server health
+                if (i < resultsWithUsers.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+            } catch (err) {
+                console.error(`❌ Failed to send email to ${res.student.user.email}:`, err);
+                failCount++;
+            }
+        }
+
+        console.log(`✉️ Batch complete: Successfully sent ${sentCount} emails. Failed: ${failCount}.`);
+        console.log(`✉️ Sent result emails to ${sentCount} students.`);
     } catch (emailError) {
         console.error("Failed to send result emails:", emailError);
     }

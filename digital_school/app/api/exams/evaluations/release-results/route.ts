@@ -119,109 +119,93 @@ export async function POST(req: NextRequest) {
 
     await Promise.all(updatePromises);
 
-    // Trigger email sending and AWAIT it
-    const sendResultEmails = async () => {
+    // Fetch institute data for branding once
+    const institute = await prisma.institute.findFirst({
+      select: { name: true, address: true, phone: true, logoUrl: true }
+    });
+
+    // Sequential email sending for stability (PDF generation is resource-intensive)
+    let sentCount = 0;
+    let failCount = 0;
+
+    for (let i = 0; i < resultsWithRanks.length; i++) {
+      const result = resultsWithRanks[i];
+      if (!result.student.user.email) continue;
+
+      console.log(`[EMAIL] Processing ${i + 1}/${resultsWithRanks.length}: ${result.student.user.email}`);
+
       try {
-        // Fetch institute data for branding
-        const institute = await prisma.institute.findFirst({
-          select: { name: true, address: true, phone: true, logoUrl: true }
+        // Map complete breakdown for accuracy
+        const breakdown = [{
+          subject: exam.name,
+          marks: result.total,
+          totalMarks: exam.totalMarks,
+          grade: result.grade || 'N/A',
+          mcqMarks: result.mcqMarks,
+          sqMarks: result.sqMarks,
+          cqMarks: result.cqMarks
+        }];
+
+        // Determine base URL dynamically needed for puppeteer
+        const protocol = req.headers.get("x-forwarded-proto") || "http";
+        const host = req.headers.get("host") || "localhost:3000";
+        const baseUrl = `${protocol}://${host}`;
+
+        // Generate PDF Attachment
+        const pdfBuffer = await generateStudentScriptPDF({
+          examId: exam.id,
+          studentId: result.studentId,
+          baseUrl: baseUrl
         });
 
-        // Pre-load fonts once for efficiency
-        let fonts = undefined;
-        try {
-          const fontPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Regular.ttf');
-          const fontBoldPath = path.join(process.cwd(), 'public/fonts/NotoSansBengali-Bold.ttf');
-
-          fonts = {
-            regular: fs.existsSync(fontPath) ? fs.readFileSync(fontPath).toString('base64') : undefined,
-            bold: fs.existsSync(fontBoldPath) ? fs.readFileSync(fontBoldPath).toString('base64') : undefined
-          };
-        } catch (fontErr) {
-          console.error("Failed to pre-load fonts:", fontErr);
-        }
-
-        const emailPromises = resultsWithRanks.map(result => {
-          if (!result.student.user.email) return Promise.resolve();
-
-          // Map complete breakdown for accuracy
-          const breakdown = [{
-            subject: exam.name,
-            marks: result.total,
-            totalMarks: exam.totalMarks,
-            grade: result.grade || 'N/A',
-            mcqMarks: result.mcqMarks,
-            sqMarks: result.sqMarks,
-            cqMarks: result.cqMarks
-          }];
-
-          return (async () => {
-            try {
-              // Find the specific submission for this student to get answers and notes
-              const studentSubmission = exam.examSubmissions.find(s => s.studentId === result.studentId);
-
-              // Determine base URL dynamically needed for puppeteer
-              const protocol = req.headers.get("x-forwarded-proto") || "http";
-              const host = req.headers.get("host") || "localhost:3000";
-              const baseUrl = `${protocol}://${host}`;
-
-              // Generate PDF Attachment
-              const pdfBuffer = await generateStudentScriptPDF({
-                examId: exam.id,
-                studentId: result.studentId,
-                baseUrl: baseUrl
-              });
-
-
-              return sendEmail({
-                to: result.student.user.email!,
-                subject: `Exam Result Released: ${exam.name}`,
-                react: ExamResultEmail({
-                  studentName: result.student.user.name,
-                  examName: exam.name,
-                  results: breakdown,
-                  totalPercentage: result.percentage || 0,
-                  finalGrade: result.grade || 'N/A',
-                  rank: result.rank || undefined,
-                  institute: institute as any,
-                  examDate: exam.date.toLocaleDateString(),
-                  remarks: result.comment || undefined,
-                  examId: exam.id,
-                  studentId: result.studentId,
-                  baseUrl: baseUrl
-                }) as any,
-                attachments: [
-                  {
-                    filename: `${result.student.user.name.replace(/\s+/g, '_')}_Result.pdf`,
-                    content: pdfBuffer
-                  }
-                ]
-              });
-            } catch (err) {
-              console.error(`Failed to send email to ${result.student.user.email}:`, err);
-              return Promise.resolve();
+        await sendEmail({
+          to: result.student.user.email!,
+          subject: `Exam Result Released: ${exam.name}`,
+          react: ExamResultEmail({
+            studentName: result.student.user.name,
+            examName: exam.name,
+            results: breakdown,
+            totalPercentage: result.percentage || 0,
+            finalGrade: result.grade || 'N/A',
+            rank: result.rank || undefined,
+            institute: institute as any,
+            examDate: exam.date.toLocaleDateString(),
+            remarks: result.comment || undefined,
+            examId: exam.id,
+            studentId: result.studentId,
+            baseUrl: baseUrl
+          }) as any,
+          attachments: [
+            {
+              filename: `${result.student.user.name.replace(/\s+/g, '_')}_Result.pdf`,
+              content: pdfBuffer
             }
-          })();
+          ]
         });
+        sentCount++;
 
-        await Promise.allSettled(emailPromises);
+        // Short cooldown for server health if not the last one
+        if (i < resultsWithRanks.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
       } catch (err) {
-        console.error('Failed to send result emails:', err);
+        console.error(`❌ Failed to send email to ${result.student.user.email}:`, err);
+        failCount++;
       }
-    };
+    }
 
-    await sendResultEmails();
-
-    const updatedResults = { count: resultsWithRanks.length };
+    console.log(`✉️ Batch complete: Successfully sent ${sentCount} emails. Failed: ${failCount}.`);
 
     return NextResponse.json({
       success: true,
-      message: `Results released for exam ${exam.name}. ${updatedReviews.count} review requests closed.`,
-      publishedCount: updatedResults.count,
+      message: `Results released for exam ${exam.name}. Successfully sent ${sentCount} emails. ${failCount > 0 ? `Failed ${failCount}.` : ''} ${updatedReviews.count} review requests closed.`,
+      publishedCount: resultsWithRanks.length,
+      sentCount,
+      failCount,
       closedReviewsCount: updatedReviews.count
     });
   } catch (error) {
     console.error("Error releasing results:", error);
     return NextResponse.json({ error: "Failed to release results" }, { status: 500 });
   }
-} 
+}
