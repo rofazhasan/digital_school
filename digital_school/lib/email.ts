@@ -2,35 +2,27 @@ import nodemailer from 'nodemailer';
 import { render } from '@react-email/render';
 import React from 'react';
 
-// Create a singleton transporter for Gmail SMTP
+// Create a singleton transporter for Brevo SMTP
 let transporter: any = null;
 
 function getTransporter() {
     if (!transporter) {
-        const host = process.env.SMTP_HOST;
+        // Brevo SMTP Defaults
+        const host = process.env.SMTP_HOST || 'smtp-relay.brevo.com';
         const port = Number(process.env.SMTP_PORT) || 587;
-        const user = process.env.SMTP_USER || process.env.GMAIL_USER;
-        const pass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD;
+        const user = process.env.SMTP_USER;
+        const pass = process.env.SMTP_PASS;
 
         if (!user || !pass) {
-            console.warn('⚠️ SMTP credentials not defined. Email sending will fail.');
+            console.warn('⚠️ Brevo SMTP credentials (SMTP_USER/SMTP_PASS) not defined. Email sending will fail.');
         }
 
-        // If host is explicitly provided, use generic SMTP (e.g., Brevo)
-        if (host) {
-            transporter = nodemailer.createTransport({
-                host,
-                port,
-                secure: port === 465,
-                auth: { user, pass },
-            });
-        } else {
-            // Fallback to Gmail service if no host is provided
-            transporter = nodemailer.createTransport({
-                service: 'gmail',
-                auth: { user, pass },
-            });
-        }
+        transporter = nodemailer.createTransport({
+            host,
+            port,
+            secure: port === 465,
+            auth: { user, pass },
+        });
     }
     return transporter;
 }
@@ -49,14 +41,14 @@ interface SendEmailProps {
 }
 
 /**
- * Standardized function to send emails using Gmail SMTP (via Nodemailer).
- * Replaces Resend for better reliability and free arbitrary recipient support.
+ * Standardized function to send emails using Brevo SMTP.
+ * Reliable and supports high daily limits.
  */
 export async function sendEmail({
     to,
     subject,
     react,
-    from = process.env.EMAIL_FROM || 'onboarding@resend.dev',
+    from = process.env.EMAIL_FROM || 'Digital School <onboarding@resend.dev>',
     replyTo,
     attachments,
 }: SendEmailProps) {
@@ -66,7 +58,7 @@ export async function sendEmail({
         // Render the React component to HTML
         const html = await render(react as React.ReactElement);
 
-        console.log(`[EMAIL] Attempting to send email to ${to} with ${attachments?.length || 0} attachments.`);
+        console.log(`[EMAIL] Attempting to send email via Brevo to ${to} with ${attachments?.length || 0} attachments.`);
 
         const info = await mailer.sendMail({
             from,
@@ -84,10 +76,10 @@ export async function sendEmail({
             })
         });
 
-        console.log('[EMAIL] Email sent successfully via Gmail:', info.messageId);
+        console.log('[EMAIL] Email sent successfully via Brevo:', info.messageId);
         return { success: true, data: info };
     } catch (error) {
-        console.error('[EMAIL] Unexpected SMTP Error:', error);
+        console.error('[EMAIL] Brevo SMTP Error:', error);
         return { success: false, error };
     }
 }
