@@ -1,3 +1,4 @@
+# Triggering initial deployment
 name: Deploy to Azure App Service
 
 on:
