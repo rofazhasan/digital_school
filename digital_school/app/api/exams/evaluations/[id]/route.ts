@@ -16,6 +16,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Role check: Students are NOT allowed to access evaluation details
+    if (tokenData.user.role === "STUDENT") {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
+
     const { id: examId } = await params;
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get('studentId');

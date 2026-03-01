@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, use } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ interface ExamResult {
 
 export default function ExamResultsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [examName, setExamName] = useState("");
     const [results, setResults] = useState<ExamResult[]>([]);
@@ -42,29 +44,31 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
 
+    const [isCheckingRole, setIsCheckingRole] = useState(true);
+
     useEffect(() => {
         const checkRoleAndRedirect = async () => {
             try {
-                // We'll use a fetch to check the current user's role
                 const response = await fetch('/api/user');
                 if (response.ok) {
                     const data = await response.json();
                     const role = data.user?.role;
                     if (role === 'STUDENT') {
                         toast.info('You do not have permission to view class-wide results.');
-                        // Direct reload/redirect to results page
-                        window.location.href = '/exams/results';
+                        router.push('/exams/results');
                         return;
                     }
                 }
+                setIsCheckingRole(false);
+                fetchResults();
             } catch (error) {
                 console.error('Error checking user role:', error);
+                router.push('/exams/results');
             }
-            fetchResults();
         };
 
         checkRoleAndRedirect();
-    }, [id]);
+    }, [id, router]);
 
     const fetchResults = async () => {
         try {
@@ -172,10 +176,12 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
         return <span className="font-medium text-gray-500">#{rank}</span>;
     };
 
-    if (loading) {
+    if (loading || isCheckingRole) {
         return (
             <div className="container mx-auto p-6 flex justify-center items-center h-64">
-                <div className="text-lg text-muted-foreground animate-pulse">Loading results...</div>
+                <div className="text-lg text-muted-foreground animate-pulse">
+                    {isCheckingRole ? "Verifying permissions..." : "Loading results..."}
+                </div>
             </div>
         );
     }
