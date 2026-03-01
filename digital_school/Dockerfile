@@ -3,10 +3,20 @@ FROM node:22 AS deps
 WORKDIR /app
 
 # Add building tools explicitly for native modules (bcrypt, canvas)
-RUN apt-get update && apt-get install -y build-essential python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    make \
+    g++ \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Identifiable build marker
-ENV BUILD_VERSION="DEBUG_INSTALL_V2"
+ENV BUILD_VERSION="DEBUG_INSTALL_V3_CANVAS_HEADERS"
 
 # Install dependencies (skipping lockfile temporarily for debugging)
 COPY package.json ./
