@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Identifiable build marker
-ENV BUILD_VERSION="V4_CLEAN_DEPS"
+ENV BUILD_VERSION="V5_IGNORE_SCRIPTS"
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --ignore-scripts
 
 # 2. Rebuild the source code only when needed
 FROM node:22 AS builder
