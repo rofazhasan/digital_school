@@ -2,6 +2,12 @@
 FROM node:22 AS deps
 WORKDIR /app
 
+# Add building tools explicitly for native modules (bcrypt, canvas)
+RUN apt-get update && apt-get install -y build-essential python3 make g++ && rm -rf /var/lib/apt/lists/*
+
+# Identifiable build marker
+ENV BUILD_VERSION="DEBUG_INSTALL_V2"
+
 # Install dependencies (skipping lockfile temporarily for debugging)
 COPY package.json ./
 RUN npm cache clean --force && npm install --no-package-lock --legacy-peer-deps --verbose
