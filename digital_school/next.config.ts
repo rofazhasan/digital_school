@@ -6,6 +6,7 @@ const withPWA = require('next-pwa')({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = withPWA({
+  output: 'standalone',
   turbopack: {},
   typescript: {
     // Warning: This allows production builds to successfully complete even if
