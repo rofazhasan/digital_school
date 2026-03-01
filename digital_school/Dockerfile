@@ -1,7 +1,29 @@
-# Base image with Node.js 22
-FROM node:22-slim AS base
+# 1. Install dependencies only when needed
+FROM node:22 AS deps
+WORKDIR /app
 
-# Install dependencies for Puppeteer (Chromium)
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
+
+# 2. Rebuild the source code only when needed
+FROM node:22 AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build Next.js
+ENV NEXT_TELEMETRY_DISABLED 1
+RUN npm run build
+
+# 3. Production image, copy all the files and run next
+FROM node:22-slim AS runner
+WORKDIR /app
+
+# Install dependencies for Puppeteer (Chromium) in the final runner
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     fonts-liberation \
@@ -25,6 +47,7 @@ RUN apt-get update && apt-get install -y \
     libstdc++6 \
     libx11-6 \
     libx11-xcb1 \
+    libx11-6 \
     libxcb1 \
     libxcomposite1 \
     libxcursor1 \
@@ -40,42 +63,8 @@ RUN apt-get update && apt-get install -y \
     lsb-release \
     wget \
     xdg-utils \
-    build-essential \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libjpeg-dev \
-    libgif-dev \
-    librsvg2-dev \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
-
-# 1. Install dependencies only when needed
-FROM base AS deps
-WORKDIR /app
-
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps --verbose
-
-# 2. Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-
-# Generate Prisma client
-RUN npx prisma generate
-
-# Build Next.js
-ENV NEXT_TELEMETRY_DISABLED 1
-RUN npm run build
-
-# 3. Production image, copy all the files and run next
-FROM base AS runner
-WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
@@ -90,7 +79,6 @@ RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
-# https://nextjs.org/docs/advanced-features/output-file-tracing
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
