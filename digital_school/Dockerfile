@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Identifiable build marker
-ENV BUILD_VERSION="V5_IGNORE_SCRIPTS"
+ENV BUILD_VERSION="V6_REDEPLOY_ENV_APPLY"
 
 # Install dependencies
 COPY package.json package-lock.json* ./
