@@ -28,10 +28,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: digital_school
+          file: digital_school/Dockerfile
           push: true
           tags: ${{ secrets.AZURE_CONTAINER_REGISTRY_LOGIN_SERVER }}/digital-school:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3

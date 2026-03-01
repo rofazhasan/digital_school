@@ -1,0 +1,9 @@
+.git
+.github
+.venv
+venv
+digital_school/.next
+digital_school/node_modules
+digital_school/out
+digital_school/build
+digital-school-app.PublishSettings
