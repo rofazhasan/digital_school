@@ -2,9 +2,9 @@
 FROM node:22 AS deps
 WORKDIR /app
 
-# Install dependencies
-COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# Install dependencies (skipping lockfile temporarily for debugging)
+COPY package.json ./
+RUN npm cache clean --force && npm install --no-package-lock --legacy-peer-deps --verbose
 
 # 2. Rebuild the source code only when needed
 FROM node:22 AS builder
