@@ -16,11 +16,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Identifiable build marker
-ENV BUILD_VERSION="DEBUG_INSTALL_V3_CANVAS_HEADERS"
+ENV BUILD_VERSION="V4_CLEAN_DEPS"
 
-# Install dependencies (skipping lockfile temporarily for debugging)
-COPY package.json ./
-RUN npm cache clean --force && npm install --no-package-lock --legacy-peer-deps --verbose
+# Install dependencies
+COPY package.json package-lock.json* ./
+RUN npm install --legacy-peer-deps
 
 # 2. Rebuild the source code only when needed
 FROM node:22 AS builder
