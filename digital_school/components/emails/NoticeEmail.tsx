@@ -24,7 +24,7 @@ export const NoticeEmail: React.FC<Readonly<NoticeEmailProps>> = ({
     publishDate,
     priority = 'MEDIUM',
     institute = { name: 'Digital School' },
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitalschool.netlify.app',
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
 }) => {
     const priorityColor = priority === 'HIGH' ? '#ef4444' : priority === 'MEDIUM' ? '#f59e0b' : '#3b82f6';
     const priorityLabel = priority === 'HIGH' ? 'URGENT' : priority === 'MEDIUM' ? 'IMPORTANT' : 'ANNOUNCEMENT';

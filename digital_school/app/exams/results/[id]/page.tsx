@@ -893,7 +893,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   <Sparkles className="h-3 w-3" /> Official Assessment Report
                 </motion.div>
 
-                <h1 className="text-5xl md:text-7xl lg:text-9xl font-black leading-[0.85] tracking-tighter break-words">
+                <h1 className="text-4xl md:text-6xl lg:text-8xl font-black leading-[0.85] tracking-tighter break-words">
                   <span className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-500 dark:from-white dark:via-slate-200 dark:to-slate-400 bg-clip-text text-transparent">
                     Academic Review.
                   </span>
@@ -950,19 +950,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 pt-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                     <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-slate-50/80 dark:bg-slate-800/50 border border-white shadow-inner dark:border-slate-700/30 overflow-hidden">
                       <label className="text-[10px] uppercase tracking-widest font-black text-slate-400 dark:text-slate-500">Student Name</label>
-                      <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white break-words">{result.student.name}</div>
+                      <div className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white break-words">{result.student.name}</div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
                       <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-indigo-50/80 dark:bg-indigo-950/30 border border-white dark:border-indigo-900/30 text-center shadow-inner overflow-hidden">
                         <label className="text-[10px] uppercase tracking-widest font-black text-indigo-400 dark:text-indigo-600">Roll</label>
-                        <div className="text-xl sm:text-2xl font-black text-indigo-900 dark:text-indigo-400 break-words">{result.student.roll}</div>
+                        <div className="text-lg sm:text-2xl font-black text-indigo-900 dark:text-indigo-400 break-words">{result.student.roll}</div>
                       </div>
                       <div className="space-y-2 p-4 sm:p-6 rounded-[2rem] bg-purple-50/80 dark:bg-purple-950/30 border border-white dark:border-purple-900/30 text-center shadow-inner overflow-hidden">
                         <label className="text-[10px] uppercase tracking-widest font-black text-purple-400 dark:text-purple-600">Class</label>
-                        <div className="text-xl sm:text-2xl font-black text-purple-900 dark:text-purple-400 break-words">{result.student.class}</div>
+                        <div className="text-lg sm:text-2xl font-black text-purple-900 dark:text-purple-400 break-words">{result.student.class}</div>
                       </div>
                     </div>
                   </div>
@@ -1035,7 +1035,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                           const minutes = Math.floor(totalMs / (1000 * 60));
                           const seconds = Math.floor((totalMs % (1000 * 60)) / 1000);
-                          return <span className="flex items-baseline flex-wrap justify-center"><span className="text-xl sm:text-3xl">{minutes}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">m</span> <span className="text-xl sm:text-3xl ml-1">{seconds}</span><span className="text-[10px] ml-0.5 uppercase opacity-60">s</span></span>;
+                          return <span className="flex items-baseline flex-wrap justify-center"><span className="text-lg sm:text-3xl">{minutes}</span><span className="text-[9px] sm:text-[10px] ml-0.5 uppercase opacity-60">m</span> <span className="text-lg sm:text-3xl ml-1">{seconds}</span><span className="text-[9px] sm:text-[10px] ml-0.5 uppercase opacity-60">s</span></span>;
                         })()}
                       </div>
                     </div>
@@ -1188,7 +1188,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         </h4>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {objectiveQuestions.length > 0 && (
                           <div className="p-4 sm:p-6 rounded-[2rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-200/50 dark:border-slate-700/30 hover:shadow-lg hover:bg-white/80 dark:hover:bg-slate-800 transition-all duration-300 overflow-hidden">
                             <div className="flex items-center justify-between mb-4">

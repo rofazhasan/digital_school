@@ -44,7 +44,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     rank,
     hasAttachment = true,
     institute = { name: 'institute.name' },
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitalschool.netlify.app',
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     semester = '2026 Academic Session',
     section = 'A',
     examDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),

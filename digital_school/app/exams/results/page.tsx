@@ -596,33 +596,33 @@ export default function ExamResultsPage() {
 
                   {/* Summary Cards */}
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                      <div className="text-center p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
-                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
+                      <div className="text-center p-3 md:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
+                        <div className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
                           {studentResult.total || 0}
                         </div>
-                        <div className="text-sm text-blue-600 dark:text-blue-400">Your Score</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">Score</div>
+                        <div className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
                           out of {examResult.exam?.totalMarks || 0}
                         </div>
                       </div>
-                      <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
-                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      <div className="text-center p-3 md:p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
+                        <div className="text-xl md:text-2xl font-bold text-green-600 dark:text-green-400">
                           {studentResult.percentage?.toFixed(1) || 0}%
                         </div>
-                        <div className="text-sm text-green-600 dark:text-green-400">Percentage</div>
+                        <div className="text-xs md:text-sm text-green-600 dark:text-green-400">Percentage</div>
                       </div>
-                      <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
-                        <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+                      <div className="text-center p-3 md:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
+                        <div className="text-xl md:text-2xl font-bold text-purple-600 dark:text-purple-400">
                           {studentResult.grade || 'N/A'}
                         </div>
-                        <div className="text-sm text-purple-600 dark:text-purple-400">Grade</div>
+                        <div className="text-xs md:text-sm text-purple-600 dark:text-purple-400">Grade</div>
                       </div>
-                      <div className="text-center p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-100/50 dark:border-orange-800/20">
-                        <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                      <div className="text-center p-3 md:p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-100/50 dark:border-orange-800/20">
+                        <div className="text-xl md:text-2xl font-bold text-orange-600 dark:text-orange-400">
                           {studentResult.rank || 'N/A'}
                         </div>
-                        <div className="text-sm text-orange-600 dark:text-orange-400">Rank</div>
+                        <div className="text-xs md:text-sm text-orange-600 dark:text-orange-400">Rank</div>
                       </div>
                     </div>
 
@@ -632,31 +632,31 @@ export default function ExamResultsPage() {
                         <BarChart3 className="w-4 h-4" />
                         Detailed Breakdown
                       </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="p-4 border rounded-lg">
-                          <div className="text-sm text-muted-foreground">MCQ Marks</div>
-                          <div className="text-xl font-semibold">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                        <div className="p-3 md:p-4 border rounded-lg">
+                          <div className="text-xs md:text-sm text-muted-foreground">MCQ Marks</div>
+                          <div className="text-lg md:text-xl font-semibold">
                             {studentResult.mcqMarks || 0}
                           </div>
                           <Progress
                             value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2"
+                            className="mt-2 h-1.5 md:h-2"
                           />
                         </div>
-                        <div className="p-4 border rounded-lg">
-                          <div className="text-sm text-muted-foreground">CQ Marks</div>
-                          <div className="text-xl font-semibold">{studentResult.cqMarks || 0}</div>
+                        <div className="p-3 md:p-4 border rounded-lg">
+                          <div className="text-xs md:text-sm text-muted-foreground">CQ Marks</div>
+                          <div className="text-lg md:text-xl font-semibold">{studentResult.cqMarks || 0}</div>
                           <Progress
                             value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2"
+                            className="mt-2 h-1.5 md:h-2"
                           />
                         </div>
-                        <div className="p-4 border rounded-lg">
-                          <div className="text-sm text-muted-foreground">SQ Marks</div>
-                          <div className="text-xl font-semibold">{studentResult.sqMarks || 0}</div>
+                        <div className="p-3 md:p-4 border rounded-lg">
+                          <div className="text-xs md:text-sm text-muted-foreground">SQ Marks</div>
+                          <div className="text-lg md:text-xl font-semibold">{studentResult.sqMarks || 0}</div>
                           <Progress
                             value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2"
+                            className="mt-2 h-1.5 md:h-2"
                           />
                         </div>
                       </div>
@@ -734,12 +734,25 @@ export default function ExamResultsPage() {
                             <BookOpen className="w-4 h-4" />
                             Next Steps
                           </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Button variant="outline" className="w-full">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                            <Button
+                              variant="outline"
+                              className="w-full h-10 md:h-11"
+                              onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
+                            >
                               <Eye className="w-4 h-4 mr-2" />
                               View Detailed Answers
                             </Button>
-                            <Button variant="outline" className="w-full">
+                            <Button
+                              variant="outline"
+                              className="w-full h-10 md:h-11"
+                              onClick={() => {
+                                toggleExpandedResult(examResult.exam.id);
+                                setTimeout(() => {
+                                  toast.info("Scroll down to provide comments for review.");
+                                }, 100);
+                              }}
+                            >
                               <MessageSquare className="w-4 h-4 mr-2" />
                               Request Review
                             </Button>

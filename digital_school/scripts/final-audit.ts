@@ -17,7 +17,7 @@ async function testTemplates() {
         name: 'Elite Cyber Academy',
         address: '123 Tech Plaza, Dhaka',
         phone: '+880 1234 567890',
-        logoUrl: 'https://digitalschool.netlify.app/logo.png'
+        logoUrl: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/logo.png`
     };
 
     const templates = [
@@ -55,7 +55,7 @@ async function testTemplates() {
             subject: 'Reset Your Password',
             react: PasswordResetEmail({
                 firstName: 'Rafiu',
-                resetLink: 'https://digitalschool.netlify.app/reset-password?token=test-token',
+                resetLink: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=test-token`,
                 institute: institute as any
             })
         },

@@ -39,6 +39,20 @@ export async function GET(request: NextRequest) {
             return NextResponse.json({ error: 'Practice result not found' }, { status: 404 });
         }
 
+        // Ownership check: Student can only see their own results.
+        // Teachers, Admins, and Super Users can see all.
+        const isStudent = tokenData.user.role === 'STUDENT';
+        const canViewAll = ['TEACHER', 'ADMIN', 'SUPER_USER'].includes(tokenData.user.role);
+
+        if (isStudent && practiceResult.studentId !== tokenData.user.studentProfile?.id) {
+            console.warn(`⛔ Unauthorized access attempt to practice result ${resultId} by student ${tokenData.user.id}`);
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
+        if (!canViewAll && isStudent && practiceResult.studentId !== tokenData.user.studentProfile?.id) {
+            return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+        }
+
         const exam = practiceResult.exam;
         const studentAnswers = practiceResult.answers as any || {};
 

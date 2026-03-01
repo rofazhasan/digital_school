@@ -1,4 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env
+dotenv.config();
 
 const config: CapacitorConfig = {
   appId: 'com.examify.app',
@@ -7,7 +11,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: true,
-    url: 'https://digitalsch.netlify.app',
+    url: process.env.NEXT_PUBLIC_APP_URL || 'https://digitalsch.netlify.app',
   },
   plugins: {
     SplashScreen: {

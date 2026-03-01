@@ -43,7 +43,27 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     const itemsPerPage = 20;
 
     useEffect(() => {
-        fetchResults();
+        const checkRoleAndRedirect = async () => {
+            try {
+                // We'll use a fetch to check the current user's role
+                const response = await fetch('/api/user');
+                if (response.ok) {
+                    const data = await response.json();
+                    const role = data.user?.role;
+                    if (role === 'STUDENT') {
+                        toast.info('You do not have permission to view class-wide results.');
+                        // Direct reload/redirect to results page
+                        window.location.href = '/exams/results';
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking user role:', error);
+            }
+            fetchResults();
+        };
+
+        checkRoleAndRedirect();
     }, [id]);
 
     const fetchResults = async () => {

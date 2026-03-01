@@ -18,7 +18,7 @@ interface WelcomeEmailProps {
 export const WelcomeEmail: React.FC<Readonly<WelcomeEmailProps>> = ({
     firstName,
     institute = { name: 'Digital School' },
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://digitalschool.netlify.app',
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
     temporaryPassword,
     verificationLink,
 }) => (
