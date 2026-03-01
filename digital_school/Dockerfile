@@ -44,6 +44,11 @@ RUN apt-get update && apt-get install -y \
     python3 \
     make \
     g++ \
+    libcairo2-dev \
+    libpango1.0-dev \
+    libjpeg-dev \
+    libgif-dev \
+    librsvg2-dev \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
@@ -53,7 +58,7 @@ WORKDIR /app
 
 # Install dependencies
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps --verbose
 
 # 2. Rebuild the source code only when needed
 FROM base AS builder
