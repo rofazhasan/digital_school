@@ -4,8 +4,9 @@
 [build.environment]
   NODE_VERSION = "22"
   NPM_FLAGS = "--legacy-peer-deps"
-  NEXTAUTH_URL = "https://digitalsch.netlify.app"
-  NEXT_PUBLIC_APP_URL = "https://digitalsch.netlify.app"
+  # Set these in Netlify Dashboard
+  # NEXTAUTH_URL = "https://your-domain.com"
+  # NEXT_PUBLIC_APP_URL = "https://your-domain.com"
   NEXT_PUBLIC_APPWRITE_PROJECT_ID = "68aa7b51002070dd9a73"
   NEXT_PUBLIC_APPWRITE_PROJECT_NAME = "digitalsch"
   NEXT_PUBLIC_APPWRITE_ENDPOINT = "https://fra.cloud.appwrite.io/v1"

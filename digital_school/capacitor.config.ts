@@ -11,7 +11,7 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https',
     cleartext: true,
-    url: process.env.NEXT_PUBLIC_APP_URL || 'https://digitalsch.netlify.app',
+    url: process.env.NEXT_PUBLIC_APP_URL,
   },
   plugins: {
     SplashScreen: {
