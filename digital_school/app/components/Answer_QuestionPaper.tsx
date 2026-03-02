@@ -339,10 +339,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     const qNum = isEn ? startNum : toBengaliNumerals(startNum);
 
                     if (q.type === 'MCQ' || q.type === 'MC') {
-                      const totalOptionsLength = (q.options || []).reduce((acc: number, opt: any) => acc + (opt.text || '').length, 0);
-                      let gridClass = "options-grid-4";
-                      if (totalOptionsLength > 60) gridClass = "options-grid-1";
-                      else if (totalOptionsLength > 30) gridClass = "options-grid-2";
+                      const maxOptLen = (q.options || []).reduce((max: number, opt: any) => Math.max(max, (opt.text || '').length), 0);
+                      let gridClass = "options-grid-2"; // default: 2-col (standard BD exam format)
+                      if (maxOptLen <= 4) gridClass = "options-grid-4";  // very short: 4-col
+                      else if (maxOptLen > 15) gridClass = "options-grid-1"; // long phrases: 1-col
 
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
@@ -351,22 +351,27 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               {qNum}.{q.type === 'MC' ? '*' : ''}
                             </span>
                             <div className="flex-1">
-                              <div className="mb-1 text-black">
-                                <span className="font-bold text-gray-800">প্রশ্ন: </span>
-                                <Text>{q.q || q.questionText || ''}</Text>
+                              <Text>{`${q.q || q.questionText || ''} [${toBengaliNumerals(q.marks || 1)}]`}</Text>
+                              {q.type === 'MC' && <div className="text-blue-700 font-bold mb-1">{isEn ? '[Select all correct answers]' : '[সকল সঠিক উত্তর নির্বাচন করো]'}</div>}
+                              <div className={`mt-1 ${gridClass}`}>
+                                {(q.options || []).map((opt: any, oidx: number) => {
+                                  let isCorrectOpt = false;
+                                  if (q.type === 'MC') {
+                                    isCorrectOpt = !!opt.isCorrect;
+                                  } else {
+                                    const cAns = normalizeAnswer(q.correctAnswer);
+                                    isCorrectOpt = (cAns === MCQ_LABELS_BN[oidx] || cAns === MCQ_LABELS_EN[oidx]);
+                                  }
+                                  return (
+                                    <div key={oidx} className={`option-item flex items-start gap-0.5 ${isCorrectOpt ? 'bg-green-100 rounded' : ''}`} style={{ minWidth: 0, wordBreak: 'break-word', overflowWrap: 'break-word' }}>
+                                      {q.type === 'MC' && <span className="flex-shrink-0">{isCorrectOpt ? '☑' : '☐'}</span>}
+                                      <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''} ${isCorrectOpt ? 'bg-green-500 text-white border-green-500' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
+                                      <span className={`flex-1 ${isCorrectOpt ? 'text-green-800 font-bold' : ''}`} style={{ minWidth: 0 }}><Text>{opt.text}</Text></span>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                              <div className={`mb-2 ${gridClass} gap-y-1`}>
-                                {(q.options || []).map((opt: any, oidx: number) => (
-                                  <div key={oidx} className={`option-item flex items-start gap-1 ${q.type === 'MC' && opt.isCorrect ? 'bg-green-100 border-2 border-green-500 font-bold text-green-800' : ''}`}>
-                                    {q.type === 'MC' && <span>{opt.isCorrect ? '☑' : '☐'}</span>}
-                                    <Text>{`${isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]} ${opt.text}`}</Text>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="mb-1">
-                                <span className="text-gray-600 font-medium">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)} {isEn ? 'Marks' : 'নম্বর'}]</span>
-                              </div>
-                              <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mb-1">
+                              <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mt-2 mb-1">
                                 <span className="text-red-700 font-bold">
                                   উত্তর: {isEn ? (q.type === 'MCQ' ? (MCQ_LABELS_EN[MCQ_LABELS_BN.indexOf(normalizeAnswer(q.correctAnswer))] || normalizeAnswer(q.correctAnswer)) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_EN[q.options.indexOf(o)]).join(', ')) : (q.type === 'MCQ' ? normalizeAnswer(q.correctAnswer) : (q.options || []).filter((o: any) => o.isCorrect).map((o: any, i: number) => MCQ_LABELS_BN[q.options.indexOf(o)]).join(', '))}
                                 </span>
@@ -523,9 +528,16 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       return (
                         <div key={idx} className="mb-6 question-block break-inside-avoid">
                           <div className="bg-gray-50 p-2 border-l-4 border-black mb-3 italic text-sm">
-                            <p className="font-bold mb-1">{isEn ? `Stem for questions ${rangeStr}:` : `${rangeStr} নং প্রশ্নের উদ্দীপক:`}</p>
-                            <div className="not-italic">
+                            <p className="font-bold mb-2">
+                              {isEn ? `Read the following stem and answer questions ${rangeStr}:` : `নিচের উদ্দীপকটি পড়ো এবং ${rangeStr} নং প্রশ্নের উত্তর দাও:`}
+                            </p>
+                            <div className="not-italic font-normal">
                               <Text>{q.q || q.questionText || q.stem || ''}</Text>
+                              {q.image && (
+                                <div className="mt-2 text-center">
+                                  <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />
+                                </div>
+                              )}
                             </div>
                           </div>
                           <div className="space-y-4">
@@ -546,18 +558,42 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                 if (idxL !== -1) correctAns = MCQ_LABELS_EN[idxL];
                               }
 
+                              const maxOptLen = (sub.options || []).reduce((max: number, opt: any) => Math.max(max, (typeof opt === 'string' ? opt : opt.text || opt || '').length), 0);
+                              let gridClass = "options-grid-2";
+                              if (maxOptLen <= 4) gridClass = "options-grid-4";
+                              else if (maxOptLen > 15) gridClass = "options-grid-1";
+
                               return (
-                                <div key={sIdx} className="mb-4 text-left border-l-2 border-red-200 pl-3">
+                                <div key={sIdx} className="mb-4 text-left border-l-2 border-red-200 pl-3 break-inside-avoid">
                                   <div className="flex items-start">
                                     <span className="font-bold mr-2">{subNumStr}.</span>
                                     <div className="flex-1">
-                                      <div className="mb-1"><Text>{sub.questionText || sub.question || sub.text || ''}</Text></div>
-                                      <div className="bg-green-50 p-1 border-l-4 border-green-600 inline-block">
-                                        <span className="text-green-700 font-bold">উত্তর: {correctAns}</span>
+                                      <Text>{`${sub.questionText || sub.question || sub.text || ''} [${toBengaliNumerals(sub.marks || 1)}]`}</Text>
+                                      <div className={`mt-1 ${gridClass}`}>
+                                        {(sub.options || []).map((opt: any, oidx: number) => {
+                                          const cAns = normalizeAnswer(correctAns);
+                                          const isCorrectOpt = (cAns === MCQ_LABELS_BN[oidx] || cAns === MCQ_LABELS_EN[oidx]);
+                                          return (
+                                            <div key={oidx} className={`option-item flex items-start gap-0.5 ${isCorrectOpt ? 'bg-green-100 rounded' : ''}`}>
+                                              <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''} ${isCorrectOpt ? 'bg-green-500 text-white border-green-500' : ''}`}>{isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}</span>
+                                              <span className={`flex-1 ${isCorrectOpt ? 'text-green-800 font-bold' : ''}`}><Text>{typeof opt === 'string' ? opt : opt.text}</Text></span>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                      <div className="bg-red-50 p-1 border-l-4 border-red-600 inline-block mt-2 mb-1">
+                                        <span className="text-red-700 font-bold">উত্তর: {correctAns}</span>
                                       </div>
                                       {sub.explanation && (
-                                        <div className="mt-1 text-xs text-gray-600 bg-gray-50 p-1 rounded italic">
-                                          <span className="font-bold">ব্যাখ্যা:</span> <Text>{sub.explanation}</Text>
+                                        <div className="mt-1 text-black bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
+                                          <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
+                                          <UniversalMathJax inline dynamic>
+                                            {cleanupMath(renderDynamicExplanation(
+                                              sub.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                              sub.options,
+                                              'MCQ'
+                                            ))}
+                                          </UniversalMathJax>
                                         </div>
                                       )}
                                     </div>
