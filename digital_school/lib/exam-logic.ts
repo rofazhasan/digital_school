@@ -43,8 +43,9 @@ export function isMCQOnlyExam(exam: any, examSets: any[] = []): boolean {
 
 /**
  * Evaluate a single submission and update its Result
+ * @param saveToDb - if true (default), updates the submission status and saves the result to the DB. If false, calculates and returns scores in-memory without mutating the DB. Useful for previewing evaluations.
  */
-export async function evaluateSubmission(submission: any, exam: any, examSets: any[]) {
+export async function evaluateSubmission(submission: any, exam: any, examSets: any[], saveToDb: boolean = true) {
     let totalScore = 0;
     let mcqMarks = 0;
     let cqMarks = 0;
@@ -229,42 +230,44 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
     const percentage = calculatePercentage(totalScore, exam.totalMarks);
     const grade = calculateGrade(percentage);
 
-    await prisma.examSubmission.update({
-        where: { id: submission.id },
-        data: {
-            score: totalScore,
-            evaluatedAt: new Date(),
-            status: 'SUBMITTED' // Final status
-        }
-    });
-
-    // 4. Upsert Result
-    await prisma.result.upsert({
-        where: {
-            studentId_examId: {
-                studentId: submission.studentId,
-                examId: exam.id
+    if (saveToDb) {
+        await prisma.examSubmission.update({
+            where: { id: submission.id },
+            data: {
+                score: totalScore,
+                evaluatedAt: new Date(),
+                status: 'SUBMITTED' // Final status
             }
-        },
-        update: {
-            total: totalScore,
-            mcqMarks, cqMarks, sqMarks,
-            percentage,
-            grade,
-            isPublished: false, // Don't publish individual results yet (wait for release)
-            examSubmissionId: submission.id
-        },
-        create: {
-            studentId: submission.studentId,
-            examId: exam.id,
-            total: totalScore,
-            mcqMarks, cqMarks, sqMarks,
-            percentage,
-            grade,
-            isPublished: false,
-            examSubmissionId: submission.id
-        }
-    });
+        });
+
+        // 4. Upsert Result
+        await prisma.result.upsert({
+            where: {
+                studentId_examId: {
+                    studentId: submission.studentId,
+                    examId: exam.id
+                }
+            },
+            update: {
+                total: totalScore,
+                mcqMarks, cqMarks, sqMarks,
+                percentage,
+                grade,
+                isPublished: false, // Don't publish individual results yet (wait for release)
+                examSubmissionId: submission.id
+            },
+            create: {
+                studentId: submission.studentId,
+                examId: exam.id,
+                total: totalScore,
+                mcqMarks, cqMarks, sqMarks,
+                percentage,
+                grade,
+                isPublished: false,
+                examSubmissionId: submission.id
+            }
+        });
+    }
 
     return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks };
 }

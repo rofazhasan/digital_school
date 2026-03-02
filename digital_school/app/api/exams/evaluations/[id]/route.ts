@@ -270,173 +270,173 @@ export async function GET(
     const examSets = (exam as any).examSets || [];
 
     for (const submission of (exam as any).examSubmissions) {
-      try {
-        const evaluation = await evaluateSubmission(submission, exam, examSets);
+      // Pass false for saveToDb so we don't forcefully auto-submit active exams when viewing them
+      const evaluation = await evaluateSubmission(submission, exam, examSets, false);
 
-        let evaluationStatus = 'PENDING';
-        const hasManualGrading = Object.keys(submission.answers).some(key =>
-          key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
-        );
+      let evaluationStatus = 'PENDING';
+      const hasManualGrading = Object.keys(submission.answers).some(key =>
+        key.endsWith('_marks') && typeof submission.answers[key] === 'number' && submission.answers[key] > 0
+      );
 
-        if (submission.evaluatedAt) {
-          evaluationStatus = 'COMPLETED';
-        } else if (hasManualGrading || submission.evaluatorNotes) {
-          evaluationStatus = 'IN_PROGRESS';
-        }
-
-        let studentTotalMarks = 0;
-        const examSetId = studentExamSetMap.get(submission.studentId);
-        const studentQuestions = (examSetId && studentQuestionsMap.has(examSetId))
-          ? studentQuestionsMap.get(examSetId)
-          : allQuestions;
-
-        studentQuestions.forEach((q: any) => studentTotalMarks += (q.marks || 0));
-
-        processedSubmissions.push({
-          id: submission.id,
-          student: {
-            id: submission.student.id,
-            name: submission.student.user.name,
-            roll: submission.student.roll,
-            registrationNo: submission.student.registrationNo
-          },
-          answers: { ...submission.answers },
-          submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
-          totalMarks: studentTotalMarks,
-          earnedMarks: evaluation.totalScore,
-          status: evaluationStatus,
-          evaluatorNotes: submission.evaluatorNotes || null,
-          result: {
-            mcqMarks: evaluation.mcqMarks,
-            cqMarks: evaluation.cqMarks,
-            sqMarks: evaluation.sqMarks,
-            total: evaluation.totalScore
-          },
-          submissionStatus: submission.status
-        });
-      } catch (error) {
-        console.error(`Error processing submission for ${submission.studentId}:`, error);
-        processedSubmissions.push({
-          id: submission.id,
-          student: { id: submission.student.id, name: submission.student.user.name },
-          answers: submission.answers,
-          submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
-          earnedMarks: 0,
-          status: 'ERROR'
-        });
+      if (submission.evaluatedAt) {
+        evaluationStatus = 'COMPLETED';
+      } else if (hasManualGrading || submission.evaluatorNotes) {
+        evaluationStatus = 'IN_PROGRESS';
       }
+
+      let studentTotalMarks = 0;
+      const examSetId = studentExamSetMap.get(submission.studentId);
+      const studentQuestions = (examSetId && studentQuestionsMap.has(examSetId))
+        ? studentQuestionsMap.get(examSetId)
+        : allQuestions;
+
+      studentQuestions.forEach((q: any) => studentTotalMarks += (q.marks || 0));
+
+      processedSubmissions.push({
+        id: submission.id,
+        student: {
+          id: submission.student.id,
+          name: submission.student.user.name,
+          roll: submission.student.roll,
+          registrationNo: submission.student.registrationNo
+        },
+        answers: { ...submission.answers },
+        submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
+        totalMarks: studentTotalMarks,
+        earnedMarks: evaluation.totalScore,
+        status: evaluationStatus,
+        evaluatorNotes: submission.evaluatorNotes || null,
+        result: {
+          mcqMarks: evaluation.mcqMarks,
+          cqMarks: evaluation.cqMarks,
+          sqMarks: evaluation.sqMarks,
+          total: evaluation.totalScore
+        },
+        submissionStatus: submission.status
+      });
+    } catch (error) {
+      console.error(`Error processing submission for ${submission.studentId}:`, error);
+      processedSubmissions.push({
+        id: submission.id,
+        student: { id: submission.student.id, name: submission.student.user.name },
+        answers: submission.answers,
+        submittedAt: (submission.objectiveSubmittedAt || submission.cqSqSubmittedAt || new Date()).toISOString(),
+        earnedMarks: 0,
+        status: 'ERROR'
+      });
     }
+  }
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
 
-    // First try to get questions from generatedSet
-    if (exam.generatedSet && typeof exam.generatedSet === 'object') {
-      const generatedSet = exam.generatedSet as any;
-      if (generatedSet.questions && Array.isArray(generatedSet.questions)) {
-        baseQuestions = generatedSet.questions;
-      }
+  // First try to get questions from generatedSet
+  if (exam.generatedSet && typeof exam.generatedSet === 'object') {
+    const generatedSet = exam.generatedSet as any;
+    if (generatedSet.questions && Array.isArray(generatedSet.questions)) {
+      baseQuestions = generatedSet.questions;
     }
-
-    // If no questions from generatedSet, try to get from exam sets
-    if (baseQuestions.length === 0 && studentQuestionsMap.size > 0) {
-      // Use the first available exam set's questions
-      const firstExamSetId = Array.from(studentQuestionsMap.keys())[0];
-      baseQuestions = studentQuestionsMap.get(firstExamSetId);
-    }
-
-    // If still no questions, try to get from a specific student's exam set
-    if (baseQuestions.length === 0 && processedSubmissions.length > 0) {
-      const firstStudent = processedSubmissions[0];
-      const studentMap = await prisma.examStudentMap.findUnique({
-        where: {
-          studentId_examId: {
-            studentId: firstStudent.student.id,
-            examId: examId
-          }
-        }
-      });
-
-      if (studentMap?.examSetId && studentQuestionsMap.has(studentMap.examSetId)) {
-        baseQuestions = studentQuestionsMap.get(studentMap.examSetId);
-      }
-    }
-
-    // Final fallback: Use all unique questions collected from all sets
-    if (baseQuestions.length === 0 && allQuestions.length > 0) {
-      // Remove duplicates by ID for the base questions view
-      const uniqueMap = new Map();
-      allQuestions.forEach(q => uniqueMap.set(q.id, q));
-      baseQuestions = Array.from(uniqueMap.values());
-    }
-
-
-
-    const examData = {
-      id: exam.id,
-      name: exam.name,
-      description: exam.description || '',
-      totalMarks: exam.totalMarks,
-      class: exam.class,
-      subject: (exam as any).subject || null,
-      startTime: exam.startTime,
-      endTime: exam.endTime,
-      duration: exam.duration,
-      mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
-      cqRequiredQuestions: (exam as any).cqRequiredQuestions,
-      sqRequiredQuestions: (exam as any).sqRequiredQuestions,
-      questions: baseQuestions.map((q: any) => {
-        // Parse subQuestions if it's a JSON string
-        let parsedSubQuestions = null;
-        if (q.subQuestions) {
-          try {
-            parsedSubQuestions = typeof q.subQuestions === 'string'
-              ? JSON.parse(q.subQuestions)
-              : q.subQuestions;
-          } catch (e) {
-            console.error('Error parsing subQuestions:', e);
-            parsedSubQuestions = null;
-          }
-        }
-
-        // Extract explanation: DB > Question Level > Option Level
-        let explanation = questionDetailsMap.get(q.id) || q.explanation;
-
-        if (!explanation && Array.isArray(q.options)) {
-          const correctOpt = q.options.find((opt: any) => opt.isCorrect);
-          if (correctOpt && correctOpt.explanation) {
-            explanation = correctOpt.explanation;
-          }
-        }
-
-        return {
-          id: q.id,
-          type: q.type.toLowerCase(),
-          text: q.questionText || q.text || '',
-          marks: q.marks,
-          correct: q.correct,
-          options: q.options,
-          subQuestions: parsedSubQuestions,
-          modelAnswer: q.modelAnswer || null,
-          explanation: explanation || null,
-          assertion: q.assertion || null,
-          reason: q.reason || null,
-          correctOption: q.correctOption || q.correct || null,
-          pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
-          // New fields for MTF
-          leftColumn: q.leftColumn,
-          rightColumn: q.rightColumn,
-          matches: q.matches,
-          // New INT field
-          correctAnswer: q.correctAnswer || q.answer
-        };
-      }),
-      submissions: processedSubmissions
-    };
-
-    return NextResponse.json(examData);
-  } catch (error) {
-    console.error("Error fetching exam evaluation data:", error);
-    return NextResponse.json({ error: "Failed to fetch exam data" }, { status: 500 });
   }
+
+  // If no questions from generatedSet, try to get from exam sets
+  if (baseQuestions.length === 0 && studentQuestionsMap.size > 0) {
+    // Use the first available exam set's questions
+    const firstExamSetId = Array.from(studentQuestionsMap.keys())[0];
+    baseQuestions = studentQuestionsMap.get(firstExamSetId);
+  }
+
+  // If still no questions, try to get from a specific student's exam set
+  if (baseQuestions.length === 0 && processedSubmissions.length > 0) {
+    const firstStudent = processedSubmissions[0];
+    const studentMap = await prisma.examStudentMap.findUnique({
+      where: {
+        studentId_examId: {
+          studentId: firstStudent.student.id,
+          examId: examId
+        }
+      }
+    });
+
+    if (studentMap?.examSetId && studentQuestionsMap.has(studentMap.examSetId)) {
+      baseQuestions = studentQuestionsMap.get(studentMap.examSetId);
+    }
+  }
+
+  // Final fallback: Use all unique questions collected from all sets
+  if (baseQuestions.length === 0 && allQuestions.length > 0) {
+    // Remove duplicates by ID for the base questions view
+    const uniqueMap = new Map();
+    allQuestions.forEach(q => uniqueMap.set(q.id, q));
+    baseQuestions = Array.from(uniqueMap.values());
+  }
+
+
+
+  const examData = {
+    id: exam.id,
+    name: exam.name,
+    description: exam.description || '',
+    totalMarks: exam.totalMarks,
+    class: exam.class,
+    subject: (exam as any).subject || null,
+    startTime: exam.startTime,
+    endTime: exam.endTime,
+    duration: exam.duration,
+    mcqNegativeMarking: (exam as any).mcqNegativeMarking || 0,
+    cqRequiredQuestions: (exam as any).cqRequiredQuestions,
+    sqRequiredQuestions: (exam as any).sqRequiredQuestions,
+    questions: baseQuestions.map((q: any) => {
+      // Parse subQuestions if it's a JSON string
+      let parsedSubQuestions = null;
+      if (q.subQuestions) {
+        try {
+          parsedSubQuestions = typeof q.subQuestions === 'string'
+            ? JSON.parse(q.subQuestions)
+            : q.subQuestions;
+        } catch (e) {
+          console.error('Error parsing subQuestions:', e);
+          parsedSubQuestions = null;
+        }
+      }
+
+      // Extract explanation: DB > Question Level > Option Level
+      let explanation = questionDetailsMap.get(q.id) || q.explanation;
+
+      if (!explanation && Array.isArray(q.options)) {
+        const correctOpt = q.options.find((opt: any) => opt.isCorrect);
+        if (correctOpt && correctOpt.explanation) {
+          explanation = correctOpt.explanation;
+        }
+      }
+
+      return {
+        id: q.id,
+        type: q.type.toLowerCase(),
+        text: q.questionText || q.text || '',
+        marks: q.marks,
+        correct: q.correct,
+        options: q.options,
+        subQuestions: parsedSubQuestions,
+        modelAnswer: q.modelAnswer || null,
+        explanation: explanation || null,
+        assertion: q.assertion || null,
+        reason: q.reason || null,
+        correctOption: q.correctOption || q.correct || null,
+        pairs: typeof q.pairs === 'string' ? JSON.parse(q.pairs) : (q.pairs || null),
+        // New fields for MTF
+        leftColumn: q.leftColumn,
+        rightColumn: q.rightColumn,
+        matches: q.matches,
+        // New INT field
+        correctAnswer: q.correctAnswer || q.answer
+      };
+    }),
+    submissions: processedSubmissions
+  };
+
+  return NextResponse.json(examData);
+} catch (error) {
+  console.error("Error fetching exam evaluation data:", error);
+  return NextResponse.json({ error: "Failed to fetch exam data" }, { status: 500 });
+}
 } 
