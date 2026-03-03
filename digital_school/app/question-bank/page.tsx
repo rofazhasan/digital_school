@@ -735,7 +735,9 @@ export default function QuestionBankPage() {
                               <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
                               <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
+                              <SelectItem value="SMCQ">SMCQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>
+                              <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
@@ -3105,6 +3107,33 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                   </ol>
                 </div>
               )}
+              {type === 'SMCQ' && (
+                <div className="mt-4 space-y-6">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Scenario-based Sub-questions:</p>
+                  {(smcqQuestions || []).map((sq: any, i: number) => (
+                    <div key={i} className="pl-4 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <span className="flex-shrink-0 flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40 text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">{i + 1}</span>
+                        <div className="flex-1">
+                          <UniversalMathJax dynamic>{cleanupMath(sq.question || `(Sub-question ${i + 1})`)}</UniversalMathJax>
+                          <span className="text-[10px] font-mono text-gray-400 ml-2">[{sq.marks || 1} {sq.marks === 1 ? 'mark' : 'marks'}]</span>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 pl-7">
+                        {sq.options.map((opt: any, oi: number) => (
+                          <div key={oi} className={`flex items-start gap-2 p-2 rounded border ${opt.isCorrect ? 'bg-green-50 border-green-100 dark:bg-green-900/10 dark:border-green-900/30' : 'bg-white border-gray-100 dark:bg-gray-950/30 dark:border-gray-800'}`}>
+                            <div className={`mt-0.5 h-3 w-3 rounded-full flex-shrink-0 ${opt.isCorrect ? 'bg-green-500' : 'border border-gray-300 dark:border-gray-600'}`} />
+                            <div className="text-xs">
+                              <UniversalMathJax inline dynamic>{cleanupMath(opt.text || `(Option ${String.fromCharCode(65 + oi)})`)}</UniversalMathJax>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {type === 'SQ' && modelAnswer && (
                 <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Model Answer:</p>
@@ -3139,7 +3168,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             </div>
           </Card>
         </div>
-      </div>
+      </div >
       <div className="flex justify-end gap-2 pt-4 border-t">
         {onCancel && <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>}
         <Button type="submit" disabled={isSaving}>
@@ -3147,7 +3176,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
           {initialData?.id && !isRefiningAi ? 'Save Changes' : 'Create Question'}
         </Button>
       </div>
-    </form>
+    </form >
   );
 };
 
