@@ -1247,9 +1247,12 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   }
 
   const getAutoScore = (question: Question, allAnswers: any) => {
-    if (!allAnswers) return 0;
-    const answer = allAnswers?.[question?.id];
-    if (!answer && question?.type?.toLowerCase() !== 'smcq') return 0;
+    if (!allAnswers || typeof allAnswers !== 'object') return 0;
+    const qId = question?.id;
+    if (!qId) return 0;
+
+    const answer = allAnswers[qId];
+    if (answer === undefined && question?.type?.toLowerCase() !== 'smcq') return 0;
     const type = (question?.type || '').toLowerCase();
 
     try {
@@ -1285,8 +1288,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         if (!subQs) return 0;
         let smcqScore = 0;
         subQs.forEach((subQ: any, sIdx: number) => {
-          const subAnswer = allAnswers[`${question.id}_sub_${sIdx}`];
-          if (!subAnswer) return;
+          const subKey = `${question.id}_sub_${sIdx}`;
+          const subAnswer = allAnswers[subKey];
+          if (subAnswer === undefined) return;
 
           const normalize = (s: any) => String(s || "").trim().toLowerCase();
           const userAns = normalize(subAnswer);
@@ -3576,14 +3580,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-gray-600">Auto-graded:</span>
                                           <Badge className={
-                                            getAutoScore(currentQuestion, currentAnswer) > 0
+                                            getAutoScore(currentQuestion, currentStudent?.answers) > 0
                                               ? 'bg-green-100 text-green-800'
-                                              : getAutoScore(currentQuestion, currentAnswer) < 0
+                                              : getAutoScore(currentQuestion, currentStudent?.answers) < 0
                                                 ? 'bg-red-100 text-red-800'
                                                 : 'bg-orange-100 text-orange-800'
                                           }>
-                                            {getAutoScore(currentQuestion, currentAnswer)} / {currentQuestion?.marks}
-                                            {getAutoScore(currentQuestion, currentAnswer) < 0 && <span className="ml-1 text-xs opacity-70">(−ve)</span>}
+                                            {getAutoScore(currentQuestion, currentStudent?.answers)} / {currentQuestion?.marks}
+                                            {getAutoScore(currentQuestion, currentStudent?.answers) < 0 && <span className="ml-1 text-xs opacity-70">(−ve)</span>}
                                           </Badge>
                                         </div>
 

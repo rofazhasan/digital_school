@@ -23,14 +23,18 @@ export async function GET(
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get all review requests for this exam
+    console.log(`🔍 Fetching review requests for exam: ${examId}, User: ${token.user.id}`);
+
+    // Get all review requests for this exam with simpler include first to debug 500 error
     const reviewRequests = await (db as any).resultReview.findMany({
       where: {
         examId: examId
       },
       include: {
         student: {
-          include: {
+          select: {
+            id: true,
+            roll: true,
             user: {
               select: {
                 name: true,
@@ -46,18 +50,17 @@ export async function GET(
             cqSqSubmittedAt: true,
             score: true
           }
-        },
-        reviewer: {
-          select: {
-            name: true,
-            email: true
-          }
         }
       },
       orderBy: {
         requestedAt: 'desc'
       }
+    }).catch((err: any) => {
+      console.error('❌ Detailed Prisma Error in review-requests:', err);
+      throw err;
     });
+
+    console.log(`✅ Found ${reviewRequests.length} review requests`);
 
     // Transform the data to include student name safely
     const transformedRequests = reviewRequests.map((request: any) => {
@@ -106,4 +109,4 @@ export async function GET(
       { status: 500 }
     );
   }
-} 
+}

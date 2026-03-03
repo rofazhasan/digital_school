@@ -331,33 +331,33 @@ export default function ExamResultsPage() {
   };
 
   const getGradeColor = (grade?: string) => {
-    if (!grade) return 'bg-gray-100 text-gray-800';
+    if (!grade) return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
 
     switch (grade.toUpperCase()) {
       case 'A+':
       case 'A':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400';
       case 'A-':
       case 'B+':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400';
       case 'B':
       case 'B-':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-400';
       case 'C+':
       case 'C':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 dark:bg-orange-500/20 text-orange-800 dark:text-orange-400';
       default:
-        return 'bg-red-100 text-red-800';
+        return 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-400';
     }
   };
 
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
 
-    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
-    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
-    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
-    return <Badge variant="outline">{rank}</Badge>;
+    if (rank === 1) return <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-400 border-amber-200 dark:border-amber-500/30"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
+    if (rank === 2) return <Badge className="bg-slate-100 dark:bg-slate-500/20 text-slate-900 dark:text-slate-400 border-slate-200 dark:border-slate-500/30"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
+    if (rank === 3) return <Badge className="bg-orange-100 dark:bg-orange-500/20 text-orange-900 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
+    return <Badge variant="outline" className="border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">{rank}</Badge>;
   };
 
   const getPerformanceAnalysis = (result: Result) => {
@@ -416,10 +416,10 @@ export default function ExamResultsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center">
         <div className="relative">
-          <div className="absolute inset-0 bg-indigo-500/20 blur-3xl rounded-full" />
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 relative z-10"></div>
+          <div className="absolute inset-0 bg-indigo-500/10 dark:bg-indigo-500/20 blur-3xl rounded-full" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-500 relative z-10"></div>
         </div>
       </div>
     );
@@ -427,14 +427,15 @@ export default function ExamResultsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6">
-        <Alert className="max-w-md bg-rose-500/10 border-rose-500/20 text-rose-200 backdrop-blur-xl">
-          <AlertDescription className="flex flex-col items-center gap-4 py-4">
-            <span className="text-center font-medium">Error: {error}</span>
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center p-6">
+        <Alert className="max-w-md bg-white dark:bg-rose-500/10 border-slate-200 dark:border-rose-500/20 text-slate-900 dark:text-rose-200 backdrop-blur-xl shadow-xl">
+          <AlertDescription className="flex flex-col items-center gap-4 py-6">
+            <XCircle className="w-12 h-12 text-rose-500" />
+            <span className="text-center font-bold text-lg">Oops! Something went wrong</span>
+            <span className="text-center text-slate-500 dark:text-slate-400 text-sm">{error}</span>
             <Button
-              variant="outline"
-              size="sm"
-              className="border-rose-500/30 hover:bg-rose-500/20"
+              variant="default"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white w-full shadow-lg shadow-indigo-500/20"
               onClick={() => {
                 setError(null);
                 fetchUserAndResults();
@@ -625,37 +626,37 @@ export default function ExamResultsPage() {
                     {/* LEFT COLUMN: Analytics & Personal Result */}
                     <div className="lg:col-span-4 space-y-6">
                       {isStudent && myResult ? (
-                        <Card className="bg-indigo-600 border-none shadow-2xl shadow-indigo-500/20 overflow-hidden relative group">
+                        <Card className="bg-indigo-600 dark:bg-indigo-700 border-none shadow-2xl shadow-indigo-500/30 overflow-hidden relative group">
                           {/* Decorative Rings */}
-                          <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-                          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
+                          <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/20 dark:bg-white/10 rounded-full blur-3xl opacity-50 dark:opacity-100" />
+                          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-white/20 dark:bg-white/10 rounded-full blur-3xl opacity-50 dark:opacity-100" />
 
                           <CardHeader className="relative z-10 pb-2">
-                            <CardTitle className="text-white flex items-center justify-between">
+                            <CardTitle className="text-white flex items-center justify-between font-black tracking-tight">
                               Your Standing
-                              <Crown className="w-5 h-5 text-indigo-200" />
+                              <Crown className="w-5 h-5 text-indigo-100 dark:text-indigo-200" />
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="relative z-10 space-y-6">
                             <div className="flex items-end justify-between">
                               <div>
-                                <div className="text-4xl font-black text-white">{myResult.total}</div>
-                                <div className="text-sm text-indigo-200">Earned Points</div>
+                                <div className="text-4xl font-black text-white drop-shadow-sm">{myResult.total}</div>
+                                <div className="text-sm text-indigo-100 dark:text-indigo-200 font-medium">Earned Points</div>
                               </div>
                               <div className="text-right">
-                                <div className="text-4xl font-black text-white">#{myResult.rank || '--'}</div>
-                                <div className="text-sm text-indigo-200">Class Rank</div>
+                                <div className="text-4xl font-black text-white drop-shadow-sm">#{myResult.rank || '--'}</div>
+                                <div className="text-sm text-indigo-100 dark:text-indigo-200 font-medium">Class Rank</div>
                               </div>
                             </div>
 
-                            <div className="space-y-4 pt-4 border-t border-white/10">
+                            <div className="space-y-4 pt-4 border-t border-white/20 dark:border-white/10">
                               <div className="flex items-center justify-between text-sm">
-                                <span className="text-indigo-100">Grade: <span className="font-bold text-white">{myResult.grade}</span></span>
-                                <span className="text-indigo-100">Accuracy: <span className="font-bold text-white">{myResult.percentage?.toFixed(1)}%</span></span>
+                                <span className="text-indigo-50 dark:text-indigo-100">Grade: <span className="font-bold text-white">{myResult.grade}</span></span>
+                                <span className="text-indigo-50 dark:text-indigo-100">Accuracy: <span className="font-bold text-white">{myResult.percentage?.toFixed(1)}%</span></span>
                               </div>
-                              <div className="relative h-2 bg-white/10 rounded-full overflow-hidden">
+                              <div className="relative h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
                                 <div
-                                  className="absolute inset-y-0 left-0 bg-white rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(255,255,255,0.5)]"
+                                  className="absolute inset-y-0 left-0 bg-white rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(255,255,255,0.8)]"
                                   style={{ width: `${myResult.percentage}%` }}
                                 />
                               </div>
@@ -663,7 +664,7 @@ export default function ExamResultsPage() {
 
                             <Button
                               onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
-                              className="w-full bg-white text-indigo-600 hover:bg-slate-100 font-bold transition-transform active:scale-95"
+                              className="w-full bg-white text-indigo-600 hover:bg-slate-50 font-bold transition-transform active:scale-95 shadow-lg shadow-indigo-900/20"
                             >
                               View Full Review <Eye className="w-4 h-4 ml-2" />
                             </Button>
@@ -714,14 +715,14 @@ export default function ExamResultsPage() {
 
                     {/* RIGHT COLUMN: Leaderboard / Class Standing */}
                     <div className="lg:col-span-8">
-                      <Card className="bg-white/[0.02] border-white/10 backdrop-blur-md overflow-hidden h-full">
-                        <CardHeader className="border-b border-white/5 bg-white/[0.01]">
+                      <Card className="bg-white dark:bg-white/[0.02] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md overflow-hidden h-full">
+                        <CardHeader className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
                           <div className="flex items-center justify-between">
-                            <CardTitle className="text-slate-300 flex items-center gap-2">
-                              <Users className="w-5 h-5 text-indigo-400" /> Class Standings
+                            <CardTitle className="text-slate-800 dark:text-slate-300 flex items-center gap-2 font-black">
+                              <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Class Standings
                             </CardTitle>
-                            <Badge variant="outline" className="text-[10px] text-slate-500 border-white/10">
-                              Showcases {examResult.results.length} Students
+                            <Badge variant="outline" className="text-[10px] text-slate-500 dark:text-slate-500 border-slate-200 dark:border-white/10 font-bold uppercase tracking-wider">
+                              {examResult.results.length} Students
                             </Badge>
                           </div>
                         </CardHeader>
@@ -729,16 +730,16 @@ export default function ExamResultsPage() {
                           <div className="overflow-x-auto overflow-y-auto max-h-[600px] no-scrollbar">
                             <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
                               <Table>
-                                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                                <TableHeader className="bg-slate-100/50 dark:bg-slate-900/50">
                                   <TableRow className="hover:bg-transparent border-slate-200 dark:border-slate-800">
-                                    <TableHead className="w-[60px] font-bold text-slate-900 dark:text-white">Rank</TableHead>
-                                    <TableHead className="min-w-[150px] font-bold text-slate-900 dark:text-white">Student Name</TableHead>
-                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">Objective</TableHead>
-                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">CQ</TableHead>
-                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">SQ</TableHead>
-                                    <TableHead className="text-right font-bold text-slate-900 dark:text-white">Total</TableHead>
-                                    <TableHead className="text-right hidden md:table-cell font-bold text-slate-900 dark:text-white">%</TableHead>
-                                    <TableHead className="text-right font-bold text-slate-900 dark:text-white">Grade</TableHead>
+                                    <TableHead className="w-[60px] font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Rank</TableHead>
+                                    <TableHead className="min-w-[150px] font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Student Name</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Objective</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">CQ</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">SQ</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Total</TableHead>
+                                    <TableHead className="text-right hidden md:table-cell font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">%</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Grade</TableHead>
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -755,40 +756,40 @@ export default function ExamResultsPage() {
                                       return (
                                         <TableRow
                                           key={res.id}
-                                          className={`group border-slate-100 dark:border-slate-800/50 transition-colors ${isMe ? 'bg-indigo-50/30 dark:bg-indigo-500/5' : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30'
+                                          className={`group border-slate-100 dark:border-slate-800/50 transition-colors ${isMe ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : 'hover:bg-slate-50 dark:hover:bg-slate-900/30'
                                             }`}
                                         >
-                                          <TableCell className="font-medium">
+                                          <TableCell className="font-medium py-4">
                                             {getRankBadge(resRank)}
                                           </TableCell>
                                           <TableCell>
                                             <div className="flex flex-col">
-                                              <span className={`font-semibold ${isMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+                                              <span className={`font-bold ${isMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
                                                 {res.student.user.name}
                                               </span>
-                                              <span className="text-[10px] text-slate-500">Roll: {res.student.roll}</span>
+                                              <span className="text-[10px] text-slate-500 font-medium">Roll: {res.student.roll}</span>
                                             </div>
                                           </TableCell>
                                           <TableCell className="text-center">
-                                            <span className="text-sm font-medium">{res.mcqMarks}</span>
-                                            <span className="text-[10px] text-slate-400 block">/ {examResult.mcqTotal}</span>
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.mcqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.mcqTotal}</span>
                                           </TableCell>
                                           <TableCell className="text-center">
-                                            <span className="text-sm font-medium">{res.cqMarks}</span>
-                                            <span className="text-[10px] text-slate-400 block">/ {examResult.cqTotal}</span>
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.cqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.cqTotal}</span>
                                           </TableCell>
                                           <TableCell className="text-center">
-                                            <span className="text-sm font-medium">{res.sqMarks}</span>
-                                            <span className="text-[10px] text-slate-400 block">/ {examResult.sqTotal}</span>
-                                          </TableCell>
-                                          <TableCell className="text-right font-bold text-slate-900 dark:text-white">
-                                            {res.total}
-                                          </TableCell>
-                                          <TableCell className="text-right hidden md:table-cell">
-                                            <span className="text-[11px] text-slate-500">{res.percentage?.toFixed(1)}%</span>
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.sqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.sqTotal}</span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <Badge className={`border-none ${getGradeColor(res.grade)}`}>
+                                            <span className="font-black text-slate-900 dark:text-white">{res.total}</span>
+                                          </TableCell>
+                                          <TableCell className="text-right hidden md:table-cell">
+                                            <span className="text-[11px] text-slate-500 font-bold">{res.percentage?.toFixed(1)}%</span>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <Badge className={`border-none shadow-sm ${getGradeColor(res.grade)}`}>
                                               {res.grade}
                                             </Badge>
                                           </TableCell>
@@ -809,24 +810,28 @@ export default function ExamResultsPage() {
             })
           )}
         </div>
-      </div>
 
-      <style jsx global>{`
-        .no-scrollbar::-webkit-scrollbar {
-          display: none;
-        }
-        .no-scrollbar {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
+        <style jsx global>{`
+          .no-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          ::selection {
+            background-color: rgba(99, 102, 241, 0.2);
+            color: inherit;
+          }
+        `}</style>
+      </div>
     </div>
   );
 }
