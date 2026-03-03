@@ -1247,11 +1247,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   }
 
   const getAutoScore = (question: Question, allAnswers: any) => {
-    if (!allAnswers || typeof allAnswers !== 'object') return 0;
+    if (!allAnswers || typeof allAnswers !== 'object') {
+      // Extra safety: currentStudent?.answers might be null/undefined
+      return 0;
+    }
+
+    // Create a local safe copy to ensure it doesn't disappear/shadow
+    const safeAnswers = allAnswers;
     const qId = question?.id;
     if (!qId) return 0;
 
-    const answer = allAnswers[qId];
+    const answer = safeAnswers[qId];
     if (answer === undefined && question?.type?.toLowerCase() !== 'smcq') return 0;
     const type = (question?.type || '').toLowerCase();
 
@@ -1287,40 +1293,47 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         const subQs = question.subQuestions || question.sub_questions;
         if (!subQs) return 0;
         let smcqScore = 0;
-        subQs.forEach((subQ: any, sIdx: number) => {
-          const subKey = `${question.id}_sub_${sIdx}`;
-          const subAnswer = allAnswers[subKey];
-          if (subAnswer === undefined) return;
 
-          const normalize = (s: any) => String(s || "").trim().toLowerCase();
-          const userAns = normalize(subAnswer);
-          let isCorrect = false;
+        try {
+          subQs.forEach((subQ: any, sIdx: number) => {
+            const subKey = `${question.id}_sub_${sIdx}`;
+            // Use safeAnswers from closure
+            const subAnswer = safeAnswers[subKey];
+            if (subAnswer === undefined) return;
 
-          if (subQ.options && Array.isArray(subQ.options)) {
-            const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
-            if (correctOpt) {
-              const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
-              isCorrect = userAns === correctText;
+            const normalize = (s: any) => String(s || "").trim().toLowerCase();
+            const userAns = normalize(subAnswer);
+            let isCorrect = false;
+
+            if (subQ.options && Array.isArray(subQ.options)) {
+              const correctOpt = subQ.options.find((opt: any) => opt.isCorrect);
+              if (correctOpt) {
+                const correctText = normalize(typeof correctOpt === 'object' ? correctOpt.text : correctOpt);
+                isCorrect = userAns === correctText;
+              }
             }
-          }
 
-          if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
-            const correctIndex = Number(subQ.correctAnswer);
-            if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
-              const opt = subQ.options[correctIndex];
-              const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
-              isCorrect = userAns === correctText;
-            } else {
-              isCorrect = userAns === normalize(subQ.correctAnswer);
+            if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+              const correctIndex = Number(subQ.correctAnswer);
+              if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
+                const opt = subQ.options[correctIndex];
+                const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
+                isCorrect = userAns === correctText;
+              } else {
+                isCorrect = userAns === normalize(subQ.correctAnswer);
+              }
             }
-          }
 
-          if (isCorrect) {
-            smcqScore += Number(subQ.marks) || 1;
-          } else if (exam?.mcqNegativeMarking && exam?.mcqNegativeMarking > 0) {
-            smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
-          }
-        });
+            if (isCorrect) {
+              smcqScore += Number(subQ.marks) || 1;
+            } else if (exam?.mcqNegativeMarking && exam?.mcqNegativeMarking > 0) {
+              smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+            }
+          });
+        } catch (forEachErr) {
+          console.error("Critical error in SMCQ score calculation:", forEachErr);
+        }
+
         return smcqScore;
       }
 
