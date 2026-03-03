@@ -285,23 +285,25 @@ export async function GET(
 
       if (type === 'MCQ') {
         if (studentAnswer) {
-          if (question.options && Array.isArray(question.options)) {
-            const correctOption = question.options.find((opt: any) => opt.isCorrect);
+          const options = (question.options || []) as any[];
+          if (Array.isArray(options)) {
+            const correctOption = options.find((opt: any) => opt.isCorrect);
             if (correctOption) {
-              isCorrect = studentAnswer === correctOption.text;
+              const correctText = typeof correctOption === 'object' ? correctOption.text : correctOption;
+              isCorrect = String(studentAnswer).trim() === String(correctText).trim();
             }
           }
 
           if (!isCorrect && (question.correctAnswer !== undefined && question.correctAnswer !== null)) {
             const correctAnswer = question.correctAnswer;
             if (typeof correctAnswer === 'number') {
-              isCorrect = studentAnswer === correctAnswer;
+              isCorrect = Number(studentAnswer) === correctAnswer || studentAnswer === String(correctAnswer);
             } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-              isCorrect = studentAnswer === (correctAnswer as any).text;
+              isCorrect = String(studentAnswer).trim() === String((correctAnswer as any).text).trim();
             } else if (Array.isArray(correctAnswer)) {
-              isCorrect = correctAnswer.includes(studentAnswer);
+              isCorrect = (correctAnswer as any[]).map(s => String(s).trim()).includes(String(studentAnswer).trim());
             } else {
-              isCorrect = studentAnswer === String(correctAnswer);
+              isCorrect = String(studentAnswer).trim() === String(correctAnswer).trim();
             }
           }
 
@@ -318,12 +320,14 @@ export async function GET(
         }
       } else if (['MC', 'AR', 'INT', 'SMCQ', 'NUMERIC', 'MTF'].includes(type)) {
         if (type === 'SMCQ') {
-          if (!question.subQuestions) {
+          const subs = question.subQuestions || question.sub_questions;
+          if (!subs || !Array.isArray(subs)) {
             awardedMarks = 0;
             isCorrect = false;
           } else {
             let smcqScore = 0;
-            (question.subQuestions as any[]).forEach((subQ: any, sIdx: number) => {
+            const subQuestionsArray = subs as any[];
+            subQuestionsArray.forEach((subQ: any, sIdx: number) => {
               const subAnswer = studentAnswers[`${questionId}_sub_${sIdx}`];
               if (!subAnswer) return;
 
@@ -331,8 +335,9 @@ export async function GET(
               const userAns = normalize(subAnswer);
               let isSubCorrect = false;
 
-              if (subQ.options && Array.isArray(subQ.options)) {
-                const correctOption = subQ.options.find((opt: any) => opt.isCorrect);
+              const subOptions = subQ.options || [];
+              if (Array.isArray(subOptions)) {
+                const correctOption = subOptions.find((opt: any) => opt.isCorrect);
                 if (correctOption) {
                   const correctOptionText = normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
                   isSubCorrect = userAns === correctOptionText;
@@ -341,8 +346,8 @@ export async function GET(
 
               if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
                 const correctIndex = Number(subQ.correctAnswer);
-                if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
-                  const opt = subQ.options[correctIndex];
+                if (!isNaN(correctIndex) && subOptions && subOptions[correctIndex]) {
+                  const opt = subOptions[correctIndex];
                   const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
                   isSubCorrect = userAns === correctText;
                 } else {
@@ -351,13 +356,11 @@ export async function GET(
               }
 
               if (isSubCorrect) {
-                smcqScore += Number(subQ.marks) || 1;
-              } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+                smcqScore += Number(subQ.marks) || 0;
               }
             });
             awardedMarks = smcqScore;
-            isCorrect = awardedMarks === maxMarks;
+            isCorrect = awardedMarks >= maxMarks && maxMarks > 0;
           }
         } else if (type === 'MC') {
           awardedMarks = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
@@ -432,7 +435,7 @@ export async function GET(
       return {
         id: question.id,
         type: question.type,
-        questionText: question.questionText,
+        questionText: question.questionText || question.text || "",
         marks: maxMarks,
         awardedMarks,
         isCorrect,
@@ -552,12 +555,12 @@ export async function GET(
         let calculatedSqMarks = 0;
 
         processedQuestions.forEach((question: any) => {
-          const type = (question.type || '').toUpperCase();
-          if (type === 'MCQ' || type === 'MC' || type === 'INT' || type === 'NUMERIC' || type === 'AR' || type === 'MTF') {
+          const typeValue = (question.type || '').toUpperCase();
+          if (typeValue === 'MCQ' || typeValue === 'MC' || typeValue === 'INT' || typeValue === 'NUMERIC' || typeValue === 'AR' || typeValue === 'MTF' || typeValue === 'SMCQ') {
             calculatedMcqMarks += question.awardedMarks || 0;
-          } else if (type === 'CQ') {
+          } else if (typeValue === 'CQ') {
             allCqScores.push(question.awardedMarks || 0);
-          } else if (type === 'SQ') {
+          } else if (typeValue === 'SQ') {
             allSqScores.push(question.awardedMarks || 0);
           }
         });

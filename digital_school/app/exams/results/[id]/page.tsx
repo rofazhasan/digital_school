@@ -1617,7 +1617,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <Sparkles className="h-3 w-3" /> Scenario Context
                                             </div>
                                             <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
-                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                             </div>
                                           </div>
                                         </div>
@@ -1718,7 +1718,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     ) : type === 'MTF' ? (
                                       <div className="mb-4">
                                         <div className="text-foreground mb-4 font-medium">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                           {(question as any).pairs?.map((p: any, pidx: number) => (
@@ -1730,13 +1730,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           ))}
                                         </div>
                                       </div>
-                                    ) : (
+                                    ) : type !== 'SMCQ' ? (
                                       <div className="mb-4 overflow-x-auto max-w-full scrollbar-thin">
                                         <div className="text-lg font-medium text-foreground">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                         </div>
                                       </div>
-                                    )}
+                                    ) : null}
 
                                     {/* Result Rendering Logic */}
                                     {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
@@ -1755,12 +1755,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           }
 
                                           return (optionsToRender || []).map((option, optIndex) => {
+                                            const optText = typeof option === 'object' ? option.text : option;
                                             const isSelected =
                                               // Check for object format (e.g. MC, AR)
                                               question.studentAnswer?.selectedOptions?.includes(optIndex) ||
                                               question.studentAnswer?.selectedOption === optIndex ||
                                               // Check for primitive format (e.g. standard MCQ text or index)
-                                              question.studentAnswer === option.text ||
+                                              String(question.studentAnswer).trim() === String(optText).trim() ||
+                                              Number(question.studentAnswer) === optIndex ||
                                               question.studentAnswer === optIndex;
 
                                             // Determine correctness
@@ -1776,7 +1778,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 if (originalIdx !== undefined) {
                                                   isCorrectOpt = Number(correctIndex) === originalIdx;
                                                 } else {
-                                                  isCorrectOpt = Number(correctIndex) === optIndex;
+                                                  isCorrectOpt = Number(correctIndex) === optIndex || String((question as any).correctAnswer).trim() === String(optText).trim();
                                                 }
                                               }
                                             } else if (type === 'MC') {
@@ -1824,7 +1826,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
                                                       "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                       "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                    ][optIndex] : cleanupMath(option.text)}
+                                                    ][optIndex] : cleanupMath(optText)}
                                                   </UniversalMathJax>
                                                 </span>
                                                 {icon}
