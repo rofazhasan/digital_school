@@ -584,7 +584,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               {isEn ? `Read the following stem and answer questions ${rangeStr}:` : `নিচের উদ্দীপকটি পড়ো এবং ${rangeStr} নং প্রশ্নের উত্তর দাও:`}
                             </p>
                             <div className="not-italic font-normal">
-                              <Text>{q.q || q.questionText || q.stem || ''}</Text>
+                              <UniversalMathJax dynamic>{q.q || q.questionText || q.stem || ''}</UniversalMathJax>
                               {q.image && (
                                 <div className="mt-2 text-center">
                                   <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />

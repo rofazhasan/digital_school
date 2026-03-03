@@ -145,7 +145,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
                 questionScore = evaluateMCQuestion(question, studentAnswer, {
-                    negativeMarking: exam.mcqNegativeMarking || 0,
+                    negativeMarking: exam.mcNegativeMarking || 0,
                     partialMarking: true,
                     hasAttempted: true
                 });
@@ -168,7 +168,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 let smcqScore = 0;
                 question.subQuestions.forEach((subQ: any, sIdx: number) => {
                     const subAnswer = answers[`${question.id}_sub_${sIdx}`];
-                    if (!subAnswer) return;
+                    if (subAnswer === undefined || subAnswer === null || subAnswer === '') return;
 
                     const normalize = (s: any) => String(s || '').trim().toLowerCase();
                     const userAns = normalize(subAnswer);
@@ -199,8 +199,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                         smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
                     }
                 });
-                mcqMarks += smcqScore;
-                totalScore += smcqScore;
+                questionScore = smcqScore;
             } else if (type === 'MTF') {
                 const hasMatchSet = studentAnswer && (Array.isArray(studentAnswer.matches) ? studentAnswer.matches.length > 0 : Object.keys(studentAnswer).length > 0);
                 if (!hasMatchSet) continue;
