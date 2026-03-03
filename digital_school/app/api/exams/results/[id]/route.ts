@@ -215,7 +215,7 @@ export async function GET(
       // - ${questionId}_sub_0_image, ${questionId}_sub_1_image, etc. (CQ sub-question images)
       // - ${questionId}_images (NEW: array of multiple images for SQ)
       // - ${questionId}_sub_0_images, ${questionId}_sub_1_images, etc. (NEW: arrays for CQ sub-questions)
-      let processedImages: string[] = [];
+      const processedImages: string[] = [];
 
       // Check for main image (old format - single image)
       if (studentAnswers[`${questionId}_image`]) {

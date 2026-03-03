@@ -8,7 +8,7 @@ async function main() {
     console.log('🚀 Starting STRESS database seed...');
 
     const instituteName = "Elite School & College";
-    let institute = await prisma.institute.findFirst({
+    const institute = await prisma.institute.findFirst({
         where: { name: instituteName }
     });
 

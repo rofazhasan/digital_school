@@ -82,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (shouldCreateNew) {
       // Logic to assign exam set first
       if (exam.examSets.length > 0) {
-        let examStudentMap = await prisma.examStudentMap.findUnique({
+        const examStudentMap = await prisma.examStudentMap.findUnique({
           where: { studentId_examId: { studentId, examId } },
           include: { examSet: true }
         });

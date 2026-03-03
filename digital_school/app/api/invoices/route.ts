@@ -175,7 +175,7 @@ export async function POST(request: NextRequest) {
         const subtotal = feeStructure.totalAmount;
 
         // Apply discounts (sibling, merit, etc.)
-        let discount = 0;
+        const discount = 0;
         // TODO: Implement discount logic based on student profile
 
         const totalAmount = subtotal - discount;

@@ -60,7 +60,7 @@ export function ExamContextProvider({
   // --- Section Detection Logic ---
   const { hasObjective, hasCqSq } = useMemo(() => {
     if (!exam.questions) return { hasObjective: false, hasCqSq: false };
-    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'];
+    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq'];
     const questions = exam.questions || [];
 
     const obj = questions.some((q: any) => {
@@ -145,8 +145,8 @@ export function ExamContextProvider({
   const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
@@ -159,6 +159,7 @@ export function ExamContextProvider({
       ...grouped.mc,
       ...grouped.ar,
       ...grouped.mtf,
+      ...grouped.smcq,
       ...grouped.cq,
       ...grouped.sq,
       ...grouped.int,
@@ -172,7 +173,7 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
       });
     } else {
       return fullSortedQuestions.filter((q: any) => {
@@ -266,7 +267,7 @@ export function ExamContextProvider({
     return {
       creative: [...g.cq, ...g.descriptive],
       short: [...g.sq],
-      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
+      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.other]
     };
   }, [exam.questions]);
 

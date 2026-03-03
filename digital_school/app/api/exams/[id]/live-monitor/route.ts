@@ -103,7 +103,7 @@ export async function GET(
 
                 // Calculate Stats
                 const answers = submission.answers as Record<string, any>;
-                let totalQuestions = studentQuestions.length;
+                const totalQuestions = studentQuestions.length;
                 let answeredQuestions = 0;
                 let score = 0;
                 let maxScore = 0;

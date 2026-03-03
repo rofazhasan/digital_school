@@ -23,7 +23,7 @@ export function renderFBDToSVG(diagram: FBDDiagram): string {
 
     // 3. Background SVG Layer (Incline planes, etc.)
     if (diagram.backgroundSVG) {
-        let innerContent = diagram.backgroundSVG
+        const innerContent = diagram.backgroundSVG
             .replace(/<svg[^>]*>/, '')
             .replace(/<\/svg>/, '');
         svgContent += `<g class="diagram-background">${innerContent}</g>`;

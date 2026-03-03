@@ -56,7 +56,7 @@ export default function SessionGuard() {
     useEffect(() => {
         if (isPublicPage || isShowingModal.current) return;
 
-        let activeSocket: Socket | null = null;
+        const activeSocket: Socket | null = null;
         let pollInterval: NodeJS.Timeout | null = null;
 
         const initializeSession = async () => {

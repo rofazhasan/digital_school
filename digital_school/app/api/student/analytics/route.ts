@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
         let presentCount = 0;
         let absentCount = 0;
         let lateCount = 0;
-        let totalDays = attendanceRecords.length;
+        const totalDays = attendanceRecords.length;
 
         attendanceRecords.forEach((record: any) => {
             if (record.present.includes(studentProfile.id)) presentCount++;

@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
 
         // Post-fetch subject filtering if subject is specified and not 'all'
         // Since subject is nested or derived, sometimes it's easier to filter in JS if not indexed
-        let filteredData = data;
+        const filteredData = data;
         if (subject && subject !== 'all') {
           // This is a bit tricky since subject comes from questions. 
           // If the user wants a more robust approach, we should add 'subject' field to Exam model.

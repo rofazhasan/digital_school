@@ -163,8 +163,10 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
+            } else if (type === 'SMCQ') {
                 const subQs = question.subQuestions || question.sub_questions;
                 if (!subQs) continue;
+
                 let smcqScore = 0;
                 subQs.forEach((subQ: any, sIdx: number) => {
                     const subAnswer = answers[`${question.id}_sub_${sIdx}`];
@@ -172,28 +174,28 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
 
                     const normalize = (s: any) => String(s || '').trim().toLowerCase();
                     const userAns = normalize(subAnswer);
-                    let isCorrect = false;
+                    let isSubCorrect = false;
 
                     if (subQ.options && Array.isArray(subQ.options)) {
                         const correctOption = subQ.options.find((opt: any) => opt.isCorrect);
                         if (correctOption) {
                             const correctOptionText = normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
-                            isCorrect = userAns === correctOptionText;
+                            isSubCorrect = userAns === correctOptionText;
                         }
                     }
 
-                    if (!isCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
+                    if (!isSubCorrect && (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null)) {
                         const correctIndex = Number(subQ.correctAnswer);
                         if (!isNaN(correctIndex) && subQ.options && subQ.options[correctIndex]) {
                             const opt = subQ.options[correctIndex];
                             const correctText = normalize(typeof opt === 'object' ? opt.text : opt);
-                            isCorrect = userAns === correctText;
+                            isSubCorrect = userAns === correctText;
                         } else {
-                            isCorrect = userAns === normalize(subQ.correctAnswer);
+                            isSubCorrect = userAns === normalize(subQ.correctAnswer);
                         }
                     }
 
-                    if (isCorrect) {
+                    if (isSubCorrect) {
                         smcqScore += Number(subQ.marks) || 1;
                     } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                         smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);

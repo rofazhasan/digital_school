@@ -2458,7 +2458,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                   {currentStudent?.earnedMarks} / {totalMarks}
                                   {(() => {
                                     // Local calculation for deducted marks
-                                    let deducted = 0;
+                                    const deducted = 0;
                                     Object.entries(currentStudent?.answers || {}).forEach(([key, val]: [string, any]) => {
                                       // Marks are usually stored as {questionId}_marks: number
                                       // But for objective questions, they are auto-graded.

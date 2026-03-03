@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useExamContext } from "./ExamContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,14 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
             if (globalIdx === -1) return null;
 
             const isCurrent = (navigation.current || 0) === globalIdx;
-            const isAnswered = answers[q.id];
+            const isAnswered = useMemo(() => {
+              if (answers[q.id]) return true;
+              const type = (q.type || "").toLowerCase();
+              if (['smcq', 'cq', 'sq', 'descriptive'].includes(type)) {
+                return Object.keys(answers).some(key => key.startsWith(`${q.id}_sub_`) || key.startsWith(`${q.id}_desc_`));
+              }
+              return false;
+            }, [answers, q.id, q.type]);
             const isMarked = navigation.marked[q.id];
 
             return (

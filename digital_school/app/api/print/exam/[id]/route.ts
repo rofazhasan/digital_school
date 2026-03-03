@@ -127,7 +127,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   });
 
   // Fetch fresh details from DB
-  let questionDetailsMap = new Map<string, string>();
+  const questionDetailsMap = new Map<string, string>();
   if (questionIds.size > 0) {
     try {
       const dbQuestions = await prismadb.question.findMany({

@@ -1,4 +1,4 @@
-/* eslint-disable @next/next/no-img-element */
+ 
 import React from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Student, ExamDetails, generateQRPayload } from '@/utils/exam-management';

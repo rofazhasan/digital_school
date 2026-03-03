@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
 
         // 4. Prepare Student Queues
         let queues: any[][] = [];
-        let isSingleExam = examIds.length === 1;
+        const isSingleExam = examIds.length === 1;
 
         if (isSingleExam) {
             // Split into Odd and Even Rolls for "Interleaved" Single Class
@@ -117,7 +117,7 @@ export async function POST(req: NextRequest) {
 
         // 5. Allocation Loop
         const allocations = [];
-        let globalQueueIndex = 0; // Rotates through queues
+        const globalQueueIndex = 0; // Rotates through queues
 
         for (const hall of halls) {
             const rows = hall.rows || 10;

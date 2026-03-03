@@ -203,7 +203,7 @@ function scanAndClassify(image: any) {
     }
 
     // 2. K-MEANS CLUSTERING (k=2)
-    let centroids = [0, 255];
+    const centroids = [0, 255];
     const iterations = 5;
 
     for (let i = 0; i < iterations; i++) {
