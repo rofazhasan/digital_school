@@ -5,9 +5,9 @@ export const webglUtils = {
   isWebGLSupported(): boolean {
     try {
       const canvas = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext && 
+      return !!(window.WebGLRenderingContext &&
         (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
-    } catch (e) {
+    } catch {
       return false;
     }
   },
@@ -21,18 +21,18 @@ export const webglUtils = {
   // Check if device is low-end (mobile, etc.)
   isLowEndDevice(): boolean {
     if (typeof navigator === 'undefined') return false;
-    
+
     const userAgent = navigator.userAgent.toLowerCase();
     const isMobile = /mobile|android|iphone|ipad|phone/i.test(userAgent);
-    const isLowMemory = (navigator as any).deviceMemory && (navigator as any).deviceMemory < 4;
-    
+    const isLowMemory = !!((navigator as Navigator & { deviceMemory?: number }).deviceMemory && (navigator as Navigator & { deviceMemory?: number }).deviceMemory! < 4);
+
     return isMobile || isLowMemory;
   },
 
   // Get optimal settings based on device capabilities
   getOptimalSettings() {
     const isLowEnd = this.isLowEndDevice();
-    
+
     return {
       pixelRatio: this.getOptimalPixelRatio(),
       antialias: !isLowEnd,
@@ -51,7 +51,7 @@ export const webglUtils = {
   },
 
   // Log WebGL context events
-  logContextEvent(event: string, contextId: string, details?: any) {
+  logContextEvent(event: string, contextId: string, details?: unknown) {
     console.log(`[WebGL ${contextId}] ${event}`, details || '');
   }
 };

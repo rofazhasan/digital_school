@@ -96,6 +96,12 @@ export function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled;
 }
+interface Option {
+  id?: string;
+  originalIndex?: number;
+  [key: string]: unknown;
+}
+
 /**
  * Renders a dynamic explanation by replacing placeholders with current visual labels.
  * @param text - The explanation text (may contain [[opt:0]], [[right:1]], etc.)
@@ -106,9 +112,9 @@ export function shuffleArray<T>(array: T[]): T[] {
  */
 export function renderDynamicExplanation(
   text: string | null | undefined,
-  options: any[] | null | undefined,
+  options: Option[] | null | undefined,
   type: string,
-  rightColumn?: any[] | null | undefined
+  rightColumn?: Option[] | null | undefined
 ): string {
   if (!text) return "";
 
@@ -120,7 +126,7 @@ export function renderDynamicExplanation(
     const optRegex = /\[\[opt:(\d+)\]\]/g;
     processed = processed.replace(optRegex, (match, originalIndexStr) => {
       const originalIndex = parseInt(originalIndexStr);
-      const currentIndex = options.findIndex((opt: any) =>
+      const currentIndex = options.findIndex((opt: Option) =>
         (opt.originalIndex !== undefined ? opt.originalIndex === originalIndex : (opt.id && options.findIndex(o => o.id === opt.id) === originalIndex))
       );
 
@@ -153,7 +159,7 @@ export function renderDynamicExplanation(
     processed = processed.replace(hardcodedRegex, (match, prefix, label, suffix) => {
       const originalIndex = labelMapping[label];
       // Find where this original option is now
-      const currentIndex = options.findIndex((opt: any) =>
+      const currentIndex = options.findIndex((opt: Option) =>
         (opt.originalIndex !== undefined ? opt.originalIndex === originalIndex : false)
       );
 
@@ -170,7 +176,7 @@ export function renderDynamicExplanation(
     const rightRegex = /\[\[right:(\d+)\]\]/g;
     processed = processed.replace(rightRegex, (match, originalIndexStr) => {
       const originalIndex = parseInt(originalIndexStr);
-      const currentIndex = rightColumn.findIndex((item: any) =>
+      const currentIndex = rightColumn.findIndex((item: Option) =>
         (item.originalIndex !== undefined ? item.originalIndex === originalIndex : false)
       );
 

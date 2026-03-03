@@ -258,7 +258,7 @@ export function ExamContextProvider({
 
   const groupedQuestions = useMemo(() => {
     if (!exam.questions) return {};
-    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], descriptive: [], other: [] };
+    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cq: [], sq: [], descriptive: [], other: [] };
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
       if (g[type]) g[type].push(q);

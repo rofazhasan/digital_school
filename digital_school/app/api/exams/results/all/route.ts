@@ -70,6 +70,26 @@ export async function GET(request: NextRequest) {
       const examResultsMap = results.reduce((acc: Record<string, any>, result: any) => {
         const examId = result.exam.id;
         if (!acc[examId]) {
+          // Calculate category totals from the first available exam set
+          const questions = (result.exam.examSets?.[0]?.questionsJson as any[]) || [];
+          const mcqTotal = questions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
+            .reduce((sum, q) => {
+              if (q.type?.toUpperCase() === 'SMCQ') {
+                return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (sq.marks || 1), 0);
+              }
+              return sum + (q.marks || 1);
+            }, 0);
+
+          const cqTotal = questions.filter(q => q.type?.toUpperCase() === 'CQ')
+            .sort((a, b) => (b.marks || 0) - (a.marks || 0))
+            .slice(0, result.exam.cqRequiredQuestions || 0)
+            .reduce((sum, q) => sum + (q.marks || 0), 0);
+
+          const sqTotal = questions.filter(q => q.type?.toUpperCase() === 'SQ')
+            .sort((a, b) => (b.marks || 0) - (a.marks || 0))
+            .slice(0, result.exam.sqRequiredQuestions || 0)
+            .reduce((sum, q) => sum + (q.marks || 0), 0);
+
           acc[examId] = {
             exam: result.exam,
             results: [],
@@ -77,7 +97,10 @@ export async function GET(request: NextRequest) {
             averageScore: 0,
             highestScore: 0,
             lowestScore: 0,
-            passRate: 0
+            passRate: 0,
+            mcqTotal,
+            cqTotal,
+            sqTotal
           };
         }
         acc[examId].results.push(result);
@@ -170,6 +193,26 @@ export async function GET(request: NextRequest) {
       const examResultsMap = allResults.reduce((acc: Record<string, any>, result: any) => {
         const examId = result.exam.id;
         if (!acc[examId]) {
+          // Calculate category totals from the first available exam set
+          const questions = (result.exam.examSets?.[0]?.questionsJson as any[]) || [];
+          const mcqTotal = questions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
+            .reduce((sum, q) => {
+              if (q.type?.toUpperCase() === 'SMCQ') {
+                return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (sq.marks || 1), 0);
+              }
+              return sum + (q.marks || 1);
+            }, 0);
+
+          const cqTotal = questions.filter(q => q.type?.toUpperCase() === 'CQ')
+            .sort((a, b) => (b.marks || 0) - (a.marks || 0))
+            .slice(0, result.exam.cqRequiredQuestions || 0)
+            .reduce((sum, q) => sum + (q.marks || 0), 0);
+
+          const sqTotal = questions.filter(q => q.type?.toUpperCase() === 'SQ')
+            .sort((a, b) => (b.marks || 0) - (a.marks || 0))
+            .slice(0, result.exam.sqRequiredQuestions || 0)
+            .reduce((sum, q) => sum + (q.marks || 0), 0);
+
           acc[examId] = {
             exam: result.exam,
             results: [],
@@ -177,7 +220,10 @@ export async function GET(request: NextRequest) {
             averageScore: 0,
             highestScore: 0,
             lowestScore: 0,
-            passRate: 0
+            passRate: 0,
+            mcqTotal,
+            cqTotal,
+            sqTotal
           };
         }
         acc[examId].results.push(result);

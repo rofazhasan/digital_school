@@ -109,6 +109,9 @@ interface ExamResults {
   highestScore: number;
   lowestScore: number;
   passRate: number;
+  mcqTotal: number;
+  cqTotal: number;
+  sqTotal: number;
 }
 
 interface DetailedResult {
@@ -666,33 +669,9 @@ export default function ExamResultsPage() {
                             </Button>
                           </CardContent>
                         </Card>
-                      ) : (
-                        <Card className="bg-white/[0.03] border-white/10 backdrop-blur-xl">
-                          <CardHeader>
-                            <CardTitle className="text-slate-300">Exam Statistics</CardTitle>
-                          </CardHeader>
-                          <CardContent className="grid grid-cols-2 gap-4">
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                              <span className="text-[10px] text-slate-500 uppercase font-black">Average</span>
-                              <div className="text-xl font-bold text-indigo-400">{examResult.averageScore.toFixed(1)}</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                              <span className="text-[10px] text-slate-500 uppercase font-black">Pass Rate</span>
-                              <div className="text-xl font-bold text-emerald-400">{examResult.passRate.toFixed(1)}%</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                              <span className="text-[10px] text-slate-500 uppercase font-black">Highest</span>
-                              <div className="text-xl font-bold text-rose-400">{examResult.highestScore}</div>
-                            </div>
-                            <div className="p-4 rounded-xl bg-white/5 border border-white/5 space-y-1">
-                              <span className="text-[10px] text-slate-500 uppercase font-black">Participants</span>
-                              <div className="text-xl font-bold text-sky-400">{examResult.totalStudents}</div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
+                      ) : null}
 
-                      {/* Performance Insights Card - Fixed small devices */}
+                      {/* Performance Insights Card */}
                       <Card className="bg-white/[0.03] border-white/10 backdrop-blur-xl hidden md:block">
                         <CardHeader>
                           <CardTitle className="text-sm font-bold flex items-center gap-2">
@@ -704,17 +683,17 @@ export default function ExamResultsPage() {
                             <>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-slate-400">
-                                  <span>MCQ Accuracy</span>
-                                  <span>{((myResult.mcqMarks / (examResult.exam.totalMarks * 0.4)) * 100).toFixed(0)}%</span>
+                                  <span>Objective Accuracy</span>
+                                  <span>{((myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100).toFixed(0)}%</span>
                                 </div>
-                                <Progress value={(myResult.mcqMarks / (examResult.exam.totalMarks * 0.4)) * 100} className="h-1 bg-white/5" />
+                                <Progress value={(myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100} className="h-1 bg-white/5" />
                               </div>
                               <div className="space-y-1">
                                 <div className="flex justify-between text-xs text-slate-400">
-                                  <span>Constructed Answers</span>
-                                  <span>{((myResult.cqMarks / (examResult.exam.totalMarks * 0.4)) * 100).toFixed(0)}%</span>
+                                  <span>Creative Accuracy</span>
+                                  <span>{((myResult.cqMarks / (examResult.cqTotal || 1)) * 100).toFixed(0)}%</span>
                                 </div>
-                                <Progress value={(myResult.cqMarks / (examResult.exam.totalMarks * 0.4)) * 100} className="h-1 bg-white/5" />
+                                <Progress value={(myResult.cqMarks / (examResult.cqTotal || 1)) * 100} className="h-1 bg-white/5" />
                               </div>
                               <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-200 mt-4">
                                 <Star className="w-4 h-4" />
@@ -748,56 +727,78 @@ export default function ExamResultsPage() {
                         </CardHeader>
                         <CardContent className="p-0">
                           <div className="overflow-x-auto overflow-y-auto max-h-[600px] no-scrollbar">
-                            <Table>
-                              <TableHeader className="bg-white/[0.02] sticky top-0 z-20">
-                                <TableRow className="border-white/5 hover:bg-transparent">
-                                  <TableHead className="w-[80px] text-slate-400 uppercase text-[10px] font-black">Rank</TableHead>
-                                  <TableHead className="text-slate-400 uppercase text-[10px] font-black">Student</TableHead>
-                                  <TableHead className="text-slate-400 uppercase text-[10px] font-black text-center">Score</TableHead>
-                                  <TableHead className="text-slate-400 uppercase text-[10px] font-black text-right hidden sm:table-cell">Percentage</TableHead>
-                                  <TableHead className="text-slate-400 uppercase text-[10px] font-black text-right">Grade</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {examResult.results.sort((a: Result, b: Result) => (b.total || 0) - (a.total || 0)).map((res: Result) => {
-                                  const rankData = getRankData(res.rank);
-                                  const isMe = isStudent && res.student?.id === user.studentProfile?.id;
-
-                                  return (
-                                    <TableRow
-                                      key={res.id}
-                                      className={`border-white/5 transition-colors group ${isMe ? 'bg-indigo-500/10 hover:bg-indigo-500/20' : 'hover:bg-white/[0.03]'}`}
-                                    >
-                                      <TableCell>
-                                        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${rankData.color} flex items-center justify-center text-white shadow-lg`}>
-                                          {res.rank && res.rank <= 3 ? <rankData.icon className="w-4 h-4" /> : <span className="text-xs font-bold">{res.rank}</span>}
-                                        </div>
-                                      </TableCell>
-                                      <TableCell>
-                                        <div className="flex flex-col">
-                                          <span className={`font-bold text-sm ${isMe ? 'text-white' : 'text-slate-300'}`}>
-                                            {res.student?.user?.name || 'Anonymous Student'}
-                                            {isMe && <span className="ml-2 px-1.5 py-0.5 rounded-sm bg-indigo-500 text-[9px] uppercase tracking-tighter">You</span>}
-                                          </span>
-                                          <span className="text-[11px] text-slate-500">Roll: {res.student?.roll || 'N/A'}</span>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="text-center">
-                                        <span className="font-mono font-bold text-slate-200">{res.total}</span>
-                                      </TableCell>
-                                      <TableCell className="text-right hidden sm:table-cell">
-                                        <span className="text-[11px] text-slate-500">{res.percentage?.toFixed(1)}%</span>
-                                      </TableCell>
-                                      <TableCell className="text-right">
-                                        <Badge className={`border-none ${getGradeColor(res.grade)}`} {...({} as any)}>
-                                          {res.grade}
-                                        </Badge>
+                            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+                              <Table>
+                                <TableHeader className="bg-slate-50/50 dark:bg-slate-900/50">
+                                  <TableRow className="hover:bg-transparent border-slate-200 dark:border-slate-800">
+                                    <TableHead className="w-[60px] font-bold text-slate-900 dark:text-white">Rank</TableHead>
+                                    <TableHead className="min-w-[150px] font-bold text-slate-900 dark:text-white">Student Name</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">Objective</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">CQ</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-900 dark:text-white">SQ</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-900 dark:text-white">Total</TableHead>
+                                    <TableHead className="text-right hidden md:table-cell font-bold text-slate-900 dark:text-white">%</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-900 dark:text-white">Grade</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {classmatesResults.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={8} className="h-32 text-center text-slate-500">
+                                        No classmates results found.
                                       </TableCell>
                                     </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </Table>
+                                  ) : (
+                                    classmatesResults.map((res: Result, idx: number) => {
+                                      const isMe = isStudent && res.student.id === user.studentProfile?.id;
+                                      const resRank = res.rank || (idx + 1);
+                                      return (
+                                        <TableRow
+                                          key={res.id}
+                                          className={`group border-slate-100 dark:border-slate-800/50 transition-colors ${isMe ? 'bg-indigo-50/30 dark:bg-indigo-500/5' : 'hover:bg-slate-50/50 dark:hover:bg-slate-900/30'
+                                            }`}
+                                        >
+                                          <TableCell className="font-medium">
+                                            {getRankBadge(resRank)}
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="flex flex-col">
+                                              <span className={`font-semibold ${isMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+                                                {res.student.user.name}
+                                              </span>
+                                              <span className="text-[10px] text-slate-500">Roll: {res.student.roll}</span>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-medium">{res.mcqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block">/ {examResult.mcqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-medium">{res.cqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block">/ {examResult.cqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-medium">{res.sqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block">/ {examResult.sqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-right font-bold text-slate-900 dark:text-white">
+                                            {res.total}
+                                          </TableCell>
+                                          <TableCell className="text-right hidden md:table-cell">
+                                            <span className="text-[11px] text-slate-500">{res.percentage?.toFixed(1)}%</span>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <Badge className={`border-none ${getGradeColor(res.grade)}`} {...({} as any)}>
+                                              {res.grade}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -815,6 +816,13 @@ export default function ExamResultsPage() {
           display: none;
         }
         .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
