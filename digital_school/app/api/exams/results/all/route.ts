@@ -61,17 +61,38 @@ export async function GET(request: NextRequest) {
           publishedAt: true,
           exam: {
             include: {
-              class: true
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  section: true
+                }
+              },
+              examSets: {
+                where: { isActive: true },
+                select: {
+                  questionsJson: true
+                },
+                take: 1
+              }
             }
           },
           student: {
-            include: {
+            select: {
+              id: true,
+              roll: true,
+              registrationNo: true,
               user: {
                 select: {
                   name: true
                 }
               },
-              class: true
+              class: {
+                select: {
+                  name: true,
+                  section: true
+                }
+              }
             }
           }
         },
@@ -80,29 +101,40 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // Cache for exam totals to avoid redundant calculations
+      const examTotalsCache = new Map<string, { mcqTotal: number; cqTotal: number; sqTotal: number }>();
+
       // Group results by exam
       const examResultsMap = results.reduce((acc: Record<string, ExamResultsGroup>, result: any) => {
         const examId = result.exam.id;
+
         if (!acc[examId]) {
-          // Calculate category totals from the first available exam set
-          const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
-          const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
-            .reduce((sum, q) => {
-              if (q.type?.toUpperCase() === 'SMCQ') {
-                return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
-              }
-              return sum + (Number(q.marks) || 1);
-            }, 0);
+          // Calculate category totals once per unique exam
+          let totals = examTotalsCache.get(examId);
 
-          const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
-            .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-            .slice(0, result.exam.cqRequiredQuestions || 0)
-            .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+          if (!totals) {
+            const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
+            const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
+              .reduce((sum, q) => {
+                if (q.type?.toUpperCase() === 'SMCQ') {
+                  return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
+                }
+                return sum + (Number(q.marks) || 1);
+              }, 0);
 
-          const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
-            .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-            .slice(0, result.exam.sqRequiredQuestions || 0)
-            .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+            const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
+              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+              .slice(0, result.exam.cqRequiredQuestions || 0)
+              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+            const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
+              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+              .slice(0, result.exam.sqRequiredQuestions || 0)
+              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+            totals = { mcqTotal, cqTotal, sqTotal };
+            examTotalsCache.set(examId, totals);
+          }
 
           acc[examId] = {
             exam: result.exam,
@@ -112,9 +144,7 @@ export async function GET(request: NextRequest) {
             highestScore: 0,
             lowestScore: 0,
             passRate: 0,
-            mcqTotal,
-            cqTotal,
-            sqTotal
+            ...totals
           };
         }
         acc[examId].results.push(result);
@@ -125,12 +155,12 @@ export async function GET(request: NextRequest) {
       const examResults = Object.values(examResultsMap).map((examResult: ExamResultsGroup) => {
         const resList = examResult.results;
         const totalStudents = resList.length;
-        const totalScore = resList.reduce((sum: number, r: any) => sum + r.total, 0);
+        const totalScore = resList.reduce((sum: number, r: any) => sum + (Number(r.total) || 0), 0);
         const averageScore = totalStudents > 0 ? totalScore / totalStudents : 0;
-        const scores = resList.map((r: any) => r.total);
+        const scores = resList.map((r: any) => Number(r.total) || 0);
         const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
         const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
-        const passCount = resList.filter((r: any) => r.total >= r.exam.passMarks).length;
+        const passCount = resList.filter((r: any) => (Number(r.total) || 0) >= (Number(r.exam.passMarks) || 0)).length;
         const passRate = totalStudents > 0 ? (passCount / totalStudents) * 100 : 0;
 
         return {
@@ -151,17 +181,8 @@ export async function GET(request: NextRequest) {
       // Teachers, Admins, and Super Users can see all results
       const whereClause: any = {};
 
-      // If teacher, only show results from their institute
-      if (user.role === 'TEACHER' && user.instituteId) {
-        whereClause.exam = {
-          class: {
-            instituteId: user.instituteId
-          }
-        };
-      }
-
-      // If admin, only show results from their institute
-      if (user.role === 'ADMIN' && user.instituteId) {
+      // If teacher or admin, only show results from their institute
+      if ((user.role === 'TEACHER' || user.role === 'ADMIN') && user.instituteId) {
         whereClause.exam = {
           class: {
             instituteId: user.instituteId
@@ -184,48 +205,81 @@ export async function GET(request: NextRequest) {
           publishedAt: true,
           exam: {
             include: {
-              class: true
+              class: {
+                select: {
+                  id: true,
+                  name: true,
+                  section: true
+                }
+              },
+              examSets: {
+                where: { isActive: true },
+                select: {
+                  questionsJson: true
+                },
+                take: 1
+              }
             }
           },
           student: {
-            include: {
+            select: {
+              id: true,
+              roll: true,
+              registrationNo: true,
               user: {
                 select: {
                   name: true
                 }
               },
-              class: true
+              class: {
+                select: {
+                  name: true,
+                  section: true
+                }
+              }
             }
           }
         },
         orderBy: {
           createdAt: 'desc'
-        }
+        },
+        take: 500 // Limit initial fetch for performance
       });
+
+      // Cache for exam totals to avoid redundant calculations
+      const examTotalsCache = new Map<string, { mcqTotal: number; cqTotal: number; sqTotal: number }>();
 
       // Group results by exam and calculate statistics
       const examResultsMap = allResults.reduce((acc: Record<string, ExamResultsGroup>, result: any) => {
         const examId = result.exam.id;
+
         if (!acc[examId]) {
-          // Calculate category totals from the first available exam set
-          const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
-          const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
-            .reduce((sum, q) => {
-              if (q.type?.toUpperCase() === 'SMCQ') {
-                return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
-              }
-              return sum + (Number(q.marks) || 1);
-            }, 0);
+          // Calculate category totals once per unique exam
+          let totals = examTotalsCache.get(examId);
 
-          const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
-            .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-            .slice(0, result.exam.cqRequiredQuestions || 0)
-            .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+          if (!totals) {
+            const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
+            const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
+              .reduce((sum, q) => {
+                if (q.type?.toUpperCase() === 'SMCQ') {
+                  return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
+                }
+                return sum + (Number(q.marks) || 1);
+              }, 0);
 
-          const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
-            .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-            .slice(0, result.exam.sqRequiredQuestions || 0)
-            .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+            const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
+              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+              .slice(0, result.exam.cqRequiredQuestions || 0)
+              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+            const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
+              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+              .slice(0, result.exam.sqRequiredQuestions || 0)
+              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+            totals = { mcqTotal, cqTotal, sqTotal };
+            examTotalsCache.set(examId, totals);
+          }
 
           acc[examId] = {
             exam: result.exam,
@@ -235,9 +289,7 @@ export async function GET(request: NextRequest) {
             highestScore: 0,
             lowestScore: 0,
             passRate: 0,
-            mcqTotal,
-            cqTotal,
-            sqTotal
+            ...totals
           };
         }
         acc[examId].results.push(result);
@@ -250,8 +302,9 @@ export async function GET(request: NextRequest) {
         const totalStudents = results.length;
         const totalScore = results.reduce((sum: number, r: any) => sum + (Number(r.total) || 0), 0);
         const averageScore = totalStudents > 0 ? totalScore / totalStudents : 0;
-        const highestScore = Math.max(...results.map((r: any) => Number(r.total) || 0));
-        const lowestScore = Math.min(...results.map((r: any) => Number(r.total) || 0));
+        const scores = results.map((r: any) => Number(r.total) || 0);
+        const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
+        const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
         const passCount = results.filter((r: any) => (Number(r.total) || 0) >= (Number(r.exam.passMarks) || 0)).length;
         const passRate = totalStudents > 0 ? (passCount / totalStudents) * 100 : 0;
 
