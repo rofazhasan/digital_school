@@ -450,13 +450,13 @@ export default function ExamResultsPage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 text-slate-400">
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center p-6 text-slate-500 dark:text-slate-400">
         <div className="text-center space-y-4">
-          <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto border border-white/10">
-            <FileText className="w-8 h-8 opacity-20" />
+          <div className="w-16 h-16 bg-white dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto border border-slate-200 dark:border-white/10 shadow-sm">
+            <FileText className="w-8 h-8 opacity-40 dark:opacity-20 text-indigo-600 dark:text-indigo-400" />
           </div>
-          <p className="text-lg font-medium">Please login to view your results</p>
-          <Button onClick={() => router.push('/login')} className="bg-indigo-600 hover:bg-indigo-700">
+          <p className="text-lg font-medium text-slate-700 dark:text-slate-400">Please login to view your results</p>
+          <Button onClick={() => router.push('/login')} className="bg-indigo-600 hover:bg-indigo-700 text-white">
             Login Now
           </Button>
         </div>
@@ -465,12 +465,12 @@ export default function ExamResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#020617] text-slate-50 selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-50 selection:bg-indigo-500/30">
       {/* Dynamic Background Elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/10 blur-[120px] rounded-full" />
-        <div className="absolute top-[20%] -right-[10%] w-[35%] h-[35%] bg-purple-500/10 blur-[120px] rounded-full" />
-        <div className="absolute -bottom-[10%] left-[20%] w-[30%] h-[30%] bg-rose-500/5 blur-[100px] rounded-full" />
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/[0.08] dark:bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] -right-[10%] w-[35%] h-[35%] bg-purple-500/[0.08] dark:bg-purple-500/10 blur-[120px] rounded-full" />
+        <div className="absolute -bottom-[10%] left-[20%] w-[30%] h-[30%] bg-rose-500/[0.05] dark:bg-rose-500/5 blur-[100px] rounded-full" />
       </div>
 
       <div className="container mx-auto p-4 md:p-8 relative z-10 space-y-8">
@@ -481,10 +481,10 @@ export default function ExamResultsPage() {
               <GraduationCap className="w-3.5 h-3.5" />
               Academic Excellence
             </div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-white via-slate-300 to-slate-500 bg-clip-text text-transparent">
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-slate-900 via-slate-700 to-slate-500 dark:from-white dark:via-slate-300 dark:to-slate-500 bg-clip-text text-transparent">
               Exam Results
             </h1>
-            <p className="text-slate-400 max-w-md">
+            <p className="text-slate-500 dark:text-slate-400 max-w-md">
               Detailed performance metrics and competitive class standings.
             </p>
           </div>
@@ -499,10 +499,10 @@ export default function ExamResultsPage() {
               Back
             </Button>
             {isStudent && user.studentProfile && (
-              <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-                <span className="text-xs font-medium text-slate-400">Class {user.studentProfile.class.name}</span>
-                <div className="h-4 w-px bg-white/10" />
-                <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-none">
+              <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Class {user.studentProfile.class.name}</span>
+                <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+                <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/30 border-none">
                   Roll: {user.studentProfile.roll}
                 </Badge>
               </div>
@@ -512,7 +512,7 @@ export default function ExamResultsPage() {
 
         {/* Filters - Advanced Glassmorphism */}
         {canViewAllResults && (
-          <Card className="bg-white/[0.03] border-white/10 backdrop-blur-xl overflow-hidden group">
+          <Card className="bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-xl overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             <CardContent className="p-6 relative z-10">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -522,14 +522,14 @@ export default function ExamResultsPage() {
                     placeholder="Search students or exams..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 h-11 bg-white/5 border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-200 placeholder:text-slate-500"
+                    className="pl-10 h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <Select value={selectedExam} onValueChange={setSelectedExam}>
-                  <SelectTrigger className="h-11 bg-white/5 border-white/10 focus:ring-indigo-500/20">
+                  <SelectTrigger className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200">
                     <SelectValue placeholder="Select Exam" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10 text-slate-200">
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-200">
                     <SelectItem value="all">All Exams</SelectItem>
                     {examResults.map((result: ExamResults) => (
                       <SelectItem key={result.exam.id} value={result.exam.id}>
@@ -539,10 +539,10 @@ export default function ExamResultsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
-                  <SelectTrigger className="h-11 bg-white/5 border-white/10 focus:ring-indigo-500/20">
+                  <SelectTrigger className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200">
                     <SelectValue placeholder="Sort By" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-900 border-white/10 text-slate-200">
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-200">
                     <SelectItem value="date">Date Published</SelectItem>
                     <SelectItem value="name">Exam Name</SelectItem>
                     <SelectItem value="class">Classroom</SelectItem>
@@ -550,7 +550,7 @@ export default function ExamResultsPage() {
                 </Select>
                 <Button
                   variant="outline"
-                  className="h-11 bg-white/5 border-white/10 hover:bg-white/10 text-slate-300"
+                  className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
                   onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
                 >
                   {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
@@ -564,13 +564,13 @@ export default function ExamResultsPage() {
         {/* Main Content Area */}
         <div className="space-y-12">
           {filteredResults.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 bg-white/[0.02] rounded-3xl border border-dashed border-white/10 backdrop-blur-sm">
+            <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-white/[0.02] rounded-3xl border border-dashed border-slate-200 dark:border-white/10 backdrop-blur-sm shadow-sm">
               <div className="relative mb-6">
-                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full animate-pulse" />
-                <FileText className="w-16 h-16 text-slate-600 relative z-10" />
+                <div className="absolute inset-0 bg-indigo-500/10 dark:bg-indigo-500/20 blur-2xl rounded-full animate-pulse" />
+                <FileText className="w-16 h-16 text-slate-300 dark:text-slate-600 relative z-10" />
               </div>
-              <h3 className="text-xl font-bold text-slate-300">No outcomes found</h3>
-              <p className="text-slate-500 mt-2">Check back later or adjust your filters.</p>
+              <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">No outcomes found</h3>
+              <p className="text-slate-400 dark:text-slate-500 mt-2">Check back later or adjust your filters.</p>
             </div>
           ) : (
             filteredResults.map((examResult: ExamResults) => {
@@ -583,18 +583,18 @@ export default function ExamResultsPage() {
               return (
                 <div key={examResult.exam.id} className="space-y-6">
                   {/* Exam Banner */}
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 backdrop-blur-xl">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-indigo-500/20 shadow-sm backdrop-blur-xl">
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                        <Trophy className="w-6 h-6 text-indigo-400" />
+                      <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/30 shadow-inner">
+                        <Trophy className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                       </div>
                       <div>
-                        <h2 className="text-xl font-bold text-white tracking-tight">{examResult.exam.name}</h2>
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{examResult.exam.name}</h2>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                           <Calendar className="w-3.5 h-3.5" />
                           {new Date(examResult.exam.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
-                          <span className="mx-1 opacity-30">|</span>
-                          <span className="font-semibold text-slate-300">{examResult.exam.totalMarks} Total Marks</span>
+                          <span className="mx-1 opacity-20 dark:opacity-30">|</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">{examResult.exam.totalMarks} Total Marks</span>
                         </div>
                       </div>
                     </div>
@@ -602,16 +602,16 @@ export default function ExamResultsPage() {
                       <div className="flex gap-2">
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="text-slate-400 hover:text-sky-400 hover:bg-sky-500/10 border border-white/5"
+                          variant="outline"
+                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 border-slate-200 dark:border-white/5 shadow-sm"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                         >
                           <Download className="w-4 h-4 mr-2" /> PDF
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/10 border border-white/5"
+                          variant="outline"
+                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border-slate-200 dark:border-white/5 shadow-sm"
                           onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
                         >
                           <Download className="w-4 h-4 mr-2" /> CSV
@@ -672,40 +672,40 @@ export default function ExamResultsPage() {
                       ) : null}
 
                       {/* Performance Insights Card */}
-                      <Card className="bg-white/[0.03] border-white/10 backdrop-blur-xl hidden md:block">
-                        <CardHeader>
-                          <CardTitle className="text-sm font-bold flex items-center gap-2">
-                            <TrendingUp className="w-4 h-4 text-rose-400" /> Performance Insights
+                      <Card className="bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-xl hidden md:block">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                            <TrendingUp className="w-4 h-4 text-rose-500 dark:text-rose-400" /> Performance Insights
                           </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-4 pt-2">
                           {myResult ? (
                             <>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs text-slate-400">
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
                                   <span>Objective Accuracy</span>
                                   <span>{((myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100).toFixed(0)}%</span>
                                 </div>
-                                <Progress value={(myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100} className="h-1 bg-white/5" />
+                                <Progress value={(myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100} className="h-1.5 bg-slate-100 dark:bg-white/5" />
                               </div>
-                              <div className="space-y-1">
-                                <div className="flex justify-between text-xs text-slate-400">
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
                                   <span>Creative Accuracy</span>
                                   <span>{((myResult.cqMarks / (examResult.cqTotal || 1)) * 100).toFixed(0)}%</span>
                                 </div>
-                                <Progress value={(myResult.cqMarks / (examResult.cqTotal || 1)) * 100} className="h-1 bg-white/5" />
+                                <Progress value={(myResult.cqMarks / (examResult.cqTotal || 1)) * 100} className="h-1.5 bg-slate-100 dark:bg-white/5" />
                               </div>
-                              <Alert className="bg-amber-500/10 border-amber-500/20 text-amber-200 mt-4">
-                                <Star className="w-4 h-4" />
-                                <AlertDescription className="text-[11px]">
+                              <Alert className="bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-200 mt-4 py-3">
+                                <Star className="w-4 h-4 shrink-0" />
+                                <AlertDescription className="text-[11px] font-medium leading-relaxed">
                                   {getPerformanceAnalysis(myResult).recommendation}
                                 </AlertDescription>
                               </Alert>
                             </>
                           ) : (
-                            <div className="flex flex-col items-center justify-center py-6 text-center">
-                              <BarChart3 className="w-8 h-8 text-slate-700 mb-2" />
-                              <p className="text-xs text-slate-500">Aggregate analytics for teacher review.</p>
+                            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50/50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                              <BarChart3 className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2" />
+                              <p className="text-xs text-slate-500 dark:text-slate-500 px-4">Aggregate analytics for teacher review.</p>
                             </div>
                           )}
                         </CardContent>

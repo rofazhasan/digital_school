@@ -42,7 +42,8 @@ export async function GET(
         examSubmission: {
           select: {
             id: true,
-            submittedAt: true,
+            objectiveSubmittedAt: true,
+            cqSqSubmittedAt: true,
             score: true
           }
         },

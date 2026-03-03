@@ -180,6 +180,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
+                res = { score: questionScore, type, isCorrect };
             } else if (type === 'MC') {
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
@@ -188,20 +189,23 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     partialMarking: true,
                     hasAttempted: true
                 });
+                res = { score: questionScore, type };
             } else if (type === 'INT' || type === 'NUMERIC') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
-                const res = evaluateINTQuestion(question, studentAnswer);
-                questionScore = res.score;
-                if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                const evaluationRes = evaluateINTQuestion(question, studentAnswer);
+                questionScore = evaluationRes.score;
+                if (!evaluationRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
+                res = { score: questionScore, type, isCorrect: evaluationRes.isCorrect };
             } else if (type === 'AR') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
-                const res = evaluateARQuestion(question as unknown as ARQuestion, studentAnswer);
-                questionScore = res.score;
-                if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                const evaluationRes = evaluateARQuestion(question as unknown as ARQuestion, studentAnswer);
+                questionScore = evaluationRes.score;
+                if (!evaluationRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
+                res = { score: questionScore, type, isCorrect: evaluationRes.isCorrect };
             } else if (type === 'SMCQ') {
                 const subQs = question.subQuestions || question.sub_questions;
                 if (!subQs) continue;

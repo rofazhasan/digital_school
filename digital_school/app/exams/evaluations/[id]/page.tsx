@@ -1247,6 +1247,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   }
 
   const getAutoScore = (question: Question, allAnswers: any) => {
+    if (!allAnswers) return 0;
     const answer = allAnswers?.[question?.id];
     if (!answer && question?.type?.toLowerCase() !== 'smcq') return 0;
     const type = (question?.type || '').toLowerCase();
