@@ -190,7 +190,7 @@ export default function ExamResultsPage() {
         throw new Error(`Failed to fetch user: ${userResponse.status}`);
       }
       const userData = await userResponse.json();
-      setUser(userData);
+      setUser(userData.user || userData);
 
       // Fetch results based on user role
       const resultsResponse = await fetch('/api/exams/results/all', {

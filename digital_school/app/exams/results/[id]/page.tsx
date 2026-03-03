@@ -1649,7 +1649,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     </Badge>
                                                   </div>
                                                   <div className="text-lg font-bold text-slate-700 dark:text-slate-200 leading-snug">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || "")}</UniversalMathJax>
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
                                                   </div>
                                                 </div>
 
@@ -2165,7 +2165,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="flex items-start gap-2">
                                               <span className="shrink-0 font-bold text-indigo-600 dark:text-indigo-400">{subIdx + 1}.</span>
                                               <div className="text-sm font-medium">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question)}</UniversalMathJax>
+                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
                                               </div>
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>

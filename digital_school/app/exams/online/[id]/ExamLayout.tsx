@@ -18,9 +18,40 @@ import { nativeConfirm } from "@/lib/native/interaction";
 import { speakText, stopSpeech } from "@/lib/native/accessibility";
 import { Capacitor } from "@capacitor/core";
 import { Volume2, VolumeX } from "lucide-react";
+import { mobileOptimizations } from "./performance-utils";
 
 
 // Mobile-optimized navigation component
+interface MobileNavButtonProps {
+  id: string;
+  idx: number;
+  isCurrent: boolean;
+  isAnswered: boolean;
+  isMarked: boolean;
+  onNavigate: (index: number) => void;
+}
+
+const MobileNavButton = memo(({ id, idx, isCurrent, isAnswered, isMarked, onNavigate }: MobileNavButtonProps) => {
+  let bgClass = "bg-card border-border text-muted-foreground hover:bg-accent";
+  if (isCurrent) bgClass = "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20 shadow-lg shadow-primary/30 scale-110";
+  else if (isMarked) bgClass = "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-800";
+  else if (isAnswered) bgClass = "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-800";
+
+  return (
+    <button
+      onClick={() => onNavigate(idx)}
+      className={`
+        flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border transition-all duration-300
+        ${bgClass}
+      `}
+    >
+      {idx + 1}
+    </button>
+  );
+});
+
+MobileNavButton.displayName = 'MobileNavButton';
+
 const MobileNavigator = memo(({
   questions,
   currentIndex,
@@ -36,29 +67,17 @@ const MobileNavigator = memo(({
 }) => {
   return (
     <div className="flex gap-2 p-4 overflow-x-auto no-scrollbar pb-2 bg-background/50 backdrop-blur-md rounded-2xl mb-4 border border-border">
-      {questions.map((q, idx) => {
-        const isCurrent = idx === currentIndex;
-        const isAnswered = !!answers[q.id];
-        const isMarked = !!marked[q.id];
-
-        let bgClass = "bg-card border-border text-muted-foreground hover:bg-accent";
-        if (isCurrent) bgClass = "bg-primary text-primary-foreground border-primary ring-2 ring-primary/20 shadow-lg shadow-primary/30 scale-110";
-        else if (isMarked) bgClass = "bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-800";
-        else if (isAnswered) bgClass = "bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-900/40 dark:text-emerald-100 dark:border-emerald-800";
-
-        return (
-          <button
-            key={q.id}
-            onClick={() => onNavigate(idx)}
-            className={`
-                flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold border transition-all duration-300
-                ${bgClass}
-             `}
-          >
-            {idx + 1}
-          </button>
-        );
-      })}
+      {questions.map((q, idx) => (
+        <MobileNavButton
+          key={q.id}
+          id={q.id}
+          idx={idx}
+          isCurrent={idx === currentIndex}
+          isAnswered={!!answers[q.id]}
+          isMarked={!!marked[q.id]}
+          onNavigate={onNavigate}
+        />
+      ))}
     </div>
   );
 });
@@ -75,18 +94,25 @@ const SectionTransitionOverlay = memo(({
   onAction: () => void,
   stats?: { answered: number, total: number }
 }) => {
+  const isLowPerf = mobileOptimizations.isLowPerformanceDevice();
+
   return (
-    <div className="fixed inset-0 z-[120] bg-background/98 backdrop-blur-md flex items-center justify-center p-6 animate-in fade-in zoom-in duration-500">
+    <div className={cn(
+      "fixed inset-0 z-[120] bg-background/98 backdrop-blur-md flex items-center justify-center p-6",
+      !isLowPerf && "animate-in fade-in zoom-in duration-500"
+    )}>
       <div className="max-w-md w-full text-center space-y-8">
         <div className="relative inline-block">
           <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mx-auto ring-8 ring-primary/5">
             {type === 'objective_submitted' ? (
-              <CheckCircle className="w-12 h-12 text-emerald-500 animate-in bounce-in" />
+              <CheckCircle className={cn("w-12 h-12 text-emerald-500", !isLowPerf && "animate-in bounce-in")} />
             ) : (
-              <Eye className="w-12 h-12 text-primary animate-pulse" />
+              <Eye className={cn("w-12 h-12 text-primary", !isLowPerf && "animate-pulse")} />
             )}
           </div>
-          <div className="absolute -top-2 -right-2 w-8 h-8 bg-background border-4 border-primary/20 rounded-full animate-spin-slow shadow-xl" />
+          {!isLowPerf && (
+            <div className="absolute -top-2 -right-2 w-8 h-8 bg-background border-4 border-primary/20 rounded-full animate-spin-slow shadow-xl" />
+          )}
         </div>
 
         <div className="space-y-3">

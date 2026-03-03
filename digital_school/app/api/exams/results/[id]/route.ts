@@ -453,7 +453,7 @@ export async function GET(
         options: question.options || [],
         modelAnswer: modelAnswer,
         explanation: explanation,
-        subQuestions: question.subQuestions ? (question.subQuestions as any[]).map((subQ: any, idx: number) => {
+        subQuestions: (question.subQuestions || (question as any).sub_questions) ? ((question.subQuestions || (question as any).sub_questions) as any[]).map((subQ: any, idx: number) => {
           const subAnswer = studentAnswers[`${questionId}_sub_${idx}`];
           const normalize = (s: any) => String(s || "").trim().toLowerCase();
 

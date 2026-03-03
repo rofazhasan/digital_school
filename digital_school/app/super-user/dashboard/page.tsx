@@ -168,6 +168,7 @@ import { Label } from "@/components/ui/label";
 
 
 import { ApprovalsTab, AiUsageTab, SystemLogsTab, AnalyticsTab, ProfileTab } from "@/components/dashboard/super-user-tabs";
+import { NoticesTab } from "@/components/dashboard/admin-tabs";
 
 import {
   Chart as ChartJS,
@@ -205,6 +206,7 @@ const sidebarItems: SidebarItem[] = [
   { id: 'ai-usage', label: 'AI Usage Monitor', icon: Zap, href: '#ai-usage' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, href: '#analytics' },
   { id: 'logs', label: 'System Logs', icon: History, href: '#logs' },
+  { id: 'notices', label: 'Notice Board', icon: Bell, href: '#notices' },
   { id: 'settings', label: 'Institute Settings', icon: Settings, href: '#settings' },
   { id: 'billing', label: 'Billing', icon: CreditCard, href: '#billing' }
 ];
@@ -627,6 +629,45 @@ export default function SuperUserDashboardPage() {
                       ))}
                     </div>
 
+                    {/* Quick Actions */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4 px-1">
+                        <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
+                          <Zap className="w-4 h-4 text-primary" />
+                          Quick Actions
+                        </h2>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Register User', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/5', border: 'border-blue-500/20', href: '/admin/users', desc: 'Add new users to the system' },
+                          { label: 'Notice Board', icon: Bell, color: 'text-indigo-500', bg: 'bg-indigo-500/5', border: 'border-indigo-500/20', href: '#notices', desc: 'Post and manage notices' },
+                          { label: 'Manage Exams', icon: FileText, color: 'text-violet-500', bg: 'bg-violet-500/5', border: 'border-violet-500/20', href: '/exams', desc: 'Oversee institutional assessments' },
+                          { label: 'Question Bank', icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/5', border: 'border-amber-500/20', href: '/question-bank', desc: 'Access study and test materials' },
+                        ].map((action, i) => (
+                          <motion.button
+                            key={i}
+                            whileHover={{ scale: 1.02, y: -2 }}
+                            whileTap={{ scale: 0.98 }}
+                            onClick={() => {
+                              if (action.href === '#notices') {
+                                setActiveTab('notices');
+                              } else {
+                                router.push(action.href);
+                              }
+                            }}
+                            className={`flex flex-col text-left p-5 bg-card rounded-2xl border ${action.border} shadow-sm hover:shadow-md transition-all group relative overflow-hidden`}
+                          >
+                            <div className={`p-3 rounded-xl ${action.bg} ${action.color} mb-3 self-start`}>
+                              <action.icon className="h-5 w-5 stroke-[2.5px]" />
+                            </div>
+                            <span className="font-bold text-sm text-foreground mb-1">{action.label}</span>
+                            <p className="text-[10px] text-muted-foreground leading-relaxed">{action.desc}</p>
+                          </motion.button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Recent Activities and Pending Approvals */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
                       <motion.div
@@ -955,6 +996,7 @@ export default function SuperUserDashboardPage() {
                   {activeTab === 'approvals' && <ApprovalsTab approvals={pendingApprovals} />}
                   {activeTab === 'ai-usage' && <AiUsageTab data={aiUsageData} />}
                   {activeTab === 'logs' && <SystemLogsTab logs={activityLogs} />}
+                  {activeTab === 'notices' && <NoticesTab isAdmin={true} />}
                   {activeTab === 'analytics' && <AnalyticsTab systemStats={systemStats} />}
                   {activeTab === 'profile' && <ProfileTab user={user} />}
 

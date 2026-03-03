@@ -109,7 +109,7 @@ export default function AdminDashboard() {
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
-        return <OverviewTab />;
+        return <OverviewTab onTabChange={setActiveTab} />;
       case 'classes':
         return <ClassesTab />;
       case 'admit-cards':
@@ -129,7 +129,7 @@ export default function AdminDashboard() {
       case 'settings':
         return <AdminSettingsTab />;
       default:
-        return <OverviewTab />;
+        return <OverviewTab onTabChange={setActiveTab} />;
     }
   };
 
@@ -284,7 +284,7 @@ export default function AdminDashboard() {
 }
 
 // Overview Tab Component - Redesigned for a premium "WOW" experience
-function OverviewTab() {
+function OverviewTab({ onTabChange }: { onTabChange: (id: string) => void }) {
   const [stats, setStats] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const router = useRouter();
 
@@ -397,7 +397,7 @@ function OverviewTab() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[
             { label: 'Register Student', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/5', border: 'border-blue-500/20', href: '/admin/users?role=STUDENT', desc: 'Add new students to the system' },
-            { label: 'Recruit Staff', icon: UserCheck, color: 'text-emerald-500', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', href: '/admin/users?role=TEACHER', desc: 'Onboard new faculty members' },
+            { label: 'Manage Notices', icon: Bell, color: 'text-indigo-500', bg: 'bg-indigo-500/5', border: 'border-indigo-500/20', href: '#notices', desc: 'Post and manage school notices' },
             { label: 'Manage Exams', icon: FileText, color: 'text-violet-500', bg: 'bg-violet-500/5', border: 'border-violet-500/20', href: '/exams', desc: 'Schedule and review assessments' },
             { label: 'Curricular Bank', icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/5', border: 'border-amber-500/20', href: '/question-bank', desc: 'Access study and test materials' },
           ].map((action, i) => (
@@ -405,7 +405,13 @@ function OverviewTab() {
               key={i}
               whileHover={{ scale: 1.02, y: -5 }}
               whileTap={{ scale: 0.98 }}
-              onClick={() => router.push(action.href)}
+              onClick={() => {
+                if (action.href === '#notices') {
+                  onTabChange('notices');
+                } else {
+                  router.push(action.href);
+                }
+              }}
               className={`flex flex-col text-left p-8 bg-card backdrop-blur-sm rounded-[2.5rem] border ${action.border} shadow-sm hover:shadow-2xl hover:bg-background transition-all group relative overflow-hidden`}
             >
               <div className={`absolute top-0 right-0 w-24 h-24 ${action.bg} rounded-bl-[3rem] transition-all group-hover:scale-150 group-hover:opacity-20 duration-500`} />

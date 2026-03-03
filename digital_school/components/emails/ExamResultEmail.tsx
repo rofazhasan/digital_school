@@ -44,7 +44,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     rank,
     hasAttachment = true,
     institute = { name: 'institute.name' },
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://rofazacademy.dev',
     semester = '2026 Academic Session',
     section = 'A',
     examDate = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
@@ -61,7 +61,7 @@ export const ExamResultEmail: React.FC<Readonly<ExamResultEmailProps>> = ({
     const scoreColor = totalPercentage >= 80 ? successColor : totalPercentage >= 40 ? primaryColor : dangerColor;
     const scriptUrl = examId
         ? `${baseUrl}/exams/results/${examId}`
-        : `${baseUrl}/student/results`;
+        : `${baseUrl}/exams/results`;
 
     // Inline simple CSS for clients that support it
     const styleTag = `
