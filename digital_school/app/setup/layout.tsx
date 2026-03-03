@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Initial Setup | Digital School",
+    title: "Initial Setup",
     description: "Configure your school settings",
 };
 

@@ -1,6 +1,15 @@
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket, DefaultEventsMap } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import { verifyToken } from './auth';
+
+interface SocketData {
+  user: {
+    userId: string;
+    name?: string;
+    email: string;
+    role: string;
+  };
+}
 
 export interface CollaborationSession {
   id: string;
@@ -23,7 +32,7 @@ export interface CollaborationMessage {
   type: 'comment' | 'suggestion' | 'question' | 'approval';
   content: string;
   timestamp: Date;
-  metadata?: any;
+  metadata?: Record<string, unknown>;
 }
 
 class SocketService {
@@ -131,7 +140,7 @@ class SocketService {
     });
   }
 
-  private async joinQuestionSession(socket: any, questionId: string, userId: string, userName: string) {
+  private async joinQuestionSession(socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>, questionId: string, userId: string, userName: string) {
     const sessionId = `question-${questionId}`;
 
     // Join the room
@@ -187,7 +196,7 @@ class SocketService {
     console.log(`User ${userName} joined question session ${sessionId}`);
   }
 
-  private async leaveQuestionSession(socket: any, questionId: string, userId: string) {
+  private async leaveQuestionSession(socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>, questionId: string, userId: string) {
     const sessionId = `question-${questionId}`;
 
     // Leave the room
@@ -224,13 +233,13 @@ class SocketService {
   }
 
   private async sendCollaborationMessage(
-    socket: any,
+    socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>,
     sessionId: string,
     userId: string,
     userName: string,
     type: string,
     content: string,
-    metadata?: any
+    metadata?: Record<string, unknown>
   ) {
     const message: CollaborationMessage = {
       id: `${sessionId}-${Date.now()}-${userId}`,
@@ -253,7 +262,7 @@ class SocketService {
   }
 
   private async handleQuestionStatusChange(
-    socket: any,
+    socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>,
     questionId: string,
     userId: string,
     userName: string,
@@ -280,7 +289,7 @@ class SocketService {
     }
   }
 
-  private handleUserDisconnect(socket: any) {
+  private handleUserDisconnect(socket: Socket<DefaultEventsMap, DefaultEventsMap, DefaultEventsMap, SocketData>) {
     const userId = socket.data.user.userId;
     const userSessions = this.userSessions.get(userId);
 
@@ -330,7 +339,7 @@ class SocketService {
   }
 
   // Send notification to specific user (securely via room)
-  sendNotificationToUser(userId: string, notification: any) {
+  sendNotificationToUser(userId: string, notification: Record<string, unknown>) {
     this.io?.to(`user-${userId}`).emit('notification', {
       userId,
       ...notification
@@ -343,7 +352,7 @@ class SocketService {
   }
 
   // Broadcast to all connected users
-  broadcastToAll(event: string, data: any) {
+  broadcastToAll(event: string, data: unknown) {
     this.io?.emit(event, data);
   }
 }

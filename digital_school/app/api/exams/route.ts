@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
       // Extract subject from questions - get the most common subject
       let examSubject = '';
-      const allQuestions = exam.examSets.flatMap(set => set.questions);
+      const allQuestions = (exam.examSets || []).flatMap(set => set.questions || []);
       if (allQuestions.length > 0) {
         const subjectCounts: { [key: string]: number } = {};
         allQuestions.forEach(q => {
@@ -58,7 +58,6 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // Find the subject with the highest count
         const entries = Object.entries(subjectCounts);
         if (entries.length > 0) {
           const mostCommonSubject = entries.reduce((a, b) =>
@@ -68,43 +67,40 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      const examAny = exam as any;
       const examData = {
-        id: examAny.id,
-        name: examAny.name,
-        description: examAny.description,
-        date: examAny.date,
-        startTime: examAny.startTime,
-        endTime: examAny.endTime,
-        subject: examSubject || examAny.class?.name || '', // Use actual subject, fallback to class name
-        totalMarks: examAny.totalMarks,
-        isActive: examAny.isActive,
-        createdBy: examAny.createdBy?.name || '',
-        classId: examAny.classId,
-        createdAt: examAny.createdAt,
-        generatedSet: examAny.generatedSet || null,
-        type: examAny.type,
-        allowRetake: examAny.allowRetake || false,
-        mcqNegativeMarking: examAny.mcqNegativeMarking,
-        cqTotalQuestions: examAny.cqTotalQuestions || 0,
-        cqRequiredQuestions: examAny.cqRequiredQuestions || 0,
-        sqTotalQuestions: examAny.sqTotalQuestions || 0,
-        sqRequiredQuestions: examAny.sqRequiredQuestions || 0,
-        objectiveTime: examAny.objectiveTime || null,
-        cqSqTime: examAny.cqSqTime || null,
-        cqSubsections: examAny.cqSubsections || null,
+        id: exam.id,
+        name: exam.name,
+        description: exam.description,
+        date: exam.date,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
+        subject: examSubject || (exam.class as any)?.name || '',
+        totalMarks: exam.totalMarks,
+        isActive: exam.isActive,
+        createdBy: (exam.createdBy as any)?.name || '',
+        classId: exam.classId,
+        createdAt: exam.createdAt,
+        generatedSet: exam.generatedSet || null,
+        type: exam.type,
+        allowRetake: exam.allowRetake || false,
+        mcqNegativeMarking: exam.mcqNegativeMarking,
+        cqTotalQuestions: exam.cqTotalQuestions || 0,
+        cqRequiredQuestions: exam.cqRequiredQuestions || 0,
+        sqTotalQuestions: exam.sqTotalQuestions || 0,
+        sqRequiredQuestions: exam.sqRequiredQuestions || 0,
+        objectiveTime: exam.objectiveTime || null,
+        cqSqTime: exam.cqSqTime || null,
+        cqSubsections: exam.cqSubsections || null,
       };
 
       // Cache the result for 5 minutes (TTL)
       DatabaseCache.set(cacheKey, examData, 300000);
 
-      // Return fresh data (or SWR stale match if we had one but updated in bg? No, this is fresh fetch)
       return createApiResponse(examData, undefined, 200, {
         cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
       });
     } catch (error) {
       console.error('Failed to fetch exam:', error);
-      // If we have stale data, return it as fallback even on error
       if (cached) {
         return createApiResponse(cached.data, undefined, 200, {
           cacheControl: 'public, s-maxage=60, stale-while-revalidate=300'
@@ -123,11 +119,11 @@ export async function GET(request: NextRequest) {
   // Filter parameters
   const search = url.searchParams.get('search') || '';
   const classId = url.searchParams.get('classId') || '';
-  const type = url.searchParams.get('type') || '';
-  const subject = url.searchParams.get('subject') || '';
-  const status = url.searchParams.get('status') || '';
+  const typeFilter = url.searchParams.get('type') || '';
+  const subjectFilter = url.searchParams.get('subject') || '';
+  const statusFilter = url.searchParams.get('status') || '';
 
-  const cacheKey = `exams:all:${page}:${limit}:${summary}:${search}:${classId}:${type}:${subject}:${status}`;
+  const cacheKey = `exams:all:${page}:${limit}:${summary}:${search}:${classId}:${typeFilter}:${subjectFilter}:${statusFilter}`;
   const cached = DatabaseCache.getSWR(cacheKey);
 
   // If valid cache exists, return immediately (Edge will handle SWR)
@@ -151,9 +147,9 @@ export async function GET(request: NextRequest) {
           ];
         }
         if (classId && classId !== 'all') where.classId = classId;
-        if (type && type !== 'all') where.type = type;
-        if (status === 'active') where.isActive = true;
-        if (status === 'pending') where.isActive = false;
+        if (typeFilter && typeFilter !== 'all') where.type = typeFilter;
+        if (statusFilter === 'active') where.isActive = true;
+        if (statusFilter === 'pending') where.isActive = false;
 
         const selectFields: any = {
           id: true,
@@ -209,34 +205,19 @@ export async function GET(request: NextRequest) {
           db.exam.count({ where })
         ]);
 
-        // Post-fetch subject filtering if subject is specified and not 'all'
-        // Since subject is nested or derived, sometimes it's easier to filter in JS if not indexed
-        const filteredData = data;
-        if (subject && subject !== 'all') {
-          // This is a bit tricky since subject comes from questions. 
-          // If the user wants a more robust approach, we should add 'subject' field to Exam model.
-          // For now, if we are in summary mode, we can't reliably filter by subject without fetching more.
-          // But if the client is doing it, we should at least provide the data.
-        }
-
-        return [filteredData, count];
+        return [data, count];
       },
       'Fetch exams page'
     );
 
     const examsData = (exams as any[]).map((exam) => {
-      const examAny = exam as any;
       let examSubject = '';
-
       if (!summary) {
-        // Extract subject from questions - get the most common subject from sample
-        const sampleQuestions = (examAny.examSets || []).flatMap((set: any) => set.questions || []);
+        const sampleQuestions = (exam.examSets || []).flatMap((set: any) => set.questions || []);
         if (sampleQuestions.length > 0) {
           const subjectCounts: { [key: string]: number } = {};
           sampleQuestions.forEach((q: any) => {
-            if (q.subject) {
-              subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
-            }
+            if (q.subject) subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
           });
 
           const entries = Object.entries(subjectCounts);
@@ -250,36 +231,42 @@ export async function GET(request: NextRequest) {
       }
 
       return {
-        id: examAny.id,
-        name: examAny.name,
-        description: summary ? undefined : examAny.description,
-        date: examAny.date,
-        startTime: examAny.startTime,
-        endTime: examAny.endTime,
-        subject: examSubject || examAny.class?.name || '',
-        totalMarks: examAny.totalMarks,
-        isActive: examAny.isActive,
-        createdBy: examAny.createdBy?.name || '',
-        classId: examAny.classId,
-        createdAt: summary ? undefined : examAny.createdAt,
-        type: examAny.type,
-        allowRetake: examAny.allowRetake || false,
-        duration: examAny.duration,
-        mcqNegativeMarking: examAny.mcqNegativeMarking,
-        mcNegativeMarking: examAny.mcNegativeMarking,
-        cqTotalQuestions: summary ? undefined : examAny.cqTotalQuestions,
-        cqRequiredQuestions: summary ? undefined : examAny.cqRequiredQuestions,
-        sqTotalQuestions: summary ? undefined : examAny.sqTotalQuestions,
-        sqRequiredQuestions: summary ? undefined : examAny.sqRequiredQuestions,
-        objectiveTime: summary ? undefined : examAny.objectiveTime,
-        cqSqTime: summary ? undefined : examAny.cqSqTime,
-        cqSubsections: summary ? undefined : examAny.cqSubsections,
+        id: exam.id,
+        name: exam.name,
+        description: summary ? undefined : exam.description,
+        date: exam.date,
+        startTime: exam.startTime,
+        endTime: exam.endTime,
+        subject: examSubject || exam.class?.name || '',
+        totalMarks: exam.totalMarks,
+        isActive: exam.isActive,
+        createdBy: exam.createdBy?.name || '',
+        classId: exam.classId,
+        createdAt: summary ? undefined : exam.createdAt,
+        type: exam.type,
+        allowRetake: exam.allowRetake || false,
+        duration: exam.duration,
+        mcqNegativeMarking: exam.mcqNegativeMarking,
+        mcNegativeMarking: exam.mcNegativeMarking,
+        cqTotalQuestions: summary ? undefined : exam.cqTotalQuestions,
+        cqRequiredQuestions: summary ? undefined : exam.cqRequiredQuestions,
+        sqTotalQuestions: summary ? undefined : exam.sqTotalQuestions,
+        sqRequiredQuestions: summary ? undefined : exam.sqRequiredQuestions,
+        objectiveTime: summary ? undefined : exam.objectiveTime,
+        cqSqTime: summary ? undefined : exam.cqSqTime,
+        cqSubsections: summary ? undefined : exam.cqSubsections,
       };
     });
 
+    // Post-fetch filtering by subject if requested
+    let finalExamsData = examsData;
+    if (subjectFilter && subjectFilter !== 'all') {
+      finalExamsData = examsData.filter(e => e.subject && e.subject.toLowerCase() === subjectFilter.toLowerCase());
+    }
+
     // Cache the result for 5 minutes
     const responseData = {
-      exams: examsData,
+      exams: finalExamsData,
       pagination: {
         page,
         limit,

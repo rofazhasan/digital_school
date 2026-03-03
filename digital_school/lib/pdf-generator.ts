@@ -18,8 +18,8 @@ export interface ExtendedQuestion extends Omit<Question, 'tags' | 'options' | 's
   correctOption?: number | null;
   chapter?: string;
   tags?: string | string[]; // Allow string (JSON) or string[]
-  options?: any;
-  subQuestions?: any;
+  options?: string | string[] | null;
+  subQuestions?: string | { part: string; marks: number; question: string }[] | null;
   // Re-declare tags to match Omit (optional here)
 }
 
@@ -92,7 +92,7 @@ class PDFGenerator {
       if (question.type === 'CQ' && question.subQuestions) {
         const subQuestions = Array.isArray(question.subQuestions) ? question.subQuestions : JSON.parse(question.subQuestions as string);
         html += '<div class="sub-questions" style="margin-left: 20px;">';
-        subQuestions.forEach((subQ: any) => {
+        subQuestions.forEach((subQ: { part: string; marks: number; question: string }) => {
           html += `
             <div class="sub-question" style="margin-bottom: 10px;">
               <div class="sub-question-header" style="margin-bottom: 5px;">
@@ -286,7 +286,7 @@ class PDFGenerator {
   async generateIndividualQuestionPDF(question: Question, options: PDFOptions = {}): Promise<Buffer> {
     return this.generateQuestionBankPDF({
       title: `Question: ${question.questionText.substring(0, 50)}...`,
-      questions: [question],
+      questions: [question as unknown as ExtendedQuestion],
       generatedBy: 'System',
       generatedAt: new Date()
     }, options);
@@ -295,7 +295,7 @@ class PDFGenerator {
   async generateAnswerKeyPDF(questions: Question[], options: PDFOptions = {}): Promise<Buffer> {
     return this.generateQuestionBankPDF({
       title: 'Answer Key',
-      questions,
+      questions: questions as unknown as ExtendedQuestion[],
       generatedBy: 'System',
       generatedAt: new Date()
     }, {

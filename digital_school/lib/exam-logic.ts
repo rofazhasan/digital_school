@@ -1,17 +1,54 @@
 import prisma from "@/lib/db";
 import { calculateGrade, calculatePercentage } from "@/lib/utils";
-import { evaluateMCQuestion } from "./evaluation/mcEvaluation";
-import { evaluateINTQuestion } from "./evaluation/intEvaluation";
-import { evaluateARQuestion } from "./evaluation/arEvaluation";
-import { evaluateMTFQuestion } from "./evaluation/mtfEvaluation";
+import { evaluateMCQuestion, MCQuestion, MCAnswer } from "./evaluation/mcEvaluation";
+import { evaluateINTQuestion, INTQuestion, INTAnswer } from "./evaluation/intEvaluation";
+import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluation";
+import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
+import { Exam, ExamSet, ExamSubmission, SubmissionStatus, Institute } from "@prisma/client";
+import React from "react";
+
+export interface QuestionOption {
+    text: string;
+    isCorrect?: boolean;
+}
+
+export interface SubQuestion {
+    id: string;
+    text: string;
+    type?: string;
+    marks: number;
+    options?: QuestionOption[];
+    correctAnswer?: string | number;
+}
+
+export interface QuestionData {
+    id: string;
+    type: string;
+    questionType?: string;
+    text: string;
+    marks: number;
+    options?: QuestionOption[];
+    subQuestions?: SubQuestion[];
+    sub_questions?: SubQuestion[];
+    correctAnswer?: string | number;
+    correct?: string | number;
+    assertion?: string;
+    reason?: string;
+    correctOption?: number;
+    leftColumn?: MTFMatchNode[];
+    rightColumn?: MTFMatchNode[];
+    matches?: Record<string, string>;
+}
+
+export type SubmissionAnswers = Record<string, unknown>;
 
 /**
  * Check if an exam consists only of MCQs
  * Now improved to check actual questions if settings are ambiguous
  */
-export function isMCQOnlyExam(exam: any, examSets: any[] = []): boolean {
+export function isMCQOnlyExam(exam: Partial<Exam>, examSets: Partial<ExamSet>[] = []): boolean {
     // 1. Check explicit settings if they are zero
     if (exam.cqTotalQuestions === 0 && exam.sqTotalQuestions === 0) return true;
 
@@ -28,7 +65,7 @@ export function isMCQOnlyExam(exam: any, examSets: any[] = []): boolean {
                 ? JSON.parse(set.questionsJson)
                 : set.questionsJson;
 
-            const hasNonMCQ = questions.some((q: any) => {
+            const hasNonMCQ = questions.some((q: QuestionData) => {
                 const type = (q.type || q.questionType || '').toUpperCase();
                 return type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE';
             });
@@ -45,17 +82,17 @@ export function isMCQOnlyExam(exam: any, examSets: any[] = []): boolean {
  * Evaluate a single submission and update its Result
  * @param saveToDb - if true (default), updates the submission status and saves the result to the DB. If false, calculates and returns scores in-memory without mutating the DB. Useful for previewing evaluations.
  */
-export async function evaluateSubmission(submission: any, exam: any, examSets: any[], saveToDb: boolean = true) {
+export async function evaluateSubmission(submission: ExamSubmission, exam: Exam, examSets: ExamSet[], saveToDb: boolean = true) {
     let totalScore = 0;
     let mcqMarks = 0;
     let cqMarks = 0;
     let sqMarks = 0;
-    const answers = submission.answers as any;
+    const answers = submission.answers as SubmissionAnswers;
 
     // Initialize section-wise scores
     const allCqScores: number[] = [];
     const allSqScores: number[] = [];
-
+    const evaluationResult: Record<string, any> = {};
     // 1. Determine Exam Set
     const studentExamMap = await prisma.examStudentMap.findFirst({
         where: { studentId: submission.studentId, examId: exam.id }
@@ -80,9 +117,9 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             ? JSON.parse(targetSet.questionsJson)
             : targetSet.questionsJson;
 
-        for (const question of questions) {
+        for (const question of (questions as QuestionData[])) {
             const type = question.type?.toUpperCase();
-            const studentAnswer = answers[question.id];
+            const studentAnswer = answers[question.id] as any;
             const manualMark = answers[`${question.id}_marks`];
 
             // A. Handle Manual Grading (CQ/SQ/DESCRIPTIVE)
@@ -92,7 +129,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 const subQs = question.subQuestions || question.sub_questions;
                 if ((type === 'DESCRIPTIVE' || type === 'CQ' || type === 'SQ') && subQs) {
                     // Sum up sub-question marks if they exist
-                    subQs.forEach((sub: any, idx: number) => {
+                    subQs.forEach((sub: SubQuestion, idx: number) => {
                         // Support both _desc_ and _sub_ prefixes for maximum compatibility
                         const subMark = answers[`${question.id}_desc_${idx}_marks`] ?? answers[`${question.id}_sub_${idx}_marks`];
                         if (typeof subMark === 'number') {
@@ -115,17 +152,19 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
 
             // B. Auto-grading (Objective Types)
             let questionScore = 0;
+            let res: any = null;
+
             if (type === 'MCQ') {
                 if (!studentAnswer) continue;
 
                 // Use a simplified version of MC evaluation for MCQ or just direct check
                 // For MCQ (single choice), it's stored as a string or index
-                const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                const normalize = (s: string | number | undefined | null) => String(s || '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
                 if (question.options && Array.isArray(question.options)) {
-                    const correctOption = question.options.find((opt: any) => opt.isCorrect);
+                    const correctOption = question.options.find((opt: QuestionOption) => opt.isCorrect);
                     if (correctOption) {
                         const correctOptionText = normalize(correctOption.text);
                         isCorrect = userAns === correctOptionText;
@@ -144,7 +183,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             } else if (type === 'MC') {
                 const hasSelected = studentAnswer && Array.isArray(studentAnswer.selectedOptions) && studentAnswer.selectedOptions.length > 0;
                 if (!hasSelected) continue;
-                questionScore = evaluateMCQuestion(question, studentAnswer, {
+                questionScore = evaluateMCQuestion(question as unknown as MCQuestion, studentAnswer as MCAnswer, {
                     negativeMarking: exam.mcNegativeMarking || 0,
                     partialMarking: true,
                     hasAttempted: true
@@ -158,7 +197,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 }
             } else if (type === 'AR') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
-                const res = evaluateARQuestion(question, studentAnswer);
+                const res = evaluateARQuestion(question as unknown as ARQuestion, studentAnswer);
                 questionScore = res.score;
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
@@ -168,18 +207,20 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 if (!subQs) continue;
 
                 let smcqScore = 0;
-                subQs.forEach((subQ: any, sIdx: number) => {
-                    const subAnswer = answers[`${question.id}_sub_${sIdx}`];
+                let subAttemptCount = 0;
+                subQs.forEach((subQ: SubQuestion, sIdx: number) => {
+                    const subAnswer = answers[`${question.id}_sub_${sIdx}`] as any;
                     if (subAnswer === undefined || subAnswer === null || subAnswer === '') return;
 
-                    const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                    subAttemptCount++;
+                    const normalize = (s: string | number | undefined | null) => String(s || '').trim().toLowerCase();
                     const userAns = normalize(subAnswer);
                     let isSubCorrect = false;
 
                     if (subQ.options && Array.isArray(subQ.options)) {
-                        const correctOption = subQ.options.find((opt: any) => opt.isCorrect);
+                        const correctOption = subQ.options.find((opt: QuestionOption) => opt.isCorrect);
                         if (correctOption) {
-                            const correctOptionText = normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
+                            const correctOptionText = normalize(correctOption.text);
                             isSubCorrect = userAns === correctOptionText;
                         }
                     }
@@ -202,18 +243,26 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                     }
                 });
                 questionScore = smcqScore;
+                const allSubAttempted = subAttemptCount > 0;
+                res = { score: questionScore, type, attempted: allSubAttempted };
             } else if (type === 'MTF') {
-                const hasMatchSet = studentAnswer && (Array.isArray(studentAnswer.matches) ? studentAnswer.matches.length > 0 : Object.keys(studentAnswer).length > 0);
-                if (!hasMatchSet) continue;
+                const hasMatchSet = studentAnswer && (Array.isArray((studentAnswer as any).matches) ? (studentAnswer as any).matches.length > 0 : Object.keys(studentAnswer as any).length > 0);
+                if (!hasMatchSet) {
+                    evaluationResult[question.id] = { score: 0, type, isCorrect: false, attempted: false };
+                    continue;
+                }
 
-                const res = evaluateMTFQuestion(question, studentAnswer);
+                res = evaluateMTFQuestion(question as unknown as any, studentAnswer as unknown as MTFAnswer);
                 questionScore = res.score;
-                // For MTF, we usually don't apply negative marking if it's partial, 
+                // For MTF, we usually don't apply negative marking if it's partial,
                 // but let's stick to the current logic of the codebase if any
             }
 
-            mcqMarks += questionScore;
-            totalScore += questionScore;
+            if (res) {
+                mcqMarks += questionScore;
+                totalScore += questionScore;
+                evaluationResult[question.id] = { ...res, type };
+            }
         }
     }
 
@@ -235,9 +284,11 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         await prisma.examSubmission.update({
             where: { id: submission.id },
             data: {
-                score: totalScore,
-                evaluatedAt: new Date(),
-                status: 'SUBMITTED' // Final status
+                score: totalScore, // Keep score for backward compatibility
+                status: SubmissionStatus.SUBMITTED,
+                objectiveStatus: SubmissionStatus.SUBMITTED,
+                cqSqStatus: SubmissionStatus.SUBMITTED,
+                evaluatedAt: new Date()
             }
         });
 
@@ -270,7 +321,7 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
         });
     }
 
-    return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks };
+    return { totalScore, percentage, grade, mcqMarks, cqMarks, sqMarks, evaluationResult };
 }
 
 /**
@@ -289,18 +340,18 @@ export async function releaseExamResults(examId: string) {
     });
 
     // Calculate ranks
-    const resultsWithRanks = allResults.map((result: any, index: number) => {
-        const sameCount = allResults.filter((r: any) => r.total === result.total).length;
+    const resultsWithRanks = allResults.map((result, index: number) => {
+        const sameCount = allResults.filter(r => r.total === result.total).length;
         let rank = index + 1;
         if (sameCount > 1) {
-            const firstIndex = allResults.findIndex((r: any) => r.total === result.total);
+            const firstIndex = allResults.findIndex(r => r.total === result.total);
             rank = firstIndex + 1;
         }
         return { id: result.id, rank };
     });
 
     // Bulk update
-    await Promise.all(resultsWithRanks.map((item: any) =>
+    await Promise.all(resultsWithRanks.map(item =>
         prisma.result.update({
             where: { id: item.id },
             data: {
@@ -342,7 +393,8 @@ export async function releaseExamResults(examId: string) {
         const firstSet = await prisma.examSet.findFirst({
             where: { examId }
         });
-        const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
+        // const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
+        // The 'questions' variable was unused, removed it as per instruction.
 
         // Sequential email sending for stability
         let sentCount = 0;
@@ -357,28 +409,31 @@ export async function releaseExamResults(examId: string) {
             try {
                 const resultItems = [{
                     subject: (exam as any).subject || exam?.name || "General",
-                    marks: res.total,
+                    marks: res.total || 0,
                     totalMarks: exam?.totalMarks || 100,
-                    grade: res.grade || "F"
+                    grade: res.grade || "F",
+                    mcqMarks: res.mcqMarks,
+                    cqMarks: res.cqMarks,
+                    sqMarks: res.sqMarks
                 }];
 
                 await sendEmail({
-                    to: res.student.user.email!,
+                    to: res.student?.user?.email || '',
                     subject: `Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
                     react: ExamResultEmail({
-                        studentName: res.student.user.name,
+                        studentName: res.student?.user?.name || "Student",
                         examName: exam?.name || "Exam",
                         results: resultItems,
                         totalPercentage: res.percentage || 0,
                         finalGrade: res.grade || "F",
-                        rank: res.rank || undefined,
+                        rank: (res as any).rank || undefined,
                         institute: institute as any,
-                        section: res.student.class?.section || undefined,
-                        examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined
-                    }) as any
+                        section: res.student?.class?.section || undefined,
+                        examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined,
+                        baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+                    }) as React.ReactElement
                 });
                 sentCount++;
-
                 // Short cooldown for server health
                 if (i < resultsWithUsers.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
@@ -399,25 +454,25 @@ export async function releaseExamResults(examId: string) {
 /**
  * Check for expired sections and auto-submit them
  */
-export async function autoSubmitExpiredSections(submission: any, exam: any) {
-    if (!submission || submission.status === 'SUBMITTED') return submission;
+export async function autoSubmitExpiredSections(submission: ExamSubmission, exam: Partial<Exam> & { examSets?: ExamSet[] }) {
+    if (!submission || submission.status === SubmissionStatus.SUBMITTED) return submission;
 
     const now = new Date();
     const bufferMs = 60 * 1000; // 1 minute buffer for auto-submission
     let hasChanges = false;
-    const updateData: any = {};
+    const updateData: Partial<ExamSubmission> = {};
 
     // Intelligent section detection
     const isMCQOnly = isMCQOnlyExam(exam, exam.examSets || []);
-    const isObjectiveAvailable = (exam.objectiveTime && exam.objectiveTime > 0) || isMCQOnly || (exam as any).hasObjective;
-    const isCqSqAvailable = (exam.cqSqTime && exam.cqSqTime > 0) || !isMCQOnly || (exam as any).hasCqSq;
+    const isObjectiveAvailable = (exam.objectiveTime && exam.objectiveTime > 0) || isMCQOnly || (exam as { hasObjective?: boolean }).hasObjective;
+    const isCqSqAvailable = (exam.cqSqTime && exam.cqSqTime > 0) || !isMCQOnly || (exam as { hasCqSq?: boolean }).hasCqSq;
 
     // 1. Check Objective Section
-    if (submission.objectiveStatus === 'IN_PROGRESS' && submission.objectiveStartedAt && isObjectiveAvailable) {
+    if (submission.objectiveStatus === SubmissionStatus.IN_PROGRESS && submission.objectiveStartedAt && isObjectiveAvailable) {
         const objStartTime = new Date(submission.objectiveStartedAt).getTime();
-        const objLimitMs = (exam.objectiveTime || exam.duration) * 60 * 1000;
+        const objLimitMs = (Number(exam.objectiveTime) || Number(exam.duration) || 0) * 60 * 1000;
         if (now.getTime() > objStartTime + objLimitMs + bufferMs) {
-            updateData.objectiveStatus = 'SUBMITTED';
+            updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
             updateData.objectiveSubmittedAt = now;
             hasChanges = true;
             console.log(`[Auto-Submit] Objective expired for submission ${submission.id}`);
@@ -425,11 +480,11 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     }
 
     // 2. Check CQ/SQ Section
-    if (submission.cqSqStatus === 'IN_PROGRESS' && submission.cqSqStartedAt && isCqSqAvailable) {
+    if (submission.cqSqStatus === SubmissionStatus.IN_PROGRESS && submission.cqSqStartedAt && isCqSqAvailable) {
         const cqStartTime = new Date(submission.cqSqStartedAt).getTime();
-        const cqLimitMs = (exam.cqSqTime || exam.duration) * 60 * 1000;
+        const cqLimitMs = (Number(exam.cqSqTime) || Number(exam.duration) || 0) * 60 * 1000;
         if (now.getTime() > cqStartTime + cqLimitMs + bufferMs) {
-            updateData.cqSqStatus = 'SUBMITTED';
+            updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
             updateData.cqSqSubmittedAt = now;
             hasChanges = true;
             console.log(`[Auto-Submit] CQ/SQ expired for submission ${submission.id}`);
@@ -437,19 +492,15 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     }
 
     // 3. Check Overall Exam Time (Absolute end time)
-    const examEndTime = new Date(exam.endTime).getTime();
-    if (now.getTime() > examEndTime + bufferMs) {
-        if (submission.status !== 'SUBMITTED') {
-            updateData.status = 'SUBMITTED';
+    if (exam.endTime) {
+        const examEndTime = new Date(exam.endTime).getTime();
+        if (now.getTime() > examEndTime + bufferMs) {
+            updateData.status = SubmissionStatus.SUBMITTED;
             // Also force sections to submitted if overall time is over
-            if (submission.objectiveStatus !== 'SUBMITTED') {
-                updateData.objectiveStatus = 'SUBMITTED';
-                updateData.objectiveSubmittedAt = now;
-            }
-            if (submission.cqSqStatus !== 'SUBMITTED') {
-                updateData.cqSqStatus = 'SUBMITTED';
-                updateData.cqSqSubmittedAt = now;
-            }
+            updateData.objectiveStatus = SubmissionStatus.SUBMITTED;
+            updateData.objectiveSubmittedAt = now;
+            updateData.cqSqStatus = SubmissionStatus.SUBMITTED;
+            updateData.cqSqSubmittedAt = now;
             hasChanges = true;
             console.log(`[Auto-Submit] Overall exam time expired for submission ${submission.id}`);
         }
@@ -458,7 +509,7 @@ export async function autoSubmitExpiredSections(submission: any, exam: any) {
     if (hasChanges) {
         return await prisma.examSubmission.update({
             where: { id: submission.id },
-            data: updateData
+            data: updateData as any
         });
     }
 
@@ -476,13 +527,22 @@ export async function finalizeAndReleaseExam(examId: string) {
 
     if (!exam) return;
 
-    // Find all active submissions
+    // Get non-submitted in-progress submissions
     const pendingSubmissions = await prisma.examSubmission.findMany({
         where: {
             examId,
-            status: 'IN_PROGRESS' as any
+            status: SubmissionStatus.IN_PROGRESS
+        },
+        include: {
+            exam: {
+                include: {
+                    examSets: true
+                }
+            }
         }
     });
+
+    console.log(`[Auto-Submit] Found ${pendingSubmissions.length} pending submissions for exam ${examId}`);
 
     // Force evaluate them after checking for expirations
     for (const submission of pendingSubmissions) {

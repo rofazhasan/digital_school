@@ -1,5 +1,4 @@
-
-const { Jimp, intToRGBA } = require('jimp');
+import { Jimp, JimpInstance } from 'jimp';
 import jsQR from 'jsqr';
 
 // ------------------------------------------------------------------
@@ -13,8 +12,20 @@ export interface OMRResult {
     answers: Record<number, string>;
     error?: string;
     debugImage?: string;
-    qrData?: any;
-    grading?: { score: number; total: number; details: any[] };
+    qrData?: OMRAnchors;
+    grading?: { score: number; total: number; details: unknown[] };
+}
+
+export interface Point {
+    x: number;
+    y: number;
+}
+
+export interface OMRAnchors {
+    tl?: Point;
+    tr?: Point;
+    bl?: Point;
+    br?: Point;
 }
 
 // Layout constants relative to the WARPED ID card (Normalized 0..1)
@@ -34,9 +45,9 @@ const LAYOUT = {
     }
 };
 
-export async function processOMR(imageBuffer: Buffer, mimeType: string): Promise<OMRResult> {
+export async function processOMR(imageBuffer: Buffer, _mimeType: string): Promise<OMRResult> {
     try {
-        const image = await Jimp.read(imageBuffer);
+        const image = await Jimp.read(imageBuffer) as unknown as JimpInstance;
 
         // 1. Resize for speed
         if (image.bitmap.width > 2000) image.resize({ w: 2000 });
@@ -59,7 +70,7 @@ export async function processOMR(imageBuffer: Buffer, mimeType: string): Promise
         console.log("Warping...");
         const warpedWidth = 1000;
         const warpedHeight = 1400;
-        const warped = warpPerspective(image, anchors, warpedWidth, warpedHeight);
+        const warped = warpPerspective(image, anchors as Required<OMRAnchors>, warpedWidth, warpedHeight);
         console.log("Warped.");
 
         // 4. Extract Bubbles & Classify using K-Means
@@ -74,11 +85,12 @@ export async function processOMR(imageBuffer: Buffer, mimeType: string): Promise
             debugImage: debugBase64
         };
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("OMR 2.0 Error:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
         return {
             roll: '', set: '', reg: '', answers: {},
-            error: `Processing Failed: ${error.message}`
+            error: `Processing Failed: ${errorMessage}`
         };
     }
 }
@@ -86,7 +98,7 @@ export async function processOMR(imageBuffer: Buffer, mimeType: string): Promise
 // ------------------------------------------------------------------
 // 1. QUADRANT QR DETECTION
 // ------------------------------------------------------------------
-async function findQuadAnchors(image: any) {
+async function findQuadAnchors(image: JimpInstance): Promise<OMRAnchors> {
     const w = image.bitmap.width;
     const h = image.bitmap.height;
 
@@ -98,7 +110,7 @@ async function findQuadAnchors(image: any) {
         br: { x: w / 2, y: h / 2, w: w / 2, h: h / 2 }
     };
 
-    const detected: any = {};
+    const detected: OMRAnchors = {};
 
     for (const [key, reg] of Object.entries(regions)) {
         // Crop virtual region
@@ -116,10 +128,14 @@ async function findQuadAnchors(image: any) {
 
             try {
                 const json = JSON.parse(code.data);
-                if (json.loc) detected[json.loc.toLowerCase()] = { x: cx, y: cy };
-                else detected[key] = { x: cx, y: cy };
-            } catch (e) {
-                detected[key] = { x: cx, y: cy };
+                if (json.loc) {
+                    const locKey = json.loc.toLowerCase() as keyof OMRAnchors;
+                    detected[locKey] = { x: cx, y: cy };
+                } else {
+                    detected[key as keyof OMRAnchors] = { x: cx, y: cy };
+                }
+            } catch (_e) {
+                detected[key as keyof OMRAnchors] = { x: cx, y: cy };
             }
         }
     }
@@ -130,10 +146,10 @@ async function findQuadAnchors(image: any) {
 // ------------------------------------------------------------------
 // 2. PERSPECTIVE TRANSFORM (Bilinear)
 // ------------------------------------------------------------------
-function warpPerspective(image: any, anchors: any, outW: number, outH: number) {
-    const out = image.clone().resize({ w: outW, h: outH });
+function warpPerspective(image: JimpInstance, anchors: Required<OMRAnchors>, outW: number, outH: number) {
+    const out = image.clone().resize({ w: outW, h: outH }) as unknown as JimpInstance;
     // Fill white
-    out.scan(0, 0, outW, outH, function (this: any, x: number, y: number, idx: number) {
+    out.scan(0, 0, outW, outH, function (this: JimpInstance, _x: number, _y: number, idx: number) {
         this.bitmap.data[idx + 0] = 255;
         this.bitmap.data[idx + 1] = 255;
         this.bitmap.data[idx + 2] = 255;
@@ -167,7 +183,7 @@ function warpPerspective(image: any, anchors: any, outW: number, outH: number) {
 // ------------------------------------------------------------------
 // 3. SCANNING & K-MEANS
 // ------------------------------------------------------------------
-function scanAndClassify(image: any) {
+function scanAndClassify(image: JimpInstance) {
     const w = image.bitmap.width;
     const h = image.bitmap.height;
     const samples: { val: number, type: string, id: string }[] = [];
@@ -251,7 +267,7 @@ function scanAndClassify(image: any) {
         }
     }
 
-    const answers: any = {};
+    const answers: Record<string, string> = {};
     for (let q = 1; q <= 100; q++) {
         let bestOpt = -1;
         let bestVal = 255;
@@ -275,7 +291,7 @@ function scanAndClassify(image: any) {
     return { roll, set: setCode, answers, reg: '' };
 }
 
-function getAverageBrightness(image: any, x: number, y: number, r: number) {
+function getAverageBrightness(image: JimpInstance, x: number, y: number, r: number) {
     let total = 0, count = 0;
     const w = image.bitmap.width;
     const h = image.bitmap.height;
@@ -285,8 +301,10 @@ function getAverageBrightness(image: any, x: number, y: number, r: number) {
             const py = Math.floor(y + dy);
             if (px >= 0 && px < w && py >= 0 && py < h) {
                 const col = image.getPixelColor(px, py);
-                const rgba = intToRGBA(col);
-                total += (rgba.r + rgba.g + rgba.b) / 3;
+                const r_val = (col >> 24) & 0xff;
+                const g_val = (col >> 16) & 0xff;
+                const b_val = (col >> 8) & 0xff;
+                total += (r_val + g_val + b_val) / 3;
                 count++;
             }
         }
@@ -294,11 +312,11 @@ function getAverageBrightness(image: any, x: number, y: number, r: number) {
     return total / count;
 }
 
-async function getDebugImage(image: any): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
-        image.getBase64("image/jpeg", (err: any, res: string) => {
-            if (err) resolve("");
-            else resolve(res);
-        });
-    });
+async function getDebugImage(image: JimpInstance): Promise<string> {
+    try {
+        const base64 = await image.getBase64("image/jpeg");
+        return base64;
+    } catch (_e) {
+        return "";
+    }
 }

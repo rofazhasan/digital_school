@@ -48,7 +48,6 @@ export function evaluateMCQuestion(
         return 0;
     }
 
-    const selectedSet = new Set(answer.selectedOptions);
     const correctSet = new Set(correctIndices);
 
     // Count correct and wrong selections

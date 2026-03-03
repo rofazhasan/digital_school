@@ -26,14 +26,14 @@ const prismadb = globalThis.prisma || createPrismaClient();
 const extendedPrisma = prismadb.$extends({
     model: {
         $allModels: {
-            async executeWithConnection<T>(callback: (db: any) => Promise<T>): Promise<T> {
-                return callback(prismadb);
+            async executeWithConnection<T>(callback: (db: PrismaClient) => Promise<T>): Promise<T> {
+                return callback(prismadb as PrismaClient);
             }
         }
     },
     client: {
-        async executeWithConnection<T>(callback: (db: any) => Promise<T>): Promise<T> {
-            return callback(prismadb);
+        async executeWithConnection<T>(callback: (db: PrismaClient) => Promise<T>): Promise<T> {
+            return callback(prismadb as PrismaClient);
         }
     }
 });

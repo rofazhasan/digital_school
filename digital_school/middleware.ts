@@ -258,11 +258,11 @@ export async function middleware(request: NextRequest) {
 
   // Skip middleware for static files, API routes, and other assets
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/_next/') ||
     pathname.startsWith('/api/') ||
-    pathname.includes('.') ||
-    pathname.startsWith('/public/')
+    pathname.startsWith('/favicon.ico') ||
+    pathname.startsWith('/public/') ||
+    pathname.includes('.')
   ) {
     return NextResponse.next();
   }
@@ -272,7 +272,9 @@ export async function middleware(request: NextRequest) {
   console.log('[MIDDLEWARE] user role:', userData?.role, 'path:', pathname);
 
   // Handle public routes
-  if (ROUTE_PERMISSIONS.public.some(route => pathMatches(route, pathname))) {
+  const isPublicRoute = ROUTE_PERMISSIONS.public.some(route => pathMatches(route, pathname));
+
+  if (isPublicRoute) {
     const reason = request.nextUrl.searchParams.get('reason');
 
     // If user is authenticated and trying to access login/signup, redirect to dashboard
@@ -302,10 +304,6 @@ export async function middleware(request: NextRequest) {
   }
 
   // Handle pending verification/approval
-  // Exclude Admins and Super Users from this check if needed, 
-  // but strictly speaking, even they should be verified if self-signed up.
-  // HOWEVER, the user said "admin/superuser can add user like previous with no code and nothing needed"
-  // which I handled by setting their flags to true on creation.
   const isPending = userData.verified === false || userData.approved === false;
   if (isPending && pathname !== '/auth/pending' && !pathname.startsWith('/api/')) {
     return NextResponse.redirect(new URL('/auth/pending', request.url));
@@ -342,7 +340,8 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public files (images, etc.)
+     * - file extensions (e.g. .png, .jpg, .css)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|public/|.*\\..*).*)',
   ],
 };

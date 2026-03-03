@@ -1,7 +1,7 @@
 // app/api/exams/[id]/route.ts
 
 import { NextRequest, NextResponse } from 'next/server';
-import { Question, QuestionType, Difficulty } from '@prisma/client';
+import { Question, QuestionType, Difficulty, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { shuffleArray } from '@/lib/utils';
 import { DatabaseClient } from '@/lib/db';
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const skip = (page - 1) * limit;
 
     // 3. Construct a dynamic where clause for professional-grade filtering
-    const whereClause: any = {
+    const whereClause: Prisma.QuestionWhereInput = {
       classId: exam.classId, // CRITICAL: Only show questions for the exam's class
       // Add other filters if they are provided
       ...(type && { type }),
@@ -133,6 +133,11 @@ export async function PUT(
     }
 
     const selectedQuestions = await prisma.question.findMany({ where: { id: { in: questionIds } } });
+
+    if (selectedQuestions.length !== questionIds.length) {
+      return NextResponse.json({ error: 'Some question IDs are invalid.' }, { status: 400 });
+    }
+
     const totalMarksOfSelectedQuestions = selectedQuestions.reduce((sum, q) => sum + q.marks, 0);
 
     if (totalMarksOfSelectedQuestions !== exam.totalMarks) {
@@ -194,9 +199,9 @@ export async function PUT(
         name,
         exam: { connect: { id: examId } },
         createdBy: { connect: { id: exam.createdById } },
-        questionsJson: questionsToSave,
+        questionsJson: questionsToSave as Prisma.JsonArray,
         questions: { connect: questionIds.map((id: string) => ({ id })) },
-      } as any,
+      },
     });
 
     return NextResponse.json(newExamSet, { status: 201 });
@@ -305,9 +310,9 @@ export async function POST(
         name,
         exam: { connect: { id: examId } },
         createdBy: { connect: { id: exam.createdById } },
-        questionsJson: generatedSetWithNegativeMarks,
+        questionsJson: generatedSetWithNegativeMarks as Prisma.JsonArray,
         questions: { connect: generatedSet.map(q => ({ id: q.id })) },
-      } as any,
+      },
     });
 
     return NextResponse.json(newExamSet, { status: 201 });

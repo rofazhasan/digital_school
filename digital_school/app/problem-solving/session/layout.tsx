@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Problem Solving | Digital School",
+    title: "Problem Solving",
     description: "Practice and solve mathematical problems",
 };
 

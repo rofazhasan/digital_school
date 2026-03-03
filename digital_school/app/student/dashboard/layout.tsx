@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { validateSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
-    title: "Student Dashboard | Digital School",
+    title: "Student Dashboard",
     description: "Manage your exams and view progress",
 };
 

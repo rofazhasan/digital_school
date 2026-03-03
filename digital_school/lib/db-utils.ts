@@ -24,7 +24,7 @@ export async function withDatabaseTimeout<T>(
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            const db = await DatabaseClient.getInstance();
+            await DatabaseClient.getInstance();
 
             return await DatabaseClient.executeWithTimeout(
                 async () => {
@@ -128,9 +128,9 @@ export async function checkDatabaseHealth(): Promise<{ healthy: boolean; message
 
 // Cache management with Stale-While-Revalidate support
 export class DatabaseCache {
-    private static cache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+    private static cache = new Map<string, { data: unknown; timestamp: number; ttl: number }>();
 
-    static set(key: string, data: any, ttlMs: number = 300000): void { // 5 minutes default
+    static set(key: string, data: unknown, ttlMs: number = 300000): void { // 5 minutes default
         this.cache.set(key, {
             data,
             timestamp: Date.now(),
@@ -138,9 +138,8 @@ export class DatabaseCache {
         });
     }
 
-    // New: Stale-While-Revalidate pattern
-    // Returns { data: any, isStale: boolean } or null
-    static getSWR(key: string): { data: any; isStale: boolean } | null {
+    // Returns { data: unknown, isStale: boolean } or null
+    static getSWR(key: string): { data: unknown; isStale: boolean } | null {
         const item = this.cache.get(key);
         if (!item) return null;
 
@@ -156,7 +155,7 @@ export class DatabaseCache {
         return { data: item.data, isStale };
     }
 
-    static get(key: string): any | null {
+    static get(key: string): unknown | null {
         const item = this.cache.get(key);
         if (!item) return null;
 

@@ -1,4 +1,4 @@
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Haptics, ImpactStyle, NotificationType } from '@capacitor/haptics';
 
 export { ImpactStyle };
 import { Capacitor } from '@capacitor/core';
@@ -7,8 +7,8 @@ export const triggerHaptic = async (style: ImpactStyle = ImpactStyle.Light) => {
     if (Capacitor.isNativePlatform()) {
         try {
             await Haptics.impact({ style });
-        } catch (e) {
-            console.warn('Haptics not available:', e);
+        } catch (_e) {
+            console.warn('Haptics not available:', _e);
         }
     }
 };
@@ -16,8 +16,8 @@ export const triggerHaptic = async (style: ImpactStyle = ImpactStyle.Light) => {
 export const triggerSuccessHaptic = async () => {
     if (Capacitor.isNativePlatform()) {
         try {
-            await Haptics.notification({ type: 'SUCCESS' as any });
-        } catch (e) { }
+            await Haptics.notification({ type: NotificationType.Success });
+        } catch (_e) { }
     }
 };
 
@@ -26,14 +26,14 @@ export const triggerGradingHaptic = async (type: 'CORRECT' | 'WRONG' | 'REVIEW')
     try {
         switch (type) {
             case 'CORRECT':
-                await Haptics.notification({ type: 'SUCCESS' as any });
+                await Haptics.notification({ type: NotificationType.Success });
                 break;
             case 'WRONG':
-                await Haptics.notification({ type: 'ERROR' as any });
+                await Haptics.notification({ type: NotificationType.Error });
                 break;
             case 'REVIEW':
                 await Haptics.impact({ style: ImpactStyle.Heavy });
                 break;
         }
-    } catch (e) { }
+    } catch (_e) { }
 };

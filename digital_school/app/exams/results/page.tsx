@@ -210,7 +210,7 @@ export default function ExamResultsPage() {
 
         console.log('📊 API Response:', resultsData);
         console.log('📊 Processed exam results:', examResults);
-        setExamResults(examResults);
+        setExamResults(examResults as ExamResults[]);
       } else {
         console.error('Failed to fetch results:', resultsResponse.status);
         toast.error('Failed to load exam results');
@@ -354,10 +354,10 @@ export default function ExamResultsPage() {
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
 
-    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800" {...({} as any)}><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
-    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800" {...({} as any)}><Award className="w-3 h-3 mr-1" />2nd</Badge>;
-    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800" {...({} as any)}><Award className="w-3 h-3 mr-1" />3rd</Badge>;
-    return <Badge variant="outline" {...({} as any)}>{rank}</Badge>;
+    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
+    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
+    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
+    return <Badge variant="outline">{rank}</Badge>;
   };
 
   const getPerformanceAnalysis = (result: Result) => {
@@ -502,7 +502,7 @@ export default function ExamResultsPage() {
               <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
                 <span className="text-xs font-medium text-slate-400">Class {user.studentProfile.class.name}</span>
                 <div className="h-4 w-px bg-white/10" />
-                <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-none" {...({} as any)}>
+                <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-none">
                   Roll: {user.studentProfile.roll}
                 </Badge>
               </div>
@@ -720,7 +720,7 @@ export default function ExamResultsPage() {
                             <CardTitle className="text-slate-300 flex items-center gap-2">
                               <Users className="w-5 h-5 text-indigo-400" /> Class Standings
                             </CardTitle>
-                            <Badge variant="outline" className="text-[10px] text-slate-500 border-white/10" {...({} as any)}>
+                            <Badge variant="outline" className="text-[10px] text-slate-500 border-white/10">
                               Showcases {examResult.results.length} Students
                             </Badge>
                           </div>
@@ -788,7 +788,7 @@ export default function ExamResultsPage() {
                                             <span className="text-[11px] text-slate-500">{res.percentage?.toFixed(1)}%</span>
                                           </TableCell>
                                           <TableCell className="text-right">
-                                            <Badge className={`border-none ${getGradeColor(res.grade)}`} {...({} as any)}>
+                                            <Badge className={`border-none ${getGradeColor(res.grade)}`}>
                                               {res.grade}
                                             </Badge>
                                           </TableCell>

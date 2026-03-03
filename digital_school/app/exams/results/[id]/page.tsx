@@ -120,6 +120,18 @@ interface SubmissionInfo {
   cqSqSubmittedAt?: string;
 }
 
+interface SubQuestion {
+  id: string;
+  questionText: string;
+  marks: number;
+  awardedMarks: number;
+  isCorrect: boolean;
+  studentAnswer: string | string[] | any;
+  studentImages: string[];
+  options?: { text: string; isCorrect: boolean; originalIndex?: number }[];
+  correctAnswer?: string | number;
+}
+
 interface Question {
   id: string;
   type: string;
@@ -127,7 +139,7 @@ interface Question {
   marks: number;
   awardedMarks: number;
   isCorrect: boolean;
-  studentAnswer?: any;
+  studentAnswer?: any; // Reverting to any for flexible student answer structures
   studentAnswerImages?: string[];
   drawingData?: {
     imageData: string;
@@ -138,13 +150,19 @@ interface Question {
     imageData: string;
     originalImagePath: string;
   }[];
-  options?: any[];
+  options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
   modelAnswer?: string;
   explanation?: string;
-  subQuestions?: any[];
-  sub_questions?: any[];
+  subQuestions?: SubQuestion[];
+  sub_questions?: SubQuestion[];
   feedback?: string;
   images?: string[];
+  assertion?: string;
+  reason?: string;
+  correctOption?: number;
+  leftColumn?: string[];
+  rightColumn?: string[];
+  matches?: Record<string, number>;
 }
 
 interface Statistics {
@@ -237,7 +255,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       triggerHaptic(ImpactStyle.Medium);
     }
   } as any);
-
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -505,7 +522,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         setNotifications(data.notifications || []);
 
         // Check for review response notifications
-        const reviewNotifications = data.notifications?.filter((n: any) =>
+        const reviewNotifications = (data.notifications as any[] || []).filter((n: any) =>
           n.type === 'REVIEW_RESPONSE' && n.relatedType === 'result_review'
         ) || [];
 
@@ -1606,7 +1623,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                         </div>
 
                                         <div className="space-y-10 pl-2 md:pl-10 border-l-4 border-dashed border-indigo-500/20">
-                                          {(question.subQuestions || []).map((subQ: any, subIdx: number) => (
+                                          {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
                                             <div key={subIdx} className="relative space-y-6 group">
                                               {/* connector dot */}
                                               <div className="absolute -left-12 top-2 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-4 border-indigo-500 shadow-lg shadow-indigo-500/50 z-10" />

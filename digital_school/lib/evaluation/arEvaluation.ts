@@ -1,4 +1,4 @@
-interface ARQuestion {
+export interface ARQuestion {
     assertion: string;
     reason: string;
     correctOption?: number; // 1-5
@@ -6,7 +6,7 @@ interface ARQuestion {
     marks: number;
 }
 
-interface ARAnswer {
+export interface ARAnswer {
     selectedOption: number; // 1-5
 }
 

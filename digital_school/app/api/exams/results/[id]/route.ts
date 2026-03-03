@@ -6,6 +6,41 @@ import { evaluateMCQuestion } from '@/lib/evaluation/mcEvaluation';
 import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
 import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
 import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
+import { Prisma, QuestionType } from '@prisma/client';
+
+interface ProcessedQuestion {
+  id: string;
+  type: string;
+  questionText: string;
+  marks: number;
+  awardedMarks: number;
+  isCorrect: boolean;
+  studentAnswer: any;
+  studentAnswerImages: string[];
+  drawingData: {
+    imageData: string;
+    originalImagePath: string;
+  } | null;
+  allDrawings: {
+    imageIndex: number;
+    imageData: string;
+    originalImagePath: string;
+  }[];
+  options: any[];
+  modelAnswer: string;
+  explanation: string;
+  subQuestions: any[];
+  feedback: string;
+  images: string[];
+  assertion?: string;
+  reason?: string;
+  correctOption?: number;
+  leftColumn?: string[];
+  rightColumn?: string[];
+  matches?: Record<string, number>;
+  correctAnswer?: any;
+  tolerance?: number;
+}
 
 // export const dynamic = 'force-dynamic'; // Ensure no caching
 
@@ -15,6 +50,7 @@ export async function GET(
 ) {
   try {
     const { id: examId } = await params;
+
     const token = await getTokenFromRequest(request);
 
     if (!token) {
@@ -106,7 +142,7 @@ export async function GET(
     }
     // -------------------------------------------------------------------------
 
-    const submission = await (db.examSubmission as any).findFirst({
+    const submission = await db.examSubmission.findFirst({
       where: {
         examId: examId,
         studentId: user.studentProfile.id
@@ -157,10 +193,15 @@ export async function GET(
     });
 
     // Fetch review request for this exam and student
-    const reviewRequest = await (db as any).resultReview.findFirst({
+    const reviewRequest = await db.resultReview.findFirst({
       where: {
         examId: examId,
         studentId: user.studentProfile.id
+      },
+      include: {
+        reviewer: {
+          select: { id: true, name: true }
+        }
       }
     });
 
@@ -203,18 +244,10 @@ export async function GET(
     const hideDetails = !isTeacher && result && !result.isPublished;
 
     // Process questions with student answers and marking details
-    const processedQuestions = questions.map((question: any) => {
+    const processedQuestions: ProcessedQuestion[] = questions.map((question: any) => {
       const questionId = question.id;
       const studentAnswer = studentAnswers[questionId];
 
-      // ... (existing image logic)
-
-      // Collect all image URLs for this question
-      // Images can be stored as:
-      // - ${questionId}_image (main SQ/CQ image)
-      // - ${questionId}_sub_0_image, ${questionId}_sub_1_image, etc. (CQ sub-question images)
-      // - ${questionId}_images (NEW: array of multiple images for SQ)
-      // - ${questionId}_sub_0_images, ${questionId}_sub_1_images, etc. (NEW: arrays for CQ sub-questions)
       const processedImages: string[] = [];
 
       // Check for main image (old format - single image)
@@ -228,38 +261,30 @@ export async function GET(
       }
 
       // Check for sub-question images (CQ type)
-      for (let i = 0; i < 10; i++) { // Check up to 10 sub-questions
-        // Old format - single image per sub-question
+      for (let i = 0; i < 10; i++) {
         const subImageKey = `${questionId}_sub_${i}_image`;
         if (studentAnswers[subImageKey]) {
           processedImages.push(studentAnswers[subImageKey]);
         }
 
-        // New format - multiple images per sub-question
         const subImagesKey = `${questionId}_sub_${i}_images`;
         if (studentAnswers[subImagesKey] && Array.isArray(studentAnswers[subImagesKey])) {
           processedImages.push(...studentAnswers[subImagesKey]);
         }
       }
 
-      // Debug logging
-      if (processedImages.length > 0) {
-        console.log(`[ResultAPI] Found ${processedImages.length} images for question ${questionId}:`, processedImages);
-      }
-
-      // Get drawing data for this question (support multiple images)
       const drawingData = submission?.drawings?.find((d: any) => d.questionId === questionId && d.imageIndex === 0);
       const allDrawingsForQuestion = submission?.drawings?.filter((d: any) => d.questionId === questionId) || [];
 
       let isCorrect = false;
       let awardedMarks = 0;
-      const maxMarks = question.marks || 0;
+      const maxMarks = Number(question.marks) || 0;
       const feedback = '';
 
-      // Check if answer is correct based on question type
-      if (question.type === 'MCQ') {
+      const type = (question.type || '').toUpperCase();
+
+      if (type === 'MCQ') {
         if (studentAnswer) {
-          // Check if student answer matches any option marked as correct
           if (question.options && Array.isArray(question.options)) {
             const correctOption = question.options.find((opt: any) => opt.isCorrect);
             if (correctOption) {
@@ -267,21 +292,15 @@ export async function GET(
             }
           }
 
-          // Fallback: Check if there's a direct correctAnswer field
-          if (!isCorrect && question.correctAnswer) {
+          if (!isCorrect && (question.correctAnswer !== undefined && question.correctAnswer !== null)) {
             const correctAnswer = question.correctAnswer;
-
-            // Handle different correct answer formats
             if (typeof correctAnswer === 'number') {
               isCorrect = studentAnswer === correctAnswer;
             } else if (typeof correctAnswer === 'object' && correctAnswer !== null) {
-              // Handle object format (e.g., {text: "answer"})
-              isCorrect = studentAnswer === correctAnswer.text;
+              isCorrect = studentAnswer === (correctAnswer as any).text;
             } else if (Array.isArray(correctAnswer)) {
-              // Handle array format (e.g., ["answer1", "answer2"])
               isCorrect = correctAnswer.includes(studentAnswer);
             } else {
-              // Handle string format
               isCorrect = studentAnswer === String(correctAnswer);
             }
           }
@@ -289,7 +308,6 @@ export async function GET(
           if (isCorrect) {
             awardedMarks = maxMarks;
           } else {
-            // Apply negative marking for wrong answers if enabled
             if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
               const negativeMarks = (maxMarks * exam.mcqNegativeMarking) / 100;
               awardedMarks = -negativeMarks;
@@ -297,25 +315,15 @@ export async function GET(
               awardedMarks = 0;
             }
           }
-
-          console.log(`MCQ Question ${question.id}:`, {
-            studentAnswer,
-            correctOptionText: question.options?.find((opt: any) => opt.isCorrect)?.text || 'No correct option found',
-            isCorrect,
-            awardedMarks,
-            maxMarks,
-            negativeMarking: exam.mcqNegativeMarking
-          });
         }
-      } else if (question.type === 'MC' || question.type === 'AR' || question.type === 'INT' || question.type === 'SMCQ' || question.type === 'NUMERIC' || question.type === 'MTF') {
-        const type = question.type.toUpperCase();
+      } else if (['MC', 'AR', 'INT', 'SMCQ', 'NUMERIC', 'MTF'].includes(type)) {
         if (type === 'SMCQ') {
           if (!question.subQuestions) {
             awardedMarks = 0;
             isCorrect = false;
           } else {
             let smcqScore = 0;
-            question.subQuestions.forEach((subQ: any, sIdx: number) => {
+            (question.subQuestions as any[]).forEach((subQ: any, sIdx: number) => {
               const subAnswer = studentAnswers[`${questionId}_sub_${sIdx}`];
               if (!subAnswer) return;
 
@@ -353,9 +361,9 @@ export async function GET(
           }
         } else if (type === 'MC') {
           awardedMarks = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
-            negativeMarking: (exam as any).mcqNegativeMarking || 0,
+            negativeMarking: exam.mcqNegativeMarking || 0,
             partialMarking: true,
-            hasAttempted: !!studentAnswer // Only apply negative marking if attempted
+            hasAttempted: !!studentAnswer
           });
           isCorrect = awardedMarks === maxMarks;
         } else if (type === 'INT' || type === 'NUMERIC') {
@@ -367,8 +375,8 @@ export async function GET(
             const res = evaluateINTQuestion(question, studentAnswer);
             awardedMarks = res.score;
             isCorrect = res.isCorrect;
-            if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-              awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+            if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+              awardedMarks = -((maxMarks * exam.mcqNegativeMarking) / 100);
             }
           }
         } else if (type === 'AR') {
@@ -380,34 +388,26 @@ export async function GET(
             const res = evaluateARQuestion(question, studentAnswer);
             awardedMarks = res.score;
             isCorrect = res.isCorrect;
-            if (!isCorrect && (exam as any).mcqNegativeMarking && (exam as any).mcqNegativeMarking > 0) {
-              awardedMarks = -((maxMarks * (exam as any).mcqNegativeMarking) / 100);
+            if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+              awardedMarks = -((maxMarks * exam.mcqNegativeMarking) / 100);
             }
           }
         } else if (type === 'MTF') {
           const res = evaluateMTFQuestion(question, studentAnswer || {});
-          // Ensure no negative marking for MTF (Partial marking only)
           awardedMarks = Math.max(0, res.score);
           isCorrect = res.isCorrect;
         }
       } else {
-        // For CQ/SQ, marks are manually awarded
-        // Get marks from submission answers
-        awardedMarks = studentAnswers[`${questionId}_marks`] || 0;
-
-        // If student didn't answer and no marks were manually awarded, award 0 marks
-        if ((!studentAnswer || studentAnswer.trim() === '' || studentAnswer === 'No answer') && awardedMarks === 0) {
+        awardedMarks = Number(studentAnswers[`${questionId}_marks`]) || 0;
+        if ((!studentAnswer || String(studentAnswer).trim() === '' || studentAnswer === 'No answer') && awardedMarks === 0) {
           awardedMarks = 0;
         }
-        // Otherwise, keep the manually awarded marks (even if student didn't answer but teacher gave partial marks)
       }
 
-      // Get explanations and model answers based on question type
       let explanation = '';
       let modelAnswer = question.modelAnswer || '';
 
-      if (question.type === 'MCQ') {
-        // For MCQ, get explanation from the correct option
+      if (type === 'MCQ') {
         if (question.options && Array.isArray(question.options)) {
           const correctOption = question.options.find((opt: any) => opt.isCorrect);
           if (correctOption) {
@@ -415,19 +415,16 @@ export async function GET(
             modelAnswer = correctOption.text;
           }
         }
-      } else if (question.type === 'CQ') {
-        // ... (existing CQ logic handled elsewhere or uses question.explanation)
-      } else if (question.type === 'SQ') {
+      } else if (type === 'SQ') {
         modelAnswer = question.modelAnswer || question.answer || '';
-      } else if (question.type === 'INT' || question.type === 'NUMERIC') {
+      } else if (type === 'INT' || type === 'NUMERIC') {
         modelAnswer = question.modelAnswer || question.answer || question.correctAnswer || '';
-      } else if (question.type === 'AR') {
+      } else if (type === 'AR') {
         modelAnswer = `Option ${question.correctOption || question.correct}`;
-      } else if (question.type === 'MTF') {
+      } else if (type === 'MTF') {
         modelAnswer = "See matches below";
       }
 
-      // Universal fallback for explanation
       if (!explanation) {
         explanation = question.explanation || question.reason || '';
       }
@@ -453,7 +450,7 @@ export async function GET(
         options: question.options || [],
         modelAnswer: modelAnswer,
         explanation: explanation,
-        subQuestions: question.subQuestions ? question.subQuestions.map((subQ: any, idx: number) => {
+        subQuestions: question.subQuestions ? (question.subQuestions as any[]).map((subQ: any, idx: number) => {
           const subAnswer = studentAnswers[`${questionId}_sub_${idx}`];
           const normalize = (s: any) => String(s || "").trim().toLowerCase();
 
@@ -483,21 +480,18 @@ export async function GET(
             ...subQ,
             studentAnswer: subAnswer || "",
             studentImages: studentAnswers[`${questionId}_sub_${idx}_images`] || (studentAnswers[`${questionId}_sub_${idx}_image`] ? [studentAnswers[`${questionId}_sub_${idx}_image`]] : []),
-            awardedMarks: studentAnswers[`${questionId}_sub_${idx}_marks`] || 0,
+            awardedMarks: Number(studentAnswers[`${questionId}_sub_${idx}_marks`]) || 0,
             isCorrect: isSubCorrect
           };
         }) : [],
         feedback,
         images: question.images || [],
-        // AR Specific Fields
         assertion: (question as any).assertion,
         reason: (question as any).reason,
-        correctOption: (question as any).correctOption || (question as any).correct,
-        // MTF Specific Fields
+        correctOption: Number((question as any).correctOption || (question as any).correct) || undefined,
         leftColumn: (question as any).leftColumn,
         rightColumn: (question as any).rightColumn,
         matches: (question as any).matches,
-        // INT Specific Fields
         correctAnswer: (question as any).correctAnswer || (question as any).answer,
         tolerance: (question as any).tolerance
       };

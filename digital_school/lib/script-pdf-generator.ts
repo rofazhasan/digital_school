@@ -28,7 +28,7 @@ export async function generateStudentScriptPDF({ examId, studentId, baseUrl }: S
                 if (status === 'error') return true; // Fail fast if there's an error
                 if (status === 'ready') {
                     // Also wait for MathJax to signal it's done
-                    return (window as any).__IS_MATHJAX_READY === true;
+                    return (window as unknown as { __IS_MATHJAX_READY: boolean }).__IS_MATHJAX_READY === true;
                 }
             }
             return false;

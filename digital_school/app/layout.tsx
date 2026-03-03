@@ -52,12 +52,26 @@ const balooDa2 = { variable: '' };
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
-  let title = "Examify";
+  let title = "Elite Exam System";
   try {
     const settings = await db.settings.findFirst({
-      select: { instituteName: true, institute: { select: { name: true } } }
+      select: {
+        instituteName: true,
+        institute: { select: { name: true } }
+      }
     });
-    title = settings?.instituteName || settings?.institute?.name || "Examify";
+
+    // If settings doesn't have a name, try fetching directly from Institute
+    let instituteName = settings?.instituteName || settings?.institute?.name;
+
+    if (!instituteName) {
+      const institute = await db.institute.findFirst({
+        select: { name: true }
+      });
+      instituteName = institute?.name;
+    }
+
+    title = instituteName || "Elite Exam System";
   } catch (error) {
     console.warn("Failed to fetch settings for metadata:", error);
   }

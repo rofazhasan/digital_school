@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Review Session | Digital School",
+    title: "Review Session",
     description: "Review exam answers and explanations",
 };
 

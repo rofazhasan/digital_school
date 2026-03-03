@@ -49,11 +49,11 @@ export const mathJaxConfig = {
         // Ensure proper rendering on load
         typeset: true,
         ready: () => {
-            // @ts-ignore
+            // @ts-expect-error MathJax is defined globally in the browser
             if (typeof MathJax !== 'undefined') {
-                // @ts-ignore
+                // @ts-expect-error MathJax is defined globally in the browser
                 MathJax.startup.defaultReady();
-                // @ts-ignore
+                // @ts-expect-error MathJax is defined globally in the browser
                 MathJax.startup.promise.then(() => {
                     console.log('MathJax loaded with Unicode support');
                 });

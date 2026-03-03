@@ -1116,83 +1116,83 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                     ))}
                   </div>
                 )}
+              </div>
+            )}
 
-                {type === "smcq" && (
-                  <div className="space-y-10 mt-6">
-                    {subQuestions.map((subQ: any, idx: number) => {
-                      const subUserAnswer = answers[`${question.id}_sub_${idx}`];
-                      return (
-                        <div key={idx} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                          {/* Sub-question Header */}
-                          <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg border border-primary/20 shadow-sm">
-                              {idx + 1}
+            {type === "smcq" && (
+              <div className="space-y-10 mt-6">
+                {subQuestions.map((subQ: any, idx: number) => {
+                  const subUserAnswer = answers[`${question.id}_sub_${idx}`];
+                  return (
+                    <div key={idx} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                      {/* Sub-question Header */}
+                      <div className="flex items-start gap-4">
+                        <div className="flex-shrink-0 w-10 h-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-black text-lg border border-primary/20 shadow-sm">
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 space-y-3">
+                          <div className="flex justify-between items-start gap-4">
+                            <div className={`font-bold text-foreground/95 leading-relaxed ${getTextSize('text-lg md:text-xl')}`}>
+                              <UniversalMathJax inline dynamic>{cleanupMath(subQ.question || subQ.text || "")}</UniversalMathJax>
                             </div>
-                            <div className="flex-1 space-y-3">
-                              <div className="flex justify-between items-start gap-4">
-                                <div className={`font-bold text-foreground/95 leading-relaxed ${getTextSize('text-lg md:text-xl')}`}>
-                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.question || subQ.text || "")}</UniversalMathJax>
-                                </div>
-                                <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase bg-primary text-primary-foreground px-3 py-1 rounded-lg">
-                                  {subQ.marks} Point{Number(subQ.marks) !== 1 && 's'}
-                                </Badge>
-                              </div>
-                              {subQ.image && (
-                                <div className="mt-4">
-                                  <ZoomableImage src={subQ.image} alt={`Sub-question ${idx + 1}`} className="max-h-64 w-full rounded-2xl border border-border bg-card p-1 shadow-md hover:shadow-lg transition-shadow" />
-                                </div>
-                              )}
-                            </div>
+                            <Badge variant="secondary" className="shrink-0 text-[10px] font-black uppercase bg-primary text-primary-foreground px-3 py-1 rounded-lg">
+                              {subQ.marks} Point{Number(subQ.marks) !== 1 && 's'}
+                            </Badge>
                           </div>
-
-                          {/* Options using standard MCQOption for consistency */}
-                          <div className="grid grid-cols-1 gap-3 ml-0 md:ml-14">
-                            {(subQ.options || []).map((opt: any, oi: number) => {
-                              const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-                              const isSelected = String(subUserAnswer).trim() === label.trim();
-
-                              // Result logic for sub-question
-                              let isCorrect = false;
-                              if (showResult) {
-                                if (typeof opt === 'object' && opt.isCorrect !== undefined) {
-                                  isCorrect = opt.isCorrect;
-                                } else if (subQ.correctAnswer !== undefined) {
-                                  const cAns = subQ.correctAnswer;
-                                  isCorrect = (cAns === oi || String(cAns) === String(oi) ||
-                                    (typeof cAns === 'string' && (cAns === String.fromCharCode(65 + oi) || cAns === toBengaliAlphabets(oi))));
-                                }
-                              }
-
-                              return (
-                                <MCQOption
-                                  key={oi}
-                                  option={opt}
-                                  index={oi}
-                                  isSelected={isSelected}
-                                  isCorrect={isCorrect}
-                                  showResult={showResult}
-                                  userAnswer={subUserAnswer}
-                                  disabled={!!disabled}
-                                  submitted={!!submitted}
-                                  onSelect={(val) => handleSubAnswerChange(idx, val)}
-                                  fontSize={fontSize}
-                                />
-                              );
-                            })}
-                          </div>
-
-                          {/* Explanation if correct answer is revealed */}
-                          {showResult && subQ.explanation && (
-                            <div className="ml-0 md:ml-14 mt-4 p-4 bg-primary/5 border border-primary/10 rounded-2xl italic text-sm text-foreground/80">
-                              <span className="font-bold text-primary not-italic mr-2">Explanation:</span>
-                              <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation)}</UniversalMathJax>
+                          {subQ.image && (
+                            <div className="mt-4">
+                              <ZoomableImage src={subQ.image} alt={`Sub-question ${idx + 1}`} className="max-h-64 w-full rounded-2xl border border-border bg-card p-1 shadow-md hover:shadow-lg transition-shadow" />
                             </div>
                           )}
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
+                      </div>
+
+                      {/* Options using standard MCQOption for consistency */}
+                      <div className="grid grid-cols-1 gap-3 ml-0 md:ml-14">
+                        {(subQ.options || []).map((opt: any, oi: number) => {
+                          const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
+                          const isSelected = String(subUserAnswer).trim() === label.trim();
+
+                          // Result logic for sub-question
+                          let isCorrect = false;
+                          if (showResult) {
+                            if (typeof opt === 'object' && opt.isCorrect !== undefined) {
+                              isCorrect = opt.isCorrect;
+                            } else if (subQ.correctAnswer !== undefined) {
+                              const cAns = subQ.correctAnswer;
+                              isCorrect = (cAns === oi || String(cAns) === String(oi) ||
+                                (typeof cAns === 'string' && (cAns === String.fromCharCode(65 + oi) || cAns === toBengaliAlphabets(oi))));
+                            }
+                          }
+
+                          return (
+                            <MCQOption
+                              key={oi}
+                              option={opt}
+                              index={oi}
+                              isSelected={isSelected}
+                              isCorrect={isCorrect}
+                              showResult={showResult}
+                              userAnswer={subUserAnswer}
+                              disabled={!!disabled}
+                              submitted={!!submitted}
+                              onSelect={(val) => handleSubAnswerChange(idx, val)}
+                              fontSize={fontSize}
+                            />
+                          );
+                        })}
+                      </div>
+
+                      {/* Explanation if correct answer is revealed */}
+                      {showResult && subQ.explanation && (
+                        <div className="ml-0 md:ml-14 mt-4 p-4 bg-primary/5 border border-primary/10 rounded-2xl italic text-sm text-foreground/80">
+                          <span className="font-bold text-primary not-italic mr-2">Explanation:</span>
+                          <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation)}</UniversalMathJax>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
 

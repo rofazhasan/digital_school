@@ -1280,9 +1280,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
 
       if (type === 'smcq') {
-        if (!question.subQuestions) return 0;
+        const subQs = question.subQuestions || question.sub_questions;
+        if (!subQs) return 0;
         let smcqScore = 0;
-        question.subQuestions.forEach((subQ: any, sIdx: number) => {
+        subQs.forEach((subQ: any, sIdx: number) => {
           const subAnswer = allAnswers[`${question.id}_sub_${sIdx}`];
           if (!subAnswer) return;
 
@@ -2555,7 +2556,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <div>
                                   <div className="flex items-center justify-between mb-2">
                                     <Badge className={
-                                      currentQuestion?.type?.toLowerCase() === 'mcq' ? 'bg-blue-100 text-blue-800' :
+                                      ['mcq', 'smcq'].includes(currentQuestion?.type?.toLowerCase() || '') ? 'bg-blue-100 text-blue-800' :
                                         currentQuestion?.type?.toLowerCase() === 'cq' ? 'bg-green-100 text-green-800' :
                                           'bg-yellow-100 text-yellow-800'
                                     }>
@@ -2665,7 +2666,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                             {currentQuestion?.type?.toLowerCase() === 'smcq' && (
                                               <div className="space-y-4">
-                                                {(currentQuestion?.subQuestions || []).map((subQ: any, sIdx: number) => {
+                                                {(currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).map((subQ: any, sIdx: number) => {
                                                   const subAns = currentStudent?.answers?.[`${currentQuestion.id}_sub_${sIdx}`];
 
                                                   const normalize = (s: any) => String(s || "").trim().toLowerCase();
@@ -3569,7 +3570,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                 <div>
                                   <h4 className="font-semibold mb-2">Grading:</h4>
                                   <div className="flex items-center gap-4">
-                                    {['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
+                                    {['mcq', 'smcq', 'mc', 'ar', 'mtf', 'int', 'numeric'].includes(currentQuestion?.type?.toLowerCase() || '') ? (
                                       <div className="flex flex-col gap-3">
                                         <div className="flex items-center gap-2">
                                           <span className="text-sm text-gray-600">Auto-graded:</span>

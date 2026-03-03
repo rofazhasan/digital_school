@@ -21,7 +21,6 @@ export const getStudentTelemetry = async (): Promise<StudentTelemetry | null> =>
     if (!Capacitor.isNativePlatform()) return null;
 
     try {
-        const info = await Device.getInfo();
         const battery = await Device.getBatteryInfo();
         const network = await Network.getStatus();
         const id = await Device.getId();
