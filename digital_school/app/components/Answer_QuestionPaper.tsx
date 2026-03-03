@@ -66,6 +66,7 @@ interface DESCRIPTIVE {
   type: string;
   marks: number;
   subQuestions: any[];
+  questionText?: string;
 }
 interface AnswerQuestionPaperProps {
   examInfo: {
@@ -252,19 +253,19 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const mtfs = questions.mtf || [];
 
     const allObjective = [
-      ...(mcqs.map(q => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
-      ...(mcs.map(q => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
-      ...(ints.map(q => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
-      ...(ars.map(q => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
-      ...(mtfs.map(q => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
-      ...(questions.smcq || []).map(q => ({ ...q, type: 'SMCQ' }))
+      ...(mcqs.map((q: MCQ) => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
+      ...(mcs.map((q: MC) => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
+      ...(ints.map((q: INT) => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
+      ...(ars.map((q: AR) => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
+      ...(mtfs.map((q: MTF) => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
+      ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' }))
     ];
 
-    const mcqTotal = mcqs.reduce((sum, q) => sum + (q.marks || 1), 0);
-    const mcTotal = mcs.reduce((sum, q) => sum + (q.marks || 1), 0);
-    const intTotal = ints.reduce((sum, q) => sum + (q.marks || 1), 0);
-    const arTotal = ars.reduce((sum, q) => sum + (q.marks || 1), 0);
-    const mtfTotal = mtfs.reduce((sum, q) => sum + (q.marks || 1), 0);
+    const mcqTotal = mcqs.reduce((sum: number, q: MCQ) => sum + (q.marks || 1), 0);
+    const mcTotal = mcs.reduce((sum: number, q: MC) => sum + (q.marks || 1), 0);
+    const intTotal = ints.reduce((sum: number, q: INT) => sum + (q.marks || 1), 0);
+    const arTotal = ars.reduce((sum: number, q: AR) => sum + (q.marks || 1), 0);
+    const mtfTotal = mtfs.reduce((sum: number, q: MTF) => sum + (q.marks || 1), 0);
 
     const objectiveTotal = mcqTotal + mcTotal + intTotal + arTotal + mtfTotal;
 
@@ -276,13 +277,13 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const cqSorted = [...cqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
     const sqSorted = [...sqs].sort((a, b) => (b.marks || 0) - (a.marks || 0));
 
-    const cqRequiredMarks = cqSorted.slice(0, cqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
-    const sqRequiredMarks = sqSorted.slice(0, sqRequired).reduce((sum, q) => sum + (q.marks || 0), 0);
+    const cqRequiredMarks = cqSorted.slice(0, cqRequired).reduce((sum: number, q: CQ) => sum + (q.marks || 0), 0);
+    const sqRequiredMarks = sqSorted.slice(0, sqRequired).reduce((sum: number, q: SQ) => sum + (q.marks || 0), 0);
 
     const totalTimeMinutes = (examInfo.objectiveTime || 0) + (examInfo.cqSqTime || 0);
     const cqRequiredMarksNum = Number(cqRequiredMarks) || 0;
     const sqRequiredMarksNum = Number(sqRequiredMarks) || 0;
-    const descMarks = descriptives.reduce((sum, q) => sum + (q.marks || 0), 0);
+    const descMarks = descriptives.reduce((sum: number, q: DESCRIPTIVE) => sum + (q.marks || 0), 0);
     const cqSqTotalMarks = cqRequiredMarksNum + sqRequiredMarksNum + descMarks;
     const grandTotalMarks = objectiveTotal + cqSqTotalMarks;
 
@@ -338,7 +339,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
               <div className="mcq-container">
                 {(() => {
                   let questionCounter = 1;
-                  return allObjective.map((q: any, idx) => {
+                  return allObjective.map((q: any, idx: number) => {
                     const startNum = questionCounter;
                     if (q.type?.toUpperCase() === 'SMCQ') {
                       questionCounter += (q.subQuestions?.length || 0);
@@ -716,7 +717,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                           {/* Answers in this subsection */}
                           <div className="ml-4">
-                            {subsectionQuestions.map((q, idx) => (
+                            {subsectionQuestions.map((q: CQ, idx: number) => (
                               <div key={idx} className="mb-3 text-left cq-question">
                                 <div className="flex items-start">
                                   <span className="font-bold mr-2">{isEn ? (subsection.startIndex + idx) : toBengaliNumerals(subsection.startIndex + idx)}.</span>
@@ -725,7 +726,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer:' : 'উত্তর:'}</div>
                                     {q.subQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0 ? (
                                       <ul className="list-inside mt-1 ml-4">
-                                        {q.subQuestions.map((sub, sidx) => (
+                                        {q.subQuestions.map((sub: any, sidx: number) => (
                                           <li key={sidx} className="ml-4 flex items-start mb-2">
                                             <span className="font-bold mr-1">{isEn ? (ENGLISH_SUB_LABELS[sidx] || String.fromCharCode(97 + sidx)) : (BENGALI_SUB_LABELS[sidx] || String.fromCharCode(0x0995 + sidx))}.</span>
                                             <span className="flex-1">
@@ -756,7 +757,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                   ) : (
                     // Single subsection or no subsections - render normally
                     <div>
-                      {cqs.map((q, idx) => (
+                      {cqs.map((q: CQ, idx: number) => (
                         <div key={idx} className="mb-3 text-left cq-question">
                           <div className="flex items-start">
                             <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
@@ -806,7 +807,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     </div>
                   </div>
                   <div>
-                    {descriptives.map((q, idx) => {
+                    {descriptives.map((q: DESCRIPTIVE, idx: number) => {
                       const questionBaseNum = cqs.length + sqs.length + idx + 1;
                       return (
                         <div key={idx} className="mb-4 text-left descriptive-question break-inside-avoid">

@@ -351,10 +351,10 @@ export default function ExamResultsPage() {
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
 
-    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
-    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
-    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
-    return <Badge variant="outline">{rank}</Badge>;
+    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800" {...({} as any)}><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
+    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800" {...({} as any)}><Award className="w-3 h-3 mr-1" />2nd</Badge>;
+    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800" {...({} as any)}><Award className="w-3 h-3 mr-1" />3rd</Badge>;
+    return <Badge variant="outline" {...({} as any)}>{rank}</Badge>;
   };
 
   const getPerformanceAnalysis = (result: Result) => {
@@ -499,7 +499,7 @@ export default function ExamResultsPage() {
               <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
                 <span className="text-xs font-medium text-slate-400">Class {user.studentProfile.class.name}</span>
                 <div className="h-4 w-px bg-white/10" />
-                <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-none">
+                <Badge variant="secondary" className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 border-none" {...({} as any)}>
                   Roll: {user.studentProfile.roll}
                 </Badge>
               </div>
@@ -528,7 +528,7 @@ export default function ExamResultsPage() {
                   </SelectTrigger>
                   <SelectContent className="bg-slate-900 border-white/10 text-slate-200">
                     <SelectItem value="all">All Exams</SelectItem>
-                    {examResults.map((result) => (
+                    {examResults.map((result: ExamResults) => (
                       <SelectItem key={result.exam.id} value={result.exam.id}>
                         {result.exam.name}
                       </SelectItem>
@@ -570,11 +570,11 @@ export default function ExamResultsPage() {
               <p className="text-slate-500 mt-2">Check back later or adjust your filters.</p>
             </div>
           ) : (
-            filteredResults.map((examResult) => {
-              const myResult = isStudent ? examResult.results.find(r => r.student?.id === user.studentProfile?.id) : null;
+            filteredResults.map((examResult: ExamResults) => {
+              const myResult = isStudent ? examResult.results.find((r: Result) => r.student?.id === user.studentProfile?.id) : null;
               const classmatesResults = isStudent
-                ? examResult.results.filter(r => r.student?.id !== user.studentProfile?.id)
-                  .sort((a, b) => (b.total || 0) - (a.total || 0))
+                ? examResult.results.filter((r: Result) => r.student?.id !== user.studentProfile?.id)
+                  .sort((a: Result, b: Result) => (b.total || 0) - (a.total || 0))
                 : examResult.results;
 
               return (
@@ -741,7 +741,7 @@ export default function ExamResultsPage() {
                             <CardTitle className="text-slate-300 flex items-center gap-2">
                               <Users className="w-5 h-5 text-indigo-400" /> Class Standings
                             </CardTitle>
-                            <Badge variant="outline" className="text-[10px] text-slate-500 border-white/10">
+                            <Badge variant="outline" className="text-[10px] text-slate-500 border-white/10" {...({} as any)}>
                               Showcases {examResult.results.length} Students
                             </Badge>
                           </div>
@@ -789,7 +789,7 @@ export default function ExamResultsPage() {
                                         <span className="text-[11px] text-slate-500">{res.percentage?.toFixed(1)}%</span>
                                       </TableCell>
                                       <TableCell className="text-right">
-                                        <Badge className={`border-none ${getGradeColor(res.grade)}`}>
+                                        <Badge className={`border-none ${getGradeColor(res.grade)}`} {...({} as any)}>
                                           {res.grade}
                                         </Badge>
                                       </TableCell>
