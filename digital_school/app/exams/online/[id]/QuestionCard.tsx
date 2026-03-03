@@ -1,5 +1,6 @@
 "use client";
-import React, { useRef, useState, useMemo, useCallback, memo, useEffect } from "react";
+import React, { useRef, useState, useMemo, useCallback, memo, useEffect, Suspense, lazy } from "react";
+const CameraCapture = lazy(() => import("./CameraCapture"));
 import { useExamContext } from "./ExamContext";
 import { MathJax, MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
@@ -598,6 +599,34 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
 
   const currentIdx = typeof questionIdx === 'number' ? questionIdx : (navigation.current || 0);
   const question = questionOverride || questions[currentIdx];
+  const [cameraTarget, setCameraTarget] = useState<{ qId: string, idx?: number } | null>(null);
+
+  const handleCapture = async (file: File, qId: string, subIdx?: number) => {
+    setIsUploading?.(true);
+    setCameraTarget(null);
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (res.ok) {
+        setAnswers((prev: any) => {
+          const key = typeof subIdx === 'number' ? `${qId}_sub_${subIdx}_images` : `${qId}_images`;
+          const current = prev[key] || [];
+          return {
+            ...prev,
+            [key]: [...current, data.url]
+          };
+        });
+        toast.success("Photo captured and uploaded successfully");
+      }
+    } catch (err) {
+      console.error('Capture upload error:', err);
+      toast.error("Failed to upload captured photo");
+    } finally {
+      setIsUploading?.(false);
+    }
+  };
 
   // Dynamic Font Size Classes
   const getTextSize = (base: string) => {
@@ -947,6 +976,17 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                           <label htmlFor={`q-img-${question.id}`} className="inline-flex items-center gap-2 px-4 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-xl cursor-pointer text-sm font-medium transition-colors shadow-sm">
                             <Upload className="w-4 h-4 text-primary" /> Upload Images (Max 5)
                           </label>
+
+                          {/* Web Camera Button */}
+                          {!Capacitor.isNativePlatform() && (
+                            <button
+                              type="button"
+                              onClick={() => setCameraTarget({ qId: question.id })}
+                              className="inline-flex items-center gap-2 px-4 py-2 border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl text-sm font-medium transition-colors shadow-sm"
+                            >
+                              <CameraIcon className="w-4 h-4" /> Capture Photo
+                            </button>
+                          )}
                         </div>
                       ) : null}
                     </div>
@@ -1066,6 +1106,17 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                                 </button>
                               )}
 
+                              {/* Web Camera Button */}
+                              {!Capacitor.isNativePlatform() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraTarget({ qId: question.id, idx })}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl text-xs font-bold transition-all"
+                                >
+                                  <CameraIcon className="w-3.5 h-3.5" /> Capture Photo
+                                </button>
+                              )}
+
                               <input
                                 type="file"
                                 accept="image/*"
@@ -1109,6 +1160,17 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
                               <label htmlFor={`sub-img-${question.id}-${idx}`} className="inline-flex items-center gap-2 px-3 py-1.5 border border-input bg-background hover:bg-accent rounded-xl cursor-pointer text-xs font-bold transition-all shadow-sm">
                                 <Upload className="w-3.5 h-3.5 text-primary" /> Upload Images
                               </label>
+
+                              {/* Web Camera Button */}
+                              {!Capacitor.isNativePlatform() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setCameraTarget({ qId: question.id, idx })}
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 border border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl text-xs font-bold transition-all"
+                                >
+                                  <CameraIcon className="w-3.5 h-3.5" /> Capture Photo
+                                </button>
+                              )}
                             </div>
                           ) : null}
                         </div>
@@ -1778,6 +1840,16 @@ function QuestionCard({ disabled, result, submitted, isMCQOnly, questionIdx, que
 
         </CardContent>
       </Card>
+      {cameraTarget && (
+        <Suspense fallback={null}>
+          <CameraCapture
+            examId={exam.id}
+            questionId={cameraTarget.qId}
+            onClose={() => setCameraTarget(null)}
+            onCapture={(file) => handleCapture(file, cameraTarget.qId, cameraTarget.idx)}
+          />
+        </Suspense>
+      )}
     </MathJaxContext >
   );
 }

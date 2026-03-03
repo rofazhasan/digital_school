@@ -77,9 +77,26 @@ export function ExamContextProvider({
     return { hasObjective: obj, hasCqSq: sub };
   }, [exam.questions]);
 
-  const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(
-    exam.objectiveStatus === 'SUBMITTED' || !hasObjective ? 'cqsq' : 'objective'
-  );
+  const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(() => {
+    // If explicitly submitted or no objective section, always cqsq
+    if (exam.objectiveStatus === 'SUBMITTED' || !hasObjective) return 'cqsq';
+
+    // Fairness (insaf) check: if objective section was started and time has elapsed
+    // even if it wasn't marked as SUBMITTED yet (e.g. user closed tab),
+    // we should treat it as expired if the objectiveTime has passed.
+    if (exam.objectiveStartedAt && (exam.objectiveTime || exam.duration)) {
+      const objTime = exam.objectiveTime || exam.duration;
+      const startTime = new Date(exam.objectiveStartedAt).getTime();
+      const now = Date.now();
+      const limitMs = objTime * 60 * 1000;
+
+      if (now > startTime + limitMs) {
+        return 'cqsq';
+      }
+    }
+
+    return 'objective';
+  });
   const isOnline = useOnlineStatus();
 
   // Scope to specific submission to prevent retake bleed-over

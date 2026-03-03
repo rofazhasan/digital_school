@@ -64,9 +64,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const searchParams = req.nextUrl.searchParams;
     const action = searchParams.get('action');
 
-    // 1. REDIRECTION LOGIC: If submitted and no retake allowed, redirect to results
-    if (isFinished && !exam.allowRetake) {
-      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId}`);
+    // 1. STRICT REDIRECTION LOGIC
+    // If retake is allowed and user hasn't explicitly clicked 'start', we show the preview/instructions
+    // If retake is NOT allowed:
+    // - If submission exists and is SUBMITTED, redirect to results.
+    // - If submission exists and is IN_PROGRESS, allow entry (resume).
+    // - If no submission exists, allow entry (first time).
+
+    if (!exam.allowRetake && existingSubmission && existingSubmission.status === 'SUBMITTED') {
+      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId} (Already submitted)`);
       return NextResponse.json({
         id: exam.id,
         name: exam.name,
