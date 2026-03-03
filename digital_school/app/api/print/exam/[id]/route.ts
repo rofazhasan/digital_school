@@ -294,6 +294,32 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions : [],
     }));
 
+    // Create an ordered list of all objective questions to preserve original sequence
+    const orderedObjective = questionsArr
+      .filter((q: any) => ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'SMCQ'].includes((q.type || "").toUpperCase()))
+      .map((q: any) => {
+        const type = (q.type || "").toUpperCase();
+        if (type === 'MCQ') {
+          return mcq.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'MC') {
+          return mc.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'INT' || type === 'NUMERIC') {
+          return int.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'AR') {
+          return ar.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'MTF') {
+          return mtf.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'SMCQ') {
+          return smcq.find((m: any) => m.id === q.id) || q;
+        }
+        return q;
+      });
+
     return {
       setId: set.id,
       setName: set.name,
@@ -306,6 +332,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       sq,
       descriptive,
       smcq,
+      orderedObjective,
       qrData: { examId, setId: set.id, classId: exam.classId },
       barcode: `${examId}|${set.id}|${exam.classId}`,
     };
@@ -318,7 +345,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     set.cq?.length ||
     set.sq?.length ||
     set.descriptive?.length ||
-    set.smcq?.length
+    set.smcq?.length ||
+    set.orderedObjective?.length
   );
 
   return NextResponse.json({ examInfo, sets });

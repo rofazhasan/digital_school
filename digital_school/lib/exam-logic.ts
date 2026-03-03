@@ -89,10 +89,10 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
             if (type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE') {
                 let score = 0;
 
-                // For CQ/SQ, we also check sub-questions now
-                if ((type === 'DESCRIPTIVE' || type === 'CQ' || type === 'SQ') && question.subQuestions) {
+                const subQs = question.subQuestions || question.sub_questions;
+                if ((type === 'DESCRIPTIVE' || type === 'CQ' || type === 'SQ') && subQs) {
                     // Sum up sub-question marks if they exist
-                    question.subQuestions.forEach((sub: any, idx: number) => {
+                    subQs.forEach((sub: any, idx: number) => {
                         // Support both _desc_ and _sub_ prefixes for maximum compatibility
                         const subMark = answers[`${question.id}_desc_${idx}_marks`] ?? answers[`${question.id}_sub_${idx}_marks`];
                         if (typeof subMark === 'number') {
@@ -163,10 +163,10 @@ export async function evaluateSubmission(submission: any, exam: any, examSets: a
                 if (!res.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
-            } else if (type === 'SMCQ') {
-                if (!question.subQuestions) continue;
+                const subQs = question.subQuestions || question.sub_questions;
+                if (!subQs) continue;
                 let smcqScore = 0;
-                question.subQuestions.forEach((subQ: any, sIdx: number) => {
+                subQs.forEach((subQ: any, sIdx: number) => {
                     const subAnswer = answers[`${question.id}_sub_${sIdx}`];
                     if (subAnswer === undefined || subAnswer === null || subAnswer === '') return;
 

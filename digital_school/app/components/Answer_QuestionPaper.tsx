@@ -98,6 +98,7 @@ interface AnswerQuestionPaperProps {
     sq: SQ[];
     descriptive: DESCRIPTIVE[];
     smcq?: any[];
+    allObjective?: any[];
   };
   qrData: any;
   fontSize?: number;
@@ -252,22 +253,24 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const descriptives = questions.descriptive || [];
     const mtfs = questions.mtf || [];
 
-    const allObjective = [
-      ...(mcqs.map((q: MCQ) => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
-      ...(mcs.map((q: MC) => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
-      ...(ints.map((q: INT) => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
-      ...(ars.map((q: AR) => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
-      ...(mtfs.map((q: MTF) => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
-      ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' }))
-    ];
+    const allObjective = questions.allObjective && questions.allObjective.length > 0
+      ? questions.allObjective
+      : [
+        ...(mcqs.map((q: MCQ) => ({ ...q, type: (q.type || 'MCQ').toUpperCase() }))),
+        ...(mcs.map((q: MC) => ({ ...q, type: (q.type || 'MC').toUpperCase() }))),
+        ...(ints.map((q: INT) => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
+        ...(ars.map((q: AR) => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
+        ...(mtfs.map((q: MTF) => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
+        ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' }))
+      ];
 
-    const mcqTotal = mcqs.reduce((sum: number, q: MCQ) => sum + (q.marks || 1), 0);
-    const mcTotal = mcs.reduce((sum: number, q: MC) => sum + (q.marks || 1), 0);
-    const intTotal = ints.reduce((sum: number, q: INT) => sum + (q.marks || 1), 0);
-    const arTotal = ars.reduce((sum: number, q: AR) => sum + (q.marks || 1), 0);
-    const mtfTotal = mtfs.reduce((sum: number, q: MTF) => sum + (q.marks || 1), 0);
-
-    const objectiveTotal = mcqTotal + mcTotal + intTotal + arTotal + mtfTotal;
+    const objectiveTotal = allObjective.reduce((sum, q) => {
+      if (q.type?.toUpperCase() === 'SMCQ') {
+        const subMarks = (q.subQuestions || []).reduce((s: number, sq: any) => s + (sq.marks || 1), 0);
+        return sum + subMarks;
+      }
+      return sum + (q.marks || 1);
+    }, 0);
 
     // Calculate highest possible marks for required questions
     const cqRequired = examInfo.cqRequiredQuestions || 0;
