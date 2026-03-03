@@ -1332,7 +1332,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Accuracy</p>
                               <p className="text-lg font-black">
                                 {(() => {
-                                  const answered = result.questions.filter(q => q.studentAnswer && q.studentAnswer !== 'No answer provided').length;
+                                  const answered = result.questions.filter(q => {
+                                    const type = (q.type || "").toUpperCase();
+                                    if (type === 'SMCQ') {
+                                      return (q.subQuestions || q.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided');
+                                    }
+                                    return q.studentAnswer && q.studentAnswer !== 'No answer provided';
+                                  }).length;
                                   const correct = result.questions.filter(q => q.isCorrect).length;
                                   return answered > 0 ? ((correct / answered) * 100).toFixed(0) : '0';
                                 })()}%
@@ -1542,7 +1548,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
 
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
+                          const hasAnswer = type === 'SMCQ'
+                            ? (q.subQuestions || q.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided')
+                            : q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
                           const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
 
                           switch (filterStatus) {
@@ -1575,7 +1583,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 const type = (question.type || "").toUpperCase();
                                 const globalIndex = startIndex + index;
                                 const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                                const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
+                                const hasAnswer = type === 'SMCQ'
+                                  ? (question.subQuestions || question.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided')
+                                  : question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
 
                                 return (
                                   <motion.div
@@ -1639,7 +1649,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     </Badge>
                                                   </div>
                                                   <div className="text-lg font-bold text-slate-700 dark:text-slate-200 leading-snug">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax>
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || "")}</UniversalMathJax>
                                                   </div>
                                                 </div>
 
