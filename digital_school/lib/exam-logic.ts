@@ -593,17 +593,17 @@ export async function releaseExamResults(examId: string) {
                     }
 
                     // Score Header: Dear Rofaz\nMidterm Score:85/100 (85% A+)
-                    const header = `Dear ${firstName},\n${examName} Res:${res.total}/${totalMarks} (${percentage}% ${res.grade})${res.rank ? ` Rnk:${res.rank}` : ''}`;
+                    const header = `Dear ${firstName},\n${examName} Res:${res.total}/${totalMarks} (${percentage}% ${res.grade})${res.rank ? ` Rank:${res.rank}` : ''}`;
 
                     // Analytics: MCQ:40 C:20 W:5 Ded:1.2 CQ:45
                     let analytics = '';
                     if (res.mcqMarks > 0 || mcqCorrect > 0) {
-                        analytics += `\nMCQ:${res.mcqMarks} C:${mcqCorrect} W:${mcqWrong}${mcqDed > 0 ? ` Ded:${mcqDed.toFixed(1)}` : ''}`;
+                        analytics += `\nMCQ:${res.mcqMarks} Cor:${mcqCorrect} Wro:${mcqWrong}${mcqDed > 0 ? ` Ded:${mcqDed.toFixed(1)}` : ''}`;
                     }
                     if (res.cqMarks > 0) analytics += ` CQ:${res.cqMarks}`;
                     if (res.sqMarks > 0) analytics += ` SQ:${res.sqMarks}`;
 
-                    const smsMessage = `${isCorrection ? 'Corrected Res:\n' : ''}${header}${analytics}\nSuccess! - ${instName}`;
+                    const smsMessage = `${isCorrection ? 'Cor. Result:\n' : ''}${header}${analytics}\nGood Luck! - ${instName}`;
 
                     const smsResult = await sendSMS(res.student.user.phone!, smsMessage);
                     if (smsResult.success) sentCount++;
