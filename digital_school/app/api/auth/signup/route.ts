@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
 import { ApprovalRequestEmail } from '@/components/emails/ApprovalRequestEmail';
 import { sendEmail } from '@/lib/email';
+import { sendSMS } from '@/lib/sms';
 
 /**
  * POST handler for production-ready user signup.
@@ -56,8 +57,12 @@ export async function POST(request: NextRequest) {
         // Hash the password
         const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
-        // Generate verification token if email is provided
-        const verificationToken = validatedData.email ? crypto.randomUUID() : null;
+        // Generate verification token or OTP
+        // If phone is provided and no email, use 6-digit numeric OTP for SMS verification
+        const isPhoneOnly = !!(validatedData.phone && !validatedData.email);
+        const verificationToken = isPhoneOnly
+            ? Math.floor(100000 + Math.random() * 900000).toString()
+            : (validatedData.email ? crypto.randomUUID() : null);
 
         // Create user data
         const userData: any = {
@@ -174,8 +179,8 @@ export async function POST(request: NextRequest) {
             role: user.role as JWTPayload['role'],
             instituteId: user.instituteId || undefined,
             sid: sessionId,
-            verified: (user as any).emailVerified,
-            approved: (user as any).isApproved,
+            verified: (user as any).emailVerified || false,
+            approved: (user as any).isApproved || false,
         });
 
         // Update user session in DB
@@ -191,6 +196,27 @@ export async function POST(request: NextRequest) {
         // Remove password from response
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
+
+        // Send Verification OTP if phone is provided and no email
+        if (user.phone && !user.email && verificationToken) {
+            try {
+                // Fetch institute data for branding
+                let instName = 'Digital School';
+                if (user.instituteId) {
+                    const inst = await (prismadb.institute as any).findUnique({
+                        where: { id: user.instituteId },
+                        select: { name: true }
+                    });
+                    if (inst) instName = inst.name;
+                }
+
+                // Follow specific provider format: (Your {Brand/Company Name} OTP is XXXX)
+                const welcomeMessage = `Your ${instName} OTP is ${verificationToken}`;
+                await sendSMS(user.phone, welcomeMessage);
+            } catch (smsError) {
+                console.error('Failed to send verification SMS:', smsError);
+            }
+        }
 
         // Send Verification Email if email is provided
         if (user.email && verificationToken) {

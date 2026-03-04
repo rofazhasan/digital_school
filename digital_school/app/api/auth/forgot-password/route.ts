@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import crypto from 'crypto';
 import { sendEmail } from '@/lib/email';
+import { sendSMS } from '@/lib/sms';
 import { PasswordResetEmail } from '@/components/emails/PasswordResetEmail';
 
 /**
@@ -34,7 +35,12 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate token and expiry (1 hour)
-        const token = crypto.randomBytes(32).toString('hex');
+        // For phone users, we'll use a 6-digit numeric OTP for better SMS compatibility
+        const isPhoneUser = !!(user.phone && !user.email);
+        const token = isPhoneUser
+            ? Math.floor(100000 + Math.random() * 900000).toString()
+            : crypto.randomBytes(32).toString('hex');
+
         const expires = new Date(Date.now() + 3600000);
 
         await prismadb.user.update({
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
             data: {
                 passwordResetToken: token,
                 passwordResetExpires: expires,
-            } as any, // Cast to any to avoid lint error if types are stale
+            } as any,
         });
 
         // 1. If user has an email, send the professional email
@@ -88,9 +94,29 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // 2. If user has ONLY a phone, allow direct reset as per "no need verification" request
-        // In a real production app, we would send an OTP here. 
-        // For now, we provide the token back to the frontend to allow the "no verification" flow.
+        // 2. If user has ONLY a phone, try to send SMS first
+        if (user.phone) {
+            console.log('[FORGOT_PASSWORD] Attempting to send SMS to:', user.phone);
+            try {
+                const instName = user.institute?.name || 'Digital School';
+                // Follow specific provider format: (Your {Brand/Company Name} OTP is XXXX)
+                const message = `Your ${instName} OTP is ${token}`;
+                const smsResult = await sendSMS(user.phone, message);
+
+                if (smsResult.success) {
+                    return NextResponse.json({
+                        message: `A password reset OTP has been sent to your registered phone number.`,
+                        type: 'phone'
+                    });
+                }
+                console.warn('[FORGOT_PASSWORD] SMS delivery failed, falling back to direct reset.');
+            } catch (smsError) {
+                console.error('[FORGOT_PASSWORD] SMS processing error:', smsError);
+            }
+        }
+
+        // 3. Fallback: If user has ONLY a phone (and SMS failed or was skipped), 
+        // allow direct reset as per "previously approval service" (existing bypass logic)
         return NextResponse.json({
             message: 'Direct reset enabled for your phone-based account.',
             type: 'phone',

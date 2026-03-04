@@ -5,6 +5,7 @@ import { evaluateINTQuestion, INTQuestion, INTAnswer } from "./evaluation/intEva
 import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluation";
 import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
 import { sendEmail } from "@/lib/email";
+import { sendSMS } from "@/lib/sms";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
 import { Exam, ExamSet, ExamSubmission, SubmissionStatus, Institute, PrismaClient } from "@prisma/client";
 import React from "react";
@@ -427,8 +428,20 @@ export async function releaseExamResults(examId: string) {
         return { id: result.id, rank };
     });
 
-    // 4. IDENTIFY RESULTS TO NOTIFY (Before update to avoid redundancy)
-    const newlyPublishedIds = allResults.filter(r => !r.isPublished).map(r => r.id);
+    // 4. IDENTIFY RESULTS TO NOTIFY (Before update to detect changes)
+    const resultsWithCorrections = allResults.map(r => {
+        const rw = resultsWithRanks.find(item => item.id === r.id);
+        const newRank = rw?.rank;
+        const wasPreviouslyReleased = r.publishedAt !== null;
+
+        // Correction if previously released AND (marks changed [isPublished: false] OR rank changed)
+        const isCorrection = wasPreviouslyReleased && (!r.isPublished || r.rank !== newRank);
+        const isNew = !r.isPublished && !wasPreviouslyReleased;
+
+        return { id: r.id, isNew, isCorrection };
+    }).filter(r => r.isNew || r.isCorrection);
+
+    const resultsToNotifyIds = resultsWithCorrections.map(r => r.id);
 
     // 5. Bulk update with conditional publishedAt
     const now = new Date();
@@ -452,32 +465,33 @@ export async function releaseExamResults(examId: string) {
     try {
         const exam = await prisma.exam.findUnique({
             where: { id: examId },
-            include: { class: true }
+            include: { class: true, examSets: true }
         });
 
         const institute = await prisma.institute.findFirst({
             select: { name: true, address: true, phone: true, logoUrl: true }
         });
 
-        // Only send emails to results that were actually unpublished before this call
-        if (newlyPublishedIds.length === 0) {
-            console.log(`[EMAIL] No new results to notify for exam ${examId}.`);
+        // Only send notifications to results that are new or corrected
+        if (resultsToNotifyIds.length === 0) {
+            console.log(`[NOTIFY] No new or corrected results to notify for exam ${examId}.`);
             return;
         }
 
         const resultsToNotify = await prisma.result.findMany({
             where: {
-                id: { in: newlyPublishedIds }
+                id: { in: resultsToNotifyIds }
             },
             include: {
                 student: {
                     include: {
                         user: {
-                            select: { name: true, email: true }
+                            select: { id: true, name: true, email: true, phone: true }
                         },
                         class: { select: { name: true, section: true } }
                     }
-                }
+                },
+                examSubmission: true
             }
         });
 
@@ -487,9 +501,12 @@ export async function releaseExamResults(examId: string) {
 
         for (let i = 0; i < resultsToNotify.length; i++) {
             const res = resultsToNotify[i];
-            if (!res.student.user.email) continue;
 
-            console.log(`[EMAIL] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.email}`);
+            const correctionInfo = resultsWithCorrections.find(c => c.id === res.id);
+            const isCorrection = correctionInfo?.isCorrection || false;
+
+            // Skip if no contact info
+            if (!res.student.user.email && !res.student.user.phone) continue;
 
             try {
                 const resultItems = [{
@@ -502,37 +519,111 @@ export async function releaseExamResults(examId: string) {
                     sqMarks: res.sqMarks
                 }];
 
-                await sendEmail({
-                    to: res.student?.user?.email || '',
-                    subject: `Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
-                    react: ExamResultEmail({
-                        studentName: res.student?.user?.name || "Student",
-                        examName: exam?.name || "Exam",
-                        results: resultItems,
-                        totalPercentage: res.percentage || 0,
-                        finalGrade: res.grade || "F",
-                        rank: (res as any).rank || undefined,
-                        institute: institute as any,
-                        section: res.student?.class?.section || undefined,
-                        examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined,
-                        baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-                    }) as React.ReactElement
-                });
-                sentCount++;
+                const hasEmail = !!(res.student?.user?.email && res.student.user.email.trim() !== '');
+                const hasPhone = !!(res.student?.user?.phone && res.student.user.phone.trim() !== '');
+
+                if (hasEmail) {
+                    console.log(`[EMAIL] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.email}`);
+                    await sendEmail({
+                        to: res.student?.user?.email || '',
+                        subject: `${isCorrection ? 'Updated ' : ''}Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
+                        react: ExamResultEmail({
+                            studentName: res.student?.user?.name || "Student",
+                            examName: exam?.name || "Exam",
+                            results: resultItems,
+                            totalPercentage: res.percentage || 0,
+                            finalGrade: res.grade || "F",
+                            rank: (res as any).rank || undefined,
+                            institute: institute as any,
+                            section: res.student?.class?.section || undefined,
+                            examDate: exam?.date ? new Date(exam.date).toLocaleDateString() : undefined,
+                            baseUrl: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+                        }) as React.ReactElement
+                    });
+                    sentCount++;
+                } else if (hasPhone) {
+                    console.log(`[SMS] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.phone}`);
+                    // --- ULTRA-DENSE WORLD CLASS SMS (Optimized for 1-Part) ---
+                    const firstName = res.student.user.name.split(' ')[0];
+                    const instName = institute?.name || 'School';
+                    const examName = exam?.name || 'Exam';
+                    const totalMarks = exam?.totalMarks || 100;
+                    const percentage = Math.round(res.percentage || 0);
+
+                    let mcqCorrect = 0;
+                    let mcqWrong = 0;
+                    let mcqDed = 0;
+                    const keys: string[] = [];
+
+                    if (res.examSubmission && exam?.examSets) {
+                        const answers = res.examSubmission.answers as Record<string, any>;
+                        const setId = res.examSubmission.examSetId;
+                        const targetSet = exam.examSets.find(s => s.id === setId) || exam.examSets[0];
+
+                        if (targetSet?.questionsJson) {
+                            const questions = typeof targetSet.questionsJson === 'string'
+                                ? JSON.parse(targetSet.questionsJson)
+                                : targetSet.questionsJson;
+
+                            questions.forEach((q: any) => {
+                                const type = q.type?.toUpperCase();
+                                if (type === 'MCQ' || type === 'MC') {
+                                    const studentAnswer = answers[q.id];
+                                    const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                                    const correctIdx = q.options?.findIndex((o: any) => o.isCorrect);
+                                    const correctLabel = correctIdx !== -1 ? String.fromCharCode(65 + (correctIdx || 0)) : '?';
+
+                                    keys.push(correctLabel);
+
+                                    if (studentAnswer) {
+                                        const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                                        if (normalize(studentAnswer) === normalize(correctOpt?.text)) {
+                                            mcqCorrect++;
+                                        } else {
+                                            mcqWrong++;
+                                            if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                                                mcqDed += (Number(q.marks || 1) * exam.mcqNegativeMarking) / 100;
+                                            }
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                    }
+
+                    // Score Header: Dear Rofaz\nMidterm Score:85/100 (85% A+)
+                    const header = `Dear ${firstName},\n${examName} Res:${res.total}/${totalMarks} (${percentage}% ${res.grade})${res.rank ? ` Rnk:${res.rank}` : ''}`;
+
+                    // Analytics: MCQ:40 C:20 W:5 Ded:1.2 CQ:45
+                    let analytics = '';
+                    if (res.mcqMarks > 0 || mcqCorrect > 0) {
+                        analytics += `\nMCQ:${res.mcqMarks} C:${mcqCorrect} W:${mcqWrong}${mcqDed > 0 ? ` Ded:${mcqDed.toFixed(1)}` : ''}`;
+                    }
+                    if (res.cqMarks > 0) analytics += ` CQ:${res.cqMarks}`;
+                    if (res.sqMarks > 0) analytics += ` SQ:${res.sqMarks}`;
+
+                    // Keys Header: Keys:ABCDE... (160 char limit focus)
+                    const keysStr = keys.length > 0 ? `\nKeys:${keys.join('')}` : '';
+
+                    const smsMessage = `${isCorrection ? 'Corrected Res:\n' : ''}${header}${analytics}${keysStr}\nSuccess! - ${instName}`;
+
+                    const smsResult = await sendSMS(res.student.user.phone!, smsMessage);
+                    if (smsResult.success) sentCount++;
+                    else failCount++;
+                }
 
                 if (i < resultsToNotify.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             } catch (err) {
-                console.error(`❌ Failed to send email to ${res.student.user.email}:`, err);
+                console.error(`❌ Failed to send notification to ${res.student.user.email || res.student.user.phone}:`, err);
                 failCount++;
             }
         }
 
-        console.log(`✉️ Batch complete: Successfully sent ${sentCount} emails. Failed: ${failCount}.`);
-        console.log(`✉️ Sent result emails to ${sentCount} students.`);
+        console.log(`✉️ Batch complete: Successfully sent ${sentCount} notifications. Failed: ${failCount}.`);
     } catch (emailError) {
-        console.error("Failed to send result emails:", emailError);
+        console.error("Failed to send result notifications:", emailError);
     }
 }
 
