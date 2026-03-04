@@ -10,25 +10,26 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const all = url.searchParams.get('all') === 'true';
 
-    console.log('[API_USER] GET request, all:', all);
+    console.log('[API_USER] GET request starting, all:', all);
 
     const authData = await getTokenFromRequest(request);
 
     if (!authData) {
-      console.warn('[API_USER] No auth data found');
+      console.warn('[API_USER] Unauthorized access attempt');
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
       );
     }
 
-    // Get database client with automatic initialization
-    const prismadb = await getDatabaseClient();
+    // Use standard prismadb
+    const db = (await import('@/lib/db')).default;
 
     // If ?all=true and admin/super_user, return all users
     if (all && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
       try {
-        const users = await (prismadb.user as any).findMany({
+        console.log('[API_USER] Fetching all users for', authData.user.role);
+        const users = await (db.user as any).findMany({
           select: {
             id: true,
             name: true,
@@ -50,6 +51,8 @@ export async function GET(request: NextRequest) {
           orderBy: { createdAt: 'desc' }
         });
 
+        console.log(`[API_USER] Successfully fetched ${users.length} users`);
+
         return NextResponse.json({
           users: users.map((u: any) => ({
             id: u.id,
@@ -68,20 +71,22 @@ export async function GET(request: NextRequest) {
           }))
         });
       } catch (dbError: any) {
-        console.error('[API_USER] findMany failed:', dbError.message);
-        // Fallback to even more minimal results if it fails
-        const minimalUsers = await (prismadb.user as any).findMany({
-          select: { id: true, name: true, email: true, role: true }
-        });
-        return NextResponse.json({ users: minimalUsers, warning: 'Partial data returned due to database error' });
+        console.error('[API_USER] Database query failed:', dbError.message);
+
+        // Return a 500 but with the database error message for debugging
+        return NextResponse.json(
+          { error: "Database error", message: dbError.message },
+          { status: 500 }
+        );
       }
     }
 
+    console.log('[API_USER] Returning current user data');
     return NextResponse.json({
       user: authData.user,
     });
   } catch (error: any) {
-    console.error("Get user error:", error.message);
+    console.error("[API_USER] Outer catch block error:", error.message);
 
     return NextResponse.json(
       { error: "Internal server error", message: error.message },
