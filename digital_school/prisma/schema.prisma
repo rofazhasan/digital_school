@@ -26,6 +26,7 @@ model User {
   lastSessionInfo      Json?
   passwordResetExpires DateTime?
   passwordResetToken   String?                    @unique
+  passwordResetApproved Boolean                   @default(true)
   emailChangeToken     String?                    @unique
   emailVerified        Boolean                    @default(false)
   isApproved           Boolean                    @default(false)
