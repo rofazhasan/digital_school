@@ -427,17 +427,24 @@ export async function releaseExamResults(examId: string) {
         return { id: result.id, rank };
     });
 
-    // Bulk update
-    await Promise.all(resultsWithRanks.map(item =>
-        prisma.result.update({
+    // 4. IDENTIFY RESULTS TO NOTIFY (Before update to avoid redundancy)
+    const newlyPublishedIds = allResults.filter(r => !r.isPublished).map(r => r.id);
+
+    // 5. Bulk update with conditional publishedAt
+    const now = new Date();
+    await Promise.all(resultsWithRanks.map(item => {
+        const existing = allResults.find(r => r.id === item.id);
+        const needsPublishing = !existing?.isPublished;
+
+        return prisma.result.update({
             where: { id: item.id },
             data: {
                 rank: item.rank,
                 isPublished: true,
-                publishedAt: new Date()
+                ...(needsPublishing && { publishedAt: now })
             }
-        })
-    ));
+        });
+    }));
 
     console.log(`🚀 Released results for exam ${examId}. Published ${resultsWithRanks.length} results.`);
 
@@ -452,8 +459,16 @@ export async function releaseExamResults(examId: string) {
             select: { name: true, address: true, phone: true, logoUrl: true }
         });
 
-        const resultsWithUsers = await prisma.result.findMany({
-            where: { examId, isPublished: true },
+        // Only send emails to results that were actually unpublished before this call
+        if (newlyPublishedIds.length === 0) {
+            console.log(`[EMAIL] No new results to notify for exam ${examId}.`);
+            return;
+        }
+
+        const resultsToNotify = await prisma.result.findMany({
+            where: {
+                id: { in: newlyPublishedIds }
+            },
             include: {
                 student: {
                     include: {
@@ -466,22 +481,15 @@ export async function releaseExamResults(examId: string) {
             }
         });
 
-        // Fetch all questions for this exam (using first set as reference for subjects)
-        const firstSet = await prisma.examSet.findFirst({
-            where: { examId }
-        });
-        // const questions = firstSet?.questionsJson ? (typeof firstSet.questionsJson === 'string' ? JSON.parse(firstSet.questionsJson) : firstSet.questionsJson) : [];
-        // The 'questions' variable was unused, removed it as per instruction.
-
         // Sequential email sending for stability
         let sentCount = 0;
         let failCount = 0;
 
-        for (let i = 0; i < resultsWithUsers.length; i++) {
-            const res = resultsWithUsers[i];
+        for (let i = 0; i < resultsToNotify.length; i++) {
+            const res = resultsToNotify[i];
             if (!res.student.user.email) continue;
 
-            console.log(`[EMAIL] Processing ${i + 1}/${resultsWithUsers.length}: ${res.student.user.email}`);
+            console.log(`[EMAIL] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.email}`);
 
             try {
                 const resultItems = [{
@@ -511,8 +519,8 @@ export async function releaseExamResults(examId: string) {
                     }) as React.ReactElement
                 });
                 sentCount++;
-                // Short cooldown for server health
-                if (i < resultsWithUsers.length - 1) {
+
+                if (i < resultsToNotify.length - 1) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             } catch (err) {
