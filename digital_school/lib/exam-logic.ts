@@ -559,7 +559,6 @@ export async function releaseExamResults(examId: string) {
                     let mcqCorrect = 0;
                     let mcqWrong = 0;
                     let mcqDed = 0;
-                    const keys: string[] = [];
 
                     if (res.examSubmission && exam?.examSets) {
                         const answers = res.examSubmission.answers as Record<string, any>;
@@ -576,10 +575,6 @@ export async function releaseExamResults(examId: string) {
                                 if (type === 'MCQ' || type === 'MC') {
                                     const studentAnswer = answers[q.id];
                                     const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                                    const correctIdx = q.options?.findIndex((o: any) => o.isCorrect);
-                                    const correctLabel = correctIdx !== -1 ? String.fromCharCode(65 + (correctIdx || 0)) : '?';
-
-                                    keys.push(correctLabel);
 
                                     if (studentAnswer) {
                                         const normalize = (s: any) => String(s || '').trim().toLowerCase();
@@ -608,10 +603,7 @@ export async function releaseExamResults(examId: string) {
                     if (res.cqMarks > 0) analytics += ` CQ:${res.cqMarks}`;
                     if (res.sqMarks > 0) analytics += ` SQ:${res.sqMarks}`;
 
-                    // Keys Header: Keys:ABCDE... (160 char limit focus)
-                    const keysStr = keys.length > 0 ? `\nKeys:${keys.join('')}` : '';
-
-                    const smsMessage = `${isCorrection ? 'Corrected Res:\n' : ''}${header}${analytics}${keysStr}\nSuccess! - ${instName}`;
+                    const smsMessage = `${isCorrection ? 'Corrected Res:\n' : ''}${header}${analytics}\nSuccess! - ${instName}`;
 
                     const smsResult = await sendSMS(res.student.user.phone!, smsMessage);
                     if (smsResult.success) sentCount++;
