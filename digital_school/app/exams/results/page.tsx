@@ -165,10 +165,11 @@ export default function ExamResultsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
   useEffect(() => {
     fetchUserAndResults();
-  }, []);
+  }, [pagination.page]);
 
   useEffect(() => {
     filterAndSortResults();
@@ -192,25 +193,36 @@ export default function ExamResultsPage() {
       const userData = await userResponse.json();
       setUser(userData.user || userData);
 
-      // Fetch results based on user role
-      const resultsResponse = await fetch('/api/exams/results/all', {
+      // Fetch results based on user role and pagination
+      const queryParams = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
+      });
+
+      const resultsResponse = await fetch(`/api/exams/results/all?${queryParams.toString()}`, {
         credentials: 'include'
       });
+
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
 
-        // Handle different possible data structures
-        let examResults = [];
-        if (Array.isArray(resultsData)) examResults = resultsData;
-        else if (Array.isArray(resultsData.examResults)) examResults = resultsData.examResults;
-        else if (Array.isArray(resultsData.results)) examResults = resultsData.results;
-        else if (Array.isArray(resultsData.data)) examResults = resultsData.data;
-        else if (resultsData.data?.examResults && Array.isArray(resultsData.data.examResults)) examResults = resultsData.data.examResults;
-        else if (resultsData.data?.results && Array.isArray(resultsData.data.results)) examResults = resultsData.data.results;
+        // Handle new paginated data structure
+        let examResultsData = [];
+        if (resultsData.examResults) {
+          examResultsData = resultsData.examResults;
+        } else if (Array.isArray(resultsData)) {
+          examResultsData = resultsData;
+        }
 
-        console.log('📊 API Response:', resultsData);
-        console.log('📊 Processed exam results:', examResults);
-        setExamResults(examResults as ExamResults[]);
+        setExamResults(examResultsData as ExamResults[]);
+
+        if (resultsData.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            total: resultsData.pagination.total,
+            totalPages: resultsData.pagination.totalPages
+          }));
+        }
       } else {
         console.error('Failed to fetch results:', resultsResponse.status);
         toast.error('Failed to load exam results');
@@ -808,6 +820,55 @@ export default function ExamResultsPage() {
                 </div>
               );
             })
+          )}
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-4 border-t border-slate-200 dark:border-white/10">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Showing page <span className="font-semibold text-slate-900 dark:text-white">{pagination.page}</span> of <span className="font-semibold text-slate-900 dark:text-white">{pagination.totalPages}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                  disabled={pagination.page === 1}
+                  className="bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"
+                >
+                  Previous
+                </Button>
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum = pagination.page;
+                    if (pagination.totalPages <= 5) pageNum = i + 1;
+                    else if (pagination.page <= 3) pageNum = i + 1;
+                    else if (pagination.page >= pagination.totalPages - 2) pageNum = pagination.totalPages - 4 + i;
+                    else pageNum = pagination.page - 2 + i;
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pagination.page === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                        className={pagination.page === pageNum ? "bg-indigo-600" : "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </div>
 

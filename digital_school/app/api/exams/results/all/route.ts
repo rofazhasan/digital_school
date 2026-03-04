@@ -18,6 +18,11 @@ interface ExamResultsGroup {
 
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '50')));
+    const skip = (page - 1) * limit;
+
     const token = await getTokenFromRequest(request);
 
     if (!token) {
@@ -28,309 +33,214 @@ export async function GET(request: NextRequest) {
     const isStudent = user.role === 'STUDENT';
     const canViewAllResults = ['SUPER_USER', 'ADMIN', 'TEACHER'].includes(user.role);
 
+    let results = [];
+    let totalCount = 0;
+
     if (isStudent) {
-      // Student can see their own results and their classmates' published results
       if (!user.studentProfile) {
         return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
       }
 
       const studentClassId = user.studentProfile.classId;
+      const whereCondition = {
+        OR: [
+          { studentId: user.studentProfile.id },
+          {
+            student: { classId: studentClassId },
+            isPublished: true
+          }
+        ]
+      };
 
-      const results = await prismadb.result.findMany({
-        where: {
-          OR: [
-            { studentId: user.studentProfile.id },
-            {
-              student: {
-                classId: studentClassId
-              },
-              isPublished: true
-            }
-          ]
-        },
-        select: {
-          id: true,
-          mcqMarks: true,
-          cqMarks: true,
-          sqMarks: true,
-          total: true,
-          rank: true,
-          grade: true,
-          percentage: true,
-          isPublished: true,
-          publishedAt: true,
-          exam: {
-            include: {
-              class: {
-                select: {
-                  id: true,
-                  name: true,
-                  section: true
+      [results, totalCount] = await Promise.all([
+        prismadb.result.findMany({
+          where: whereCondition,
+          select: {
+            id: true,
+            mcqMarks: true,
+            cqMarks: true,
+            sqMarks: true,
+            total: true,
+            rank: true,
+            grade: true,
+            percentage: true,
+            isPublished: true,
+            publishedAt: true,
+            examId: true,
+            exam: {
+              select: {
+                id: true,
+                name: true,
+                passMarks: true,
+                cqRequiredQuestions: true,
+                sqRequiredQuestions: true,
+                class: {
+                  select: { id: true, name: true, section: true }
                 }
-              },
-              examSets: {
-                where: { isActive: true },
-                select: {
-                  questionsJson: true
-                },
-                take: 1
+              }
+            },
+            student: {
+              select: {
+                id: true,
+                roll: true,
+                user: { select: { name: true } },
+                class: { select: { name: true, section: true } }
               }
             }
           },
-          student: {
-            select: {
-              id: true,
-              roll: true,
-              registrationNo: true,
-              user: {
-                select: {
-                  name: true
-                }
-              },
-              class: {
-                select: {
-                  name: true,
-                  section: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          total: 'desc'
-        }
-      });
-
-      // Cache for exam totals to avoid redundant calculations
-      const examTotalsCache = new Map<string, { mcqTotal: number; cqTotal: number; sqTotal: number }>();
-
-      // Group results by exam
-      const examResultsMap = results.reduce((acc: Record<string, ExamResultsGroup>, result: any) => {
-        const examId = result.exam.id;
-
-        if (!acc[examId]) {
-          // Calculate category totals once per unique exam
-          let totals = examTotalsCache.get(examId);
-
-          if (!totals) {
-            const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
-            const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
-              .reduce((sum, q) => {
-                if (q.type?.toUpperCase() === 'SMCQ') {
-                  return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
-                }
-                return sum + (Number(q.marks) || 1);
-              }, 0);
-
-            const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
-              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-              .slice(0, result.exam.cqRequiredQuestions || 0)
-              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
-
-            const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
-              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-              .slice(0, result.exam.sqRequiredQuestions || 0)
-              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
-
-            totals = { mcqTotal, cqTotal, sqTotal };
-            examTotalsCache.set(examId, totals);
-          }
-
-          acc[examId] = {
-            exam: result.exam,
-            results: [],
-            totalStudents: 0,
-            averageScore: 0,
-            highestScore: 0,
-            lowestScore: 0,
-            passRate: 0,
-            ...totals
-          };
-        }
-        acc[examId].results.push(result);
-        return acc;
-      }, {} as Record<string, ExamResultsGroup>);
-
-      // Calculate statistics for each exam
-      const examResults = Object.values(examResultsMap).map((examResult: ExamResultsGroup) => {
-        const resList = examResult.results;
-        const totalStudents = resList.length;
-        const totalScore = resList.reduce((sum: number, r: any) => sum + (Number(r.total) || 0), 0);
-        const averageScore = totalStudents > 0 ? totalScore / totalStudents : 0;
-        const scores = resList.map((r: any) => Number(r.total) || 0);
-        const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
-        const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
-        const passCount = resList.filter((r: any) => (Number(r.total) || 0) >= (Number(r.exam.passMarks) || 0)).length;
-        const passRate = totalStudents > 0 ? (passCount / totalStudents) * 100 : 0;
-
-        return {
-          ...examResult,
-          totalStudents,
-          averageScore,
-          highestScore,
-          lowestScore,
-          passRate
-        };
-      });
-
-      return NextResponse.json({
-        examResults
-      });
+          orderBy: { total: 'desc' },
+          skip,
+          take: limit
+        }),
+        prismadb.result.count({ where: whereCondition })
+      ]);
 
     } else if (canViewAllResults) {
-      // Teachers, Admins, and Super Users can see all results
       const whereClause: any = {};
-
-      // If teacher or admin, only show results from their institute
       if ((user.role === 'TEACHER' || user.role === 'ADMIN') && user.instituteId) {
-        whereClause.exam = {
-          class: {
-            instituteId: user.instituteId
-          }
-        };
+        whereClause.exam = { class: { instituteId: user.instituteId } };
       }
 
-      const allResults = await prismadb.result.findMany({
-        where: whereClause,
-        select: {
-          id: true,
-          mcqMarks: true,
-          cqMarks: true,
-          sqMarks: true,
-          total: true,
-          rank: true,
-          grade: true,
-          percentage: true,
-          isPublished: true,
-          publishedAt: true,
-          exam: {
-            include: {
-              class: {
-                select: {
-                  id: true,
-                  name: true,
-                  section: true
+      [results, totalCount] = await Promise.all([
+        prismadb.result.findMany({
+          where: whereClause,
+          select: {
+            id: true,
+            mcqMarks: true,
+            cqMarks: true,
+            sqMarks: true,
+            total: true,
+            rank: true,
+            grade: true,
+            percentage: true,
+            isPublished: true,
+            publishedAt: true,
+            examId: true,
+            exam: {
+              select: {
+                id: true,
+                name: true,
+                passMarks: true,
+                cqRequiredQuestions: true,
+                sqRequiredQuestions: true,
+                class: {
+                  select: { id: true, name: true, section: true }
                 }
-              },
-              examSets: {
-                where: { isActive: true },
-                select: {
-                  questionsJson: true
-                },
-                take: 1
+              }
+            },
+            student: {
+              select: {
+                id: true,
+                roll: true,
+                user: { select: { name: true } },
+                class: { select: { name: true, section: true } }
               }
             }
           },
-          student: {
-            select: {
-              id: true,
-              roll: true,
-              registrationNo: true,
-              user: {
-                select: {
-                  name: true
-                }
-              },
-              class: {
-                select: {
-                  name: true,
-                  section: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: {
-          createdAt: 'desc'
-        },
-        take: 500 // Limit initial fetch for performance
-      });
-
-      // Cache for exam totals to avoid redundant calculations
-      const examTotalsCache = new Map<string, { mcqTotal: number; cqTotal: number; sqTotal: number }>();
-
-      // Group results by exam and calculate statistics
-      const examResultsMap = allResults.reduce((acc: Record<string, ExamResultsGroup>, result: any) => {
-        const examId = result.exam.id;
-
-        if (!acc[examId]) {
-          // Calculate category totals once per unique exam
-          let totals = examTotalsCache.get(examId);
-
-          if (!totals) {
-            const questions = (result.exam.examSets?.[0]?.questionsJson as Prisma.JsonArray) || [];
-            const mcqTotal = (questions as any[]).filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
-              .reduce((sum, q) => {
-                if (q.type?.toUpperCase() === 'SMCQ') {
-                  return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
-                }
-                return sum + (Number(q.marks) || 1);
-              }, 0);
-
-            const cqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'CQ')
-              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-              .slice(0, result.exam.cqRequiredQuestions || 0)
-              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
-
-            const sqTotal = (questions as any[]).filter(q => q.type?.toUpperCase() === 'SQ')
-              .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
-              .slice(0, result.exam.sqRequiredQuestions || 0)
-              .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
-
-            totals = { mcqTotal, cqTotal, sqTotal };
-            examTotalsCache.set(examId, totals);
-          }
-
-          acc[examId] = {
-            exam: result.exam,
-            results: [],
-            totalStudents: 0,
-            averageScore: 0,
-            highestScore: 0,
-            lowestScore: 0,
-            passRate: 0,
-            ...totals
-          };
-        }
-        acc[examId].results.push(result);
-        return acc;
-      }, {} as Record<string, ExamResultsGroup>);
-
-      // Calculate statistics for each exam
-      const examResults = Object.values(examResultsMap).map((examResult: ExamResultsGroup) => {
-        const results = examResult.results;
-        const totalStudents = results.length;
-        const totalScore = results.reduce((sum: number, r: any) => sum + (Number(r.total) || 0), 0);
-        const averageScore = totalStudents > 0 ? totalScore / totalStudents : 0;
-        const scores = results.map((r: any) => Number(r.total) || 0);
-        const highestScore = scores.length > 0 ? Math.max(...scores) : 0;
-        const lowestScore = scores.length > 0 ? Math.min(...scores) : 0;
-        const passCount = results.filter((r: any) => (Number(r.total) || 0) >= (Number(r.exam.passMarks) || 0)).length;
-        const passRate = totalStudents > 0 ? (passCount / totalStudents) * 100 : 0;
-
-        return {
-          ...examResult,
-          totalStudents,
-          averageScore,
-          highestScore,
-          lowestScore,
-          passRate
-        };
-      });
-
-      return NextResponse.json({
-        examResults
-      });
-
+          orderBy: { createdAt: 'desc' },
+          skip,
+          take: limit
+        }),
+        prismadb.result.count({ where: whereClause })
+      ]);
     } else {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
+    // 1. Get unique exam IDs from results
+    const uniqueExamIds = Array.from(new Set(results.map(r => r.examId)));
+
+    // 2. Fetch exam sets only once per exam
+    const examSets = await prismadb.examSet.findMany({
+      where: {
+        examId: { in: uniqueExamIds },
+        isActive: true
+      },
+      select: {
+        examId: true,
+        questionsJson: true
+      }
+    });
+
+    // 3. Pre-calculate totals for each exam
+    const examTotalsMap = new Map();
+    examSets.forEach(set => {
+      if (examTotalsMap.has(set.examId)) return; // Already processed a set for this exam
+
+      const questions = (set.questionsJson as any[]) || [];
+      const mcqTotal = questions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ'].includes(q.type?.toUpperCase()))
+        .reduce((sum, q) => {
+          if (q.type?.toUpperCase() === 'SMCQ') {
+            return sum + (q.subQuestions || []).reduce((s: number, sq: any) => s + (Number(sq.marks) || 1), 0);
+          }
+          return sum + (Number(q.marks) || 1);
+        }, 0);
+
+      // Find first result of this exam to get required question counts (they are same for all results of same exam)
+      const sampleResult = results.find(r => r.examId === set.examId);
+      const cqTotal = questions.filter(q => q.type?.toUpperCase() === 'CQ')
+        .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+        .slice(0, sampleResult?.exam.cqRequiredQuestions || 0)
+        .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+      const sqTotal = questions.filter(q => q.type?.toUpperCase() === 'SQ')
+        .sort((a, b) => (Number(b.marks) || 0) - (Number(a.marks) || 0))
+        .slice(0, sampleResult?.exam.sqRequiredQuestions || 0)
+        .reduce((sum, q) => sum + (Number(q.marks) || 0), 0);
+
+      examTotalsMap.set(set.examId, { mcqTotal, cqTotal, sqTotal });
+    });
+
+    // 4. Group results by exam
+    const examGroupsMap: Record<string, ExamResultsGroup> = {};
+    results.forEach((result: any) => {
+      const examId = result.examId;
+      if (!examGroupsMap[examId]) {
+        const totals = examTotalsMap.get(examId) || { mcqTotal: 0, cqTotal: 0, sqTotal: 0 };
+        examGroupsMap[examId] = {
+          exam: result.exam,
+          results: [],
+          totalStudents: 0,
+          averageScore: 0,
+          highestScore: 0,
+          lowestScore: 0,
+          passRate: 0,
+          ...totals
+        };
+      }
+      examGroupsMap[examId].results.push(result);
+    });
+
+    // 5. Calculate final statistics
+    const examResults = Object.values(examGroupsMap).map(group => {
+      const resList = group.results;
+      const count = resList.length;
+      const scores = resList.map((r: any) => Number(r.total) || 0);
+      const totalScore = scores.reduce((a, b) => a + b, 0);
+      const passCount = resList.filter((r: any) => (Number(r.total) || 0) >= (Number(r.exam.passMarks) || 0)).length;
+
+      return {
+        ...group,
+        totalStudents: count,
+        averageScore: count > 0 ? totalScore / count : 0,
+        highestScore: count > 0 ? Math.max(...scores) : 0,
+        lowestScore: count > 0 ? Math.min(...scores) : 0,
+        passRate: count > 0 ? (passCount / count) * 100 : 0
+      };
+    });
+
+    return NextResponse.json({
+      examResults,
+      pagination: {
+        page,
+        limit,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limit)
+      }
+    });
+
   } catch (error) {
     console.error('Error fetching exam results:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
-} 
+}
