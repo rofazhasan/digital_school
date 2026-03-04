@@ -7,11 +7,7 @@ const SENDER_ID = process.env.BULKSMSBD_SENDER_ID;
 const BASE_URL = process.env.BULKSMSBD_BASE_URL || 'http://bulksmsbd.net/api';
 
 if (!API_KEY || !SENDER_ID) {
-    if (process.env.NODE_ENV === 'production') {
-        throw new Error('BULKSMSBD_API_KEY and BULKSMSBD_SENDER_ID must be defined in environment variables');
-    } else {
-        console.warn('BULKSMSBD_API_KEY or BULKSMSBD_SENDER_ID is missing from environment variables. SMS service will not work correctly.');
-    }
+    console.warn('⚠️ BULKSMSBD_API_KEY or BULKSMSBD_SENDER_ID is missing from environment variables. SMS service will not work correctly.');
 }
 
 export interface SMSRunResponse {
