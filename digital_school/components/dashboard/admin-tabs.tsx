@@ -60,7 +60,8 @@ import {
     Loader2,
     RefreshCw,
     ToggleLeft,
-    ToggleRight
+    ToggleRight,
+    CheckSquare
 } from "lucide-react";
 import { Line, Bar, Doughnut } from "react-chartjs-2";
 import {
@@ -330,6 +331,7 @@ function formatTimeAgo(dateStr: string) {
 // ============================================================
 export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
     const [notices, setNotices] = useState<Notice[]>([]);
+    const [classes, setClasses] = useState<NoticeClass[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [filterPriority, setFilterPriority] = useState<string>('ALL');
@@ -356,13 +358,22 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
         setLoading(true);
         try {
             const endpoint = isAdmin ? '/api/super-user/notices' : '/api/notices';
-            const res = await fetch(endpoint);
-            if (res.ok) {
-                const data = await res.json();
+            const [noticesRes, classesRes] = await Promise.all([
+                fetch(endpoint),
+                isAdmin ? fetch('/api/classes') : Promise.resolve(null)
+            ]);
+
+            if (noticesRes.ok) {
+                const data = await noticesRes.json();
                 setNotices(data.notices || []);
             }
+
+            if (classesRes && classesRes.ok) {
+                const data = await classesRes.json();
+                setClasses(data.classes || []);
+            }
         } catch (e) {
-            console.error('Failed to fetch notices', e);
+            console.error('Failed to fetch data', e);
         } finally {
             setLoading(false);
         }
@@ -453,6 +464,15 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
         setNewLink({ label: '', url: '' });
     };
 
+    const toggleClass = (id: string) => {
+        setForm(f => ({
+            ...f,
+            targetClassIds: f.targetClassIds.includes(id)
+                ? f.targetClassIds.filter(cid => cid !== id)
+                : [...f.targetClassIds, id]
+        }));
+    };
+
     const removeLink = (i: number) => {
         setForm(f => ({ ...f, links: f.links.filter((_, idx) => idx !== i) }));
     };
@@ -535,8 +555,8 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                     key={p}
                                     onClick={() => setFilterPriority(p)}
                                     className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterPriority === p
-                                            ? 'bg-primary text-primary-foreground border-primary shadow-sm'
-                                            : 'bg-muted/30 text-muted-foreground border-border hover:border-primary/50'
+                                        ? 'bg-primary text-primary-foreground border-primary shadow-sm'
+                                        : 'bg-muted/30 text-muted-foreground border-border hover:border-primary/50'
                                         }`}
                                 >
                                     {p === 'ALL' ? 'All' : p}
@@ -593,7 +613,9 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                                         </span>
                                                         <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${tc?.color}`}>
                                                             <TIcon className="h-3 w-3" />
-                                                            {tc?.bangla}
+                                                            {notice.targetType === 'SPECIFIC_CLASS' && notice.targetClasses?.length > 0
+                                                                ? notice.targetClasses.map(c => `${c.name}-${c.section}`).join(', ')
+                                                                : tc?.bangla}
                                                         </span>
                                                         {notice.category && notice.category !== 'General' && (
                                                             <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">
@@ -688,8 +710,8 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                                             variant="ghost"
                                                             size="sm"
                                                             className={`h-8 w-8 p-0 rounded-lg ${notice.isActive
-                                                                    ? 'hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/30'
-                                                                    : 'hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30'
+                                                                ? 'hover:bg-amber-50 hover:text-amber-600 dark:hover:bg-amber-900/30'
+                                                                : 'hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/30'
                                                                 }`}
                                                             onClick={() => handleToggleActive(notice)}
                                                             title={notice.isActive ? 'Deactivate' : 'Activate'}
@@ -742,8 +764,8 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                                 type="button"
                                                 onClick={() => setForm(f => ({ ...f, priority: p }))}
                                                 className={`px-3 py-2 rounded-lg text-xs font-bold border-2 transition-all ${form.priority === p
-                                                        ? `${cfg.color} border-current`
-                                                        : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
+                                                    ? `${cfg.color} border-current`
+                                                    : 'border-border bg-muted/30 text-muted-foreground hover:border-primary/50'
                                                     }`}
                                             >
                                                 {p}
@@ -773,7 +795,7 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                         <div className="space-y-2">
                             <Label className="font-semibold">Target Audience • লক্ষ্য দর্শক</Label>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                {Object.entries(TARGET_CONFIG).filter(([k]) => k !== 'SPECIFIC_CLASS').map(([key, cfg]) => {
+                                {Object.entries(TARGET_CONFIG).map(([key, cfg]) => {
                                     const Icon = cfg.icon;
                                     return (
                                         <button
@@ -781,8 +803,8 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                             type="button"
                                             onClick={() => setForm(f => ({ ...f, targetType: key }))}
                                             className={`flex items-center gap-2 p-3 rounded-xl border-2 text-left transition-all ${form.targetType === key
-                                                    ? `${cfg.color.replace('text-', 'border-').replace(/dark:[^\s]+/g, '').replace('bg-', 'border-l-')} border-current bg-gradient-to-br from-muted to-muted/50`
-                                                    : 'border-border bg-muted/20 hover:border-primary/40'
+                                                ? `${cfg.color.replace('text-', 'border-').replace(/dark:[^\s]+/g, '').replace('bg-', 'border-l-')} border-current bg-gradient-to-br from-muted to-muted/50`
+                                                : 'border-border bg-muted/20 hover:border-primary/40'
                                                 }`}
                                         >
                                             <Icon className="h-4 w-4 flex-shrink-0" />
@@ -795,6 +817,37 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                 })}
                             </div>
                         </div>
+
+                        {/* Class Selection UI */}
+                        {form.targetType === 'SPECIFIC_CLASS' && (
+                            <div className="space-y-3 p-4 bg-muted/30 rounded-xl border border-border animate-in fade-in slide-in-from-top-2">
+                                <Label className="font-semibold flex items-center justify-between">
+                                    <span>Select Classes • শ্রেণী নির্বাচন করুন</span>
+                                    <span className="text-xs font-normal text-muted-foreground">{form.targetClassIds.length} selected</span>
+                                </Label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                                    {classes.map((cls) => (
+                                        <button
+                                            key={cls.id}
+                                            type="button"
+                                            onClick={() => toggleClass(cls.id)}
+                                            className={`flex items-center gap-2 p-2 rounded-lg border text-xs transition-all ${form.targetClassIds.includes(cls.id)
+                                                ? 'bg-primary/10 border-primary text-primary font-semibold'
+                                                : 'bg-background border-border hover:border-primary/50'
+                                                }`}
+                                        >
+                                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${form.targetClassIds.includes(cls.id) ? 'bg-primary border-primary' : 'border-muted-foreground/30'}`}>
+                                                {form.targetClassIds.includes(cls.id) && <CheckSquare className="w-3 h-3 text-white" />}
+                                            </div>
+                                            <span className="truncate">{cls.name} - {cls.section}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                                {classes.length === 0 && (
+                                    <p className="text-xs text-center text-muted-foreground py-2">No classes found. Please create classes first.</p>
+                                )}
+                            </div>
+                        )}
 
                         {/* Title */}
                         <div className="space-y-2">
@@ -896,7 +949,11 @@ export function NoticesTab({ isAdmin = true }: { isAdmin?: boolean }) {
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${pc?.badge}`}>{viewingNotice.priority}</span>
-                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tc?.color}`}>{tc?.label}</span>
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${tc?.color}`}>
+                                                    {viewingNotice.targetType === 'SPECIFIC_CLASS' && viewingNotice.targetClasses?.length > 0
+                                                        ? viewingNotice.targetClasses.map(c => `${c.name}-${c.section}`).join(', ')
+                                                        : tc?.label}
+                                                </span>
                                                 {viewingNotice.category && <span className="text-xs px-2 py-0.5 rounded-full bg-muted">{viewingNotice.category}</span>}
                                             </div>
                                         </div>
