@@ -6,8 +6,81 @@ import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluat
 import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
 import { sendEmail } from "@/lib/email";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
-import { Exam, ExamSet, ExamSubmission, SubmissionStatus, Institute } from "@prisma/client";
+import { Exam, ExamSet, ExamSubmission, SubmissionStatus, Institute, PrismaClient } from "@prisma/client";
 import React from "react";
+
+/**
+ * Assign an exam set to a student using a balanced random approach (least-assigned).
+ * If the student is already assigned, returns the existing set.
+ */
+export async function assignBalancedExamSet(studentId: string, examId: string, prismaClient?: PrismaClient) {
+    const db = prismaClient || prisma;
+
+    // 1. Check for existing mapping
+    const existingMap = await db.examStudentMap.findUnique({
+        where: { studentId_examId: { studentId, examId } },
+        select: { examSetId: true }
+    });
+
+    if (existingMap?.examSetId) {
+        return existingMap.examSetId;
+    }
+
+    // 2. Get all active sets for this exam
+    const examSets = await db.examSet.findMany({
+        where: { examId, isActive: true },
+        select: { id: true }
+    });
+
+    if (examSets.length === 0) return null;
+    if (examSets.length === 1) {
+        const setId = examSets[0].id;
+        await db.examStudentMap.upsert({
+            where: { studentId_examId: { studentId, examId } },
+            update: { examSetId: setId },
+            create: { studentId, examId, examSetId: setId }
+        });
+        return setId;
+    }
+
+    // 3. Count current assignments for each set to ensure balance
+    const assignmentCounts = await db.examStudentMap.groupBy({
+        by: ['examSetId'],
+        where: {
+            examId,
+            examSetId: { in: examSets.map(s => s.id) }
+        },
+        _count: { _all: true }
+    });
+
+    const countMap = new Map<string, number>();
+    examSets.forEach(s => countMap.set(s.id, 0));
+    assignmentCounts.forEach(c => {
+        if (c.examSetId) countMap.set(c.examSetId, c._count._all);
+    });
+
+    // 4. Find the minimum count
+    let minCount = Infinity;
+    countMap.forEach(count => {
+        if (count < minCount) minCount = count;
+    });
+
+    // 5. Get all sets that have this minimum count
+    const candidates = examSets.filter(s => countMap.get(s.id) === minCount);
+
+    // 6. Pick one randomly from candidates
+    const selectedSet = candidates[Math.floor(Math.random() * candidates.length)];
+
+    // 7. Persist assignment
+    await db.examStudentMap.upsert({
+        where: { studentId_examId: { studentId, examId } },
+        update: { examSetId: selectedSet.id },
+        create: { studentId, examId, examSetId: selectedSet.id }
+    });
+
+    console.log(`[SetAssignment] Student ${studentId} assigned to set ${selectedSet.id} for exam ${examId} (Balance: ${minCount} assignments)`);
+    return selectedSet.id;
+}
 
 export interface QuestionOption {
     text: string;

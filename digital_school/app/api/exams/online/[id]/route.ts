@@ -32,6 +32,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let questions: any[] = [];
     let assignedExamSetId = null;
 
+    // PROACTIVE SET ASSIGNMENT: Ensure student has a set even before starting
+    const { assignBalancedExamSet } = await import("@/lib/exam-logic");
+    assignedExamSetId = await assignBalancedExamSet(studentId, examId);
+
     const submissions = await prisma.examSubmission.findMany({
       where: {
         examId: examId,
@@ -86,27 +90,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const shouldCreateNew = (!existingSubmission || (isFinished && exam.allowRetake)) && action === 'start';
 
     if (shouldCreateNew) {
-      // Logic to assign exam set first
-      if (exam.examSets.length > 0) {
-        const examStudentMap = await prisma.examStudentMap.findUnique({
-          where: { studentId_examId: { studentId, examId } },
-          include: { examSet: true }
-        });
-
-        assignedExamSetId = examStudentMap?.examSetId;
-
-        if (!assignedExamSetId) {
-          const randomIndex = Math.floor(Math.random() * exam.examSets.length);
-          const examSet = exam.examSets[randomIndex];
-          assignedExamSetId = examSet.id;
-
-          await prisma.examStudentMap.upsert({
-            where: { studentId_examId: { studentId, examId } },
-            update: { examSetId: assignedExamSetId },
-            create: { studentId, examId, examSetId: assignedExamSetId }
-          });
-        }
-      }
+      // Set is already assigned proactively above
+      // But we still need to ensure it's in the submission
 
       // DELETE PREVIOUS SUBMISSION BEFORE STARTING NEW ONE (RETAKE CLEANUP)
       if (existingSubmission) {

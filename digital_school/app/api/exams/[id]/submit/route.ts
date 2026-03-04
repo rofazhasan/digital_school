@@ -55,8 +55,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } as any
     })) as any;
 
-    if (!targetExamSetId && existingSubmission?.examSetId) {
-      targetExamSetId = existingSubmission.examSetId;
+    if (!targetExamSetId) {
+      if (existingSubmission?.examSetId) {
+        targetExamSetId = existingSubmission.examSetId;
+      } else {
+        // Final fallback: Assign if still missing
+        const { assignBalancedExamSet } = await import("@/lib/exam-logic");
+        targetExamSetId = await assignBalancedExamSet(studentId, examId);
+      }
     }
 
     // Determine current section being submitted

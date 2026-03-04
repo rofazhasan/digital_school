@@ -66,6 +66,10 @@ export async function GET(
       });
       if (preFetchedStudentMap?.examSetId) {
         targetExamSetId = preFetchedStudentMap.examSetId;
+      } else if (studentId) {
+        // Fix inconsistency: If not assigned but we are evaluating, assign now
+        const { assignBalancedExamSet } = await import("@/lib/exam-logic");
+        targetExamSetId = (await assignBalancedExamSet(studentId, examId)) || undefined;
       }
     }
 
