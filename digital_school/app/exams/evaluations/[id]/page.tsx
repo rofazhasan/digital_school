@@ -20,7 +20,6 @@ import {
   PenTool,
   Save,
   ArrowLeft,
-  ArrowRight,
   Star,
   MessageSquare,
   Download,
@@ -43,8 +42,20 @@ import {
   Menu,
   Loader2,
   AlertCircle,
-  FileSearch
+  FileSearch,
+  Users,
+  Search,
+  LayoutGrid,
+  List,
+  RefreshCw,
+  ArrowRight
 } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
 import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
@@ -442,15 +453,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const renderLiveMonitor = () => {
     if (!liveStats) return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] text-muted-foreground">
-        <Loader2 className="w-10 h-10 animate-spin mb-4 text-blue-500" />
-        <p>Connecting to live exam feed...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+          <Activity className="w-6 h-6 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
+        </div>
+        <p className="text-muted-foreground font-medium animate-pulse">Establishing secure live connection...</p>
       </div>
     );
 
     const { liveData, activeStudents, submittedStudents, totalStudents } = liveStats;
 
-    // Filter and Sort Logic
     let filteredData = (liveData || [])?.filter(student => {
       const matchesSearch = student?.studentName?.toLowerCase()?.includes(monitorSearch?.toLowerCase()) ||
         student?.roll?.includes(monitorSearch);
@@ -458,7 +471,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
         ? true
         : monitorFilter === 'active'
           ? student?.status === 'IN_PROGRESS'
-          : student?.status === 'COMPLETED'; // API now returns COMPLETED for evaluated students
+          : student?.status === 'COMPLETED';
       return matchesSearch && matchesFilter;
     });
 
@@ -470,342 +483,282 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     });
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        {/* Modern Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Evaluation</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-blue-600">{activeStudents}</p>
-                  <span className="text-xs text-blue-400 font-medium">students</span>
-                </div>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <Activity className="h-6 w-6 text-blue-600 animate-pulse" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Evaluated</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-green-600">{submittedStudents}</p>
-                  <span className="text-xs text-green-400 font-medium">completed</span>
-                </div>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center">
-                <CheckCircle className="h-6 w-6 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-none shadow-md shadow-primary/5 hover:shadow-lg transition-shadow">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Completion Rate</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-purple-600">
-                    {totalStudents > 0 ? Math.round((submittedStudents / totalStudents) * 100) : 0}%
-                  </p>
-                </div>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-purple-500/10 flex items-center justify-center">
-                <Trophy className="h-6 w-6 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-none shadow-md hover:shadow-lg transition-shadow">
-            <CardContent className="p-5 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Candidates</p>
-                <p className="text-3xl font-bold text-foreground">{totalStudents}</p>
-              </div>
-              <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center">
-                <User className="h-6 w-6 text-muted-foreground" />
-              </div>
-            </CardContent>
-          </Card>
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* Top Tier Stats - Glassmorphism Style */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {[
+            { label: 'Live Monitoring', value: activeStudents, icon: Activity, color: 'blue', sub: 'Active Students' },
+            { label: 'Evaluation Done', value: submittedStudents, icon: CheckCircle, color: 'emerald', sub: `${totalStudents > 0 ? Math.round((submittedStudents / totalStudents) * 100) : 0}% Completion` },
+            { label: 'Class Average', value: totalStudents > 0 ? (liveData.reduce((acc, s) => acc + (s.score || 0), 0) / totalStudents).toFixed(1) : '0', icon: Trophy, color: 'amber', sub: 'Based on current scores' },
+            { label: 'Total Candidates', value: totalStudents, icon: Users, color: 'indigo', sub: 'Registered for Exam' }
+          ].map((stat, i) => (
+            <div key={i} className="relative group">
+              <div className={`absolute -inset-0.5 bg-gradient-to-r from-${stat.color}-500 to-${stat.color}-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500`}></div>
+              <Card className="relative bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-white/20 dark:border-slate-800/50 shadow-xl rounded-2xl overflow-hidden">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">{stat.label}</p>
+                      <h3 className="text-3xl font-black tracking-tight">{stat.value}</h3>
+                      <p className="text-[10px] font-medium text-muted-foreground mt-1 flex items-center gap-1">
+                        <span className={`w-1 h-1 rounded-full bg-${stat.color}-500 animate-pulse`}></span>
+                        {stat.sub}
+                      </p>
+                    </div>
+                    <div className={`p-3 rounded-xl bg-${stat.color}-500/10 text-${stat.color}-600`}>
+                      <stat.icon className="w-6 h-6" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ))}
         </div>
 
-        {/* Action Bar */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-card p-4 rounded-xl shadow-sm border border-border">
-          <div className="flex items-center gap-4 w-full md:w-auto">
-            {/* ... Search ... */}
-            <div className="relative w-full md:w-64">
+        {/* Dynamic Action Bar */}
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between sticky top-4 z-10 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md p-3 rounded-2xl border border-white/20 shadow-lg">
+          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+            <div className="relative group flex-1 md:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
               <Input
-                placeholder="Search student..."
+                placeholder="Search by name or roll..."
                 value={monitorSearch}
                 onChange={(e) => setMonitorSearch(e.target.value)}
-                className="pl-9 h-10 bg-muted/50 border-border focus:bg-card transition-colors"
+                className="pl-10 w-full md:w-72 bg-white/50 dark:bg-slate-800/50 border-none shadow-inner focus-visible:ring-2 focus-visible:ring-primary/20 rounded-xl"
               />
-              <ZoomIn className="w-4 h-4 absolute left-3 top-3 text-muted-foreground" />
             </div>
 
-            <Select value={monitorFilter} onValueChange={(v: any) => setMonitorFilter(v)}>
-              <SelectTrigger className="w-[140px] h-10 bg-muted/50 border-border">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active Now</SelectItem>
-                <SelectItem value="submitted">Evaluated</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-2">
+              <Select value={monitorFilter} onValueChange={(v: any) => setMonitorFilter(v)}>
+                <SelectTrigger className="w-[130px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  <SelectItem value="all">All Participation</SelectItem>
+                  <SelectItem value="active">In Progress</SelectItem>
+                  <SelectItem value="submitted">Completed</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={monitorSort} onValueChange={(v: any) => setMonitorSort(v)}>
-              <SelectTrigger className="w-[140px] h-10 bg-muted/50 border-border">
-                <SelectValue placeholder="Sort by" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="progress">Progress</SelectItem>
-                <SelectItem value="score">Score</SelectItem>
-                <SelectItem value="time">Recent Activity</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={monitorSort} onValueChange={(v: any) => setMonitorSort(v)}>
+                <SelectTrigger className="w-[130px] bg-white/50 dark:bg-slate-800/50 border-none rounded-xl font-medium">
+                  <SelectValue placeholder="Sort By" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-none shadow-2xl">
+                  <SelectItem value="progress">Top Progress</SelectItem>
+                  <SelectItem value="score">Highest Score</SelectItem>
+                  <SelectItem value="time">Activity Time</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-            <div className="bg-muted p-1 rounded-lg flex gap-1">
+          <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+            <div className="bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl flex gap-1">
               <Button
                 variant="ghost"
-                size="sm"
-                className={`h-8 px-2 ${monitorViewMode === 'grid' ? 'bg-card shadow text-primary font-bold' : 'text-muted-foreground'}`}
+                size="icon"
+                className={`w-9 h-9 rounded-lg transition-all ${monitorViewMode === 'grid' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-muted-foreground'}`}
                 onClick={() => setMonitorViewMode('grid')}
               >
-                <LayoutDashboard className="w-4 h-4" />
+                <LayoutGrid className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
-                className={`h-8 px-2 ${monitorViewMode === 'list' ? 'bg-card shadow text-primary font-bold' : 'text-muted-foreground'}`}
+                size="icon"
+                className={`w-9 h-9 rounded-lg transition-all ${monitorViewMode === 'list' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary' : 'text-muted-foreground'}`}
                 onClick={() => setMonitorViewMode('list')}
               >
-                <Menu className="w-4 h-4" />
+                <List className="w-4 h-4" />
               </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchLiveStats} className="h-10 border-blue-200 text-blue-700 hover:bg-blue-50">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Refresh
+            <Button
+              variant="default"
+              size="sm"
+              onClick={fetchLiveStats}
+              className="rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 active:scale-95 transition-all h-10 px-6 font-bold"
+            >
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin-slow" />
+              Live Sync
             </Button>
           </div>
         </div>
 
-        {/* Content Area */}
-        {
-          monitorViewMode === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {filteredData.map(student => (
+        {/* Main Feed */}
+        {monitorViewMode === 'grid' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredData.map((student, i) => (
+              <div
+                key={student?.id}
+                className="animate-in fade-in zoom-in-95 duration-500 fill-mode-both"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
                 <Card
-                  key={student?.id}
-                  className={`cursor-pointer group relative overflow-hidden transition-all duration-300 hover:shadow-xl hover:-translate-y-1 
+                  className={`group relative overflow-hidden transition-all duration-500 cursor-pointer border-none shadow-sm hover:shadow-2xl hover:-translate-y-2
                   ${student?.status === 'IN_PROGRESS'
-                      ? 'border-l-4 border-l-blue-500'
-                      : 'border-l-4 border-l-green-500 bg-green-50/10'}`}
+                      ? 'bg-gradient-to-br from-white to-blue-50/30'
+                      : 'bg-gradient-to-br from-white to-emerald-50/30'} dark:from-slate-900 dark:to-slate-900`}
                   onClick={() => {
                     setSelectedLiveStudent(student);
                     setIsLiveModalOpen(true);
                   }}
                 >
-                  <CardContent className="p-5 space-y-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-3 min-w-0">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white shadow-md shrink-0
-                            ${student?.status === 'IN_PROGRESS'
-                            ? 'bg-gradient-to-br from-blue-500 to-indigo-600'
-                            : 'bg-gradient-to-br from-green-500 to-emerald-600'}`}>
-                          {student?.studentName?.substring(0, 2)?.toUpperCase()}
+                  {/* Status Indicator Bar */}
+                  <div className={`absolute top-0 left-0 w-full h-1 ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-emerald-500'}`} />
+
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-6">
+                      <div className="relative">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-xl transition-transform group-hover:scale-110 duration-500
+                          ${student?.status === 'IN_PROGRESS' ? 'bg-blue-600 shadow-blue-500/20' : 'bg-emerald-600 shadow-emerald-500/20'}`}>
+                          {student?.studentName?.substring(0, 1)?.toUpperCase()}
                         </div>
-                        <div className="min-w-0">
-                          <p className="font-bold text-foreground truncate">{student?.studentName}</p>
-                          <p className="text-xs text-muted-foreground font-mono">Roll: {student?.roll}</p>
+                        <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center
+                          ${student?.isOnline !== false ? 'bg-emerald-500' : 'bg-slate-300'}`}>
+                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                         </div>
                       </div>
 
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-8 w-8 rounded-full shadow-sm bg-indigo-50 text-indigo-600 hover:bg-indigo-100 shrink-0"
-                        title="Open Review Session"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const questions = liveStats?.defaultQuestions || [];
-                          if (!questions.length) return toast.error("No questions found");
-
-                          const sessionData = (questions || [])?.map((q: any) => {
-                            const ans = student?.answers ? student?.answers?.[q?.id] : null;
-                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                            let userIdx = null;
-
-                            if (ans !== undefined && ans !== null) {
-                              const correctOpt = q?.options?.find((o: any) => o?.isCorrect);
-                              const isCorrect = correctOpt && (
-                                (typeof ans === 'number' && q?.options?.[ans]?.text === correctOpt?.text) ||
-                                (ans === correctOpt?.text)
-                              );
-                              status = isCorrect ? 'correct' : 'wrong';
-                              if ((q?.type || "").toUpperCase() === 'MCQ' && q?.options) {
-                                userIdx = typeof ans === 'number' ? ans : (q?.options?.findIndex((o: any) => o?.text === ans) ?? -1);
-                              }
-                            }
-                            return { ...q, status, userAnswer: userIdx };
-                          });
-
-                          const sessionPayload = {
-                            questions: sessionData,
-                            examName: liveStats?.examName || "Review Session"
-                          };
-                          localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
-                          toast.success("Opening Review Session...");
-                          window.open('/problem-solving/session?mode=review', '_blank');
-                        }}
-                      >
-                        <MonitorPlay className="w-4 h-4 ml-0.5" />
-                      </Button>
-                    </div>
-
-                    {/* Stats Grid inside Card */}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-muted/50 p-2 rounded border border-border">
-                        <span className="text-muted-foreground block mb-1">Answered</span>
-                        <span className="font-semibold">{student?.answered} / {student?.totalQuestions}</span>
-                      </div>
-                      <div className="bg-muted/50 p-2 rounded border border-border">
-                        <span className="text-muted-foreground block mb-1">Score</span>
-                        <span className="font-semibold text-primary">{student?.score}</span>
+                      <div className="text-right">
+                        <h4 className="font-black text-lg leading-tight truncate max-w-[150px]">{student?.studentName}</h4>
+                        <p className="text-[10px] font-bold text-muted-foreground tracking-widest uppercase">ROLL: {student?.roll}</p>
                       </div>
                     </div>
 
-                    {/* Progress Bar */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span className="text-muted-foreground">Progress</span>
-                        <span className={student?.progress === 100 ? "text-green-600" : "text-blue-600"}>{student?.progress}%</span>
+                    <div className="grid grid-cols-2 gap-3 mb-6">
+                      <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Answers</p>
+                        <p className="font-black text-xl">{student?.answered}<span className="text-xs text-muted-foreground font-medium ml-1">/ {student?.totalQuestions}</span></p>
                       </div>
-                      <div className="w-full bg-muted rounded-full h-2 overflow-hidden shadow-inner">
+                      <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Live Score</p>
+                        <p className="font-black text-xl text-primary">{student?.score}<span className="text-[10px] text-muted-foreground font-medium ml-1">pts</span></p>
+                      </div>
+                    </div>
+
+                    {/* Premium Progress Bar */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center px-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Course Progress</span>
+                        <span className={`text-xs font-black ${student?.progress === 100 ? 'text-emerald-500' : 'text-blue-500'}`}>{student?.progress}%</span>
+                      </div>
+                      <div className="h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden p-0.5 shadow-inner">
                         <div
-                          className={`h-full rounded-full transition-all duration-700 ease-out flex items-center justify-end
-                           ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}
+                          className={`h-full rounded-full transition-all duration-1000 ease-in-out relative
+                            ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500 shadow-lg shadow-blue-500/50' : 'bg-emerald-500 shadow-lg shadow-emerald-500/50'}`}
                           style={{ width: `${student?.progress}%` }}
                         >
-                          {/* Shimmer effect */}
-                          <div className="w-full h-full bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" />
+                          <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
                         </div>
                       </div>
                     </div>
 
-                    <div className="pt-2 border-t flex justify-between items-center text-[11px]">
-                      <Badge variant="outline" className={`border-none ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500/10 text-blue-600' : 'bg-green-500/10 text-green-600'}`}>
-                        {student?.status === 'IN_PROGRESS' ? '● Pending' : '✓ Evaluated'}
-                      </Badge>
-
-                      <div className="flex items-center gap-2">
-                        <Wifi className={`w-3 h-3 ${student?.isOnline !== false ? 'text-emerald-500' : 'text-rose-500'}`} />
-                        <Battery className={`w-3 h-3 ${(student?.batteryLevel ?? 100) > 20 ? 'text-emerald-500' : 'text-rose-500'}`} />
-                        <ShieldCheck className={`w-3 h-3 ${student?.isFocus !== false ? 'text-blue-500' : 'text-amber-500'}`} />
+                    {/* Device Status Bar */}
+                    <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                      <div className="flex gap-3">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`p-1.5 rounded-lg ${(student?.batteryLevel ?? 100) > 20 ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'}`}>
+                                <Battery className="w-3.5 h-3.5" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>Battery: {student?.batteryLevel || 100}%</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={`p-1.5 rounded-lg ${student?.isFocus !== false ? 'bg-blue-500/10 text-blue-600' : 'bg-amber-500/10 text-amber-600'}`}>
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>{student?.isFocus !== false ? 'In Focus - Secure' : 'App Minimized - Warning'}</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </div>
-
-                      <span className="text-muted-foreground font-medium">
+                      <span className="text-[10px] font-bold text-muted-foreground bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">
                         {new Date(student?.lastActive || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </div>
                   </CardContent>
                 </Card>
-              ))}
-            </div>
-          ) : (
-            /* List View */
-            <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
-              <div className="grid grid-cols-12 gap-4 p-4 border-b bg-muted/50 text-xs font-semibold text-muted-foreground uppercase tracking-wider divide-border/50">
-                <div className="col-span-4">Student</div>
-                <div className="col-span-2 text-center">Status</div>
-                <div className="col-span-3">Progress</div>
-                <div className="col-span-2 text-center">Score</div>
-                <div className="col-span-1">Action</div>
               </div>
-              <div className="divide-y divide-border/50">
-                {filteredData.map(student => (
-                  <div key={student?.id} className="grid grid-cols-12 gap-4 p-4 items-center hover:bg-muted/30 transition-colors">
-                    <div className="col-span-4 flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white
-                           ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`}>
-                        {student?.studentName?.substring(0, 2)?.toUpperCase()}
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm text-gray-900">{student?.studentName}</p>
-                        <p className="text-xs text-muted-foreground">Roll: {student?.roll} • {student?.className}</p>
-                      </div>
-                    </div>
-                    <div className="col-span-2 flex justify-center">
-                      <Badge variant="secondary" className={`${student?.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'}`}>
-                        {student?.status === 'IN_PROGRESS' ? 'Pending' : 'Evaluated'}
-                      </Badge>
-                    </div>
-                    <div className="col-span-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-green-500'}`} style={{ width: `${student?.progress}%` }} />
+            ))}
+          </div>
+        ) : (
+          /* List View - Also Premium Glassmorphism */
+          <div className="bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-100/50 dark:bg-slate-800/50 text-[10px] font-black uppercase tracking-widest text-muted-foreground border-b border-white/10">
+                    <th className="px-6 py-4">Student Identity</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4">Progress Monitor</th>
+                    <th className="px-6 py-4 text-center">Live Score</th>
+                    <th className="px-6 py-4 text-right">Metrics</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {filteredData.map(student => (
+                    <tr
+                      key={student?.id}
+                      className="group hover:bg-white/40 dark:hover:bg-slate-800/40 transition-all cursor-pointer"
+                      onClick={() => {
+                        setSelectedLiveStudent(student);
+                        setIsLiveModalOpen(true);
+                      }}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white shadow-lg
+                            ${student?.status === 'IN_PROGRESS' ? 'bg-blue-600' : 'bg-emerald-600'}`}>
+                            {student?.studentName?.substring(0, 1)?.toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-bold text-sm">{student?.studentName}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground">Roll: {student?.roll} • {student?.className}</p>
+                          </div>
                         </div>
-                        <span className="text-xs font-medium w-8 text-right">{student?.progress}%</span>
-                      </div>
-                    </div>
-                    <div className="col-span-2 text-center text-sm font-medium">
-                      {student?.score}
-                    </div>
-                    <div className="col-span-1 flex gap-1 justify-end">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-700"
-                        title="Open Review Session"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const questions = liveStats?.defaultQuestions || [];
-                          if (!questions.length) return toast.error("No questions found");
-
-                          const sessionData = (questions || [])?.map((q: any) => {
-                            const ans = student?.answers ? student?.answers?.[q?.id] : null;
-                            let status: 'correct' | 'wrong' | 'unanswered' = 'unanswered';
-                            let userIdx = null;
-
-                            if (ans !== undefined && ans !== null) {
-                              const correctOpt = q?.options?.find((o: any) => o?.isCorrect);
-                              const isCorrect = correctOpt && (
-                                (typeof ans === 'number' && q?.options?.[ans]?.text === correctOpt?.text) ||
-                                (ans === correctOpt?.text)
-                              );
-                              status = isCorrect ? 'correct' : 'wrong';
-
-                              if ((q?.type || "").toUpperCase() === 'MCQ' && q?.options) {
-                                userIdx = typeof ans === 'number' ? ans : (q?.options?.findIndex((o: any) => o?.text === ans) ?? -1);
-                              }
-                            }
-                            return { ...q, status, userAnswer: userIdx };
-                          });
-                          const sessionPayload = {
-                            questions: sessionData,
-                            examName: liveStats?.examName || "Review Session"
-                          };
-                          localStorage.setItem("review-session-data", JSON.stringify(sessionPayload));
-                          window.open('/problem-solving/session?mode=review', '_blank');
-                        }}
-                      >
-                        <MonitorPlay className="w-4 h-4" />
-                      </Button>
-                      <Button variant="ghost" size="sm" onClick={() => { setSelectedLiveStudent(student); setIsLiveModalOpen(true); }} className="h-8 w-8 p-0">
-                        <Maximize2 className="w-4 h-4 text-muted-foreground" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase
+                          ${student?.status === 'IN_PROGRESS' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full mr-2 ${student?.status === 'IN_PROGRESS' ? 'bg-blue-500' : 'bg-emerald-500'} animate-pulse`}></span>
+                          {student?.status === 'IN_PROGRESS' ? 'Live' : 'Done'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 min-w-[200px]">
+                        <div className="space-y-1">
+                          <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-primary rounded-full transition-all duration-1000" style={{ width: `${student?.progress}%` }} />
+                          </div>
+                          <div className="flex justify-between text-[9px] font-bold text-muted-foreground uppercase">
+                            <span>{student?.answered} / {student?.totalQuestions} Q</span>
+                            <span>{student?.progress}%</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <div className="inline-block px-3 py-1 bg-primary/10 rounded-lg">
+                          <p className="font-black text-lg text-primary">{student?.score}</p>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3 text-muted-foreground">
+                          <Battery className={`w-4 h-4 ${(student?.batteryLevel ?? 100) > 20 ? 'text-emerald-500' : 'text-rose-500'}`} />
+                          <ShieldCheck className={`w-4 h-4 ${student?.isFocus !== false ? 'text-blue-500' : 'text-amber-500'}`} />
+                          <ArrowRight className="w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )
-        }
+          </div>
+        )}
 
 
         {/* Detailed View Modal */}
@@ -968,7 +921,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+      </div >
     );
   };
 
