@@ -8,6 +8,7 @@ import { createToken, JWTPayload } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
+import { ApprovalRequestEmail } from '@/components/emails/ApprovalRequestEmail';
 import { sendEmail } from '@/lib/email';
 
 /**
@@ -217,6 +218,43 @@ export async function POST(request: NextRequest) {
                 });
             } catch (emailError) {
                 console.error('Failed to send verification email:', emailError);
+            }
+        }
+
+        // Send Approval Request Email to Super Admin if student signed up with phone
+        if (user.role === UserRole.STUDENT && user.phone && !user.isApproved) {
+            try {
+                // Find Super Admin email
+                const superAdmin = await (prismadb.user as any).findFirst({
+                    where: { role: 'SUPER_USER' },
+                    select: { email: true }
+                });
+
+                if (superAdmin?.email) {
+                    // Fetch institute data if associated
+                    let institute = undefined;
+                    if (user.instituteId) {
+                        const inst = await (prismadb.institute as any).findUnique({
+                            where: { id: user.instituteId },
+                            select: { name: true, address: true, phone: true, logoUrl: true }
+                        });
+                        if (inst) institute = inst;
+                    }
+
+                    await sendEmail({
+                        to: superAdmin.email,
+                        subject: `New Student Approval Required - ${user.name}`,
+                        react: ApprovalRequestEmail({
+                            studentName: user.name,
+                            studentPhone: user.phone,
+                            studentClass: validatedData.class,
+                            studentSection: validatedData.section,
+                            institute: institute as any,
+                        }) as any,
+                    });
+                }
+            } catch (adminEmailError) {
+                console.error('Failed to send admin notification email:', adminEmailError);
             }
         }
 
