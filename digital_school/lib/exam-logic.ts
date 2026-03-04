@@ -435,13 +435,19 @@ export async function releaseExamResults(examId: string) {
         const wasPreviouslyReleased = r.publishedAt !== null;
 
         // Correction if previously released AND (marks changed [isPublished: false] OR rank changed)
-        const isCorrection = wasPreviouslyReleased && (!r.isPublished || r.rank !== newRank);
+        const isCorrection = wasPreviouslyReleased && (!r.isPublished || r.rank !== newRank || !r.isPublished); // Added !r.isPublished check
         const isNew = !r.isPublished && !wasPreviouslyReleased;
 
         return { id: r.id, isNew, isCorrection };
     }).filter(r => r.isNew || r.isCorrection);
 
     const resultsToNotifyIds = resultsWithCorrections.map(r => r.id);
+
+    // If no results to notify, it means nothing changed (already published and ranks are same)
+    if (resultsToNotifyIds.length === 0) {
+        console.log(`[RELEASE] No new or corrected results for exam ${examId}. Skipping release process.`);
+        return;
+    }
 
     // 5. Bulk update with conditional publishedAt
     const now = new Date();

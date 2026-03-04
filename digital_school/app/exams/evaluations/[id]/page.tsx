@@ -122,6 +122,7 @@ interface StudentSubmission {
     cqMarks: number;
     sqMarks: number;
     total: number;
+    isPublished?: boolean;
   };
 }
 
@@ -1974,14 +1975,20 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       )}
                     </Button>
                     {isSuperUser && (
-                      <Button
-                        onClick={releaseResults}
-                        className="bg-green-600 hover:bg-green-700 w-full sm:w-auto"
-                        title="Release results to make them visible to students"
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" />
-                        Release Results
-                      </Button>
+                      (() => {
+                        const allPublished = exam?.submissions?.length > 0 && exam.submissions.every(s => s.result?.isPublished);
+                        return (
+                          <Button
+                            onClick={releaseResults}
+                            disabled={allPublished}
+                            className={`${allPublished ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} w-full sm:w-auto`}
+                            title={allPublished ? "Results have already been released" : "Release results to make them visible to students"}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            {allPublished ? 'Results Released' : 'Release Results'}
+                          </Button>
+                        );
+                      })()
                     )}
                   </div>
                 </div>

@@ -42,7 +42,8 @@ export async function GET(
         mcqMarks: true,
         cqMarks: true,
         sqMarks: true,
-        total: true
+        total: true,
+        isPublished: true
       }
     });
 
@@ -315,7 +316,8 @@ export async function GET(
             mcqMarks: evaluation.mcqMarks,
             cqMarks: evaluation.cqMarks,
             sqMarks: evaluation.sqMarks,
-            total: evaluation.totalScore
+            total: evaluation.totalScore,
+            isPublished: studentResultMap.get(submission.studentId)?.isPublished || false
           },
           submissionStatus: submission.status
         });

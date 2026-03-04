@@ -47,6 +47,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Exam not found" }, { status: 404 });
     }
 
+    // Early Check: If all results are already published, skip everything
+    const allPublished = exam.results.length > 0 && exam.results.every(r => r.isPublished);
+    if (allPublished) {
+      return NextResponse.json({
+        success: true,
+        message: "Results are already released and up to date.",
+        alreadyPublished: true
+      });
+    }
+
     // Close all pending review requests for this exam
     const updatedReviews = await (prisma as any).resultReview.updateMany({
       where: {
