@@ -24,9 +24,14 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       algorithms: [JWT_ALGORITHM],
     });
 
+    if (!payload) {
+      console.warn('[AUTH] jwtVerify returned no payload');
+      return null;
+    }
+
     return payload as unknown as JWTPayload;
-  } catch (error) {
-    console.error('Token verification failed:', error);
+  } catch (error: any) {
+    console.warn('[AUTH] Token verification failed:', error.message);
     return null;
   }
 }
@@ -34,8 +39,14 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
 // Validate session status
 export async function validateSession(token: string) {
   try {
+    console.log('[AUTH] Validating session token...');
     const payload = await verifyToken(token);
-    if (!payload) return { status: 'invalid' };
+    if (!payload) {
+      console.warn('[AUTH] No payload returned from verifyToken');
+      return { status: 'invalid' };
+    }
+
+    console.log('[AUTH] Payload verified for user:', payload.userId);
 
     // Defensive check for database query
     let user: any;

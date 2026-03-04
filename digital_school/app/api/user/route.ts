@@ -7,9 +7,15 @@ import { WelcomeEmail } from "@/components/emails/WelcomeEmail";
 
 export async function GET(request: NextRequest) {
   try {
+    const url = new URL(request.url);
+    const all = url.searchParams.get('all') === 'true';
+
+    console.log('[API_USER] GET request, all:', all);
+
     const authData = await getTokenFromRequest(request);
 
     if (!authData) {
+      console.warn('[API_USER] No auth data found');
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
@@ -20,46 +26,65 @@ export async function GET(request: NextRequest) {
     const prismadb = await getDatabaseClient();
 
     // If ?all=true and admin/super_user, return all users
-    const url = new URL(request.url);
-    const all = url.searchParams.get('all');
-    if (all === 'true' && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
-      const users = await (prismadb.user as any).findMany({
-        include: {
-          studentProfile: {
-            select: {
-              roll: true,
-              class: { select: { name: true, section: true } }
+    if (all && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
+      try {
+        const users = await (prismadb.user as any).findMany({
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            isActive: true,
+            emailVerified: true,
+            isApproved: true,
+            pendingEmail: true,
+            pendingPhone: true,
+            studentProfile: {
+              select: {
+                roll: true,
+                class: { select: { name: true, section: true } }
+              }
             }
-          }
-        }
-      });
-      return NextResponse.json({
-        users: users.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          phone: u.phone || '',
-          role: u.role,
-          isActive: u.isActive,
-          emailVerified: u.emailVerified,
-          isApproved: u.isApproved,
-          pendingEmail: u.pendingEmail,
-          pendingPhone: u.pendingPhone,
-          class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
-          section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
-          roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
-        }))
-      });
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        return NextResponse.json({
+          users: users.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            role: u.role,
+            isActive: u.isActive,
+            emailVerified: u.emailVerified,
+            isApproved: u.isApproved,
+            pendingEmail: u.pendingEmail,
+            pendingPhone: u.pendingPhone,
+            class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
+            section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
+            roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
+          }))
+        });
+      } catch (dbError: any) {
+        console.error('[API_USER] findMany failed:', dbError.message);
+        // Fallback to even more minimal results if it fails
+        const minimalUsers = await (prismadb.user as any).findMany({
+          select: { id: true, name: true, email: true, role: true }
+        });
+        return NextResponse.json({ users: minimalUsers, warning: 'Partial data returned due to database error' });
+      }
     }
 
     return NextResponse.json({
       user: authData.user,
     });
-  } catch (error) {
-    console.error("Get user error:", error);
+  } catch (error: any) {
+    console.error("Get user error:", error.message);
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", message: error.message },
       { status: 500 }
     );
   }

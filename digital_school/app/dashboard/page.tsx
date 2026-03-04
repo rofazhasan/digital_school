@@ -5,14 +5,14 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  User, 
-  GraduationCap, 
-  BookOpen, 
-  Users, 
-  Settings, 
+import {
+  User,
+  GraduationCap,
+  BookOpen,
+  Users,
+  Settings,
   LogOut,
-  ArrowRight 
+  ArrowRight
 } from "lucide-react";
 
 interface User {
@@ -47,15 +47,23 @@ export default function DashboardPage() {
   useEffect(() => {
     // Fetch current user data
     fetch('/api/user')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) {
+          console.error('API /api/user returned status:', res.status);
+          throw new Error('API failure');
+        }
+        return res.json();
+      })
       .then(data => {
-        if (data.user) {
+        if (data && data.user) {
           setUser(data.user);
         } else {
+          console.warn('Invalid user data received:', data);
           router.push('/login');
         }
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Dashboard fetch error:', error);
         router.push('/login');
       })
       .finally(() => {
@@ -74,7 +82,7 @@ export default function DashboardPage() {
 
   const getRoleDashboard = () => {
     if (!user) return '/login';
-    
+
     switch (user.role) {
       case 'SUPER_USER':
         return '/super-user/dashboard';
@@ -244,8 +252,8 @@ export default function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button 
-              className="w-full" 
+            <Button
+              className="w-full"
               onClick={() => router.push(getRoleDashboard())}
             >
               Go to {user.role.replace('_', ' ')} Dashboard
