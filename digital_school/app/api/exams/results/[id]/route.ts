@@ -288,6 +288,17 @@ export async function GET(
             }
             calculatedMarks = isCorrect ? maxMarks : (exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0);
           }
+        } else if (type === 'MC') {
+          const mcAnswer = studentAnswer;
+          if (mcAnswer !== undefined && mcAnswer !== null) {
+            const mcAns = typeof mcAnswer === 'object' && mcAnswer !== null && Array.isArray((mcAnswer as any).selectedOptions)
+              ? mcAnswer as { selectedOptions: number[] }
+              : { selectedOptions: Array.isArray(mcAnswer) ? mcAnswer : [] };
+            calculatedMarks = evaluateMCQuestion(question as any, mcAns, {
+              negativeMarking: exam.mcqNegativeMarking || 0,
+              partialMarking: true
+            });
+          }
         } else if (type === 'SMCQ') {
           calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
         } else if (type === 'INT' || type === 'NUMERIC') {
@@ -316,7 +327,16 @@ export async function GET(
         options: question.options || [],
         subQuestions: processedSubQuestions,
         modelAnswer: question.modelAnswer || "",
-        explanation: question.explanation || ""
+        explanation: question.explanation || "",
+        // AR fields
+        assertion: question.assertion || null,
+        reason: question.reason || null,
+        // MTF fields
+        leftColumn: question.leftColumn || null,
+        rightColumn: question.rightColumn || null,
+        matches: question.matches || null,
+        correctAnswer: question.correctAnswer !== undefined ? question.correctAnswer : (question.correctOption !== undefined ? question.correctOption : null),
+        correctOption: question.correctOption !== undefined ? question.correctOption : null,
       };
     });
 
