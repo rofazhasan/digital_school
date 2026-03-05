@@ -229,11 +229,11 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             let res: any = null;
 
             if (type === 'MCQ') {
-                if (!studentAnswer) continue;
+                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
 
                 // Use a simplified version of MC evaluation for MCQ or just direct check
                 // For MCQ (single choice), it's stored as a string or index
-                const normalize = (s: string | number | undefined | null) => String(s || '').trim().toLowerCase();
+                const normalize = (s: string | number | undefined | null) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
@@ -288,7 +288,10 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 let subAttemptCount = 0;
                 subQs.forEach((subQ: SubQuestion, sIdx: number) => {
                     const subAnswer = answers[`${question.id}_sub_${sIdx}`] as any;
-                    if (subAnswer === undefined || subAnswer === null || subAnswer === '') return;
+                    if (subAnswer === undefined || subAnswer === null || subAnswer === '') {
+                        answers[`${question.id}_sub_${sIdx}_marks`] = 0;
+                        return;
+                    }
 
                     subAttemptCount++;
                     const normalize = (s: string | number | undefined | null) => String(s || '').trim().toLowerCase();
@@ -315,9 +318,15 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                     }
 
                     if (isSubCorrect) {
-                        smcqScore += Number(subQ.marks) || 1;
+                        const sMark = Number(subQ.marks) || 1;
+                        smcqScore += sMark;
+                        answers[`${question.id}_sub_${sIdx}_marks`] = sMark;
                     } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                        smcqScore -= ((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+                        const negMark = -((Number(subQ.marks || 1) * exam.mcqNegativeMarking) / 100);
+                        smcqScore += negMark;
+                        answers[`${question.id}_sub_${sIdx}_marks`] = negMark;
+                    } else {
+                        answers[`${question.id}_sub_${sIdx}_marks`] = 0;
                     }
                 });
                 questionScore = smcqScore;
@@ -340,6 +349,9 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 mcqMarks += questionScore;
                 totalScore += questionScore;
                 evaluationResult[question.id] = { ...res, type };
+
+                // PERSIST MARKS in answers JSON for results view
+                answers[`${question.id}_marks`] = questionScore;
             }
         }
     }
@@ -362,6 +374,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
         await prisma.examSubmission.update({
             where: { id: submission.id },
             data: {
+                answers: answers as any, // Include populated _marks
                 score: totalScore, // Keep score for backward compatibility
                 status: SubmissionStatus.SUBMITTED,
                 objectiveStatus: SubmissionStatus.SUBMITTED,

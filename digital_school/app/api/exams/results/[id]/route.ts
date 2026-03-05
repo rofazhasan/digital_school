@@ -151,15 +151,27 @@ export async function GET(
 
         const type = (question.type || '').toUpperCase();
         let awardedMarks = 0;
-        let isCorrect = false;
+
+        // Populate sub-questions if they exist (SMCQ, etc.)
+        let processedSubQuestions: any[] = [];
+        const rawSubQuestions = question.subQuestions || question.sub_questions || [];
+
+        if (rawSubQuestions.length > 0) {
+          processedSubQuestions = rawSubQuestions.map((subQ: any, subIdx: number) => {
+            const subAwardedMarks = Number((studentAnswers as any)[`${questionId}_sub_${subIdx}_marks`]);
+            const subTotalMarks = Number(subQ.marks) || 0;
+            return {
+              ...subQ,
+              studentAnswer: (studentAnswers as any)[`${questionId}_sub_${subIdx}`],
+              awardedMarks: isNaN(subAwardedMarks) ? 0 : subAwardedMarks,
+              isCorrect: !isNaN(subAwardedMarks) && subAwardedMarks >= subTotalMarks && subTotalMarks > 0
+            };
+          });
+        }
 
         // Simplified awarded marks selection (prioritize DB if available)
         if (['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'SMCQ'].includes(type)) {
-          // Re-evaluate or use stored marks? 
-          // For results view, we should ideally use the stored marks for consistency, 
-          // but the current API re-evaluates. Let's keep a simplified re-evaluation.
           awardedMarks = Number((studentAnswers as any)[`${questionId}_marks`]) || 0;
-          // ... (keep the complex logic if absolutely necessary, but here we prioritize speed)
         } else {
           awardedMarks = Number((studentAnswers as any)[`${questionId}_marks`]) || 0;
         }
@@ -176,6 +188,7 @@ export async function GET(
           drawingData,
           allDrawings,
           options: question.options || [],
+          subQuestions: processedSubQuestions,
           modelAnswer: question.modelAnswer || "",
           explanation: question.explanation || ""
         };

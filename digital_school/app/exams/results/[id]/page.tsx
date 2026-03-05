@@ -1644,7 +1644,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   </div>
                                                 </div>
 
-                                                {subQ.studentAnswer && (
+                                                {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
                                                   <div className={cn(
                                                     "px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border whitespace-nowrap",
                                                     subQ.isCorrect
@@ -1659,8 +1659,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {(subQ.options || []).map((opt: any, oi: number) => {
                                                   const optText = typeof opt === 'object' ? opt.text : opt;
-                                                  const isSelected = String(subQ.studentAnswer) === String(optText);
-                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && (String(subQ.correctAnswer) === String(optText) || Number(subQ.correctAnswer) === oi)));
+                                                  const isSelected = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && String(subQ.studentAnswer).trim() === String(optText).trim();
+                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null && (String(subQ.correctAnswer).trim() === String(optText).trim() || Number(subQ.correctAnswer) === oi)));
 
                                                   let style = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
                                                   let icon = null;
@@ -1842,7 +1842,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           <div className="flex items-center gap-4">
                                             <div className="text-sm font-bold text-gray-600">
                                               Your Answer:
-                                              {(question.studentAnswer as any)?.answer !== undefined || (typeof question.studentAnswer === 'string' && question.studentAnswer) ? (
+                                              {((question.studentAnswer as any)?.answer !== undefined || (question.studentAnswer !== undefined && question.studentAnswer !== null && question.studentAnswer !== '')) ? (
                                                 <span className={`ml-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
                                                   {(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : question.studentAnswer}
                                                 </span>
