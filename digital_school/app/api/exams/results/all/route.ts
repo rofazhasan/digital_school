@@ -71,6 +71,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
+                date: true,
                 passMarks: true,
                 cqRequiredQuestions: true,
                 sqRequiredQuestions: true,
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
               select: {
                 id: true,
                 name: true,
+                date: true,
                 passMarks: true,
                 cqRequiredQuestions: true,
                 sqRequiredQuestions: true,
