@@ -42,7 +42,8 @@ import {
   Sparkles,
   Search,
   Zap,
-  Calendar
+  Calendar,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -1773,6 +1774,42 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   );
                                                 })}
                                               </div>
+
+                                              {/* Sub-question Uploaded Images (Isolated) */}
+                                              {subQ.studentImages && subQ.studentImages.length > 0 && (
+                                                <div className="mt-4 p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 shadow-sm relative overflow-hidden group">
+                                                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:rotate-12 transition-transform">
+                                                    <ImageIcon className="h-10 w-10 text-emerald-500" />
+                                                  </div>
+                                                  <div className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/50 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                                    Visual Evidence (Part {subIdx + 1})
+                                                  </div>
+                                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                    {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
+                                                      const annotation = subQ.allDrawings?.find((d: any) => d.originalImagePath === imageUrl || d.imageIndex === imgIdx);
+                                                      return (
+                                                        <div
+                                                          key={imgIdx}
+                                                          className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm hover:shadow-xl transition-all"
+                                                          onClick={() => handleImageZoom(imageUrl, `Question ${globalIndex + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, annotation)}
+                                                        >
+                                                          <img src={imageUrl} alt={`Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                          {annotation && (
+                                                            <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
+                                                          )}
+                                                          {annotation && (
+                                                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg ring-2 ring-white animate-bounce-subtle">
+                                                              <Zap className="h-2 w-2 fill-white" /> ANNOTATED
+                                                            </div>
+                                                          )}
+                                                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
@@ -2078,45 +2115,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
 
                             {/* Pagination Controls */}
-                            {totalPages > 1 && (
-                              <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (currentPage > 1) {
-                                      setCurrentPage(curr => curr - 1);
-                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                    }
-                                  }}
-                                  disabled={currentPage === 1}
-                                  className="w-24"
-                                >
-                                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                                </Button>
+                            {
+                              totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (currentPage > 1) {
+                                        setCurrentPage(curr => curr - 1);
+                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }
+                                    }}
+                                    disabled={currentPage === 1}
+                                    className="w-24"
+                                  >
+                                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                  </Button>
 
-                                <div className="flex items-center gap-1 mx-4">
-                                  <span className="text-sm font-medium text-gray-600">
-                                    Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
-                                  </span>
+                                  <div className="flex items-center gap-1 mx-4">
+                                    <span className="text-sm font-medium text-gray-600">
+                                      Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
+                                    </span>
+                                  </div>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (currentPage < totalPages) {
+                                        setCurrentPage(curr => curr + 1);
+                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }
+                                    }}
+                                    disabled={currentPage === totalPages}
+                                    className="w-24"
+                                  >
+                                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                                  </Button>
                                 </div>
-
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (currentPage < totalPages) {
-                                      setCurrentPage(curr => curr + 1);
-                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                    }
-                                  }}
-                                  disabled={currentPage === totalPages}
-                                  className="w-24"
-                                >
-                                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
-                              </div>
-                            )}
+                              )
+                            }
                           </div>
                         );
                       })()}
@@ -2206,28 +2245,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       )}
                                     </div>
 
-                                    {/* Student Answer Images */}
-                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
-                                              <div
-                                                key={imgIdx}
-                                                className="relative group cursor-pointer"
-                                                onClick={() => {
-                                                  const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
-                                                  handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, annotation);
-                                                }}
-                                              >
-                                                <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
-                                              </div>
-                                            ))}
+                                    {/* Student Answer Images - Only show if not CQ/SQ with sub-questions */}
+                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && !(
+                                      (question.type === 'CQ' || question.type === 'SQ') &&
+                                      (question.subQuestions || question.sub_questions || []).length > 0
+                                    ) && (
+                                        <div className="mb-4">
+                                          <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
+                                          <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                              {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
+                                                <div
+                                                  key={imgIdx}
+                                                  className="relative group cursor-pointer"
+                                                  onClick={() => {
+                                                    const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+                                                    handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, annotation);
+                                                  }}
+                                                >
+                                                  <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
                                     {/* Sub-questions breakdown for CQ */}
                                     {(question.subQuestions || question.sub_questions) && (question.subQuestions || question.sub_questions || []).length > 0 && (
@@ -2274,8 +2316,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 </div>
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                   {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
-                                                    const annotation = question.allDrawings?.find(d =>
-                                                      d.originalImagePath === imageUrl || (d.imageIndex === imgIdx && (question.type === 'CQ' || question.type === 'SQ'))
+                                                    const annotation = subQ.allDrawings?.find((d: any) =>
+                                                      d.originalImagePath === imageUrl || d.imageIndex === imgIdx
                                                     );
                                                     return (
                                                       <div
@@ -2505,209 +2547,211 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Modals and Print Utility */}
-      {result && (
-        <>
-          {/* Review Request Modal */}
-          <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  Request Mark Review
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Explain why you think your marks should be reviewed:
-                  </label>
-                  <Textarea
-                    value={studentComment}
-                    onChange={(e) => setStudentComment(e.target.value)}
-                    placeholder="Please provide specific details about which questions you think were marked incorrectly and why..."
-                    rows={6}
-                    className="w-full"
-                  />
-                </div>
-                <div className="text-sm text-blue-800 dark:text-blue-200 bg-blue-500/10 dark:bg-blue-500/20 p-3 rounded-lg border border-blue-500/20">
-                  <div className="font-bold mb-1">Review Process:</div>
-                  <ul className="list-disc list-inside space-y-1 opacity-90">
-                    <li>Your request will be sent to the teacher/evaluator</li>
-                    <li>They will review your submission and comment</li>
-                    <li>You&apos;ll be notified when the review is complete</li>
-                    <li>Marks may be adjusted if errors are found</li>
-                  </ul>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowReviewModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={submitReviewRequest}
-                    disabled={submittingReview || !studentComment.trim()}
-                    className="bg-yellow-600 hover:bg-yellow-700"
-                  >
-                    {submittingReview ? 'Submitting...' : 'Submit Review Request'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Zoom Modal */}
-          <Dialog open={showZoomModal} onOpenChange={setShowZoomModal}>
-            <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-950/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-[2.5rem]">
-              <DialogHeader className="p-6 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
-                <div className="flex flex-col gap-1">
-                  <DialogTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                    <Eye className="w-5 h-5 text-indigo-400" />
-                    {zoomedImageTitle}
+      {
+        result && (
+          <>
+            {/* Review Request Modal */}
+            <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Request Mark Review
                   </DialogTitle>
-                  <DialogDescription className="text-[10px] text-white/40 uppercase font-black tracking-[0.2em] flex items-center gap-2">
-                    Result Explorer <Search className="w-2.5 h-2.5" /> Subjective Detail
-                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">
+                      Explain why you think your marks should be reviewed:
+                    </label>
+                    <Textarea
+                      value={studentComment}
+                      onChange={(e) => setStudentComment(e.target.value)}
+                      placeholder="Please provide specific details about which questions you think were marked incorrectly and why..."
+                      rows={6}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 bg-blue-500/10 dark:bg-blue-500/20 p-3 rounded-lg border border-blue-500/20">
+                    <div className="font-bold mb-1">Review Process:</div>
+                    <ul className="list-disc list-inside space-y-1 opacity-90">
+                      <li>Your request will be sent to the teacher/evaluator</li>
+                      <li>They will review your submission and comment</li>
+                      <li>You&apos;ll be notified when the review is complete</li>
+                      <li>Marks may be adjusted if errors are found</li>
+                    </ul>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowReviewModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={submitReviewRequest}
+                      disabled={submittingReview || !studentComment.trim()}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {submittingReview ? 'Submitting...' : 'Submit Review Request'}
+                    </Button>
+                  </div>
                 </div>
+              </DialogContent>
+            </Dialog>
 
-                <div className="flex items-center gap-3">
-                  {showComparison && (
-                    <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant={!annotatedImageFailed ? "secondary" : "ghost"}
-                        onClick={() => setAnnotatedImageFailed(false)}
-                        className={cn(
-                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
-                          !annotatedImageFailed ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-600" : "text-white/60 hover:text-white"
-                        )}
+            {/* Zoom Modal */}
+            <Dialog open={showZoomModal} onOpenChange={setShowZoomModal}>
+              <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-950/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-[2.5rem]">
+                <DialogHeader className="p-6 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
+                  <div className="flex flex-col gap-1">
+                    <DialogTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                      <Eye className="w-5 h-5 text-indigo-400" />
+                      {zoomedImageTitle}
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] text-white/40 uppercase font-black tracking-[0.2em] flex items-center gap-2">
+                      Result Explorer <Search className="w-2.5 h-2.5" /> Subjective Detail
+                    </DialogDescription>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {showComparison && (
+                      <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant={!annotatedImageFailed ? "secondary" : "ghost"}
+                          onClick={() => setAnnotatedImageFailed(false)}
+                          className={cn(
+                            "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                            !annotatedImageFailed ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-600" : "text-white/60 hover:text-white"
+                          )}
+                        >
+                          <Zap className="w-3.5 h-3.5 mr-2 fill-current" /> Teacher Feedback
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={annotatedImageFailed ? "secondary" : "ghost"}
+                          onClick={() => setAnnotatedImageFailed(true)}
+                          className={cn(
+                            "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                            annotatedImageFailed ? "bg-slate-700 text-white shadow-lg" : "text-white/60 hover:text-white"
+                          )}
+                        >
+                          <User className="w-3.5 h-3.5 mr-2" /> Original Response
+                        </Button>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setShowZoomModal(false);
+                        setZoomedImage('');
+                        setZoomedImageTitle('');
+                        setAnnotatedImageFailed(false);
+                        setOriginalImageFallback('');
+                      }}
+                      className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all border border-white/10 group"
+                      aria-label="Close zoom"
+                    >
+                      <XCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
+                    </button>
+                  </div>
+                </DialogHeader>
+
+                <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
+                  {isApplyingDrawing ? (
+                    <div className="flex flex-col items-center gap-4 text-white/60">
+                      <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                      <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
+                    </div>
+                  ) : (
+                    <div className="relative max-w-full max-h-full">
+                      {/* Floating Hint */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
                       >
-                        <Zap className="w-3.5 h-3.5 mr-2 fill-current" /> Teacher Feedback
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={annotatedImageFailed ? "secondary" : "ghost"}
-                        onClick={() => setAnnotatedImageFailed(true)}
-                        className={cn(
-                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
-                          annotatedImageFailed ? "bg-slate-700 text-white shadow-lg" : "text-white/60 hover:text-white"
-                        )}
-                      >
-                        <User className="w-3.5 h-3.5 mr-2" /> Original Response
-                      </Button>
+                        Pinch or scroll to zoom • Click and drag to pan
+                      </motion.div>
+
+                      <img
+                        src={annotatedImageFailed ? originalImageFallback : zoomedImage}
+                        alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
+                        className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
+                        onError={() => {
+                          if (!annotatedImageFailed && originalImageFallback) {
+                            setAnnotatedImageFailed(true);
+                          }
+                        }}
+                      />
+
+                      {/* Badge Overlay */}
+                      <div className="absolute top-6 left-6 pointer-events-none">
+                        <div className={cn(
+                          "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
+                          annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
+                        )}>
+                          {annotatedImageFailed ? (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
-
-                  <button
-                    onClick={() => {
-                      setShowZoomModal(false);
-                      setZoomedImage('');
-                      setZoomedImageTitle('');
-                      setAnnotatedImageFailed(false);
-                      setOriginalImageFallback('');
-                    }}
-                    className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all border border-white/10 group"
-                    aria-label="Close zoom"
-                  >
-                    <XCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                  </button>
                 </div>
-              </DialogHeader>
 
-              <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
-                {isApplyingDrawing ? (
-                  <div className="flex flex-col items-center gap-4 text-white/60">
-                    <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-                    <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
-                  </div>
-                ) : (
-                  <div className="relative max-w-full max-h-full">
-                    {/* Floating Hint */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
-                    >
-                      Pinch or scroll to zoom • Click and drag to pan
-                    </motion.div>
-
-                    <img
-                      src={annotatedImageFailed ? originalImageFallback : zoomedImage}
-                      alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
-                      className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
-                      onError={() => {
-                        if (!annotatedImageFailed && originalImageFallback) {
-                          setAnnotatedImageFailed(true);
-                        }
-                      }}
-                    />
-
-                    {/* Badge Overlay */}
-                    <div className="absolute top-6 left-6 pointer-events-none">
-                      <div className={cn(
-                        "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
-                        annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
-                      )}>
-                        {annotatedImageFailed ? (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
-                          </>
-                        )}
+                <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                      <Camera className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase tracking-wider">Submission Quality</div>
+                      <div className="text-[10px] text-white/40 flex items-center gap-2">
+                        Verified by System <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                    <Camera className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white uppercase tracking-wider">Submission Quality</div>
-                    <div className="text-[10px] text-white/40 flex items-center gap-2">
-                      Verified by System <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
-                    </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">Exam Reference</div>
+                    <div className="text-xs font-mono text-indigo-300">#{id.slice(-8).toUpperCase()}</div>
                   </div>
                 </div>
+              </DialogContent>
+            </Dialog>
 
-                <div className="text-right">
-                  <div className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">Exam Reference</div>
-                  <div className="text-xs font-mono text-indigo-300">#{id.slice(-8).toUpperCase()}</div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Hidden Print Component */}
-          <div style={{ display: 'none' }}>
-            {printData && (
-              <MarkedQuestionPaper
-                ref={printRef}
-                examInfo={printData.examInfo}
-                questions={printData.questions}
-                submission={printData.submission}
-                rank={result.result?.rank}
-                totalStudents={result.statistics.totalStudents}
-                qrData={{
-                  id: result.submission.id,
-                  student: result.student.name,
-                  exam: result.exam.name,
-                  score: result.submission.score
-                }}
-              />
-            )}
-          </div>
-        </>
-      )}
-    </MathJaxContext>
+            {/* Hidden Print Component */}
+            <div style={{ display: 'none' }}>
+              {printData && (
+                <MarkedQuestionPaper
+                  ref={printRef}
+                  examInfo={printData.examInfo}
+                  questions={printData.questions}
+                  submission={printData.submission}
+                  rank={result.result?.rank}
+                  totalStudents={result.statistics.totalStudents}
+                  qrData={{
+                    id: result.submission.id,
+                    student: result.student.name,
+                    exam: result.exam.name,
+                    score: result.submission.score
+                  }}
+                />
+              )}
+            </div>
+          </>
+        )
+      }
+    </MathJaxContext >
   );
 }

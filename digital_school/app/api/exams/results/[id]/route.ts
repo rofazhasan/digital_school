@@ -210,8 +210,10 @@ export async function GET(
           if ((studentAnswers as any)[`${subId}_image`]) subImages.push((studentAnswers as any)[`${subId}_image`]);
           if (Array.isArray((studentAnswers as any)[`${subId}_images`])) subImages.push(...(studentAnswers as any)[`${subId}_images`]);
 
-          // MAP SUB-QUESTION DRAWINGS
-          const subDrawingsForPart = allDrawings.filter(d => d.imageIndex === subIdx);
+          // MAP SUB-QUESTION DRAWINGS (Match by original path for accuracy)
+          const subDrawingsForPart = allDrawings.filter(d =>
+            subImages.includes(d.originalImagePath) || d.imageIndex === subIdx
+          );
 
           // Try pre-calculated marks
           let subAwarded = (studentAnswers as any)[`${subId}_marks`];

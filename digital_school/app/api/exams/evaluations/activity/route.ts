@@ -98,6 +98,9 @@ export async function GET(req: NextRequest) {
             const lastActiveDate = new Date(lastActive);
             const isIdle = sub.status === 'IN_PROGRESS' && (new Date().getTime() - lastActiveDate.getTime()) > 5 * 60 * 1000;
 
+            // Stable start time
+            let startedAt = sub.objectiveStartedAt || sub.cqSqStartedAt || sub.createdAt || lastActiveDate;
+
             return {
                 id: sub.id,
                 examId: sub.exam?.id || '',
@@ -114,12 +117,14 @@ export async function GET(req: NextRequest) {
                 score,
                 maxScore: sub.exam?.totalMarks || 100,
                 updatedAt: lastActiveDate.toISOString(),
+                startedAt: new Date(startedAt).toISOString(),
                 isIdle
             };
         });
 
-        // Sort by recent activity locally since we fetched by 'id' descending to get newly created ones
-        activityData.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+        // SORT BY START TIME DESCENDING (MOST RECENT STARTS AT TOP)
+        // This makes the UI stable as startedAt never changes
+        activityData.sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime());
 
         return NextResponse.json({ activity: activityData });
 
