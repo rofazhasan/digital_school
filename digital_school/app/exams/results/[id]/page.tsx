@@ -52,6 +52,7 @@ import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
+import { hasStudentAnswered, isAnswerCorrect } from "@/lib/exam-result-utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -1332,14 +1333,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Accuracy</p>
                               <p className="text-lg font-black">
                                 {(() => {
-                                  const answered = result.questions.filter(q => {
-                                    const type = (q.type || "").toUpperCase();
-                                    if (type === 'SMCQ') {
-                                      return (q.subQuestions || q.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided');
-                                    }
-                                    return q.studentAnswer && q.studentAnswer !== 'No answer provided';
-                                  }).length;
-                                  const correct = result.questions.filter(q => q.isCorrect).length;
+                                  const answered = result.questions.filter(q => hasStudentAnswered(q.type, q.studentAnswer, q.subQuestions || q.sub_questions)).length;
+                                  const correct = result.questions.filter(q => isAnswerCorrect(q.awardedMarks, q.marks)).length;
                                   return answered > 0 ? ((correct / answered) * 100).toFixed(0) : '0';
                                 })()}%
                               </p>
@@ -1548,10 +1543,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
 
-                          const hasAnswer = type === 'SMCQ'
-                            ? (q.subQuestions || q.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided')
-                            : q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(type, q.studentAnswer, q.subQuestions || q.sub_questions);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -1582,10 +1575,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               {paginatedQuestions.map((question, index) => {
                                 const type = (question.type || "").toUpperCase();
                                 const globalIndex = startIndex + index;
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                                const hasAnswer = type === 'SMCQ'
-                                  ? (question.subQuestions || question.sub_questions || []).some((sq: any) => sq.studentAnswer && sq.studentAnswer !== 'No answer provided')
-                                  : question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
+                                const hasAnswer = hasStudentAnswered(type, question.studentAnswer, question.subQuestions || question.sub_questions);
 
                                 return (
                                   <motion.div
@@ -2056,8 +2047,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {(() => {
                         const filteredQuestions = result.questions.filter(q => {
                           if (q.type?.toUpperCase() !== 'CQ') return false;
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -2087,8 +2078,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <div className="space-y-6">
                               {paginatedQuestions.map((question, index) => {
                                 const globalIndex = startIndex + index;
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                                const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
+                                const hasAnswer = hasStudentAnswered(question.type, question.studentAnswer);
 
                                 return (
                                   <motion.div
@@ -2284,8 +2275,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {(() => {
                         const filteredQuestions = result.questions.filter(q => {
                           if (q.type?.toUpperCase() !== 'SQ') return false;
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -2310,7 +2301,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <div className="space-y-6">
                               {filteredQuestions.map((question, index) => {
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
                                 return (
                                   <motion.div
                                     key={question.id}
