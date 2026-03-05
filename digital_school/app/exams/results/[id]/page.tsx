@@ -713,62 +713,143 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
+          animate={{
+            scale: [1, 1.1, 1],
+            rotate: [0, 5, -5, 0],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="relative mb-8"
         >
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading your result...</p>
+          <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 animate-pulse"></div>
+          <div className="relative p-6 rounded-3xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800">
+            <GraduationCap className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+          </div>
         </motion.div>
+        <div className="space-y-3 text-center">
+          <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Preparing Report</h2>
+          <div className="flex items-center gap-1 justify-center">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.3, 1, 0.3],
+                }}
+                transition={{
+                  duration: 1,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+                className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Notification banner for review responses
   const reviewNotifications = notifications.filter(n =>
     n.type === 'REVIEW_RESPONSE' && n.relatedType === 'result_review'
   );
 
-  // Debug: Log notifications to see what's actually there
-  console.log('All notifications:', notifications);
-  console.log('Review notifications:', reviewNotifications);
-
-  // More detailed debugging
-  notifications.forEach((n, index) => {
-    console.log(`Notification ${index}:`, {
-      id: n.id,
-      type: n.type,
-      relatedType: n.relatedType,
-      title: n.title,
-      message: n.message,
-      isRead: n.isRead
-    });
-  });
-
-
-  if (!result) {
+  // --- STRICT PRIVACY CHECK START ---
+  if (!result || !result.exam || !result.submission) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-2 border-dashed border-slate-200 dark:border-slate-800 bg-transparent shadow-none rounded-[2rem]">
+          <CardContent className="p-12 text-center space-y-6">
+            <div className="inline-flex p-5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-400">
+              <Eye className="h-10 w-10 opacity-50" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Result Not Found</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">The requested assessment report could not be located or you do not have permission to view it.</p>
+            </div>
+            <Button asChild className="w-full rounded-2xl bg-black dark:bg-white text-white dark:text-black hover:scale-105 transition-transform">
+              <Link href="/student/dashboard">Return to Dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (result.result && !result.result.isPublished && userRole === 'STUDENT') {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-blue-500 rounded-full blur-[100px]" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-purple-500 rounded-full blur-[100px]" />
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          initial={{ opacity: 0, scale: 0.9, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100 }}
+          className="relative z-10 max-w-2xl w-full"
         >
-          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Result Not Found</h2>
-          <p className="text-gray-600 mb-4">This exam result is not available yet.</p>
-          <Button asChild>
-            <Link href="/exams/online">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Exams
-            </Link>
-          </Button>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl border border-white dark:border-slate-800 shadow-2xl rounded-[3rem] overflow-hidden">
+            <div className="h-3 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+            <CardContent className="p-10 sm:p-16 flex flex-col items-center text-center space-y-10">
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500 rounded-full blur-2xl opacity-20 animate-pulse" />
+                <div className="relative p-8 rounded-[2.5rem] bg-gradient-to-br from-blue-50 via-indigo-50 to-white dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 border border-white dark:border-slate-700 shadow-xl group">
+                  <Lock className="h-16 w-16 text-blue-600 dark:text-blue-400 group-hover:rotate-12 transition-transform duration-500" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-widest border border-blue-200 dark:border-blue-800">
+                  <Sparkles className="h-3 w-3" /> Status: Evaluation Ongoing
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-[0.9] tracking-tighter">
+                  Assessment results <br />
+                  <span className="text-blue-600 dark:text-blue-400">are strictly private.</span>
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400 text-lg font-medium max-w-md mx-auto leading-relaxed">
+                  Your performance in <span className="font-bold text-slate-800 dark:text-slate-200">{result.exam.name}</span> is currently being reviewed by the department.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 w-full">
+                <div className="p-6 rounded-[2rem] bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                  <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Submitted</p>
+                  <p className="text-lg font-black text-slate-700 dark:text-slate-300">
+                    {result.submission.submittedAt ? new Date(result.submission.submittedAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-6 rounded-[2rem] bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-[10px] uppercase font-black text-blue-400 tracking-widest mb-1">Visibility</p>
+                  <p className="text-lg font-black text-blue-700 dark:text-blue-300 italic">Pending Release</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 w-full">
+                <Button asChild className="w-full h-16 rounded-[1.5rem] bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-xl shadow-blue-500/20 group transition-all duration-300">
+                  <Link href="/student/dashboard" className="flex items-center justify-center gap-2">
+                    Back to Academic Dashboard
+                    <ArrowLeft className="h-5 w-5 rotate-180 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+                <p className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
+                  Copyright © 2026 Academic Information System
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     );
   }
+  // --- STRICT PRIVACY CHECK END ---
 
   // Calculate marks breakdown
   const mcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MCQ') || [];

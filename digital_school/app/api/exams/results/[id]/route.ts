@@ -123,179 +123,7 @@ export async function GET(
     // 4. Determine visibility
     const hideDetails = !isTeacher && result && !result.isPublished;
 
-    // Cache parsing results
-    let questions = [];
-    if (examSet?.questionsJson) {
-      questions = typeof examSet.questionsJson === 'string' ? JSON.parse(examSet.questionsJson) : examSet.questionsJson;
-    }
-
-    let studentAnswers = {};
-    if (submission.answers) {
-      studentAnswers = typeof submission.answers === 'string' ? JSON.parse(submission.answers) : submission.answers;
-    }
-
-    // 5. Skip expensive processing if student and result not published
-    let processedQuestions: any[] = [];
-    if (!hideDetails) {
-      processedQuestions = (questions as any[]).map((question: any) => {
-        const questionId = question.id;
-        const studentAnswer = (studentAnswers as any)[questionId];
-
-        // Extract images efficiently
-        const studentAnswerImages = [];
-        if ((studentAnswers as any)[`${questionId}_image`]) studentAnswerImages.push((studentAnswers as any)[`${questionId}_image`]);
-        if (Array.isArray((studentAnswers as any)[`${questionId}_images`])) studentAnswerImages.push(...(studentAnswers as any)[`${questionId}_images`]);
-
-        const allDrawings = submission.drawings.filter(d => d.questionId === questionId);
-        const drawingData = allDrawings.find(d => d.imageIndex === 0) || null;
-
-        const type = (question.type || '').toUpperCase();
-        let awardedMarks = 0;
-        const maxMarks = Number(question.marks) || 0;
-
-        // --- BUTTERY FALLBACK EVALUATION START ---
-        // Helper to normalize answers for comparison
-        const normalize = (s: any) => String(s !== undefined && s !== null ? s : "").trim().toLowerCase();
-
-        // 1. Process sub-questions (for SMCQ)
-        let processedSubQuestions: any[] = [];
-        const rawSubQuestions = question.subQuestions || question.sub_questions || [];
-
-        if (rawSubQuestions.length > 0) {
-          processedSubQuestions = rawSubQuestions.map((subQ: any, subIdx: number) => {
-            const subId = `${questionId}_sub_${subIdx}`;
-            const subAns = (studentAnswers as any)[subId];
-
-            // Try pre-calculated marks FIRST
-            let subAwarded = (studentAnswers as any)[`${subId}_marks`];
-
-            // FALLBACK: re-calculate if not present
-            if (subAwarded === undefined || subAwarded === null) {
-              if (subAns !== undefined && subAns !== null && subAns !== '' && subAns !== 'No answer provided') {
-                const subOptions = subQ.options || [];
-                const userAns = normalize(subAns);
-                let isSubCorrect = false;
-
-                // Check options
-                if (Array.isArray(subOptions)) {
-                  const correctOption = subOptions.find((opt: any) => opt.isCorrect);
-                  if (correctOption) {
-                    isSubCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
-                  }
-                }
-
-                // Check correctAnswer field
-                if (!isSubCorrect && subQ.correctAnswer !== undefined && subQ.correctAnswer !== null) {
-                  const correctIdx = Number(subQ.correctAnswer);
-                  if (!isNaN(correctIdx) && subOptions[correctIdx]) {
-                    isSubCorrect = userAns === normalize(typeof subOptions[correctIdx] === 'object' ? subOptions[correctIdx].text : subOptions[correctIdx]);
-                  } else {
-                    isSubCorrect = userAns === normalize(subQ.correctAnswer);
-                  }
-                }
-                subAwarded = isSubCorrect ? (Number(subQ.marks) || 0) : 0;
-              } else {
-                subAwarded = 0;
-              }
-            }
-
-            const subTotalMarks = Number(subQ.marks) || 0;
-            return {
-              ...subQ,
-              studentAnswer: subAns,
-              awardedMarks: Number(subAwarded) || 0,
-              isCorrect: Number(subAwarded) >= subTotalMarks && subTotalMarks > 0
-            };
-          });
-        }
-
-        // 2. Determine awarded marks for the main question
-        // Try pre-calculated marks FIRST
-        let calculatedMarks = (studentAnswers as any)[`${questionId}_marks`];
-
-        // FALLBACK: re-calculate on-the-fly for older submissions
-        if (calculatedMarks === undefined || calculatedMarks === null) {
-          if (type === 'MCQ') {
-            if (studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '' && studentAnswer !== 'No answer provided') {
-              const options = question.options || [];
-              const userAns = normalize(studentAnswer);
-              let isCorrect = false;
-
-              // Check options array
-              if (Array.isArray(options)) {
-                const correctOption = options.find((opt: any) => opt.isCorrect);
-                if (correctOption) {
-                  isCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
-                }
-              }
-
-              // Check correct / correctOption fields
-              if (!isCorrect) {
-                const correctRef = question.correctOption !== undefined ? question.correctOption : question.correct;
-                if (correctRef !== undefined && correctRef !== null) {
-                  const cIdx = Number(correctRef);
-                  if (!isNaN(cIdx) && options[cIdx]) {
-                    isCorrect = userAns === normalize(typeof options[cIdx] === 'object' ? options[cIdx].text : options[cIdx]);
-                  } else {
-                    isCorrect = userAns === normalize(correctRef);
-                  }
-                }
-              }
-
-              if (isCorrect) {
-                calculatedMarks = maxMarks;
-              } else {
-                // Negative marking fallback
-                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                  calculatedMarks = -((maxMarks * exam.mcqNegativeMarking) / 100);
-                } else {
-                  calculatedMarks = 0;
-                }
-              }
-            }
-          } else if (type === 'SMCQ') {
-            calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
-          } else if (type === 'INT' || type === 'NUMERIC') {
-            const res = evaluateINTQuestion(question, studentAnswer);
-            calculatedMarks = res.score;
-          } else if (type === 'AR') {
-            const res = evaluateARQuestion(question, studentAnswer);
-            calculatedMarks = res.score;
-          } else if (type === 'MTF') {
-            const res = evaluateMTFQuestion(question, studentAnswer || {});
-            calculatedMarks = res.score;
-          } else if (type === 'MC') {
-            calculatedMarks = evaluateMCQuestion(question, studentAnswer || { selectedOptions: [] }, {
-              negativeMarking: exam.mcqNegativeMarking || 0,
-              partialMarking: true,
-              hasAttempted: !!studentAnswer
-            });
-          }
-        }
-
-        awardedMarks = Number(calculatedMarks) || 0;
-        // --- BUTTERY FALLBACK EVALUATION END ---
-
-        return {
-          id: question.id,
-          type: question.type,
-          questionText: question.questionText || question.text || "",
-          marks: maxMarks,
-          awardedMarks,
-          isCorrect: awardedMarks >= maxMarks && maxMarks > 0,
-          studentAnswer,
-          studentAnswerImages,
-          drawingData,
-          allDrawings,
-          options: question.options || [],
-          subQuestions: processedSubQuestions,
-          modelAnswer: question.modelAnswer || "",
-          explanation: question.explanation || ""
-        };
-      });
-    }
-
-    // 6. Statistics (Aggregated)
+    // 5. Statistics (Aggregated) - Moved up to include in both private/public views
     const [stats, rankCount] = await Promise.all([
       db.result.aggregate({
         where: { examId },
@@ -308,6 +136,188 @@ export async function GET(
         where: { examId, total: { gt: result?.total || 0 } }
       })
     ]);
+
+    // 6. Return minimal data if hidden
+    if (hideDetails) {
+      return NextResponse.json({
+        exam: { ...exam, class: exam.class.name },
+        student: {
+          id: studentProfile.id,
+          name: user.name,
+          roll: studentProfile.roll,
+          registrationNo: studentProfile.registrationNo,
+          class: studentProfile.class.name
+        },
+        submission: {
+          id: submission.id,
+          submittedAt: submission.submittedAt,
+          status: submission.status
+        },
+        result: (result) ? { isPublished: false } : null,
+        reviewRequest,
+        questions: [], // STRICT PRIVACY: No questions
+        statistics: {
+          totalStudents: stats._count._all,
+          averageScore: 0, // Hide score-related stats
+          highestScore: 0,
+          lowestScore: 0
+        }
+      });
+    }
+
+    // Cache parsing results
+    let questions = [];
+    if (examSet?.questionsJson) {
+      questions = typeof examSet.questionsJson === 'string' ? JSON.parse(examSet.questionsJson) : examSet.questionsJson;
+    }
+
+    let studentAnswers = {};
+    if (submission.answers) {
+      studentAnswers = typeof submission.answers === 'string' ? JSON.parse(submission.answers) : submission.answers;
+    }
+
+    // 7. Process questions (Full View)
+    const processedQuestions = (questions as any[]).map((question: any) => {
+      const questionId = question.id;
+      const studentAnswer = (studentAnswers as any)[questionId];
+
+      // Extract images efficiently
+      const studentAnswerImages = [];
+      if ((studentAnswers as any)[`${questionId}_image`]) studentAnswerImages.push((studentAnswers as any)[`${questionId}_image`]);
+      if (Array.isArray((studentAnswers as any)[`${questionId}_images`])) studentAnswerImages.push(...(studentAnswers as any)[`${questionId}_images`]);
+
+      const allDrawings = submission.drawings.filter(d => d.questionId === questionId);
+      const drawingData = allDrawings.find(d => d.imageIndex === 0) || null;
+
+      const type = (question.type || '').toUpperCase();
+      let awardedMarks = 0;
+      const maxMarks = Number(question.marks) || 0;
+
+      // --- BUTTERY FALLBACK EVALUATION START ---
+      const normalize = (s: any) => String(s !== undefined && s !== null ? s : "").trim().toLowerCase();
+
+      // 1. Process sub-questions (for SMCQ, CQ, SQ)
+      let processedSubQuestions: any[] = [];
+      const rawSubQuestions = question.subQuestions || question.sub_questions || [];
+
+      if (rawSubQuestions.length > 0) {
+        processedSubQuestions = rawSubQuestions.map((subQ: any, subIdx: number) => {
+          const subId = `${questionId}_sub_${subIdx}`;
+          const subAns = (studentAnswers as any)[subId];
+
+          // MAP SUB-QUESTION IMAGES
+          const subImages: string[] = [];
+          if ((studentAnswers as any)[`${subId}_image`]) subImages.push((studentAnswers as any)[`${subId}_image`]);
+          if (Array.isArray((studentAnswers as any)[`${subId}_images`])) subImages.push(...(studentAnswers as any)[`${subId}_images`]);
+
+          // MAP SUB-QUESTION DRAWINGS
+          const subDrawingsForPart = allDrawings.filter(d => d.imageIndex === subIdx);
+
+          // Try pre-calculated marks
+          let subAwarded = (studentAnswers as any)[`${subId}_marks`];
+
+          // Re-calculate if MCQ/SMCQ fallback needed
+          if ((subAwarded === undefined || subAwarded === null) && type === 'SMCQ') {
+            if (subAns !== undefined && subAns !== null && subAns !== '' && subAns !== 'No answer provided') {
+              const subOptions = subQ.options || [];
+              const userAns = normalize(subAns);
+              let isSubCorrect = false;
+
+              if (Array.isArray(subOptions)) {
+                const correctOption = subOptions.find((opt: any) => opt.isCorrect);
+                if (correctOption) {
+                  isSubCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
+                }
+              }
+
+              if (!isSubCorrect && subQ.correctAnswer !== undefined && subQ.correctAnswer !== null) {
+                const correctIdx = Number(subQ.correctAnswer);
+                if (!isNaN(correctIdx) && subOptions[correctIdx]) {
+                  isSubCorrect = userAns === normalize(typeof subOptions[correctIdx] === 'object' ? subOptions[correctIdx].text : subOptions[correctIdx]);
+                } else {
+                  isSubCorrect = userAns === normalize(subQ.correctAnswer);
+                }
+              }
+              subAwarded = isSubCorrect ? (Number(subQ.marks) || 0) : 0;
+            } else {
+              subAwarded = 0;
+            }
+          }
+
+          const subTotalMarks = Number(subQ.marks) || 0;
+          return {
+            ...subQ,
+            studentAnswer: subAns,
+            studentImages: subImages, // Properly mapped now!
+            allDrawings: subDrawingsForPart, // For annotations on sub-questions
+            awardedMarks: Number(subAwarded) || 0,
+            isCorrect: Number(subAwarded) >= subTotalMarks && subTotalMarks > 0
+          };
+        });
+      }
+
+      // 2. Main awarded marks
+      let calculatedMarks = (studentAnswers as any)[`${questionId}_marks`];
+
+      if (calculatedMarks === undefined || calculatedMarks === null) {
+        if (type === 'MCQ') {
+          if (studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '' && studentAnswer !== 'No answer provided') {
+            const options = question.options || [];
+            const userAns = normalize(studentAnswer);
+            let isCorrect = false;
+
+            if (Array.isArray(options)) {
+              const correctOption = options.find((opt: any) => opt.isCorrect);
+              if (correctOption) {
+                isCorrect = userAns === normalize(typeof correctOption === 'object' ? correctOption.text : correctOption);
+              }
+            }
+
+            if (!isCorrect) {
+              const correctRef = question.correctOption !== undefined ? question.correctOption : question.correct;
+              if (correctRef !== undefined && correctRef !== null) {
+                const cIdx = Number(correctRef);
+                if (!isNaN(cIdx) && options[cIdx]) {
+                  isCorrect = userAns === normalize(typeof options[cIdx] === 'object' ? options[cIdx].text : options[cIdx]);
+                } else {
+                  isCorrect = userAns === normalize(correctRef);
+                }
+              }
+            }
+            calculatedMarks = isCorrect ? maxMarks : (exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0);
+          }
+        } else if (type === 'SMCQ') {
+          calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
+        } else if (type === 'INT' || type === 'NUMERIC') {
+          calculatedMarks = evaluateINTQuestion(question, studentAnswer).score;
+        } else if (type === 'AR') {
+          calculatedMarks = evaluateARQuestion(question, studentAnswer).score;
+        } else if (type === 'MTF') {
+          calculatedMarks = evaluateMTFQuestion(question, studentAnswer || {}).score;
+        }
+      }
+
+      awardedMarks = Number(calculatedMarks) || 0;
+      // --- BUTTERY FALLBACK EVALUATION END ---
+
+      return {
+        id: question.id,
+        type: question.type,
+        questionText: question.questionText || question.text || "",
+        marks: maxMarks,
+        awardedMarks,
+        isCorrect: awardedMarks >= maxMarks && maxMarks > 0,
+        studentAnswer,
+        studentAnswerImages,
+        drawingData,
+        allDrawings,
+        options: question.options || [],
+        subQuestions: processedSubQuestions,
+        modelAnswer: question.modelAnswer || "",
+        explanation: question.explanation || ""
+      };
+    });
+
 
     const isSuspended = submission.exceededQuestionLimit || (result as any)?.status === 'SUSPENDED';
 
