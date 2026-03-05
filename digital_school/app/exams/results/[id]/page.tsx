@@ -1875,33 +1875,45 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                                           return (optionsToRender || []).map((option, optIndex) => {
                                             const optText = typeof option === 'object' ? option.text : option;
-                                            const isSelected =
-                                              // Check for object format (e.g. MC, AR)
-                                              question.studentAnswer?.selectedOptions?.includes(optIndex) ||
-                                              question.studentAnswer?.selectedOption === optIndex ||
-                                              // Check for primitive format (e.g. standard MCQ text or index)
-                                              String(question.studentAnswer).trim() === String(optText).trim() ||
-                                              Number(question.studentAnswer) === optIndex ||
-                                              question.studentAnswer === optIndex;
+                                            const rawAnswer = question.studentAnswer;
 
-                                            // Determine correctness
+                                            // --- PRECISE isSelected DETECTION ---
+                                            let isSelected = false;
+                                            if (type === 'MC') {
+                                              // MC stores selectedOptions as index array
+                                              isSelected = rawAnswer?.selectedOptions?.includes(optIndex) ?? false;
+                                            } else if (type === 'AR') {
+                                              // AR stores selectedOption as 1-indexed number
+                                              isSelected = (rawAnswer?.selectedOption === optIndex + 1) ||
+                                                (Number(rawAnswer) === optIndex + 1);
+                                            } else {
+                                              // MCQ: studentAnswer is the chosen option text (string)
+                                              const isTextMatch = typeof rawAnswer === 'string' &&
+                                                rawAnswer.trim() !== '' &&
+                                                rawAnswer.trim() === String(optText).trim();
+                                              // Fallback: if stored as 0-based index number
+                                              const isIndexMatch = typeof rawAnswer === 'number' && rawAnswer === optIndex;
+                                              isSelected = isTextMatch || isIndexMatch;
+                                            }
+
+                                            // --- PRECISE isCorrectOpt DETECTION ---
                                             let isCorrectOpt = false;
-                                            if (type === 'MCQ' || type === 'AR') {
-                                              const correctIndex = (question as any).correctOption !== undefined ? (question as any).correctOption :
-                                                (question as any).correct;
-                                              // Handle case where correct is inside options array (legacy)
-                                              if (correctIndex === undefined && question.options) {
-                                                isCorrectOpt = question.options[optIndex]?.isCorrect;
+                                            if (type === 'MC') {
+                                              isCorrectOpt = !!(option as any).isCorrect;
+                                            } else if (type === 'AR') {
+                                              // AR: correctOption is 1-indexed
+                                              const correctIdx = (question as any).correctOption ?? (question as any).correct;
+                                              isCorrectOpt = Number(correctIdx) === optIndex + 1;
+                                            } else {
+                                              // MCQ: first check option.isCorrect flag, then fallback to correctOption index
+                                              if ((option as any).isCorrect !== undefined) {
+                                                isCorrectOpt = !!(option as any).isCorrect;
                                               } else {
-                                                const originalIdx = question.options?.[optIndex]?.originalIndex;
-                                                if (originalIdx !== undefined) {
-                                                  isCorrectOpt = Number(correctIndex) === originalIdx;
-                                                } else {
-                                                  isCorrectOpt = Number(correctIndex) === optIndex || String((question as any).correctAnswer).trim() === String(optText).trim();
+                                                const correctIdx = (question as any).correctOption ?? (question as any).correct ?? (question as any).correctAnswer;
+                                                if (correctIdx !== undefined && correctIdx !== null) {
+                                                  isCorrectOpt = Number(correctIdx) === optIndex;
                                                 }
                                               }
-                                            } else if (type === 'MC') {
-                                              isCorrectOpt = option.isCorrect;
                                             }
 
                                             let containerStyle = "";

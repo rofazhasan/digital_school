@@ -111,8 +111,9 @@ export async function GET(
 
     if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
 
-    // 3. Optimized Exam Set Fetching
-    const examSetId = studentExamMap?.examSetId || submission.examSetId;
+    // 3. Optimized Exam Set Fetching — check submission.examSetId FIRST (most accurate)
+    // then fall back to exam_student_maps, then any set for the exam
+    const examSetId = (submission as any).examSetId || studentExamMap?.examSetId;
     let examSet = null;
     if (examSetId) {
       examSet = await db.examSet.findUnique({ where: { id: examSetId } });
@@ -259,7 +260,12 @@ export async function GET(
       }
 
       // 2. Main awarded marks
-      let calculatedMarks = (studentAnswers as any)[`${questionId}_marks`];
+      // For objective types (MCQ, AR, INT, MC), ALWAYS re-calculate from the current examSet questions
+      // to avoid stale pre-saved marks from a different examSet mapping.
+      // For manual-graded types (CQ, SQ, SMCQ), trust pre-saved marks.
+      const preSavedMarks = (studentAnswers as any)[`${questionId}_marks`];
+      const isObjectiveType = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF'].includes(type);
+      let calculatedMarks: number | undefined = isObjectiveType ? undefined : preSavedMarks;
 
       if (calculatedMarks === undefined || calculatedMarks === null) {
         if (type === 'MCQ') {
@@ -302,9 +308,21 @@ export async function GET(
         } else if (type === 'SMCQ') {
           calculatedMarks = processedSubQuestions.reduce((acc, sq) => acc + (Number(sq.awardedMarks) || 0), 0);
         } else if (type === 'INT' || type === 'NUMERIC') {
-          calculatedMarks = evaluateINTQuestion(question, studentAnswer).score;
+          const intResult = evaluateINTQuestion(question, studentAnswer);
+          if (!intResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null && studentAnswer !== '') {
+            // Apply negative marking for wrong INT/NUMERIC answers
+            calculatedMarks = exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0;
+          } else {
+            calculatedMarks = intResult.score;
+          }
         } else if (type === 'AR') {
-          calculatedMarks = evaluateARQuestion(question, studentAnswer).score;
+          const arResult = evaluateARQuestion(question, studentAnswer);
+          if (!arResult.isCorrect && studentAnswer !== undefined && studentAnswer !== null) {
+            // Apply negative marking for wrong AR answers
+            calculatedMarks = exam.mcqNegativeMarking ? -((maxMarks * exam.mcqNegativeMarking) / 100) : 0;
+          } else {
+            calculatedMarks = arResult.score;
+          }
         } else if (type === 'MTF') {
           calculatedMarks = evaluateMTFQuestion(question, studentAnswer || {}).score;
         }
