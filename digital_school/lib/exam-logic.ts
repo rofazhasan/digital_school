@@ -585,21 +585,101 @@ export async function releaseExamResults(examId: string) {
 
                             questions.forEach((q: any) => {
                                 const type = q.type?.toUpperCase();
-                                if (type === 'MCQ' || type === 'MC') {
-                                    const studentAnswer = answers[q.id];
-                                    const correctOpt = q.options?.find((o: any) => o.isCorrect);
-
-                                    if (studentAnswer) {
-                                        const normalize = (s: any) => String(s || '').trim().toLowerCase();
-                                        if (normalize(studentAnswer) === normalize(correctOpt?.text)) {
-                                            mcqCorrect++;
-                                        } else {
-                                            mcqWrong++;
-                                            if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                                                mcqDed += (Number(q.marks || 1) * exam.mcqNegativeMarking) / 100;
-                                            }
-                                        }
+                                const studentAnswer = answers[q.id];
+                                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') {
+                                    // Handle SMCQ sub-answers check if main ID is empty
+                                    if (type === 'SMCQ') {
+                                        const subQs = q.subQuestions || q.sub_questions;
+                                        const hasSubAnswer = subQs?.some((_: any, idx: number) => {
+                                            const subAns = answers[`${q.id}_sub_${idx}`];
+                                            return subAns !== undefined && subAns !== null && subAns !== '';
+                                        });
+                                        if (!hasSubAnswer) return;
+                                    } else {
+                                        return;
                                     }
+                                }
+
+                                const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                                const qMarks = Number(q.marks || 1);
+                                let isCorrect = false;
+                                let isPartial = false;
+                                let penalty = 0;
+
+                                if (type === 'MCQ') {
+                                    const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                                    const correctText = normalize(correctOpt?.text || q.correctAnswer || q.correct);
+                                    isCorrect = normalize(studentAnswer) === correctText;
+                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
+                                    }
+                                } else if (type === 'MC') {
+                                    const mcScore = evaluateMCQuestion(q as unknown as MCQuestion, studentAnswer as MCAnswer, {
+                                        negativeMarking: exam.mcNegativeMarking || 0,
+                                        partialMarking: true,
+                                        hasAttempted: true
+                                    });
+
+                                    // Special logic for MC negative: calculate penalty separately if it zeroed out the score
+                                    const correctIndices = (q.options as any[]).map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1);
+                                    const totalCorrect = correctIndices.length;
+                                    const selected = (studentAnswer?.selectedOptions || []) as number[];
+                                    const correctSelected = selected.filter(idx => correctIndices.includes(idx)).length;
+                                    const wrongSelected = selected.length - correctSelected;
+
+                                    const partialMarks = (correctSelected / totalCorrect) * qMarks;
+                                    const rawPenalty = wrongSelected * ((exam.mcNegativeMarking || 0) / 100) * qMarks;
+
+                                    if (mcScore > 0) {
+                                        isCorrect = true; // Use isCorrect as the user requested Cor: 1 for partials
+                                    } else if (rawPenalty > partialMarks) {
+                                        penalty = rawPenalty;
+                                    }
+                                } else if (type === 'AR') {
+                                    const res = evaluateARQuestion(q as unknown as ARQuestion, studentAnswer);
+                                    isCorrect = res.isCorrect;
+                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
+                                    }
+                                } else if (type === 'INT' || type === 'NUMERIC') {
+                                    const res = evaluateINTQuestion(q, studentAnswer);
+                                    isCorrect = res.isCorrect;
+                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
+                                    }
+                                } else if (type === 'MTF') {
+                                    const res = evaluateMTFQuestion(q as any, studentAnswer as any);
+                                    if (res.score > 0) {
+                                        isCorrect = true; // Use isCorrect as the user requested Cor: 1 for partials
+                                    }
+                                } else if (type === 'SMCQ') {
+                                    const subQs = q.subQuestions || q.sub_questions;
+                                    let subCorrect = 0;
+                                    let subPenalty = 0;
+                                    subQs?.forEach((subQ: any, idx: number) => {
+                                        const sAns = answers[`${q.id}_sub_${idx}`];
+                                        if (sAns === undefined || sAns === null || sAns === '') return;
+                                        const sCorrectOpt = subQ.options?.find((o: any) => o.isCorrect);
+                                        const sCorrectText = normalize(sCorrectOpt?.text || subQ.correctAnswer);
+                                        const sMarks = Number(subQ.marks || 1);
+                                        if (normalize(sAns) === sCorrectText) {
+                                            subCorrect++;
+                                        } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                                            subPenalty += (sMarks * exam.mcqNegativeMarking) / 100;
+                                        }
+                                    });
+                                    if (subCorrect > 0) {
+                                        isCorrect = true; // Use isCorrect as user requested Cor: 1 for partials
+                                    } else {
+                                        penalty = subPenalty;
+                                    }
+                                }
+
+                                if (isCorrect || isPartial) {
+                                    mcqCorrect++;
+                                } else {
+                                    mcqWrong++;
+                                    mcqDed += penalty;
                                 }
                             });
                         }

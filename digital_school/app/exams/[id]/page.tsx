@@ -220,6 +220,9 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
                   <div className="text-xs font-semibold mb-2">
                     {i + 1}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax>
                     <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                    {sq.negativeMarks && (
+                      <span className="ml-2 text-[10px] text-red-500 font-bold">[-{sq.negativeMarks}M]</span>
+                    )}
                   </div>
                   {sq.options && Array.isArray(sq.options) && (
                     <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
@@ -335,7 +338,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           {question.difficulty}
         </Badge>
         <Badge variant="outline">{question.marks} Marks</Badge>
-        {question.type === 'MCQ' && question.negativeMarks && (
+        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
@@ -866,6 +869,16 @@ export default function ExamBuilderPage() {
                     };
                   }
                 }
+
+                // Add individual negative marks for each sub-question
+                if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                  const subNegMarks = (sq.marks * exam.mcqNegativeMarking) / 100;
+                  processedSq = {
+                    ...processedSq,
+                    negativeMarks: parseFloat(subNegMarks.toFixed(2))
+                  };
+                }
+
                 return processedSq;
               });
               processedQuestion = {
@@ -877,8 +890,11 @@ export default function ExamBuilderPage() {
           }
 
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
-          if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-            const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
+          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(q.type);
+          const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
+
+          if (isObjective && negativePercentage > 0) {
+            const negativeMarks = (q.marks * negativePercentage) / 100;
             processedQuestion = {
               ...processedQuestion,
               negativeMarks: parseFloat(negativeMarks.toFixed(2))
@@ -1185,7 +1201,7 @@ export default function ExamBuilderPage() {
                                       })}
                                     </ul>
                                   )}
-                                  {setQ.type === 'MCQ' && setQ.negativeMarks && (
+                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(setQ.type || '') && setQ.negativeMarks && (
                                     <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                                       -{setQ.negativeMarks} marks
                                     </div>
@@ -1208,6 +1224,9 @@ export default function ExamBuilderPage() {
                                               {sq.options.map((opt: any, oi: number) => (
                                                 <li key={oi} className={opt.isCorrect || String(opt.isCorrect) === 'true' ? 'text-green-600 font-bold' : ''}>
                                                   {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
+                                                  {sq.negativeMarks && opt.isCorrect === false && (
+                                                    <span className="text-[8px] text-red-400 ml-1">(-{sq.negativeMarks})</span>
+                                                  )}
                                                 </li>
                                               ))}
                                             </ul>
