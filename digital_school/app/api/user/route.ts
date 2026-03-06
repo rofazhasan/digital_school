@@ -22,14 +22,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Use standard prismadb
-    const db = (await import('@/lib/db')).default;
+    // Get database client with automatic initialization
+    const prismadb = await getDatabaseClient();
 
     // If ?all=true and admin/super_user, return all users
     if (all && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
       try {
         console.log('[API_USER] Fetching all users for', authData.user.role);
-        const users = await (db.user as any).findMany({
+        const users = await (prismadb.user as any).findMany({
           select: {
             id: true,
             name: true,

@@ -22,7 +22,13 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem
 } from "@/components/ui/dropdown-menu";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -325,6 +331,37 @@ export default function ExamsPage() {
       toast({
         title: 'Error',
         description: 'Failed to update exam status.',
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChangeType = async (id: string, newType: 'ONLINE' | 'OFFLINE' | 'MIXED') => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/exams?id=${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: newType }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update exam type');
+
+      // Update local state optimistically
+      setExams(prev => prev.map(exam =>
+        exam.id === id ? { ...exam, type: newType } : exam
+      ));
+
+      toast({
+        title: 'Success',
+        description: `Exam type updated to ${newType}.`
+      });
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to update exam type.',
         variant: "destructive"
       });
     } finally {
@@ -998,6 +1035,21 @@ export default function ExamsPage() {
                                         <Edit className="w-4 h-4 text-blue-500" />
                                         <span>Edit Exam</span>
                                       </DropdownMenuItem>
+                                      <DropdownMenuSub>
+                                        <DropdownMenuSubTrigger className="rounded-xl flex items-center gap-2">
+                                          <Monitor className="w-4 h-4 text-indigo-500" />
+                                          <span>Change Type</span>
+                                        </DropdownMenuSubTrigger>
+                                        <DropdownMenuPortal>
+                                          <DropdownMenuSubContent className="rounded-2xl border-gray-200 shadow-2xl p-2 min-w-[140px]">
+                                            <DropdownMenuRadioGroup value={exam.type} onValueChange={(value) => handleChangeType(exam.id, value as 'ONLINE' | 'OFFLINE' | 'MIXED')}>
+                                              <DropdownMenuRadioItem value="ONLINE" className="rounded-xl flex items-center gap-2 cursor-pointer">Online</DropdownMenuRadioItem>
+                                              <DropdownMenuRadioItem value="OFFLINE" className="rounded-xl flex items-center gap-2 cursor-pointer">Offline</DropdownMenuRadioItem>
+                                              <DropdownMenuRadioItem value="MIXED" className="rounded-xl flex items-center gap-2 cursor-pointer">Mixed</DropdownMenuRadioItem>
+                                            </DropdownMenuRadioGroup>
+                                          </DropdownMenuSubContent>
+                                        </DropdownMenuPortal>
+                                      </DropdownMenuSub>
                                       <DropdownMenuItem className="rounded-xl flex items-center gap-2" onClick={() => router.push(`/exams/evaluations/${exam.id}/results`)}>
                                         <BarChart3 className="w-4 h-4 text-emerald-500" />
                                         <span>View Results</span>

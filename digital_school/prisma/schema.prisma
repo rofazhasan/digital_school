@@ -9,57 +9,57 @@ datasource db {
 }
 
 model User {
-  id                   String                     @id @default(cuid())
-  email                String?                    @unique
-  phone                String?                    @unique
-  password             String
-  role                 Role                       @default(STUDENT)
-  name                 String
-  avatar               String?
-  isActive             Boolean                    @default(true)
-  lastLoginAt          DateTime?
-  createdAt            DateTime                   @default(now())
-  updatedAt            DateTime                   @updatedAt
-  deletedAt            DateTime?
-  instituteId          String?
-  activeSessionId      String?
-  lastSessionInfo      Json?
-  passwordResetExpires DateTime?
-  passwordResetToken   String?                    @unique
-  passwordResetApproved Boolean                   @default(true)
-  emailChangeToken     String?                    @unique
-  emailVerified        Boolean                    @default(false)
-  isApproved           Boolean                    @default(false)
-  pendingEmail         String?
-  pendingPhone         String?
-  verificationToken    String?                    @unique
-  activityAudits       ActivityAudit[]
-  admissionReviews     AdmissionApplication[]     @relation("AdmissionReviewer")
-  aiActivities         AIActivity[]
-  attendanceRecords    Attendance[]               @relation("AttendanceTeacher")
-  badges               Badge[]                    @relation("UserBadges")
-  billing              Billing[]
-  chatSessions         ChatSession[]
-  examAssignments      ExamEvaluationAssignment[] @relation("ExamAssignmentCreator")
-  examEvaluations      ExamEvaluationAssignment[] @relation("ExamEvaluator")
-  examSets             ExamSet[]
-  drawings             ExamSubmissionDrawing[]
-  assignedExams        Exam[]                     @relation("ExamAssigner")
-  createdExams         Exam[]                     @relation("ExamCreator")
-  exportJobs           ExportJob[]
-  managedInstitute     Institute?                 @relation("InstituteSuperUser")
-  createdInvoices      Invoice[]                  @relation("InvoiceCreator")
-  logs                 Log[]
-  notices              Notice[]
-  notifications        Notification[]
-  collectedPayments    Payment[]                  @relation("PaymentCollector")
-  questionBanks        QuestionBank[]
-  questions            Question[]
-  editedQuestions      Question[]                 @relation("EditedQuestions")
-  resultReviews        ResultReview[]             @relation("ResultReviewer")
-  studentProfile       StudentProfile?
-  teacherProfile       TeacherProfile?
-  institute            Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
+  id                    String                     @id @default(cuid())
+  email                 String?                    @unique
+  phone                 String?                    @unique
+  password              String
+  role                  Role                       @default(STUDENT)
+  name                  String
+  avatar                String?
+  isActive              Boolean                    @default(true)
+  lastLoginAt           DateTime?
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  deletedAt             DateTime?
+  instituteId           String?
+  activeSessionId       String?
+  lastSessionInfo       Json?
+  passwordResetExpires  DateTime?
+  passwordResetToken    String?                    @unique
+  emailChangeToken      String?                    @unique
+  emailVerified         Boolean                    @default(false)
+  isApproved            Boolean                    @default(false)
+  pendingEmail          String?
+  pendingPhone          String?
+  verificationToken     String?                    @unique
+  passwordResetApproved Boolean                    @default(true)
+  activityAudits        ActivityAudit[]
+  admissionReviews      AdmissionApplication[]     @relation("AdmissionReviewer")
+  aiActivities          AIActivity[]
+  attendanceRecords     Attendance[]               @relation("AttendanceTeacher")
+  badges                Badge[]                    @relation("UserBadges")
+  billing               Billing[]
+  chatSessions          ChatSession[]
+  examAssignments       ExamEvaluationAssignment[] @relation("ExamAssignmentCreator")
+  examEvaluations       ExamEvaluationAssignment[] @relation("ExamEvaluator")
+  examSets              ExamSet[]
+  drawings              ExamSubmissionDrawing[]
+  assignedExams         Exam[]                     @relation("ExamAssigner")
+  createdExams          Exam[]                     @relation("ExamCreator")
+  exportJobs            ExportJob[]
+  managedInstitute      Institute?                 @relation("InstituteSuperUser")
+  createdInvoices       Invoice[]                  @relation("InvoiceCreator")
+  logs                  Log[]
+  notices               Notice[]
+  notifications         Notification[]
+  collectedPayments     Payment[]                  @relation("PaymentCollector")
+  questionBanks         QuestionBank[]
+  questions             Question[]
+  editedQuestions       Question[]                 @relation("EditedQuestions")
+  resultReviews         ResultReview[]             @relation("ResultReviewer")
+  studentProfile        StudentProfile?
+  teacherProfile        TeacherProfile?
+  institute             Institute?                 @relation("InstituteUsers", fields: [instituteId], references: [id])
 
   @@index([role])
   @@map("users")
@@ -110,9 +110,9 @@ model StudentProfile {
   drawings         ExamSubmissionDrawing[]
   invoices         Invoice[]
   omrSheets        OMRSheet[]
+  practiceResults  PracticeResult[]
   resultReviews    ResultReview[]
   results          Result[]
-  practiceResults  PracticeResult[]
   seatAllocations  SeatAllocation[]
   class            Class                   @relation(fields: [classId], references: [id])
   user             User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -201,9 +201,9 @@ model Exam {
   class                 Class                      @relation(fields: [classId], references: [id])
   createdBy             User                       @relation("ExamCreator", fields: [createdById], references: [id])
   omrSheets             OMRSheet[]
+  practiceResults       PracticeResult[]
   resultReviews         ResultReview[]
   results               Result[]
-  practiceResults       PracticeResult[]
   seatAllocations       SeatAllocation[]
 
   @@index([createdAt])
@@ -426,23 +426,23 @@ model Badge {
 }
 
 model Notice {
-  id             String          @id @default(cuid())
+  id             String         @id @default(cuid())
   title          String
   description    String
   targetClassIds String[]
   targetType     NoticeTarget
-  priority       NoticePriority  @default(MEDIUM)
-  category       String?         @default("General")
-  links          Json?           // Array of { label: string, url: string }
-  attachments    Json?           // Array of { name: string, url: string }
-  readBy         String[]        // Array of user IDs who have read this notice
-  isActive       Boolean         @default(true)
+  isActive       Boolean        @default(true)
   expiresAt      DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   postedById     String
-  postedBy       User            @relation(fields: [postedById], references: [id])
-  targetClasses  Class[]         @relation("NoticeToClasses")
+  attachments    Json?
+  category       String?        @default("General")
+  links          Json?
+  priority       NoticePriority @default(MEDIUM)
+  readBy         String[]
+  postedBy       User           @relation(fields: [postedById], references: [id])
+  targetClasses  Class[]        @relation("NoticeToClasses")
 
   @@index([priority])
   @@index([createdAt])
@@ -762,16 +762,16 @@ model SeatAllocation {
 }
 
 model PracticeResult {
-  id               String          @id @default(cuid())
-  studentId        String
-  examId           String
-  answers          Json            // Store student answers
-  score            Float           @default(0)
-  totalMarks       Int
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
-  student          StudentProfile  @relation(fields: [studentId], references: [id])
-  exam             Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
+  id         String         @id @default(cuid())
+  studentId  String
+  examId     String
+  answers    Json
+  score      Float          @default(0)
+  totalMarks Int
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  exam       Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  student    StudentProfile @relation(fields: [studentId], references: [id])
 
   @@index([examId])
   @@index([studentId])
@@ -953,8 +953,8 @@ enum QuestionType {
   INT
   AR
   MTF
-  SMCQ
   DESCRIPTIVE
+  SMCQ
 }
 
 enum Difficulty {
@@ -988,8 +988,8 @@ enum NoticeTarget {
   STUDENTS
   TEACHERS
   ADMINS
-  TEACHERS_AND_ADMINS
   SPECIFIC_CLASS
+  TEACHERS_AND_ADMINS
 }
 
 enum NoticePriority {
