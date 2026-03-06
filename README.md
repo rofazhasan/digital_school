@@ -2,17 +2,24 @@
 
 <div align="center">
 
-![Digital School](https://img.shields.io/badge/Digital-School-blue?style=for-the-badge&logo=next.js)
+# 🎓 Digital School Management System
+
+<img src="./public/hero-mockup.png" alt="Digital School Multi-Device Mockup" width="100%" style="border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" />
+
+**An ultra-high-performance, AI-integrated school management system built for maximum velocity.**
+
+[![Deploy on Vercel](https://img.shields.io/badge/Deploy%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
+[![Deploy on Netlify](https://img.shields.io/badge/Deploy%20on-Netlify-00C7B7?style=for-the-badge&logo=netlify)](https://netlify.com)
+
 ![Next.js](https://img.shields.io/badge/Next.js-15.3.4-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.8.3-blue?style=for-the-badge&logo=typescript)
 ![Prisma](https://img.shields.io/badge/Prisma-6.10.1-2D3748?style=for-the-badge&logo=prisma)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-13+-336791?style=for-the-badge&logo=postgresql)
 
-**A comprehensive digital school management system built with modern web technologies**
+[![License](https://img.shields.io/badge/License-ISC-orange?style=for-the-badge)](#-license)
+[![Version](https://img.shields.io/badge/Version-0.1.0-green?style=for-the-badge)]()
 
-[![Deploy on Vercel](https://img.shields.io/badge/Deploy%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com)
-[![Deploy on Netlify](https://img.shields.io/badge/Deploy%20on-Netlify-00C7B7?style=for-the-badge&logo=netlify)](https://netlify.com)
-
+[Explore Features](#-key-features) • [Quick Start](#-quick-start) • [Deployment](#-deployment) • [Contributing](#-contributing)
 </div>
 
 ---
