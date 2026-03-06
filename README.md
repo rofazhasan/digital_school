@@ -4,7 +4,7 @@
 
 # 🎓 Digital School Management System
 
-<img src="./public/hero-mockup.png" alt="Digital School Multi-Device Mockup" width="100%" style="border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" />
+<img src="./digital_school/public/hero-mockup.png" alt="Digital School Multi-Device Mockup" width="100%" style="border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);" />
 
 **An ultra-high-performance, AI-integrated school management system built for maximum velocity.**
 
