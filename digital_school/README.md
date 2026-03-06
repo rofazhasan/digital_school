@@ -2,6 +2,9 @@
 
 <div align="center">
 
+<img src="./public/hero-mockup.png" alt="Digital School Multi-Device Mockup" />
+
+<br />
 ![Digital School](https://img.shields.io/badge/Digital-School-blue?style=for-the-badge&logo=next.js)
 ![Version](https://img.shields.io/badge/Version-0.1.0-green?style=for-the-badge)
 ![License](https://img.shields.io/badge/License-ISC-orange?style=for-the-badge)
