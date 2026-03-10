@@ -2,27 +2,17 @@
  * SMS sending utility using BulkSMSBD (http://bulksmsbd.net/api/smsapi).
  *
  * Required env vars:
- *   SMS_API_USER   — your bulksmsbd.net username  (api_key param)
- *   SMS_API_PASS   — your bulksmsbd.net password  (api_password param)
- *   SMS_SENDER_ID  — sender number/id             e.g. 8809617614084
+ *   SMS_API_KEY    — your bulksmsbd.net API key (api_key param)
+ *   SMS_API_URL    — the API endpoint URL (optional, defaults to bulksmsbd.net)
+ *   SMS_SENDER_ID  — sender number/id e.g. 8809617614084
  *
  * API response code meanings:
  *   202   SMS Submitted Successfully
- *   1001  Invalid Number
- *   1002  Sender ID not correct / disabled
- *   1003  Required fields missing
- *   1005  Internal Error
- *   1006  Balance Validity Not Available
- *   1007  Balance Insufficient
- *   1011  User Id not found
- *   1012  Masking SMS must be in Bengali
- *   1013-1021  Various gateway/account config errors
- *   1031  Account Not Verified
- *   1032  IP not whitelisted
+ * ... (skipping codes for brevity)
  */
 
 const SMS_URL = process.env.SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
-const SMS_KEY = process.env.SMS_API_KEY || process.env.SMS_API_USER || '';
+const SMS_KEY = process.env.SMS_API_KEY || '';
 const SMS_SID = process.env.SMS_SENDER_ID || '8809617614084';
 
 export interface SMSResult {
