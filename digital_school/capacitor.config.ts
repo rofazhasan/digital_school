@@ -5,13 +5,13 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 const config: CapacitorConfig = {
-  appId: 'com.examify.app',
-  appName: 'Examify',
+  appId: 'dev.rofazacademy.app',
+  appName: 'Rofaz Academy',
   webDir: 'out',
   server: {
     androidScheme: 'https',
     cleartext: true,
-    url: process.env.NEXT_PUBLIC_APP_URL,
+    url: 'https://rofazacademy.dev',
   },
   plugins: {
     SplashScreen: {
