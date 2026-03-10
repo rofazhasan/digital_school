@@ -48,17 +48,32 @@ export default function OMRScannerPage() {
         return () => worker.terminate();
     }, []);
 
-    const handleWorkerResult = (result: any) => {
+    const handleWorkerResult = async (result: any) => {
         setIsProcessing(false);
         if (result.type === 'searching') {
             setMarkersFound(result.markersFound);
             drawOverlay(null);
         } else if (result.type === 'success') {
             const data = result.data;
+
+            // --- AUTO IDENTIFICATION ---
+            if (data.qrData && data.qrData.setId && selectedExamId !== data.qrData.setId) {
+                console.log("Auto-Identified Exam Set:", data.qrData.setId);
+                setSelectedExamId(data.qrData.setId);
+                toast.success(`Exam Identified: ${data.qrData.examId || data.qrData.setId}`, {
+                    icon: <FileText className="w-4 h-4 text-primary" />
+                });
+            }
+
             setScanResult(data);
             setQualityMetrics(data.quality);
             setMarkersFound(4);
             drawOverlay(data.markers, data.sections);
+
+            // --- AUTO SUBMISSION (High Confidence) ---
+            if (data.confidence > 0.99 && data.qrData) {
+                handleSubmitScan(data);
+            }
 
             // Only toast if it's a high-confidence scan or a manual upload
             if (activeTab === 'upload' || data.confidence > 0.98) {
@@ -69,6 +84,39 @@ export default function OMRScannerPage() {
 
             // Haptic feedback
             if (window.navigator.vibrate) window.navigator.vibrate(200);
+        }
+    };
+
+    const handleSubmitScan = async (data: any) => {
+        // Prevent multiple submissions
+        if (isSyncing) return;
+
+        setIsSyncing(true);
+        try {
+            const response = await fetch('/api/omr/submit', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    examId: data.qrData.examId,
+                    setId: data.qrData.setId,
+                    studentId: data.qrData.studentId,
+                    roll: data.roll,
+                    registration: data.registration,
+                    answers: data.answers,
+                    score: data.grading?.score,
+                    confidence: data.confidence
+                })
+            });
+            const result = await response.json();
+            if (result.success) {
+                toast.success("Result Synced to Evaluation System!", {
+                    icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
+                });
+            }
+        } catch (e) {
+            console.error("Submission failed:", e);
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -269,16 +317,12 @@ export default function OMRScannerPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <div className="glass-heavy px-4 py-2 rounded-2xl">
-                                        <select
-                                            className="bg-transparent border-none text-[10px] font-black uppercase tracking-widest text-white/50 focus:ring-0 cursor-pointer"
-                                            value={selectedExamId || ''}
-                                            onChange={(e) => setSelectedExamId(e.target.value)}
-                                        >
-                                            <option value="">Select Template</option>
-                                            {pendingExams?.map(exam => (
-                                                <option key={exam.id} value={exam.id}>{exam.title}</option>
-                                            ))}
-                                        </select>
+                                        <div className="flex items-center gap-2">
+                                            <div className={`w-2 h-2 rounded-full ${selectedExamId ? 'bg-primary' : 'bg-white/10'}`} />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
+                                                {selectedExamId ? `Template: ${selectedExamId.slice(0, 8)}...` : 'Waiting for QR ID...'}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

@@ -51,8 +51,8 @@ export const generateOMRTemplate = (examId: string, setId: string): OMRTemplate 
         }
     }
 
-    // 2. REGISTRATION NUMBER SECTION
-    for (let col = 0; col < 6; col++) {
+    // 2. REGISTRATION NUMBER SECTION (Upgraded to 10 Digits)
+    for (let col = 0; col < 10; col++) {
         const xBase = 0.445 + (col * 0.0385);
         for (let digit = 0; digit < 10; digit++) {
             bubbles.push({
@@ -73,37 +73,34 @@ export const generateOMRTemplate = (examId: string, setId: string): OMRTemplate 
             type: 'SET',
             qId: 'set',
             option: setLabels[i],
-            x: 0.44 + (i * 0.035),
+            x: 0.50 + (i * 0.035), // Adjusted slightly right
             y: 0.125,
             r: 0.009
         });
     }
 
     // 4. MCQ GRID (4 Columns of 25)
-    // Precisely calibrated based on 4.jpg (Natural: 998x1620)
-    // Marker 0 Y: 65, Q1 Y: 926, Q75 Y: 1352, Marker 3 Y: 1413
-    // startY = (926-65)/(1413-65) = 0.6387
-    // rowSpacing = ((1352-926)/24)/1348 = 0.01317
-    const startY = 0.6387;
-    const colSpacing = 0.237;
-    const rowSpacing = 0.01317;
-    const optSpacing = 0.033;
+    // Refined based on user's traditional template layout
+    const startY = 0.58; // Moved up slightly to accommodate bottom footer
+    const colSpacing = 0.24;
+    const rowSpacing = 0.0145;
+    const optSpacing = 0.032;
 
     for (let col = 0; col < 4; col++) {
         for (let row = 0; row < 25; row++) {
             const qNum = (col * 25) + row + 1;
-            const xBase = 0.06 + (col * colSpacing) + 0.063; // Tuning label offset
+            const xBase = 0.05 + (col * colSpacing) + 0.055;
             const yPos = startY + (row * rowSpacing);
 
-            // 5 Options: ক, খ, গ, ঘ, ঙ
-            for (let opt = 0; opt < 5; opt++) {
+            // 4 Options (matching the image which has 4 bubbles): ক, খ, গ, ঘ
+            for (let opt = 0; opt < 4; opt++) {
                 bubbles.push({
                     type: 'MCQ',
                     qId: qNum,
-                    option: (opt).toString(), // Index 0-4
+                    option: (opt).toString(),
                     x: xBase + (opt * optSpacing),
                     y: yPos,
-                    r: 0.009
+                    r: 0.0085
                 });
             }
         }

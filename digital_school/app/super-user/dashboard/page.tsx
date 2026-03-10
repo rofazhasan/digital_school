@@ -84,7 +84,8 @@ import {
   User,
   Menu,
   X,
-  Brain
+  Brain,
+  Scan
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { motion, AnimatePresence } from "framer-motion";
@@ -642,6 +643,7 @@ export default function SuperUserDashboardPage() {
                         {[
                           { label: 'Register User', icon: Users, color: 'text-blue-500', bg: 'bg-blue-500/5', border: 'border-blue-500/20', href: '/admin/users', desc: 'Add new users to the system' },
                           { label: 'Notice Board', icon: Bell, color: 'text-indigo-500', bg: 'bg-indigo-500/5', border: 'border-indigo-500/20', href: '#notices', desc: 'Post and manage notices' },
+                          { label: 'Scan OMR Sheets', icon: Scan, color: 'text-emerald-500', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20', href: '/omr_scanner', desc: 'Direct access to AI OMR scanning engine' },
                           { label: 'Manage Exams', icon: FileText, color: 'text-violet-500', bg: 'bg-violet-500/5', border: 'border-violet-500/20', href: '/exams', desc: 'Oversee institutional assessments' },
                           { label: 'Question Bank', icon: BookOpen, color: 'text-amber-500', bg: 'bg-amber-500/5', border: 'border-amber-500/20', href: '/question-bank', desc: 'Access study and test materials' },
                         ].map((action, i) => (

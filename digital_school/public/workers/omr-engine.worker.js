@@ -2,6 +2,7 @@
 /* global cv, importScripts, self */
 
 self.importScripts('/workers/opencv.js');
+self.importScripts('/workers/jsqr.js');
 
 let isCvReady = false;
 
@@ -11,6 +12,22 @@ cv['onRuntimeInitialized'] = () => {
 };
 
 // --- OMR Logic ---
+
+const decodeQR = (mat) => {
+    try {
+        const rgba = new cv.Mat();
+        cv.cvtColor(mat, rgba, cv.COLOR_GRAY2RGBA);
+        const imgData = new Uint8ClampedArray(rgba.data);
+        const code = jsQR(imgData, rgba.cols, rgba.rows);
+        rgba.delete();
+        if (code) {
+            return JSON.parse(code.data);
+        }
+    } catch (e) {
+        console.warn("QR Detection failed:", e);
+    }
+    return null;
+};
 
 const processFrame = (imageData, template) => {
     if (!isCvReady) return { error: 'CV not ready' };
@@ -102,8 +119,15 @@ const processFrame = (imageData, template) => {
         confidence: 1.0,
         quality,
         conflicts: [],
-        sections: { ROLL: {}, REG: {}, SET: {}, MCQ: {} }
+        sections: { ROLL: {}, REG: {}, SET: {}, MCQ: {} },
+        qrData: null
     };
+
+    // 4. DETECT SECURED ID QR
+    const qrData = decodeQR(rectified);
+    if (qrData) {
+        results.qrData = qrData;
+    }
 
     if (template && template.bubbles) {
         // Find all candidates for bubbles in the binary image
