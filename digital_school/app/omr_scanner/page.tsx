@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,7 +15,9 @@ import {
     FileText,
     Zap,
     ShieldCheck,
-    Eye
+    Eye,
+    ChevronRight,
+    Camera
 } from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/dexie-db";
@@ -55,6 +57,8 @@ export default function OMRScannerPage() {
 
     const [processingQueue, setProcessingQueue] = useState<File[]>([]);
     const [queueIndex, setQueueIndex] = useState(0);
+    const [sessionScans, setSessionScans] = useState<OMRResult[]>([]);
+    const [sessionStats, setSessionStats] = useState({ total: 0, successful: 0, doubtful: 0, conflicts: 0 });
 
     const pendingExams = useLiveQuery(() => db.exams.toArray());
 
@@ -161,6 +165,15 @@ export default function OMRScannerPage() {
             setMarkersFound(4);
             drawOverlay(data.markers, data.sections);
 
+            // --- SESSION LOGGING ---
+            setSessionScans(prev => [data, ...prev]);
+            setSessionStats(prev => ({
+                total: prev.total + 1,
+                successful: prev.successful + (data.confidence > 0.95 ? 1 : 0),
+                doubtful: prev.doubtful + (data.confidence <= 0.95 && data.confidence > 0.70 ? 1 : 0),
+                conflicts: prev.conflicts + (data.conflicts && data.conflicts.length > 0 ? 1 : 0)
+            }));
+
             if (data.confidence > 0.95 && data.qrData) {
                 await handleSubmitScan(data);
             }
@@ -230,6 +243,33 @@ export default function OMRScannerPage() {
         setCameraActive(false);
     }, []);
 
+    const exportToCSV = useCallback(() => {
+        if (sessionScans.length === 0) return;
+
+        const headers = ["Roll", "Registration", "Set", "Score", "Accuracy", "Status"];
+        const rows = sessionScans.map(s => [
+            s.roll,
+            s.registration,
+            s.set,
+            s.grading?.score || 0,
+            (s.confidence * 100).toFixed(1) + "%",
+            s.conflicts && s.conflicts.length > 0 ? "CONFLICT" : (s.confidence > 0.95 ? "OK" : "DOUBTFUL")
+        ]);
+
+        const csvContent = "data:text/csv;charset=utf-8,"
+            + headers.join(",") + "\n"
+            + rows.map(e => e.join(",")).join("\n");
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `omr_session_${new Date().getTime()}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast.success("Session Data Exported!");
+    }, [sessionScans]);
+
     const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0 && workerRef.current) {
             const files = Array.from(e.target.files);
@@ -270,9 +310,9 @@ export default function OMRScannerPage() {
                 <motion.div
                     initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12"
+                    className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-12"
                 >
-                    <div>
+                    <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="h-10 w-10 bg-primary/20 border border-primary/40 rounded-xl flex items-center justify-center backdrop-blur-md shadow-glow">
                                 <Zap className="w-6 h-6 text-primary" />
@@ -280,11 +320,42 @@ export default function OMRScannerPage() {
                             <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">AI OMR SCANNER</h1>
                         </div>
                         <p className="text-white/50 font-medium tracking-wide flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Professional Grade • Offline First • 100% Precision
+                            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Professional Grade • Bulk Supported • 100% Precision
                         </p>
                     </div>
 
+                    {/* BULK STATS HUD */}
+                    {sessionStats.total > 0 && (
+                        <div className="flex flex-wrap gap-4 glass-heavy p-4 rounded-3xl border-white/5 shadow-2xl">
+                            <div className="flex flex-col px-4 border-r border-white/10">
+                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Total Scanned</span>
+                                <span className="text-xl font-black text-white">{sessionStats.total}</span>
+                            </div>
+                            <div className="flex flex-col px-4 border-r border-white/10 text-emerald-500">
+                                <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mb-1">Successful</span>
+                                <span className="text-xl font-black">{sessionStats.successful}</span>
+                            </div>
+                            <div className="flex flex-col px-4 border-r border-white/10 text-yellow-500">
+                                <span className="text-[10px] font-black text-yellow-500/50 uppercase tracking-widest mb-1">Doubtful</span>
+                                <span className="text-xl font-black">{sessionStats.doubtful}</span>
+                            </div>
+                            <div className="flex flex-col px-4 text-red-500">
+                                <span className="text-[10px] font-black text-red-500/50 uppercase tracking-widest mb-1">Conflicts</span>
+                                <span className="text-xl font-black">{sessionStats.conflicts}</span>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex items-center gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={exportToCSV}
+                            disabled={sessionScans.length === 0}
+                            className="glass border-white/10 hover:bg-white/10 text-white rounded-xl px-6 h-12"
+                        >
+                            <Upload className="w-4 h-4 mr-2 rotate-180" />
+                            Export CSV
+                        </Button>
                         <Button
                             variant="outline"
                             onClick={syncOfflineData}
@@ -446,116 +517,169 @@ export default function OMRScannerPage() {
                     </div>
 
                     {/* RIGHT: REAL-TIME ANALYTICS (5 Cols) */}
-                    <div className="lg:col-span-12 xl:col-span-5 space-y-6">
-                        <AnimatePresence mode="wait">
-                            {!scanResult ? (
-                                <motion.div
-                                    key="empty"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    className="glass-card rounded-[40px] p-12 text-center h-full flex flex-col items-center justify-center min-h-[500px]"
-                                >
-                                    <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                                        <FileText className="w-10 h-10 text-white/20" />
+                    <div className="lg:col-span-12 xl:col-span-5">
+                        <Tabs defaultValue="current" className="w-full">
+                            <TabsList className="glass mb-6 w-full p-1 rounded-2xl">
+                                <TabsTrigger value="current" className="flex-1 rounded-xl data-[state=active]:bg-primary">Current Detail</TabsTrigger>
+                                <TabsTrigger value="history" className="flex-1 rounded-xl data-[state=active]:bg-primary">
+                                    Session History
+                                    {sessionScans.length > 0 && <Badge className="ml-2 bg-white/20">{sessionScans.length}</Badge>}
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="current" className="space-y-6 mt-0">
+                                <AnimatePresence mode="wait">
+                                    {!scanResult ? (
+                                        <motion.div
+                                            key="empty"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            className="glass-card rounded-[40px] p-12 text-center h-full flex flex-col items-center justify-center min-h-[500px]"
+                                        >
+                                            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
+                                                <FileText className="w-10 h-10 text-white/20" />
+                                            </div>
+                                            <h3 className="text-2xl font-black mb-2">Ready for Insights</h3>
+                                            <p className="text-white/40 max-w-xs mx-auto">Once a sheet is successfully scanned, the AI analysis report will appear here in real-time.</p>
+                                        </motion.div>
+                                    ) : (
+                                        <motion.div
+                                            key="result"
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="space-y-6"
+                                        >
+                                            {/* Primary Score Card */}
+                                            <div className="glass-heavy rounded-[40px] p-8 border-primary/20 relative overflow-hidden">
+                                                <div className="relative z-10 flex flex-col sm:flex-row justify-between gap-6">
+                                                    <div>
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Verified Assessment</p>
+                                                        <h3 className="text-4xl font-black text-white">{scanResult.grading?.examName || "OMR DATA SCAN"}</h3>
+                                                        <p className="text-white/50 text-sm mt-1">Student verified via offline database registry.</p>
+                                                    </div>
+                                                    <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 text-center border border-white/10 min-w-[140px]">
+                                                        <p className="text-[40px] font-black leading-none text-primary italic">
+                                                            {scanResult.grading?.score?.toFixed(1) || "0.0"}
+                                                        </p>
+                                                        <p className="text-[10px] uppercase font-black text-white/40 tracking-widest mt-2">Final Score</p>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[80px] -mr-16 -mt-16" />
+                                            </div>
+
+                                            {/* Identification Matrix */}
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'ROLL') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Roll Identifier</span>
+                                                        {scanResult.conflicts?.some((c: any) => c.type === 'ROLL') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                                                    </div>
+                                                    <p className="text-2xl font-black tracking-tighter text-white">{scanResult.roll || "000000"}</p>
+                                                </div>
+                                                <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'REG') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Registration</span>
+                                                        {scanResult.conflicts?.some((c: any) => c.type === 'REG') && <AlertTriangle className="w-3 h-3 text-red-500" />}
+                                                    </div>
+                                                    <p className="text-2xl font-black tracking-tighter text-white">{scanResult.registration || "000000"}</p>
+                                                </div>
+                                            </div>
+
+                                            {/* Answer Matrix */}
+                                            <div className="glass-card rounded-[40px] p-6 max-h-[500px] flex flex-col">
+                                                <div className="flex justify-between items-center mb-6">
+                                                    <h4 className="text-sm font-black uppercase tracking-widest">Answer Fidelity Report</h4>
+                                                    <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">100 ITEMS</Badge>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
+                                                    <div className="grid grid-cols-4 gap-2">
+                                                        {Array.from({ length: 100 }).map((_, i) => {
+                                                            const qNum = i + 1;
+                                                            const res = scanResult.answers[qNum];
+                                                            const ans = typeof res === 'object' ? res.option : res;
+                                                            const confidence = typeof res === 'object' ? res.confidence : 1.0;
+                                                            const conflict = scanResult.conflicts?.find((c: any) => c.qId == qNum && c.type === 'MCQ');
+                                                            const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
+
+                                                            let stateColor = "text-white/40";
+                                                            let bgCircle = "bg-white/5";
+                                                            if (conflict) {
+                                                                stateColor = "text-red-500";
+                                                                bgCircle = "bg-red-500 shadow-glow shadow-red-500/20";
+                                                            } else if (ans) {
+                                                                if (confidence < 0.90) {
+                                                                    stateColor = "text-yellow-500";
+                                                                    bgCircle = "bg-yellow-500/20 border border-yellow-500/50";
+                                                                } else {
+                                                                    stateColor = "text-emerald-500";
+                                                                    bgCircle = "bg-emerald-500 shadow-glow shadow-emerald-500/20";
+                                                                }
+
+                                                                if (grade && grade.status === 'wrong') {
+                                                                    stateColor = "text-rose-400";
+                                                                    bgCircle = "bg-rose-400";
+                                                                }
+                                                            }
+
+                                                            return (
+                                                                <div key={qNum} className={`flex flex-col items-center bg-white/[0.02] p-2 rounded-2xl border transition-all ${confidence < 0.90 && ans ? 'border-yellow-500/30' : 'border-white/5'}`}>
+                                                                    <span className="text-[8px] font-black text-white/20 mb-1">{qNum}</span>
+                                                                    <div className={`w-8 h-8 rounded-full ${bgCircle} flex items-center justify-center text-xs font-black ${stateColor}`}>
+                                                                        {ans || "—"}
+                                                                    </div>
+                                                                    {confidence < 0.90 && ans && <span className="text-[6px] font-bold text-yellow-500 mt-1 uppercase">Doubtful</span>}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </TabsContent>
+
+                            <TabsContent value="history" className="mt-0">
+                                <div className="glass-card rounded-[40px] p-6 h-[720px] flex flex-col">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h4 className="text-sm font-black uppercase tracking-widest">Session Scan History</h4>
+                                        <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">{sessionScans.length} SHEETS</Badge>
                                     </div>
-                                    <h3 className="text-2xl font-black mb-2">Ready for Insights</h3>
-                                    <p className="text-white/40 max-w-xs mx-auto">Once a sheet is successfully scanned, the AI analysis report will appear here in real-time.</p>
-                                </motion.div>
-                            ) : (
-                                <motion.div
-                                    key="result"
-                                    initial={{ opacity: 0, x: 20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    className="space-y-6"
-                                >
-                                    {/* Primary Score Card */}
-                                    <div className="glass-heavy rounded-[40px] p-8 border-primary/20 relative overflow-hidden">
-                                        <div className="relative z-10 flex flex-col sm:flex-row justify-between gap-6">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Verified Assessment</p>
-                                                <h3 className="text-4xl font-black text-white">{scanResult.grading?.examName || "OMR DATA SCAN"}</h3>
-                                                <p className="text-white/50 text-sm mt-1">Student verified via offline database registry.</p>
+                                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                                        {sessionScans.length === 0 ? (
+                                            <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
+                                                <RefreshCw className="w-12 h-12 mb-4 animate-spin-slow" />
+                                                <p className="text-sm font-bold">No scans in this session yet</p>
                                             </div>
-                                            <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 text-center border border-white/10 min-w-[140px]">
-                                                <p className="text-[40px] font-black leading-none text-primary italic">
-                                                    {scanResult.grading?.score?.toFixed(1) || "0.0"}
-                                                </p>
-                                                <p className="text-[10px] uppercase font-black text-white/40 tracking-widest mt-2">Final Score</p>
-                                            </div>
-                                        </div>
-                                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[80px] -mr-16 -mt-16" />
-                                    </div>
-
-                                    {/* Identification Matrix */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'ROLL') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Roll Identifier</span>
-                                                {scanResult.conflicts?.some((c: any) => c.type === 'ROLL') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                                            </div>
-                                            <p className="text-2xl font-black tracking-tighter text-white">{scanResult.roll || "000000"}</p>
-                                        </div>
-                                        <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'REG') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Registration</span>
-                                                {scanResult.conflicts?.some((c: any) => c.type === 'REG') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                                            </div>
-                                            <p className="text-2xl font-black tracking-tighter text-white">{scanResult.registration || "000000"}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Answer Matrix */}
-                                    <div className="glass-card rounded-[40px] p-6 max-h-[500px] flex flex-col">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <h4 className="text-sm font-black uppercase tracking-widest">Answer Fidelity Report</h4>
-                                            <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">100 ITEMS</Badge>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                                            <div className="grid grid-cols-4 gap-2">
-                                                {Array.from({ length: 100 }).map((_, i) => {
-                                                    const qNum = i + 1;
-                                                    const res = scanResult.answers[qNum];
-                                                    const ans = typeof res === 'object' ? res.option : res;
-                                                    const confidence = typeof res === 'object' ? res.confidence : 1.0;
-                                                    const conflict = scanResult.conflicts?.find((c: any) => c.qId == qNum && c.type === 'MCQ');
-                                                    const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
-
-                                                    let stateColor = "text-white/40";
-                                                    let bgCircle = "bg-white/5";
-                                                    if (conflict) {
-                                                        stateColor = "text-red-500";
-                                                        bgCircle = "bg-red-500 shadow-glow shadow-red-500/20";
-                                                    } else if (ans) {
-                                                        if (confidence < 0.90) {
-                                                            stateColor = "text-yellow-500";
-                                                            bgCircle = "bg-yellow-500/20 border border-yellow-500/50";
-                                                        } else {
-                                                            stateColor = "text-emerald-500";
-                                                            bgCircle = "bg-emerald-500 shadow-glow shadow-emerald-500/20";
-                                                        }
-
-                                                        if (grade && grade.status === 'wrong') {
-                                                            stateColor = "text-rose-400";
-                                                            bgCircle = "bg-rose-400";
-                                                        }
-                                                    }
-
-                                                    return (
-                                                        <div key={qNum} className={`flex flex-col items-center bg-white/[0.02] p-2 rounded-2xl border transition-all ${confidence < 0.90 && ans ? 'border-yellow-500/30' : 'border-white/5'}`}>
-                                                            <span className="text-[8px] font-black text-white/20 mb-1">{qNum}</span>
-                                                            <div className={`w-8 h-8 rounded-full ${bgCircle} flex items-center justify-center text-xs font-black ${stateColor}`}>
-                                                                {ans || "—"}
-                                                            </div>
-                                                            {confidence < 0.90 && ans && <span className="text-[6px] font-bold text-yellow-500 mt-1 uppercase">Doubtful</span>}
+                                        ) : (
+                                            sessionScans.map((scan, idx) => (
+                                                <motion.button
+                                                    initial={{ opacity: 0, x: -10 }}
+                                                    animate={{ opacity: 1, x: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    key={idx}
+                                                    onClick={() => { setScanResult(scan); setQualityMetrics(scan.quality); }}
+                                                    className={`w-full text-left p-4 rounded-3xl border transition-all group flex items-center justify-between ${scanResult === scan ? 'bg-primary/20 border-primary/50' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
+                                                >
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black ${scan.confidence > 0.95 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
+                                                            {scan.grading?.score?.toFixed(1) || "0.0"}
                                                         </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-black text-white">Roll: {scan.roll}</p>
+                                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+                                                                {scan.conflicts?.length ? 'Conflict Detected' : `${(scan.confidence * 100).toFixed(0)}% Confidence`}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <ChevronRight className={`w-4 h-4 transition-transform ${scanResult === scan ? 'text-primary' : 'text-white/20 group-hover:translate-x-1'}`} />
+                                                </motion.button>
+                                            ))
+                                        )}
                                     </div>
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
                     </div>
 
                 </div>
