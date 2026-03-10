@@ -1,82 +1,140 @@
 /**
- * SMS sending utility using SSL Wireless Bangladesh SMS Gateway.
- * Env vars needed: SMS_API_USER, SMS_API_PASS, SMS_SENDER_ID
- * Falls back gracefully if credentials not set.
+ * SMS sending utility using BulkSMSBD (http://bulksmsbd.net/api/smsapi).
+ *
+ * Required env vars:
+ *   SMS_API_USER   — your bulksmsbd.net username  (api_key param)
+ *   SMS_API_PASS   — your bulksmsbd.net password  (api_password param)
+ *   SMS_SENDER_ID  — sender number/id             e.g. 8809617614084
+ *
+ * API response code meanings:
+ *   202   SMS Submitted Successfully
+ *   1001  Invalid Number
+ *   1002  Sender ID not correct / disabled
+ *   1003  Required fields missing
+ *   1005  Internal Error
+ *   1006  Balance Validity Not Available
+ *   1007  Balance Insufficient
+ *   1011  User Id not found
+ *   1012  Masking SMS must be in Bengali
+ *   1013-1021  Various gateway/account config errors
+ *   1031  Account Not Verified
+ *   1032  IP not whitelisted
  */
 
-const SMS_URL = process.env.SMS_API_URL || 'https://sms.sslwireless.com/pushapi/dynamic/server.php';
+const SMS_URL = 'http://bulksmsbd.net/api/smsapi';
 const SMS_USER = process.env.SMS_API_USER || '';
 const SMS_PASS = process.env.SMS_API_PASS || '';
-const SMS_SID = process.env.SMS_SENDER_ID || 'DIGITALSCH';
+const SMS_SID = process.env.SMS_SENDER_ID || '8809617614084';
 
 export interface SMSResult {
     success: boolean;
-    messageId?: string;
+    code?: number | string;
     error?: string;
 }
 
+const SMS_CODE_MESSAGES: Record<number, string> = {
+    202: 'SMS submitted successfully',
+    1001: 'Invalid phone number',
+    1002: 'Sender ID not correct or disabled',
+    1003: 'Required fields missing',
+    1005: 'Internal gateway error',
+    1006: 'Balance validity not available',
+    1007: 'Balance insufficient',
+    1011: 'User ID not found',
+    1012: 'Masking SMS must be sent in Bengali',
+    1013: 'Sender ID has no valid gateway (by API key)',
+    1014: 'Sender type name not found for this sender',
+    1015: 'No valid gateway for sender ID',
+    1016: 'Sender active price info not found',
+    1017: 'Sender price info not found',
+    1018: 'Owner account is disabled',
+    1019: 'Sender type price is disabled for this account',
+    1020: 'Parent account not found',
+    1021: 'Parent active price not found',
+    1031: 'Account not verified — contact administrator',
+    1032: 'IP not whitelisted',
+};
+
 /**
- * Sends a single SMS via SSL Wireless BD gateway.
+ * Normalise Bangladeshi phone → international format for the gateway.
+ * e.g. 01794678595 → 8801794678595
+ */
+function normaliseForGateway(phone: string): string {
+    let p = phone.replace(/\D/g, '');
+    if (p.startsWith('0')) p = '88' + p;       // 01... → 8801...
+    if (!p.startsWith('880')) p = '880' + p;
+    return p;
+}
+
+/**
+ * Send a single SMS via bulksmsbd.net.
  */
 export async function sendSMS(to: string, message: string): Promise<SMSResult> {
     if (!SMS_USER || !SMS_PASS) {
-        console.warn('[SMS] SMS_API_USER or SMS_API_PASS not configured. Skipping SMS send.');
+        console.warn('[SMS] SMS_API_USER or SMS_API_PASS not configured — skipping SMS.');
         return { success: false, error: 'SMS credentials not configured' };
     }
 
-    // Normalize phone for BD gateway — must be 8801XXXXXXXXX format (13 digits)
-    let phone = to.replace(/\D/g, '');
-    if (phone.startsWith('0')) phone = '88' + phone;          // 01... → 8801...
-    if (!phone.startsWith('880')) phone = '880' + phone;       // guard
-    if (phone.length < 13) {
-        return { success: false, error: `Invalid phone number: ${to}` };
-    }
+    const number = normaliseForGateway(to);
 
     const params = new URLSearchParams({
-        apiUser: SMS_USER,
-        apiPass: SMS_PASS,
+        api_key: SMS_USER,
+        api_password: SMS_PASS,
         senderid: SMS_SID,
-        mobiles: phone,
-        sms: message,
-        csmsid: `DS-${Date.now()}`,
+        number,
+        message,
     });
 
     try {
-        console.log(`[SMS] Sending to ${phone}...`);
+        console.log(`[SMS] Sending to ${number} via bulksmsbd.net …`);
         const res = await fetch(`${SMS_URL}?${params.toString()}`, {
             method: 'GET',
-            signal: AbortSignal.timeout(10000),
+            signal: AbortSignal.timeout(12000),
         });
 
         const text = await res.text();
-        console.log(`[SMS] Gateway response: ${text}`);
+        console.log(`[SMS] Gateway raw response: ${text}`);
 
-        // SSL Wireless returns XML like: <SMSCOUNT>1</SMSCOUNT><SMSID>xxx</SMSID>
-        const isOk = text.includes('<SMSID>') || text.includes('1700') || text.includes('success');
-        if (isOk) {
-            const match = text.match(/<SMSID>(.*?)<\/SMSID>/);
-            return { success: true, messageId: match?.[1] };
+        // The gateway returns a numeric code (as JSON object or plain text)
+        // Common shape: {"response_code":202,"error_message":"SMS Submit Successfully",…}
+        let code: number | null = null;
+        try {
+            const json = JSON.parse(text);
+            // Accept response_code, code, status (int) — all known gateway shapes
+            code = Number(json.response_code ?? json.code ?? json.status ?? json.Code ?? null);
+        } catch {
+            // Plain text: just the number
+            const m = text.trim().match(/^(\d+)/);
+            if (m) code = Number(m[1]);
         }
 
-        // Error code scan
-        if (text.includes('1000') || text.includes('Invalid')) {
-            return { success: false, error: `SMS gateway error: ${text.substring(0, 200)}` };
+        if (code === 202) {
+            return { success: true, code: 202 };
         }
 
-        // If status 200 but no match — treat as sent (some gateways return plain text)
-        if (res.ok) {
-            return { success: true, messageId: `ref-${Date.now()}` };
-        }
+        const errMsg = code && SMS_CODE_MESSAGES[code]
+            ? `[Code ${code}] ${SMS_CODE_MESSAGES[code]}`
+            : `Gateway returned: ${text.substring(0, 200)}`;
 
-        return { success: false, error: `HTTP ${res.status}: ${text.substring(0, 200)}` };
+        console.warn(`[SMS] Failed — ${errMsg}`);
+        return { success: false, code: code ?? undefined, error: errMsg };
+
     } catch (err: any) {
-        console.error('[SMS] Request failed:', err?.message);
+        console.error('[SMS] Network error:', err?.message);
         return { success: false, error: `Network error: ${err?.message}` };
     }
 }
 
 /**
- * Generate a 6-digit numeric OTP.
+ * Build the OTP SMS text in the required format:
+ *   "Your {BrandName} OTP is {otp}. Valid for 10 minutes."
+ */
+export function buildOtpMessage(otp: string, brandName: string = 'Digital School'): string {
+    return `Your ${brandName} OTP is ${otp}. Valid for 10 minutes.`;
+}
+
+/**
+ * Generate a secure 6-digit numeric OTP.
  */
 export function generateOTP(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();

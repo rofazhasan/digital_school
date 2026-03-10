@@ -11,7 +11,7 @@ import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
 import { ApprovalRequestEmail } from '@/components/emails/ApprovalRequestEmail';
 import { sendEmail } from '@/lib/email';
 import { normalizePhone } from '@/lib/utils';
-import { sendSMS, generateOTP } from '@/lib/sms';
+import { sendSMS, generateOTP, buildOtpMessage } from '@/lib/sms';
 
 /**
  * POST handler for production-ready user signup.
@@ -246,7 +246,18 @@ export async function POST(request: NextRequest) {
                     where: { id: user.id },
                     data: { phoneOtp: hashedOtp, phoneOtpExpiry: expiry } as any,
                 });
-                const smsMessage = `Your Digital School verification code is: ${otp}. Valid for 10 minutes.`;
+                // Build branded OTP message with institute name
+                let brandName = 'Digital School';
+                if (user.instituteId) {
+                    try {
+                        const inst = await (prismadb.institute as any).findUnique({
+                            where: { id: user.instituteId },
+                            select: { name: true },
+                        });
+                        if (inst?.name) brandName = inst.name;
+                    } catch { /* ignore */ }
+                }
+                const smsMessage = buildOtpMessage(otp, brandName);
                 const smsResult = await sendSMS(user.phone, smsMessage);
                 if (smsResult.success) {
                     verifyMethod = 'phone';
