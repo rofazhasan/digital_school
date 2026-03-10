@@ -368,7 +368,8 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
     // 3. Update Submission
     const percentage = calculatePercentage(totalScore, exam.totalMarks);
-    const grade = calculateGrade(percentage);
+    const passMark = Number(exam.passMarks) || 33;
+    const grade = calculateGrade(percentage, passMark);
 
     if (saveToDb) {
         await prisma.examSubmission.update({

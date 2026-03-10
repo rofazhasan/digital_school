@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import db from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
-import { calculateGrade, calculatePercentage } from '@/lib/utils';
+import { calculateGrade, calculateGPA, calculatePercentage } from '@/lib/utils';
 import { evaluateMCQuestion } from '@/lib/evaluation/mcEvaluation';
 import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
 import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
@@ -376,6 +376,8 @@ export async function GET(
       },
       result: (result && (result.isPublished || isTeacher)) ? {
         ...result,
+        grade: calculateGrade(result.percentage || 0, Number(exam.passMarks) || 33),
+        gpa: calculateGPA(result.percentage || 0, Number(exam.passMarks) || 33),
         rank: rankCount + 1,
         status: isSuspended ? 'SUSPENDED' : (result as any).status
       } : (result ? { isPublished: false } : null),

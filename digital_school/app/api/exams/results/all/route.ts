@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
+import { calculateGrade, calculateGPA } from '@/lib/utils';
 import { Prisma } from '@prisma/client';
 
 interface ExamResultsGroup {
@@ -148,6 +149,17 @@ export async function GET(request: NextRequest) {
     } else {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
+
+    // Recalculate Grade & GPA dynamically for "Insaaf"
+    results = results.map((r: any) => {
+      const percentage = r.percentage || (r.exam.totalMarks > 0 ? (r.total / r.exam.totalMarks) * 100 : 0);
+      const passMark = Number(r.exam.passMarks) || 33;
+      return {
+        ...r,
+        grade: calculateGrade(percentage, passMark),
+        gpa: calculateGPA(percentage, passMark)
+      };
+    });
 
     // 1. Get unique exam IDs from results
     const uniqueExamIds = Array.from(new Set(results.map(r => r.examId)));

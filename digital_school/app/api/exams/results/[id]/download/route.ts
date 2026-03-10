@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import { getTokenFromRequest } from '@/lib/auth';
+import { calculateGrade, calculateGPA } from '@/lib/utils';
 import QRCode from 'qrcode';
 import { jsPDF } from 'jspdf';
 
@@ -194,8 +195,8 @@ async function generateResultsPDF(data: PDFData): Promise<Buffer> {
 
   // Table Config
   const startY = 75;
-  const headers = ['SL', 'Roll', 'Name', 'Total', 'Rank', 'Status'];
-  const colWidths = [15, 35, 65, 25, 20, 25]; // Total approx 185 (allows for margins)
+  const headers = ['SL', 'Roll', 'Name', 'Total', 'Grade', 'GPA', 'Rank'];
+  const colWidths = [12, 30, 58, 20, 15, 15, 15]; // Total 165
   let currentY = startY;
   let currentX = margin;
 
@@ -225,22 +226,28 @@ async function generateResultsPDF(data: PDFData): Promise<Buffer> {
     currentX = margin;
     const rowHeight = 8;
 
+    const percentage = result.percentage || (exam.totalMarks > 0 ? (result.total / exam.totalMarks) * 100 : 0);
+    const passMark = Number(exam.passMarks) || 33;
+    const grade = calculateGrade(percentage, passMark);
+    const gpa = calculateGPA(percentage, passMark);
+
     // Data preparation
     const rowData = [
       String(i + 1),
       result.student.roll || '-',
       result.student.user.name || 'Unknown',
       String(result.total),
-      result.rank ? String(result.rank) : '-',
-      result.total >= exam.passMarks ? 'Pass' : 'Fail'
+      grade,
+      gpa.toFixed(2),
+      result.rank ? String(result.rank) : '-'
     ];
 
     rowData.forEach((text, colIndex) => {
       doc.rect(currentX, currentY, colWidths[colIndex], rowHeight);
       // Truncate name if too long
       let cellText = text;
-      if (colIndex === 2 && text.length > 30) {
-        cellText = text.substring(0, 27) + '...';
+      if (colIndex === 2 && text.length > 25) {
+        cellText = text.substring(0, 22) + '...';
       }
       safeText(cellText, currentX + 2, currentY + 5);
       currentX += colWidths[colIndex];

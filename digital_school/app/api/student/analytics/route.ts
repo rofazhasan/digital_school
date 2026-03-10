@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import prisma from "@/lib/db";
 import { getTokenFromRequest } from "@/lib/auth";
+import { calculateGrade, calculateGPA } from "@/lib/utils";
 
 export async function GET(req: NextRequest) {
     try {
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
         });
 
         const averagePercentage = totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
-        const gpa = (averagePercentage / 20).toFixed(2); // Rough 5.0 scale approximation
+        const gpa = calculateGPA(averagePercentage).toFixed(2);
 
         // 2. Attendance
         // Fetch attendance records where this student is present/absent
@@ -256,14 +257,4 @@ function calculateProjection(trends: any[]) {
     };
 }
 
-function calculateGrade(percentage: number) {
-    if (percentage >= 80) return 'A+';
-    if (percentage >= 75) return 'A';
-    if (percentage >= 70) return 'A-';
-    if (percentage >= 65) return 'B+';
-    if (percentage >= 60) return 'B';
-    if (percentage >= 50) return 'C';
-    if (percentage >= 40) return 'D';
-    return 'F';
-}
 

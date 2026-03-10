@@ -29,28 +29,76 @@ export function normalizePhone(phone: string): string {
 }
 
 /**
- * Calculate grade based on percentage
+ * Calculate grade based on percentage and pass mark.
+ * Standard scale: 80+=A+, 70+=A, 60+=A-, 50+=B, 40+=C, Pass+=D, <Pass=F.
  * @param percentage - The percentage score (0-100)
- * @returns The grade (A+, A, A-, B+, B, C, D, F)
+ * @param passMark - The passing threshold (default: 33)
+ * @returns The grade (A+, A, A-, B, C, D, F)
  */
-export function calculateGrade(percentage: number): string {
-  if (percentage >= 80) {
-    return 'A+';
-  } else if (percentage >= 75) {
-    return 'A';
-  } else if (percentage >= 70) {
-    return 'A-';
-  } else if (percentage >= 65) {
-    return 'B+';
-  } else if (percentage >= 60) {
-    return 'B';
-  } else if (percentage >= 55) {
-    return 'C';
-  } else if (percentage >= 40) {
-    return 'D';
-  } else {
+export function calculateGrade(percentage: number, passMark: number = 33): string {
+  if (percentage < passMark) {
     return 'F';
   }
+  if (percentage >= 80) {
+    return 'A+';
+  } else if (percentage >= 70) {
+    return 'A';
+  } else if (percentage >= 60) {
+    return 'A-';
+  } else if (percentage >= 50) {
+    return 'B';
+  } else if (percentage >= 40) {
+    return 'C';
+  } else {
+    return 'D';
+  }
+}
+
+/**
+ * Calculate GPA based on percentage and pass mark.
+ * Uses piece-wise linear interpolation to ensure "Insaaf" (fairness) 
+ * when the pass mark changes.
+ * 
+ * GPA scale:
+ * A+: 5.00 (80-100)
+ * A : 4.00 (70-79)
+ * A-: 3.50 (60-69)
+ * B : 3.00 (50-59)
+ * C : 2.00 (40-49)
+ * D : 1.00 (Pass-39)
+ * F : 0.00 (<Pass)
+ */
+export function calculateGPA(percentage: number, passMark: number = 33): number {
+  if (percentage < passMark) return 0.00;
+  if (percentage >= 80) return 5.00;
+
+  // Segment definitions for linear mapping
+  const segments = [
+    { start: 70, end: 80, minGPA: 4.00, maxGPA: 5.00 },
+    { start: 60, end: 70, minGPA: 3.50, maxGPA: 4.00 },
+    { start: 50, end: 60, minGPA: 3.00, maxGPA: 3.50 },
+    { start: 40, end: 50, minGPA: 2.00, maxGPA: 3.00 },
+    { start: passMark, end: 40, minGPA: 1.00, maxGPA: 2.00 },
+  ];
+
+  // Find the appropriate segment
+  for (const seg of segments) {
+    if (percentage >= seg.start && percentage < seg.end) {
+      const range = seg.end - seg.start;
+      if (range <= 0) return seg.minGPA;
+      const ratio = (percentage - seg.start) / range;
+      const gpa = seg.minGPA + ratio * (seg.maxGPA - seg.minGPA);
+      return Math.round(gpa * 100) / 100;
+    }
+  }
+
+  // Fallback for edge cases where passMark >= 40, 50, etc.
+  if (percentage >= 70) return 4.00;
+  if (percentage >= 60) return 3.50;
+  if (percentage >= 50) return 3.00;
+  if (percentage >= 40) return 2.00;
+
+  return 1.00;
 }
 
 /**
