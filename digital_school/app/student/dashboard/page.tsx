@@ -154,6 +154,7 @@ export default function StudentDashboardPage() {
   const [user, setUser] = useState<User | null>(null);
   const [exams, setExams] = useState<Exam[]>([]);
   const [results, setResults] = useState<Result[]>([]);
+  const [examSubmissions, setExamSubmissions] = useState<Array<{ examId: string; studentId: string; status: string }>>([]);
   const [attendance, setAttendance] = useState<any>(null); // eslint-disable-line @typescript-eslint/no-explicit-any
   const [notices, setNotices] = useState<Notice[]>([]);
   const [unreadNoticeCount, setUnreadNoticeCount] = useState(0);
@@ -181,18 +182,14 @@ export default function StudentDashboardPage() {
       .then(data => {
         if (data.user && data.user.role === 'STUDENT') {
           if (isMounted) setUser(data.user);
-          // Fetch exams after user is loaded
-          fetch('/api/exams?limit=100')
+          // Fetch ALL exams for the class (not filtered by status)
+          fetch('/api/exams?limit=200')
             .then(res => res.json())
             .then(resData => {
-              // Handle both array and { data: [] } format
               const examData = Array.isArray(resData) ? resData : (resData.exams || resData.data || []);
-
-              let filtered = [];
+              let filtered: any[] = [];
               const userClassId = data.user.studentProfile?.classId;
-
               if (userClassId && Array.isArray(examData)) {
-                // Show all exams for the student's class
                 filtered = examData.filter((exam: any) => exam.classId === userClassId); // eslint-disable-line @typescript-eslint/no-explicit-any
               }
               if (isMounted) setExams(filtered);
@@ -201,6 +198,17 @@ export default function StudentDashboardPage() {
               console.error("Failed to fetch exams", err);
               if (isMounted) setExams([]);
             });
+
+          // Fetch exam submissions to show completion status in exams tab
+          fetch('/api/exam-submissions')
+            .then(res => res.ok ? res.json() : { submissions: [] })
+            .then(subData => {
+              const subs = Array.isArray(subData) ? subData :
+                Array.isArray(subData.submissions) ? subData.submissions :
+                  Array.isArray(subData.data) ? subData.data : [];
+              if (isMounted) setExamSubmissions(subs);
+            })
+            .catch(() => { if (isMounted) setExamSubmissions([]); });
 
           // Fetch results
           fetch('/api/student/results')
@@ -983,105 +991,126 @@ export default function StudentDashboardPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {exams.length > 0 ? (
-                      exams.map((exam, i) => (
-                        <motion.div
-                          key={exam.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: i * 0.1 }}
-                        >
-                          <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-card">
-                            <CardHeader className="bg-muted/30 pb-4 border-b border-border">
-                              <div className="flex items-center justify-between mb-2">
-                                <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'} className="uppercase text-[10px] tracking-wider font-bold">
-                                  {exam.type}
-                                </Badge>
-                                <span className="text-xs font-mono text-muted-foreground bg-background px-2 py-1 rounded-md border border-border">
-                                  {exam.time ? new Date(`2000-01-01T${exam.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
-                                </span>
-                              </div>
-                              <CardTitle className="text-lg md:text-xl group-hover:text-primary transition-colors">{exam.name}</CardTitle>
-                              <CardDescription className="flex items-center gap-1 mt-1">
-                                <BookOpen className="w-3 h-3" /> {exam.subject}
-                              </CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-6">
-                              <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
-                                <Calendar className="w-4 h-4 text-primary" />
-                                <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
-                              </div>
+                      exams.map((exam, i) => {
+                        const hasResult = results.some((r: any) => r.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+                        const result = results.find((r: any) => r.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+                        const submission = examSubmissions.find((s: any) => s.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
+                        const isSubmitted = hasResult || submission?.status === 'SUBMITTED';
+                        const isInProgress = !isSubmitted && submission?.status === 'IN_PROGRESS';
+                        const now = new Date();
+                        const examEnd = exam.endTime ? new Date(exam.endTime) : (() => { const d = new Date(exam.date); d.setHours(23, 59, 59, 999); return d; })();
+                        const examStart = (() => { const d = new Date(exam.date); d.setHours(0, 0, 0, 0); return d; })();
+                        const isExpired = now > examEnd;
+                        const isActive = !isExpired && now >= examStart;
 
-                              {/* Marks & Rank Section */}
-                              {(() => {
-                                const result = results.find((r: any) => r.examId === exam.id); // eslint-disable-line @typescript-eslint/no-explicit-any
-                                if (result) {
-                                  return (
-                                    <div className="grid grid-cols-2 gap-2 mb-4">
-                                      <div className="bg-primary/10 p-2 rounded-lg text-center border border-primary/20">
-                                        <div className="text-[10px] text-primary font-bold uppercase tracking-wider">Marks</div>
-                                        <div className="text-lg font-bold text-primary">{result.total} / {exam.totalMarks}</div>
-                                      </div>
-                                      <div className="bg-amber-500/10 p-2 rounded-lg text-center border border-amber-500/20">
-                                        <div className="text-lg font-bold text-amber-600">#{result.rank || '-'}</div>
-                                      </div>
+                        return (
+                          <motion.div
+                            key={exam.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: i * 0.1 }}
+                          >
+                            <Card className="hover:shadow-xl transition-all duration-300 border-t-4 border-t-blue-500 overflow-hidden group rounded-2xl bg-card">
+                              <CardHeader className="bg-muted/30 pb-4 border-b border-border">
+                                <div className="flex items-center justify-between mb-2">
+                                  <Badge variant={exam.type === 'ONLINE' ? 'default' : 'secondary'} className="uppercase text-[10px] tracking-wider font-bold">
+                                    {exam.type}
+                                  </Badge>
+                                  {/* Status badge */}
+                                  {isSubmitted && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+                                      <CheckCircle className="w-3 h-3" /> Submitted
+                                    </span>
+                                  )}
+                                  {isInProgress && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                                      ⏳ In Progress
+                                    </span>
+                                  )}
+                                  {!isSubmitted && !isInProgress && isExpired && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                      Expired
+                                    </span>
+                                  )}
+                                  {!isSubmitted && !isInProgress && isActive && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
+                                      ⚡ Live Now
+                                    </span>
+                                  )}
+                                  {!isSubmitted && !isInProgress && !isActive && !isExpired && (
+                                    <span className="text-xs font-mono text-muted-foreground bg-background px-2 py-1 rounded-md border border-border">
+                                      {exam.time ? new Date(`2000-01-01T${exam.time}`).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'TBA'}
+                                    </span>
+                                  )}
+                                </div>
+                                <CardTitle className="text-lg md:text-xl group-hover:text-primary transition-colors">{exam.name}</CardTitle>
+                                <CardDescription className="flex items-center gap-1 mt-1">
+                                  <BookOpen className="w-3 h-3" /> {exam.subject}
+                                </CardDescription>
+                              </CardHeader>
+                              <CardContent className="pt-6">
+                                <div className="flex items-center gap-2 mb-4 text-sm text-gray-600 dark:text-gray-300">
+                                  <Calendar className="w-4 h-4 text-primary" />
+                                  <span className="font-medium">{exam.date ? new Date(exam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }) : ''}</span>
+                                </div>
+
+                                {/* Marks & Rank Section */}
+                                {result && (
+                                  <div className="grid grid-cols-2 gap-2 mb-4">
+                                    <div className="bg-primary/10 p-2 rounded-lg text-center border border-primary/20">
+                                      <div className="text-[10px] text-primary font-bold uppercase tracking-wider">Marks</div>
+                                      <div className="text-lg font-bold text-primary">{result.total} / {(exam as any).totalMarks}</div>
                                     </div>
-                                  );
-                                }
-                                return null;
-                              })()}
+                                    <div className="bg-amber-500/10 p-2 rounded-lg text-center border border-amber-500/20">
+                                      <div className="text-lg font-bold text-amber-600">#{result.rank || '-'}</div>
+                                    </div>
+                                  </div>
+                                )}
 
-                              <div className="flex flex-col gap-2">
-                                {exam.type === 'ONLINE' && (
-                                  (() => {
-                                    const result = results.find((r: any) => r.examId === exam.id);
-                                    const isExpired = exam.endTime && new Date() > new Date(exam.endTime);
-
-                                    if (result) {
-                                      return (
-                                        <div className="flex flex-col gap-2">
-                                          <div className="flex gap-2">
-                                            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
-                                              <BarChart3 className="h-4 w-4 mr-2" />
-                                              View Result
-                                            </Button>
-                                            {isExpired && (
-                                              <Button variant="outline" className="flex-1 rounded-xl border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
-                                                <Sparkles className="h-4 w-4 mr-2" />
-                                                Practice
-                                              </Button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      );
-                                    }
-
-                                    if (isExpired) {
-                                      return (
-                                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/20" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
-                                          <Sparkles className="h-4 w-4 mr-2" />
-                                          Take Practice Session
+                                <div className="flex flex-col gap-2">
+                                  {exam.type === 'ONLINE' && (
+                                    isSubmitted ? (
+                                      <div className="flex gap-2">
+                                        <Button variant="outline" className="flex-1 rounded-xl" onClick={() => router.push(`/exams/results/${exam.id}`)}>
+                                          <BarChart3 className="h-4 w-4 mr-2" />
+                                          View Result
                                         </Button>
-                                      );
-                                    }
-                                    return (
+                                        {isExpired && (
+                                          <Button variant="outline" className="flex-1 rounded-xl border-emerald-500 text-emerald-600 hover:bg-emerald-50" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
+                                            <Sparkles className="h-4 w-4 mr-2" />
+                                            Practice
+                                          </Button>
+                                        )}
+                                      </div>
+                                    ) : isInProgress ? (
+                                      <Button className="w-full rounded-xl shadow-lg shadow-amber-500/20 bg-amber-600 hover:bg-amber-700 text-white" onClick={() => router.push('/exams/online')}>
+                                        <Play className="h-4 w-4 mr-2 fill-current" />
+                                        Resume Exam
+                                      </Button>
+                                    ) : isExpired ? (
+                                      <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-lg shadow-emerald-500/20" onClick={() => router.push(`/exams/practice/${exam.id}`)}>
+                                        <Sparkles className="h-4 w-4 mr-2" />
+                                        Take Practice Session
+                                      </Button>
+                                    ) : (
                                       <Button className="w-full group-hover:bg-primary/90 rounded-xl shadow-lg shadow-primary/20" onClick={() => router.push('/exams/online')}>
                                         <Play className="h-4 w-4 mr-2 fill-current" />
-                                        Start Exam
+                                        {isActive ? 'Start Exam' : 'View Exam'}
                                       </Button>
-                                    );
-                                  })()
-                                )}
-                                {exam.type !== 'ONLINE' && (
-                                  <Button variant="outline" className="w-full rounded-xl">
-                                    <Download className="h-4 w-4 mr-2" />
-                                    Admit Card
-                                  </Button>
-                                )}
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </motion.div>
-                      ))
+                                    )
+                                  )}
+                                  {exam.type !== 'ONLINE' && (
+                                    <Button variant="outline" className="w-full rounded-xl">
+                                      <Download className="h-4 w-4 mr-2" />
+                                      Admit Card
+                                    </Button>
+                                  )}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          </motion.div>
+                        );
+                      })
                     ) : (
                       <div className="col-span-full flex flex-col items-center justify-center py-16 bg-muted/30 rounded-2xl border border-dashed border-border text-center">
                         <div className="bg-background p-4 rounded-full shadow-sm mb-4">

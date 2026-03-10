@@ -5,6 +5,7 @@ import bcrypt from 'bcryptjs';
 import { createToken, JWTPayload } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { socketService } from '@/lib/socket';
+import { normalizePhone } from '@/lib/utils';
 
 const loginSchema = z.object({
     identifier: z.string().min(1, 'Email or phone number is required'),
@@ -29,12 +30,18 @@ export async function POST(request: NextRequest) {
 
         // ... find user logic ...
         // [Existing code for finding user and verifying password]
+        // For phone login, normalize the number so +8801794678595 and 01794678595 are equivalent
+        const normalizedPhone = loginMethod === 'phone' ? normalizePhone(identifier) : identifier;
+
         let user;
         try {
+            const phoneWhere = loginMethod === 'phone'
+                ? { OR: [{ phone: normalizedPhone }, { phone: identifier }] }
+                : {};
             user = await (prismadb.user as any).findFirst({
                 where: loginMethod === 'email'
                     ? { email: identifier }
-                    : { phone: identifier },
+                    : phoneWhere,
                 select: {
                     id: true,
                     email: true,
@@ -42,9 +49,9 @@ export async function POST(request: NextRequest) {
                     password: true,
                     role: true,
                     name: true,
-                    isActive: true, // Might be missing
-                    emailVerified: true, // Might be missing
-                    isApproved: true, // Might be missing
+                    isActive: true,
+                    emailVerified: true,
+                    isApproved: true,
                     instituteId: true,
                     institute: { select: { id: true, name: true } },
                     studentProfile: {
@@ -63,7 +70,7 @@ export async function POST(request: NextRequest) {
             user = await (prismadb.user as any).findFirst({
                 where: loginMethod === 'email'
                     ? { email: identifier }
-                    : { phone: identifier }
+                    : { OR: [{ phone: normalizedPhone }, { phone: identifier }] }
             });
         }
 

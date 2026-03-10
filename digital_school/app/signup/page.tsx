@@ -152,6 +152,9 @@ export default function SignupPage() {
     };
 
 
+    const [otpPhone, setOtpPhone] = useState<string | null>(null);
+    const [successMethod, setSuccessMethod] = useState<'email' | 'phone' | 'pending' | null>(null);
+
     const onSubmit = (data: TSignupSchema) => {
         triggerHaptic(ImpactStyle.Medium);
         setError(null);
@@ -176,11 +179,24 @@ export default function SignupPage() {
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
                     triggerHaptic(ImpactStyle.Medium);
+                    const method = result.verifyMethod as 'email' | 'phone' | 'pending';
+                    setSuccessMethod(method);
                     setSuccess(true);
-                    // Redirect to pending page after a short delay
-                    setTimeout(() => {
-                        window.location.href = '/auth/pending';
-                    }, 1500);
+
+                    if (method === 'phone' && result.phone) {
+                        // Go to OTP page
+                        setOtpPhone(result.phone);
+                        setTimeout(() => {
+                            window.location.href = `/auth/verify-phone?phone=${encodeURIComponent(result.phone)}`;
+                        }, 1200);
+                    } else if (method === 'email') {
+                        // Show email-check card (success state below)
+                    } else {
+                        // Admin approval page
+                        setTimeout(() => {
+                            window.location.href = '/auth/pending';
+                        }, 1500);
+                    }
                 }
             } catch {
                 triggerHaptic(ImpactStyle.Heavy);

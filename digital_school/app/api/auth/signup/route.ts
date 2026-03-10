@@ -9,6 +9,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
 import { sendEmail } from '@/lib/email';
+import { normalizePhone } from '@/lib/utils';
+import { sendSMS, generateOTP } from '@/lib/sms';
 
 /**
  * POST handler for production-ready user signup.
@@ -23,6 +25,11 @@ export async function POST(request: NextRequest) {
 
         // Validate the request body
         const validatedData = signupSchema.parse(body);
+
+        // Normalize phone number (treat +8801... and 01... as same)
+        if (validatedData.phone) {
+            validatedData.phone = normalizePhone(validatedData.phone);
+        }
 
         // Check if user already exists by email (if email is provided)
         if (validatedData.email) {
@@ -191,12 +198,15 @@ export async function POST(request: NextRequest) {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { password, ...userWithoutPassword } = user;
 
-        // Send Verification Email if email is provided
+        // ─── VERIFICATION PRIORITY: email > phone SMS > admin approval ───────────
+
+        let verifyMethod: 'email' | 'phone' | 'pending' = 'pending';
+
         if (user.email && verificationToken) {
+            // 1) EMAIL: send a verification link
+            verifyMethod = 'email';
             try {
                 const verificationLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/auth/verify-email?token=${verificationToken}`;
-
-                // Fetch institute data if associated
                 let institute = undefined;
                 if (user.instituteId) {
                     const inst = await (prismadb.institute as any).findUnique({
@@ -205,28 +215,59 @@ export async function POST(request: NextRequest) {
                     });
                     if (inst) institute = inst;
                 }
-
-                await sendEmail({
+                const emailResult = await sendEmail({
                     to: user.email,
-                    subject: `Verify your email - ${institute?.name || 'Digital School'}`,
+                    subject: `Verify your email - ${(institute as any)?.name || 'Digital School'}`,
                     react: WelcomeEmail({
                         firstName: user.name.split(' ')[0],
                         institute: institute as any,
-                        verificationLink // Pass the link to the email template
+                        verificationLink
                     }) as any,
                 });
+                if (!emailResult.success) {
+                    console.error('[SIGNUP] Verification email failed:', emailResult.error);
+                }
             } catch (emailError) {
-                console.error('Failed to send verification email:', emailError);
+                console.error('[SIGNUP] Email error:', emailError);
+            }
+
+        } else if (user.phone) {
+            // 2) PHONE: try SMS OTP
+            try {
+                const otp = generateOTP();
+                const hashedOtp = await bcrypt.hash(otp, 10);
+                const expiry = new Date(Date.now() + 10 * 60 * 1000);
+                await (prismadb.user as any).update({
+                    where: { id: user.id },
+                    data: { phoneOtp: hashedOtp, phoneOtpExpiry: expiry } as any,
+                });
+                const smsMessage = `Your Digital School verification code is: ${otp}. Valid for 10 minutes.`;
+                const smsResult = await sendSMS(user.phone, smsMessage);
+                if (smsResult.success) {
+                    verifyMethod = 'phone';
+                    console.log('[SIGNUP] OTP SMS sent to', user.phone);
+                } else {
+                    console.warn('[SIGNUP] SMS OTP failed, falling back to admin approval:', smsResult.error);
+                    verifyMethod = 'pending'; // fall through to admin approval
+                }
+            } catch (smsErr) {
+                console.error('[SIGNUP] SMS error:', smsErr);
+                verifyMethod = 'pending';
             }
         }
+        // 3) If neither email nor phone-OTP worked → verifyMethod stays 'pending' (admin approval)
 
         const response = NextResponse.json(
             {
-                message: 'Account created successfully. ' +
-                    (user.email ? 'Please check your email to verify your account. ' : '') +
-                    (user.phone ? 'Your account is pending admin approval.' : ''),
+                message: verifyMethod === 'email'
+                    ? 'Account created! Please check your email to verify your account.'
+                    : verifyMethod === 'phone'
+                        ? 'Account created! An OTP has been sent to your phone.'
+                        : 'Account created! Your account is pending admin approval.',
                 user: userWithoutPassword,
-                token
+                token,
+                verifyMethod, // 'email' | 'phone' | 'pending'
+                phone: verifyMethod === 'phone' ? user.phone : undefined,
             },
             { status: 201 }
         );

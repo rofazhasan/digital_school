@@ -32,6 +32,8 @@ model User {
   pendingEmail         String?
   pendingPhone         String?
   verificationToken    String?                    @unique
+  phoneOtp             String?
+  phoneOtpExpiry       DateTime?
   activityAudits       ActivityAudit[]
   admissionReviews     AdmissionApplication[]     @relation("AdmissionReviewer")
   aiActivities         AIActivity[]

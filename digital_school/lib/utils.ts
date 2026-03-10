@@ -6,6 +6,29 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Normalize a Bangladeshi phone number to the canonical 01XXXXXXXXX (11-digit) format.
+ * Handles: +8801XXXXXXXXX, +880 1XXXXXXXXX, 8801XXXXXXXXX, 01XXXXXXXXX, etc.
+ * Strips spaces, dashes, parentheses before normalizing.
+ */
+export function normalizePhone(phone: string): string {
+  // Remove all non-digit characters except leading +
+  let cleaned = phone.replace(/[\s\-().]/g, '');
+  // Remove leading +
+  if (cleaned.startsWith('+')) {
+    cleaned = cleaned.slice(1);
+  }
+  // +880 / 880 prefix (Bangladesh country code)
+  if (cleaned.startsWith('880')) {
+    cleaned = '0' + cleaned.slice(3);
+  }
+  // +88 / 88 prefix
+  if (cleaned.startsWith('88') && !cleaned.startsWith('880')) {
+    cleaned = '0' + cleaned.slice(2);
+  }
+  return cleaned;
+}
+
+/**
  * Calculate grade based on percentage
  * @param percentage - The percentage score (0-100)
  * @returns The grade (A+, A, A-, B+, B, C, D, F)
