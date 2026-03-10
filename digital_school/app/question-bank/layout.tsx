@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-    title: "Question Bank | Digital School",
+    title: "Question Bank",
     description: "Manage and create questions for exams",
 };
 

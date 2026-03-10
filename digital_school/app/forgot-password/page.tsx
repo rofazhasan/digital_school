@@ -23,6 +23,8 @@ import { triggerHaptic, ImpactStyle } from '@/lib/haptics';
 export default function ForgotPasswordPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState<boolean>(false);
+    const [step, setStep] = useState<'request' | 'otp' | 'pending_approval' | 'done'>('request');
+    const [identifier, setIdentifier] = useState('');
     const [isPending, startTransition] = useTransition();
 
     const form = useForm<TForgotPasswordSchema>({
@@ -35,6 +37,7 @@ export default function ForgotPasswordPage() {
     const onSubmit = (data: TForgotPasswordSchema) => {
         triggerHaptic(ImpactStyle.Medium);
         setError(null);
+        setIdentifier(data.identifier);
         console.log('[FORGOT_PASSWORD] Submitting identifier:', data.identifier);
 
         startTransition(async () => {
@@ -53,11 +56,15 @@ export default function ForgotPasswordPage() {
                     setError(result.message || 'An unexpected error occurred.');
                 } else {
                     triggerHaptic(ImpactStyle.Medium);
-                    if (result.type === 'phone' && result.token) {
-                        console.log('[FORGOT_PASSWORD] Phone flow detected, redirecting...');
-                        window.location.href = `/reset-password?token=${result.token}`;
+                    if (result.type === 'phone' || result.type === 'otp') {
+                        console.log('[FORGOT_PASSWORD] Phone flow detected, showing OTP step');
+                        setStep('otp');
+                    } else if (result.status === 'pending_approval') {
+                        console.log('[FORGOT_PASSWORD] Pending approval flow');
+                        setStep('pending_approval');
                     } else {
                         console.log('[FORGOT_PASSWORD] Email flow successful');
+                        setStep('done');
                         setSuccess(true);
                     }
                 }
@@ -67,6 +74,12 @@ export default function ForgotPasswordPage() {
                 setError('Failed to connect to the server. Please try again.');
             }
         });
+    };
+
+    const onOtpSubmit = (otp: string) => {
+        triggerHaptic(ImpactStyle.Medium);
+        // Redirect to reset password with the OTP as token
+        window.location.href = `/reset-password?token=${otp}`;
     };
 
     return (
@@ -119,7 +132,7 @@ export default function ForgotPasswordPage() {
 
                 <div className="w-full max-w-[420px] space-y-8">
                     <AnimatePresence mode="wait">
-                        {!success ? (
+                        {step === 'request' && (
                             <motion.div
                                 key="request-form"
                                 initial={{ opacity: 0, x: 20 }}
@@ -173,18 +186,88 @@ export default function ForgotPasswordPage() {
                                             {isPending ? (
                                                 <>
                                                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                                                    Sending link...
+                                                    Searching account...
                                                 </>
                                             ) : (
                                                 <>
-                                                    Send Recovery Link <ArrowRight className="ml-2 h-4 w-4" />
+                                                    Continue <ArrowRight className="ml-2 h-4 w-4" />
                                                 </>
                                             )}
                                         </Button>
                                     </form>
                                 </Form>
                             </motion.div>
-                        ) : (
+                        )}
+
+                        {step === 'otp' && (
+                            <motion.div
+                                key="otp-form"
+                                initial={{ opacity: 0, x: 20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: -20 }}
+                                className="space-y-8"
+                            >
+                                <div className="text-center lg:text-left">
+                                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Verify Identity</h2>
+                                    <p className="mt-2 text-muted-foreground">We've sent a 6-digit OTP to your phone number <strong>{identifier}</strong>.</p>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-foreground/80">6-Digit OTP</label>
+                                        <Input
+                                            type="text"
+                                            maxLength={6}
+                                            placeholder="XXXXXX"
+                                            className="h-14 text-center text-2xl tracking-[1em] font-mono"
+                                            autoFocus
+                                            onChange={(e) => {
+                                                if (e.target.value.length === 6) {
+                                                    onOtpSubmit(e.target.value);
+                                                }
+                                            }}
+                                        />
+                                    </div>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full h-12 rounded-xl"
+                                        onClick={() => setStep('request')}
+                                    >
+                                        Change Phone Number
+                                    </Button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {step === 'pending_approval' && (
+                            <motion.div
+                                key="pending-approval"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-center space-y-6 py-8"
+                            >
+                                <div className="w-20 h-20 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <ShieldCheck className="w-10 h-10 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Approval Pending</h2>
+                                <p className="text-muted-foreground leading-relaxed text-lg">
+                                    SMS delivery failed. Your password reset request has been sent to an administrator for manual approval.
+                                </p>
+                                <div className="p-4 bg-muted/30 rounded-lg border border-border text-sm text-left">
+                                    <p className="font-semibold mb-1">What happens next?</p>
+                                    <ul className="list-disc pl-4 space-y-1 text-muted-foreground">
+                                        <li>An admin will review your request.</li>
+                                        <li>Once approved, you will be able to reset your password.</li>
+                                        <li>Please contact your institute for faster processing.</li>
+                                    </ul>
+                                </div>
+                                <Button variant="outline" className="w-full h-12 rounded-xl" asChild>
+                                    <Link href="/login">Return to Login</Link>
+                                </Button>
+                            </motion.div>
+                        )}
+
+                        {step === 'done' && (
                             <motion.div
                                 key="success-message"
                                 initial={{ opacity: 0, scale: 0.95 }}
@@ -194,18 +277,18 @@ export default function ForgotPasswordPage() {
                                 <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
                                     <CheckCircle2 className="w-10 h-10 text-green-600 dark:text-green-400" />
                                 </div>
-                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Check your inbox</h2>
-                                <p className="text-muted-foreground leading-relaxed">
-                                    We've sent a password recovery link to your registered email.
+                                <h2 className="text-3xl font-bold tracking-tight text-foreground">Next Step</h2>
+                                <p className="text-muted-foreground leading-relaxed text-lg">
+                                    We've sent a password recovery link to <strong>{identifier}</strong>.
                                     Please check your inbox and follow the instructions.
                                 </p>
                                 <Button variant="outline" className="w-full h-12 rounded-xl" asChild>
                                     <Link href="/login">Return to Login</Link>
                                 </Button>
                                 <p className="text-sm text-muted-foreground">
-                                    Didn't receive the email? Check your spam folder or{' '}
+                                    Didn't receive it? Check your spam folder or{' '}
                                     <button
-                                        onClick={() => setSuccess(false)}
+                                        onClick={() => setStep('request')}
                                         className="text-primary hover:underline font-medium"
                                     >
                                         try again

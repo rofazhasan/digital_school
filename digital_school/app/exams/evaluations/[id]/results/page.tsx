@@ -136,7 +136,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
 
     // Helper to calculate MCQ marks if not in result table yet (e.g. preview)
     const calculateMcqFromAnswers = (answers: any, questions: any[]) => {
-        let score = 0;
+        const score = 0;
         const mcqQuestions = questions.filter((q: any) => q.type === 'mcq');
 
         // Simplistic calculation matching the API logic roughly for preview

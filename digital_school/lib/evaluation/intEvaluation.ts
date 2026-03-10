@@ -1,7 +1,7 @@
 // INT (Integer Type) Question Evaluation Logic
 // Evaluates integer answer questions with exact match
 
-interface INTQuestion {
+export interface INTQuestion {
     modelAnswer?: string | number;
     correctAnswer?: string | number;
     correct?: string | number;
@@ -9,7 +9,7 @@ interface INTQuestion {
     marks: number;
 }
 
-interface INTAnswer {
+export interface INTAnswer {
     answer: number | string;
 }
 

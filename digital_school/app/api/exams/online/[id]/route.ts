@@ -32,6 +32,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     let questions: any[] = [];
     let assignedExamSetId = null;
 
+    // PROACTIVE SET ASSIGNMENT: Ensure student has a set even before starting
+    const { assignBalancedExamSet } = await import("@/lib/exam-logic");
+    assignedExamSetId = await assignBalancedExamSet(studentId, examId);
+
     const submissions = await prisma.examSubmission.findMany({
       where: {
         examId: examId,
@@ -64,9 +68,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const searchParams = req.nextUrl.searchParams;
     const action = searchParams.get('action');
 
-    // 1. REDIRECTION LOGIC: If submitted and no retake allowed, redirect to results
-    if (isFinished && !exam.allowRetake) {
-      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId}`);
+    // 1. STRICT REDIRECTION LOGIC
+    // If retake is allowed and user hasn't explicitly clicked 'start', we show the preview/instructions
+    // If retake is NOT allowed:
+    // - If submission exists and is SUBMITTED, redirect to results.
+    // - If submission exists and is IN_PROGRESS, allow entry (resume).
+    // - If no submission exists, allow entry (first time).
+
+    if (!exam.allowRetake && existingSubmission && existingSubmission.status === 'SUBMITTED') {
+      console.log(`➡️ Redirecting student ${studentId} to results for exam ${examId} (Already submitted)`);
       return NextResponse.json({
         id: exam.id,
         name: exam.name,
@@ -80,27 +90,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const shouldCreateNew = (!existingSubmission || (isFinished && exam.allowRetake)) && action === 'start';
 
     if (shouldCreateNew) {
-      // Logic to assign exam set first
-      if (exam.examSets.length > 0) {
-        let examStudentMap = await prisma.examStudentMap.findUnique({
-          where: { studentId_examId: { studentId, examId } },
-          include: { examSet: true }
-        });
-
-        assignedExamSetId = examStudentMap?.examSetId;
-
-        if (!assignedExamSetId) {
-          const randomIndex = Math.floor(Math.random() * exam.examSets.length);
-          const examSet = exam.examSets[randomIndex];
-          assignedExamSetId = examSet.id;
-
-          await prisma.examStudentMap.upsert({
-            where: { studentId_examId: { studentId, examId } },
-            update: { examSetId: assignedExamSetId },
-            create: { studentId, examId, examSetId: assignedExamSetId }
-          });
-        }
-      }
+      // Set is already assigned proactively above
+      // But we still need to ensure it's in the submission
 
       // DELETE PREVIOUS SUBMISSION BEFORE STARTING NEW ONE (RETAKE CLEANUP)
       if (existingSubmission) {

@@ -3,6 +3,29 @@ export interface MTFMatch {
     rightId: string;
 }
 
+export interface MTFMatchNode {
+    id: string;
+    text: string;
+}
+
+export interface MTFQuestion {
+    matches?: Record<string, string>;
+    leftColumn?: MTFMatchNode[];
+    rightColumn?: MTFMatchNode[];
+    marks: number;
+}
+
+export interface MTFRawMatch {
+    leftId?: string;
+    rightId?: string;
+    leftIndex?: number;
+    rightIndex?: number;
+}
+
+export interface MTFAnswer {
+    matches?: Record<string, string> | MTFRawMatch[];
+}
+
 export interface MTFResult {
     score: number;
     isCorrect: boolean;
@@ -16,8 +39,8 @@ export interface MTFResult {
 }
 
 export function evaluateMTFQuestion(
-    question: any,
-    studentMatches: any
+    question: MTFQuestion,
+    studentMatches: MTFAnswer
 ): MTFResult {
     const correctMatches = (question.matches || {}) as Record<string, string>;
     const totalLeftItems = question.leftColumn?.length || 0;
@@ -32,10 +55,10 @@ export function evaluateMTFQuestion(
 
     if (Array.isArray(rawMatches)) {
         // [{leftId: "1", rightId: "A"}, ...] or [{leftIndex: 0, rightIndex: 2}, ...]
-        rawMatches.forEach((m: any) => {
-            if (m.leftId && m.rightId) {
+        (rawMatches as MTFRawMatch[]).forEach((m) => {
+            if (m && typeof m === 'object' && m.leftId !== undefined && m.rightId !== undefined) {
                 normalizedStudentMatches[m.leftId] = m.rightId;
-            } else if (m.leftIndex !== undefined && m.rightIndex !== undefined) {
+            } else if (m && typeof m === 'object' && m.leftIndex !== undefined && m.rightIndex !== undefined) {
                 const leftItem = question.leftColumn?.[m.leftIndex];
                 const rightItem = question.rightColumn?.[m.rightIndex];
                 if (leftItem && rightItem) {
@@ -43,12 +66,12 @@ export function evaluateMTFQuestion(
                 }
             }
         });
-    } else if (typeof rawMatches === 'object') {
+    } else if (rawMatches && typeof rawMatches === 'object') {
         // Direct ID-based map: { "A": "1", "B": "2" }
-        normalizedStudentMatches = rawMatches;
+        normalizedStudentMatches = rawMatches as Record<string, string>;
     }
 
-    const matchesDetails = (question.leftColumn || []).map((item: any) => {
+    const matchesDetails = (question.leftColumn || []).map((item: MTFMatchNode) => {
         const correctRightId = correctMatches[item.id];
         const studentRightId = normalizedStudentMatches ? normalizedStudentMatches[item.id] || null : null;
         const isMatchedCorrectly = correctRightId && studentRightId && correctRightId === studentRightId;

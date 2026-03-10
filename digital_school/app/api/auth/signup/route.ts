@@ -8,6 +8,7 @@ import { createToken, JWTPayload } from '@/lib/auth';
 import { v4 as uuidv4 } from 'uuid';
 import { Prisma } from '@prisma/client';
 import { WelcomeEmail } from '@/components/emails/WelcomeEmail';
+import { ApprovalRequestEmail } from '@/components/emails/ApprovalRequestEmail';
 import { sendEmail } from '@/lib/email';
 import { normalizePhone } from '@/lib/utils';
 import { sendSMS, generateOTP } from '@/lib/sms';
@@ -62,8 +63,12 @@ export async function POST(request: NextRequest) {
         // Hash the password
         const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
-        // Generate verification token if email is provided
-        const verificationToken = validatedData.email ? crypto.randomUUID() : null;
+        // Generate verification token or OTP
+        // If phone is provided and no email, use 6-digit numeric OTP for SMS verification
+        const isPhoneOnly = !!(validatedData.phone && !validatedData.email);
+        const verificationToken = isPhoneOnly
+            ? Math.floor(100000 + Math.random() * 900000).toString()
+            : (validatedData.email ? crypto.randomUUID() : null);
 
         // Create user data
         const userData: any = {
@@ -180,8 +185,8 @@ export async function POST(request: NextRequest) {
             role: user.role as JWTPayload['role'],
             instituteId: user.instituteId || undefined,
             sid: sessionId,
-            verified: (user as any).emailVerified,
-            approved: (user as any).isApproved,
+            verified: (user as any).emailVerified || false,
+            approved: (user as any).isApproved || false,
         });
 
         // Update user session in DB
@@ -256,6 +261,43 @@ export async function POST(request: NextRequest) {
             }
         }
         // 3) If neither email nor phone-OTP worked → verifyMethod stays 'pending' (admin approval)
+
+        // Send Approval Request Email to Super Admin if student signed up with phone
+        if (user.role === UserRole.STUDENT && user.phone && !user.isApproved) {
+            try {
+                // Find Super Admin email
+                const superAdmin = await (prismadb.user as any).findFirst({
+                    where: { role: 'SUPER_USER' },
+                    select: { email: true }
+                });
+
+                if (superAdmin?.email) {
+                    // Fetch institute data if associated
+                    let institute = undefined;
+                    if (user.instituteId) {
+                        const inst = await (prismadb.institute as any).findUnique({
+                            where: { id: user.instituteId },
+                            select: { name: true, address: true, phone: true, logoUrl: true }
+                        });
+                        if (inst) institute = inst;
+                    }
+
+                    await sendEmail({
+                        to: superAdmin.email,
+                        subject: `New Student Approval Required - ${user.name}`,
+                        react: ApprovalRequestEmail({
+                            studentName: user.name,
+                            studentPhone: user.phone,
+                            studentClass: validatedData.class,
+                            studentSection: validatedData.section,
+                            institute: institute as any,
+                        }) as any,
+                    });
+                }
+            } catch (adminEmailError) {
+                console.error('Failed to send admin notification email:', adminEmailError);
+            }
+        }
 
         const response = NextResponse.json(
             {

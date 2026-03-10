@@ -24,9 +24,14 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
       algorithms: [JWT_ALGORITHM],
     });
 
+    if (!payload) {
+      console.warn('[AUTH] jwtVerify returned no payload');
+      return null;
+    }
+
     return payload as unknown as JWTPayload;
-  } catch (error) {
-    console.error('Token verification failed:', error);
+  } catch (error: any) {
+    console.warn('[AUTH] Token verification failed:', error.message);
     return null;
   }
 }
@@ -34,11 +39,17 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
 // Validate session status
 export async function validateSession(token: string) {
   try {
+    console.log('[AUTH] Validating session token...');
     const payload = await verifyToken(token);
-    if (!payload) return { status: 'invalid' };
+    if (!payload) {
+      console.warn('[AUTH] No payload returned from verifyToken');
+      return { status: 'invalid' };
+    }
+
+    console.log('[AUTH] Payload verified for user:', payload.userId);
 
     // Defensive check for database query
-    let user;
+    let user: any;
     try {
       // Use a minimal select to avoid triggering errors for missing columns
       user = await (prismadb.user as any).findUnique({
@@ -69,12 +80,13 @@ export async function validateSession(token: string) {
           },
         },
       });
-    } catch (dbError: any) {
-      console.warn('[AUTH] Session validation query failed. Likely missing schema fields.', dbError.message);
+    } catch (dbError: unknown) {
+      const errorMessage = dbError instanceof Error ? dbError.message : String(dbError);
+      console.warn('[AUTH] Session validation query failed. Likely missing schema fields.', errorMessage);
       // Fallback: If the structured query fails, try a direct findUnique with no select
       try {
         user = await (prismadb.user as any).findUnique({ where: { id: payload.userId } });
-      } catch (innerError) {
+      } catch (_innerError) {
         return { status: 'invalid' };
       }
     }
@@ -86,7 +98,7 @@ export async function validateSession(token: string) {
     // Safely check fields that might be missing in DB
     const isEmailVerified = (user as any).emailVerified !== false; // Default to true if missing or null, except if explicitly false
     const isApproved = (user as any).isApproved !== false;
-    const isActive = (user as any).isActive !== false;
+    // const isActive = (user as any).isActive !== false; // Removed unused variable
 
     const isPending = !isEmailVerified || !isApproved;
     if (isPending) {
@@ -121,8 +133,8 @@ export async function validateSession(token: string) {
       user: {
         ...user,
         role: user.role as JWTPayload['role'],
-      } as any
-    };
+      } as unknown
+    } as const;
   } catch (error) {
     console.error('Error validating session:', error);
     return { status: 'error' };

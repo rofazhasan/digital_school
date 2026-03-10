@@ -1,9 +1,9 @@
-import nodemailer from 'nodemailer';
+import nodemailer, { Transporter } from 'nodemailer';
 import { render } from '@react-email/render';
 import React from 'react';
 
 // Create a singleton transporter for Brevo SMTP
-let transporter: any = null;
+let transporter: Transporter | null = null;
 
 function getTransporter() {
     if (!transporter) {
@@ -67,7 +67,7 @@ export async function sendEmail({
             html,
             replyTo,
             attachments: attachments?.map(att => {
-                const attachment: any = { filename: att.filename };
+                const attachment: { filename: string; content?: Buffer | string; path?: string } = { filename: att.filename };
                 if (att.content) {
                     attachment.content = att.content; // Can be Buffer or string
                 }

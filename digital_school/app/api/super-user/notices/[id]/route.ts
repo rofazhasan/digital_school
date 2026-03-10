@@ -72,6 +72,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
             (updateData as any).targetClasses = {
                 set: targetClassIds.map((classId: string) => ({ id: classId }))
             };
+        } else if (targetType !== undefined && targetType !== 'SPECIFIC_CLASS') {
+            // If targetType is changed from SPECIFIC_CLASS to something else, clear existing connections
+            updateData.targetClassIds = [];
+            (updateData as any).targetClasses = {
+                set: []
+            };
         }
 
         const notice = await prisma.notice.update({

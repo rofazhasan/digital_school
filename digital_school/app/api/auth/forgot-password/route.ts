@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prismadb from '@/lib/db';
 import crypto from 'crypto';
 import { sendEmail } from '@/lib/email';
+import { sendSMS } from '@/lib/sms';
 import { PasswordResetEmail } from '@/components/emails/PasswordResetEmail';
 
 /**
@@ -34,21 +35,23 @@ export async function POST(request: NextRequest) {
         }
 
         // Generate token and expiry (1 hour)
-        const token = crypto.randomBytes(32).toString('hex');
+        const token = Math.floor(100000 + Math.random() * 900000).toString(); // Always use 6-digit for commonality
         const expires = new Date(Date.now() + 3600000);
 
-        await prismadb.user.update({
-            where: { id: user.id },
-            data: {
-                passwordResetToken: token,
-                passwordResetExpires: expires,
-            } as any, // Cast to any to avoid lint error if types are stale
-        });
-
-        // 1. If user has an email, send the professional email
+        // 1. If user has an email, send the professional email (Priority 1)
         if (user.email) {
+            console.log('[FORGOT_PASSWORD] Priority 1: Attempting to send email to:', user.email);
+
+            await prismadb.user.update({
+                where: { id: user.id },
+                data: {
+                    passwordResetToken: token,
+                    passwordResetExpires: expires,
+                    passwordResetApproved: true, // Email link is self-verifying
+                },
+            });
+
             const resetLink = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/reset-password?token=${token}`;
-            console.log('[FORGOT_PASSWORD] Attempting to send email to:', user.email);
 
             try {
                 const emailResult = await sendEmail({
@@ -66,35 +69,89 @@ export async function POST(request: NextRequest) {
                     }) as any,
                 });
 
-                if (!emailResult.success) {
-                    console.error('[FORGOT_PASSWORD] Email delivery failed:', emailResult.error);
+                if (emailResult.success) {
                     return NextResponse.json({
-                        message: 'Failed to send recovery email. Please ensure your email configuration (GMAIL_USER/GMAIL_APP_PASSWORD) is correct.',
-                        error: (emailResult.error as any)?.message || String(emailResult.error)
-                    }, { status: 500 });
+                        message: 'A password reset link has been sent to your registered email.',
+                        type: 'email'
+                    });
                 }
-            } catch (renderError: any) {
-                console.error('[FORGOT_PASSWORD] Email rendering/sending crash:', renderError);
-                return NextResponse.json({
-                    message: 'Internal error during email generation.',
-                    details: renderError.message || 'Unknown render error'
-                }, { status: 500 });
+                console.error('[FORGOT_PASSWORD] Email delivery failed:', emailResult.error);
+            } catch (err) {
+                console.error('[FORGOT_PASSWORD] Email crash:', err);
             }
-
-            console.log('[FORGOT_PASSWORD] Email sent successfully to:', user.email);
-            return NextResponse.json({
-                message: 'A password reset link has been sent to your registered email.',
-                type: 'email'
-            });
         }
 
-        // 2. If user has ONLY a phone, allow direct reset as per "no need verification" request
-        // In a real production app, we would send an OTP here. 
-        // For now, we provide the token back to the frontend to allow the "no verification" flow.
+        // 2. If no email or email failed, try SMS (Priority 2)
+        if (user.phone) {
+            console.log('[FORGOT_PASSWORD] Priority 2: Attempting to send SMS to:', user.phone);
+
+            await prismadb.user.update({
+                where: { id: user.id },
+                data: {
+                    passwordResetToken: token,
+                    passwordResetExpires: expires,
+                    passwordResetApproved: true, // SMS OTP is self-verifying
+                },
+            });
+
+            try {
+                const instName = user.institute?.name || 'Digital School';
+                const message = `Your ${instName} OTP is ${token}`;
+                const smsResult = await sendSMS(user.phone, message);
+
+                if (smsResult.success) {
+                    return NextResponse.json({
+                        message: `A password reset OTP has been sent to your registered phone number.`,
+                        type: 'phone'
+                    });
+                }
+                console.warn('[FORGOT_PASSWORD] SMS delivery failed, falling back to admin approval.');
+            } catch (smsError) {
+                console.error('[FORGOT_PASSWORD] SMS processing error:', smsError);
+            }
+        }
+
+        // 3. Fallback: Admin Approval (Priority 3)
+        console.log('[FORGOT_PASSWORD] Priority 3: Falling back to admin approval for user:', user.id);
+
+        await prismadb.user.update({
+            where: { id: user.id },
+            data: {
+                passwordResetToken: token,
+                passwordResetExpires: expires,
+                passwordResetApproved: false, // Requires admin manual intervention
+            },
+        });
+
+        try {
+            // Find Super Admin to notify
+            const superAdmin = await prismadb.user.findFirst({
+                where: { role: 'SUPER_USER' },
+                select: { email: true }
+            });
+
+            if (superAdmin?.email) {
+                const { PasswordResetApprovalEmail } = await import('@/components/emails/PasswordResetApprovalEmail');
+                await sendEmail({
+                    to: superAdmin.email,
+                    subject: `Password Reset Approval Required - ${user.name}`,
+                    react: PasswordResetApprovalEmail({
+                        userName: user.name,
+                        userIdentifier: identifier,
+                        institute: user.institute ? {
+                            name: user.institute.name,
+                            logoUrl: user.institute.logoUrl || undefined
+                        } : undefined
+                    }) as any,
+                });
+            }
+        } catch (adminNotifyErr) {
+            console.error('[FORGOT_PASSWORD] Failed to notify admin:', adminNotifyErr);
+        }
+
         return NextResponse.json({
-            message: 'Direct reset enabled for your phone-based account.',
-            type: 'phone',
-            token: token // This allows the frontend to redirect directly to /reset-password?token=...
+            message: 'SMS delivery failed. Your password reset request has been sent for admin approval. Please contact your administrator.',
+            status: 'pending_approval'
         });
 
     } catch (error) {

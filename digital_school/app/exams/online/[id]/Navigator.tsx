@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, memo } from "react";
 import { useExamContext } from "./ExamContext";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,65 @@ interface NavigatorProps {
   onSubmit?: () => void;
 }
 
-export default function Navigator({ questions, onSubmit }: NavigatorProps) {
+interface NavButtonProps {
+  questionId: string;
+  type: string;
+  localIdx: number;
+  globalIdx: number;
+  currentIdx: number;
+  marked: boolean;
+  onNavigate: (index: number) => void;
+  answers: any;
+}
+
+const NavButton = memo(({
+  questionId,
+  type,
+  localIdx,
+  globalIdx,
+  currentIdx,
+  marked,
+  onNavigate,
+  answers
+}: NavButtonProps) => {
+  const isCurrent = currentIdx === globalIdx;
+
+  const isAnswered = useMemo(() => {
+    if (answers[questionId]) return true;
+    const t = (type || "").toLowerCase();
+    if (['smcq', 'cq', 'sq', 'descriptive'].includes(t)) {
+      return Object.keys(answers).some(key => key.startsWith(`${questionId}_sub_`) || key.startsWith(`${questionId}_desc_`));
+    }
+    return false;
+  }, [answers, questionId, type]);
+
+  return (
+    <button
+      onClick={() => onNavigate(globalIdx)}
+      className={`
+        relative flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-200
+        aspect-square w-full
+        ${isCurrent
+          ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-105 ring-2 ring-primary/20 z-10'
+          : marked
+            ? 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-800'
+            : isAnswered
+              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-800'
+              : 'bg-muted border border-border text-muted-foreground hover:border-primary/50 hover:bg-accent'
+        }
+      `}
+    >
+      {localIdx + 1}
+      {marked && (
+        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-background" />
+      )}
+    </button>
+  );
+});
+
+NavButton.displayName = 'NavButton';
+
+const Navigator = ({ questions, onSubmit }: NavigatorProps) => {
   const { answers, navigation, navigateToQuestion, groupedQuestions, sortedQuestions } = useExamContext();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -31,36 +89,21 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
         )}
         <div className={`grid gap-2 md:gap-3 transition-all ${isCollapsed ? 'grid-cols-1' : 'grid-cols-5'}`}>
           {groupQuestions.map((q: any, localIdx: number) => {
-            // Find the global index of this question in the sorted list
             const globalIdx = sortedQuestions.findIndex((sq: any) => sq.id === q.id);
             if (globalIdx === -1) return null;
 
-            const isCurrent = (navigation.current || 0) === globalIdx;
-            const isAnswered = answers[q.id];
-            const isMarked = navigation.marked[q.id];
-
             return (
-              <button
+              <NavButton
                 key={q.id}
-                onClick={() => navigateToQuestion(globalIdx)}
-                className={`
-                    relative flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-200
-                    ${isCollapsed ? 'w-8 h-8 mx-auto' : 'aspect-square w-full'}
-                    ${isCurrent
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-105 ring-2 ring-primary/20 z-10'
-                    : isMarked
-                      ? 'bg-amber-100 text-amber-900 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-100 dark:border-amber-800'
-                      : isAnswered
-                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-100 dark:border-emerald-800'
-                        : 'bg-muted border border-border text-muted-foreground hover:border-primary/50 hover:bg-accent'
-                  }
-                  `}
-              >
-                {localIdx + 1}
-                {isMarked && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-background" />
-                )}
-              </button>
+                questionId={q.id}
+                type={q.type}
+                localIdx={localIdx}
+                globalIdx={globalIdx}
+                currentIdx={navigation.current || 0}
+                marked={!!navigation.marked[q.id]}
+                onNavigate={navigateToQuestion}
+                answers={answers}
+              />
             );
           })}
         </div>
@@ -119,4 +162,6 @@ export default function Navigator({ questions, onSubmit }: NavigatorProps) {
       )}
     </div>
   );
-}
+};
+
+export default memo(Navigator);

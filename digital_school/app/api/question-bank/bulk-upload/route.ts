@@ -341,7 +341,7 @@ export async function POST(req: NextRequest) {
             const workbook = XLSX.read(buffer, { type: 'buffer' });
 
             // Prefer "Template" sheet, fallback to first sheet
-            let sheetName: string = workbook.SheetNames.find(n => n === "Template") || workbook.SheetNames[0];
+            const sheetName: string = workbook.SheetNames.find(n => n === "Template") || workbook.SheetNames[0];
 
             if (!sheetName) {
                 return NextResponse.json({ error: "Excel file has no sheets" }, { status: 400 });

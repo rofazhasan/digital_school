@@ -28,7 +28,7 @@ import { cleanupMath } from "@/lib/utils";
 
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -211,6 +211,38 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           </div>
         )}
 
+        {(question.type?.toUpperCase() === 'SMCQ') && (question.subQuestions || question.sub_questions) && (
+          <div className="mt-3 space-y-4">
+            <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Sub MCQs (Stem-based):</span>
+            <div className="space-y-4 mt-2">
+              {(question.subQuestions || question.sub_questions || []).map((sq: any, i: number) => (
+                <div key={i} className="pl-4 border-l-2 border-blue-100 dark:border-blue-900 py-1 min-w-0 break-words overflow-x-auto">
+                  <div className="text-xs font-semibold mb-2">
+                    {i + 1}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax>
+                    <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                    {sq.negativeMarks && (
+                      <span className="ml-2 text-[10px] text-red-500 font-bold">[-{sq.negativeMarks}M]</span>
+                    )}
+                  </div>
+                  {sq.options && Array.isArray(sq.options) && (
+                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                      {sq.options.map((opt: any, oi: number) => {
+                        const isCorrect = opt.isCorrect || String(opt.isCorrect) === 'true';
+                        return (
+                          <li key={oi} className={`text-[11px] p-1.5 rounded border ${isCorrect ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-gray-100'}`}>
+                            <span className="mr-1.5 text-gray-400">{String.fromCharCode(65 + oi)})</span>
+                            <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {(question.type?.toUpperCase() === 'CQ' || question.type?.toUpperCase() === 'SQ' || question.type?.toUpperCase() === 'DESCRIPTIVE') && (question.subQuestions || question.sub_questions) && (
           <div className="mt-3 space-y-3">
             <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">
@@ -306,7 +338,7 @@ const QuestionCard = ({ question, onAdd, onRemove, isAdded, isSelectable, select
           {question.difficulty}
         </Badge>
         <Badge variant="outline">{question.marks} Marks</Badge>
-        {question.type === 'MCQ' && question.negativeMarks && (
+        {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(question.type || '') && question.negativeMarks && (
           <Badge variant="destructive" className="text-xs">-{question.negativeMarks} Marks</Badge>
         )}
         <Badge variant="outline">Sub: {question.subject}</Badge>
@@ -558,7 +590,7 @@ export default function ExamBuilderPage() {
   // Derived State for Question Selection Logic
   const selectedCQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'CQ'), [selectedQuestions]);
   const selectedSQQuestions = useMemo(() => selectedQuestions.filter(q => q.type === 'SQ'), [selectedQuestions]);
-  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(q.type)), [selectedQuestions]);
+  const selectedMCQQuestions = useMemo(() => selectedQuestions.filter(q => ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(q.type)), [selectedQuestions]);
 
   // Calculate marks only up to required number of questions
   const cqMarks = useMemo(() => {
@@ -605,7 +637,7 @@ export default function ExamBuilderPage() {
     }
 
     // For MCQ/Objective questions, check if adding would exceed total marks
-    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(question.type)) {
+    if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return false;
     }
 
@@ -624,7 +656,7 @@ export default function ExamBuilderPage() {
     } else if (question.type === 'SQ') {
       if (selectedSQQuestions.length >= exam.sqTotalQuestions) return 'SQ Limit Reached';
       return 'Add SQ Question';
-    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'DESCRIPTIVE'].includes(question.type)) {
+    } else if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'SMCQ', 'DESCRIPTIVE'].includes(question.type)) {
       if (currentMarks + question.marks > exam.totalMarks) return 'Exceeds Total Marks';
       return `Add ${question.type} Question`;
     }
@@ -811,9 +843,58 @@ export default function ExamBuilderPage() {
             }
           }
 
-          // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC)
-          if (['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC'].includes(q.type) && exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-            const negativeMarks = (q.marks * exam.mcqNegativeMarking) / 100;
+          // Shuffle SMCQ sub-questions and their options
+          if (q.type === 'SMCQ') {
+            const subQs = q.subQuestions || q.sub_questions || [];
+            if (Array.isArray(subQs) && subQs.length > 0) {
+              const shuffledSubQs = shuffleArray(subQs).map((sq: any) => {
+                let processedSq = { ...sq };
+                if (Array.isArray(sq.options)) {
+                  const shuffledOptions = shuffleArray(sq.options);
+                  processedSq = { ...processedSq, options: shuffledOptions };
+
+                  // Recalculate correctAnswer for the sub-question
+                  const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                    if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                      acc.push(idx);
+                    }
+                    return acc;
+                  }, []);
+
+                  if (correctIndices.length > 0) {
+                    const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                    processedSq = {
+                      ...processedSq,
+                      correctAnswer: answerString
+                    };
+                  }
+                }
+
+                // Add individual negative marks for each sub-question
+                if (exam?.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                  const subNegMarks = (sq.marks * exam.mcqNegativeMarking) / 100;
+                  processedSq = {
+                    ...processedSq,
+                    negativeMarks: parseFloat(subNegMarks.toFixed(2))
+                  };
+                }
+
+                return processedSq;
+              });
+              processedQuestion = {
+                ...processedQuestion,
+                subQuestions: shuffledSubQs,
+                sub_questions: shuffledSubQs // Keep both for safety
+              };
+            }
+          }
+
+          // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
+          const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(q.type);
+          const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
+
+          if (isObjective && negativePercentage > 0) {
+            const negativeMarks = (q.marks * negativePercentage) / 100;
             processedQuestion = {
               ...processedQuestion,
               negativeMarks: parseFloat(negativeMarks.toFixed(2))
@@ -926,6 +1007,7 @@ export default function ExamBuilderPage() {
                         <SelectItem value="MTF">MTF (Match Following)</SelectItem>
                         <SelectItem value="CQ">CQ</SelectItem>
                         <SelectItem value="SQ">SQ</SelectItem>
+                        <SelectItem value="SMCQ">SMCQ (Stem MCQ)</SelectItem>
                       </SelectContent>
                     </Select>
                     <Select value={filters.difficulty} onValueChange={(v) => handleFilterChange('difficulty', v)}>
@@ -1119,7 +1201,7 @@ export default function ExamBuilderPage() {
                                       })}
                                     </ul>
                                   )}
-                                  {setQ.type === 'MCQ' && setQ.negativeMarks && (
+                                  {['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(setQ.type || '') && setQ.negativeMarks && (
                                     <div className="mt-1 text-xs text-red-600 dark:text-red-400">
                                       -{setQ.negativeMarks} marks
                                     </div>
@@ -1127,6 +1209,30 @@ export default function ExamBuilderPage() {
                                   {(setQ.type === 'INT' || setQ.type === 'NUMERIC') && (
                                     <div className="mt-1 text-sm font-semibold text-blue-700 dark:text-blue-400">
                                       Answer: {setQ.correctAnswer || setQ.modelAnswer || setQ.correct}
+                                    </div>
+                                  )}
+                                  {setQ.type === 'SMCQ' && (setQ.subQuestions || setQ.sub_questions) && (
+                                    <div className="mt-2 text-[10px] space-y-2">
+                                      <div className="font-bold text-gray-400 uppercase tracking-tighter">Sub MCQs:</div>
+                                      {(setQ.subQuestions || setQ.sub_questions || []).map((sq: any, i: number) => (
+                                        <div key={i} className="pl-2 border-l border-blue-200">
+                                          <div className="font-medium">
+                                            {i + 1}. {sq.hasMath || /\\\(|\\\[|\\\]|\\\)/.test(sq.question || '') ? <UniversalMathJax inline>{cleanupMath(sq.question || sq.text || '')}</UniversalMathJax> : (sq.question || sq.text)}
+                                          </div>
+                                          {Array.isArray(sq.options) && (
+                                            <ul className="list-disc pl-4 mt-0.5 opacity-80">
+                                              {sq.options.map((opt: any, oi: number) => (
+                                                <li key={oi} className={opt.isCorrect || String(opt.isCorrect) === 'true' ? 'text-green-600 font-bold' : ''}>
+                                                  {opt.text && /\\\(|\\\[|\\\]|\\\)/.test(opt.text) ? <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax> : opt.text}
+                                                  {sq.negativeMarks && opt.isCorrect === false && (
+                                                    <span className="text-[8px] text-red-400 ml-1">(-{sq.negativeMarks})</span>
+                                                  )}
+                                                </li>
+                                              ))}
+                                            </ul>
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
@@ -1188,6 +1294,32 @@ export default function ExamBuilderPage() {
                           )}
                           {q.type === 'SQ' && q.modelAnswer && (
                             <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> {q.modelAnswer}</div>
+                          )}
+                          {q.type === 'SMCQ' && (q.subQuestions || q.sub_questions) && (
+                            <div className="mt-3 space-y-4 ml-6 border-l-2 border-blue-100 dark:border-blue-900 pl-4">
+                              <span className="text-[10px] font-black uppercase text-gray-500 tracking-wider">Sub MCQs (Stem-based):</span>
+                              {(q.subQuestions || q.sub_questions || []).map((sq: any, i: number) => (
+                                <div key={i} className="space-y-2">
+                                  <div className="text-sm font-semibold">
+                                    {i + 1}. <UniversalMathJax inline>{cleanupMath(sq.question || sq.questionText || sq.text || sq || '')}</UniversalMathJax>
+                                    <span className="ml-2 text-[10px] text-gray-400">[{sq.marks}M]</span>
+                                  </div>
+                                  {sq.options && Array.isArray(sq.options) && (
+                                    <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                                      {sq.options.map((opt: any, oi: number) => {
+                                        const isCorrect = opt.isCorrect || String(opt.isCorrect) === 'true';
+                                        return (
+                                          <li key={oi} className={`text-[11px] p-1.5 rounded border ${isCorrect ? 'bg-green-50 border-green-200 text-green-700 font-bold' : 'bg-white border-gray-100'}`}>
+                                            <span className="mr-1.5 text-gray-400">{String.fromCharCode(65 + oi)})</span>
+                                            <UniversalMathJax inline>{cleanupMath(opt.text)}</UniversalMathJax>
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </div>
                       ))

@@ -43,7 +43,7 @@ export function parseDiagramsInText(text: string): string {
                 if (combineMatch) {
                     const [, mode, args] = combineMatch;
                     const syntax = `${mode}:${args}`;
-                    let diagram = parseCombination(syntax);
+                    const diagram = parseCombination(syntax);
 
                     if (diagram && fbdParts) {
                         const extraFBD = parseExcelFBD(fbdParts, `hybrid-combine-${Math.random().toString(36).substr(2, 5)}`);
@@ -136,7 +136,7 @@ export function parseDiagramsInText(text: string): string {
                         }) : [];
 
                         const id = `diagram-${name}-${Math.random().toString(36).substr(2, 9)}`;
-                        let diagram = presetFn(id, ...args);
+                        const diagram = presetFn(id, ...args);
 
                         if (fbdParts) {
                             const extraFBD = parseExcelFBD(fbdParts, `hybrid-${id}`);

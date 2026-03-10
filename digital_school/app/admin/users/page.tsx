@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, UserPlus, Edit, Trash2, Users, Shield, Loader2, CheckCircle, XCircle, LayoutDashboard, MoreHorizontal, Mail, Phone, Eye, EyeOff, School, Plus } from "lucide-react";
@@ -130,13 +130,16 @@ export default function AdminUsersPage() {
     useEffect(() => {
         setLoading(true);
         // Fetch Current User Role & Data
-        fetch("/api/user").then(res => res.json()).then(data => {
-            if (data.user) setActiveUserRole(data.user.role);
-        });
+        fetch("/api/user")
+            .then(res => res.ok ? res.json() : { error: 'Failed to fetch user' })
+            .then(data => {
+                if (data.user) setActiveUserRole(data.user.role);
+            })
+            .catch(err => console.error("Error fetching current user:", err));
 
         Promise.all([
-            fetch("/api/user?all=true").then(res => res.json()),
-            fetch("/api/classes").then(res => res.json()).catch(() => ({ classes: [] }))
+            fetch("/api/user?all=true").then(res => res.ok ? res.json() : { error: 'Failed to fetch users', users: [] }),
+            fetch("/api/classes").then(res => res.ok ? res.json() : { classes: [] }).catch(() => ({ classes: [] }))
         ])
             .then(([usersData, classesData]) => {
                 // Handle various response structures for users
@@ -759,6 +762,9 @@ export default function AdminUsersPage() {
                         <DialogContent>
                             <DialogHeader>
                                 <DialogTitle>Edit User Details</DialogTitle>
+                                <DialogDescription>
+                                    Update the profile information for this user.
+                                </DialogDescription>
                             </DialogHeader>
                             <form onSubmit={(e) => {
                                 e.preventDefault();

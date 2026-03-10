@@ -154,7 +154,8 @@ export default function PrintExamPage() {
       set.cq?.length ||
       set.sq?.length ||
       set.mtf?.length ||
-      set.descriptive?.length
+      set.descriptive?.length ||
+      set.smcq?.length
     )
   );
 
@@ -219,7 +220,8 @@ export default function PrintExamPage() {
                       sq: set.sq || [],
                       mtf: set.mtf || [],
                       descriptive: set.descriptive || [],
-                      smcq: set.smcq || []
+                      smcq: set.smcq || [],
+                      allObjective: set.orderedObjective || []
                     }}
                     qrData={set.qrData}
                     fontSize={objectiveFontSize}
@@ -252,7 +254,8 @@ export default function PrintExamPage() {
                     sq: set.sq || [],
                     mtf: set.mtf || [],
                     descriptive: set.descriptive || [],
-                    smcq: set.smcq || []
+                    smcq: set.smcq || [],
+                    allObjective: set.orderedObjective || []
                   }}
                   qrData={set.qrData}
                   fontSize={objectiveFontSize}

@@ -1,7 +1,7 @@
 // Minimal type definitions for test runner
-declare var describe: (name: string, fn: () => void) => void;
-declare var it: (name: string, fn: () => void) => void;
-declare var expect: (actual: any) => { toBe: (expected: any) => void; toBeCloseTo: (expected: number, precision?: number) => void; };
+declare let describe: (name: string, fn: () => void) => void;
+declare let it: (name: string, fn: () => void) => void;
+declare let expect: (actual: any) => { toBe: (expected: any) => void; toBeCloseTo: (expected: number, precision?: number) => void; };
 
 import { calculateMCQMarks, validateQuestionSelection, getQuestionSelectionSummary } from './exam-utils';
 

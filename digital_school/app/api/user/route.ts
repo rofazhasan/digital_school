@@ -7,9 +7,15 @@ import { WelcomeEmail } from "@/components/emails/WelcomeEmail";
 
 export async function GET(request: NextRequest) {
   try {
+    const url = new URL(request.url);
+    const all = url.searchParams.get('all') === 'true';
+
+    console.log('[API_USER] GET request starting, all:', all);
+
     const authData = await getTokenFromRequest(request);
 
     if (!authData) {
+      console.warn('[API_USER] Unauthorized access attempt');
       return NextResponse.json(
         { error: "Not authenticated" },
         { status: 401 }
@@ -20,46 +26,70 @@ export async function GET(request: NextRequest) {
     const prismadb = await getDatabaseClient();
 
     // If ?all=true and admin/super_user, return all users
-    const url = new URL(request.url);
-    const all = url.searchParams.get('all');
-    if (all === 'true' && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
-      const users = await (prismadb.user as any).findMany({
-        include: {
-          studentProfile: {
-            select: {
-              roll: true,
-              class: { select: { name: true, section: true } }
+    if (all && (authData.user.role === 'ADMIN' || authData.user.role === 'SUPER_USER')) {
+      try {
+        console.log('[API_USER] Fetching all users for', authData.user.role);
+        const users = await (prismadb.user as any).findMany({
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+            role: true,
+            isActive: true,
+            emailVerified: true,
+            isApproved: true,
+            pendingEmail: true,
+            pendingPhone: true,
+            studentProfile: {
+              select: {
+                roll: true,
+                class: { select: { name: true, section: true } }
+              }
             }
-          }
-        }
-      });
-      return NextResponse.json({
-        users: users.map((u: any) => ({
-          id: u.id,
-          name: u.name,
-          email: u.email,
-          phone: u.phone || '',
-          role: u.role,
-          isActive: u.isActive,
-          emailVerified: u.emailVerified,
-          isApproved: u.isApproved,
-          pendingEmail: u.pendingEmail,
-          pendingPhone: u.pendingPhone,
-          class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
-          section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
-          roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
-        }))
-      });
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        console.log(`[API_USER] Successfully fetched ${users.length} users`);
+
+        return NextResponse.json({
+          users: users.map((u: any) => ({
+            id: u.id,
+            name: u.name,
+            email: u.email,
+            phone: u.phone || '',
+            role: u.role,
+            isActive: u.isActive,
+            emailVerified: u.emailVerified,
+            isApproved: u.isApproved,
+            pendingEmail: u.pendingEmail,
+            pendingPhone: u.pendingPhone,
+            class: u.role === 'STUDENT' ? u.studentProfile?.class?.name || '' : undefined,
+            section: u.role === 'STUDENT' ? u.studentProfile?.class?.section || '' : undefined,
+            roll: u.role === 'STUDENT' ? u.studentProfile?.roll || '' : undefined,
+          }))
+        });
+      } catch (dbError: any) {
+        console.error('[API_USER] Database query failed:', dbError.message);
+
+        // Return a 500 but with the database error message for debugging
+        return NextResponse.json(
+          { error: "Database error", message: dbError.message },
+          { status: 500 }
+        );
+      }
     }
 
+    console.log('[API_USER] Returning current user data');
     return NextResponse.json({
       user: authData.user,
     });
-  } catch (error) {
-    console.error("Get user error:", error);
+  } catch (error: any) {
+    console.error("[API_USER] Outer catch block error:", error.message);
 
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", message: error.message },
       { status: 500 }
     );
   }
@@ -292,7 +322,11 @@ export async function DELETE(request: NextRequest) {
           prismadb.attendance.updateMany({ where: { teacherId: targetId }, data: { teacherId: adminId } }),
           prismadb.examEvaluationAssignment.updateMany({ where: { assignedById: targetId }, data: { assignedById: adminId } }),
           prismadb.examSubmissionDrawing.updateMany({ where: { evaluatorId: targetId }, data: { evaluatorId: adminId } }),
-          prismadb.resultReview.updateMany({ where: { reviewedById: targetId }, data: { reviewedById: adminId } })
+          prismadb.resultReview.updateMany({ where: { reviewedById: targetId }, data: { reviewedById: adminId } }),
+          prismadb.admissionApplication.updateMany({ where: { reviewedBy: targetId }, data: { reviewedBy: adminId } }),
+          prismadb.invoice.updateMany({ where: { createdBy: targetId }, data: { createdBy: adminId } }),
+          prismadb.payment.updateMany({ where: { collectedBy: targetId }, data: { collectedBy: adminId } }),
+          prismadb.institute.updateMany({ where: { superUserId: targetId }, data: { superUserId: null } })
         ]);
 
         const teacherProfile = await prismadb.teacherProfile.findUnique({ where: { userId: targetId } });
@@ -325,9 +359,43 @@ export async function DELETE(request: NextRequest) {
           await tx.chatSession.deleteMany({ where: { userId: targetId } });
         }
 
-        const studentProfile = await tx.studentProfile.findUnique({ where: { userId: targetId } });
+        const studentProfile = await tx.studentProfile.findUnique({
+          where: { userId: targetId },
+          include: {
+            invoices: {
+              include: {
+                payments: true
+              }
+            }
+          }
+        });
+
         if (studentProfile) {
           const studentId = studentProfile.id;
+
+          // Delete Invoice-related data
+          if (studentProfile.invoices.length > 0) {
+            const invoiceIds = studentProfile.invoices.map(i => i.id);
+            const invoiceNumbers = studentProfile.invoices.map(i => i.invoiceNumber);
+            const paymentReceiptNumbers = studentProfile.invoices.flatMap(i => i.payments.map(p => p.receiptNumber));
+
+            // Delete VerifiableDocuments first (they reference invoice numbers/receipt numbers)
+            await tx.verifiableDocument.deleteMany({
+              where: {
+                OR: [
+                  { documentNumber: { in: invoiceNumbers } },
+                  { documentNumber: { in: paymentReceiptNumbers } }
+                ]
+              }
+            });
+
+            // Delete Payments
+            await tx.payment.deleteMany({ where: { invoiceId: { in: invoiceIds } } });
+
+            // Delete Invoices
+            await tx.invoice.deleteMany({ where: { id: { in: invoiceIds } } });
+          }
+
           await tx.examSubmissionDrawing.deleteMany({ where: { studentId } });
           await tx.examSubmission.deleteMany({ where: { studentId } });
           await tx.result.deleteMany({ where: { studentId } });
@@ -336,12 +404,28 @@ export async function DELETE(request: NextRequest) {
           await tx.examStudentMap.deleteMany({ where: { studentId } });
           await tx.badge.deleteMany({ where: { studentId } });
           await tx.resultReview.deleteMany({ where: { studentId } });
+
+          // Use any cast or check for dynamic table existence if necessary, 
+          // but here we follow the schema we saw. We'll add a safe check for PracticeResult
+          if ((tx as any).practiceResult) {
+            await (tx as any).practiceResult.deleteMany({ where: { studentId } });
+          }
+          if ((tx as any).seatAllocation) {
+            await (tx as any).seatAllocation.deleteMany({ where: { studentId } });
+          }
+
+          // Decouple admission applications
+          await tx.admissionApplication.updateMany({
+            where: { studentId },
+            data: { studentId: null }
+          });
+
           await tx.studentProfile.delete({ where: { id: studentId } });
         }
 
         await tx.teacherProfile.deleteMany({ where: { userId: targetId } });
         await tx.user.delete({ where: { id: targetId } });
-      }, { maxWait: 10000, timeout: 20000 });
+      }, { maxWait: 15000, timeout: 30000 });
     };
 
     // Iterate through IDs sequentially

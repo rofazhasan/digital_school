@@ -109,6 +109,9 @@ interface ExamResults {
   highestScore: number;
   lowestScore: number;
   passRate: number;
+  mcqTotal: number;
+  cqTotal: number;
+  sqTotal: number;
 }
 
 interface DetailedResult {
@@ -162,10 +165,11 @@ export default function ExamResultsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [expandedResults, setExpandedResults] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState<Set<string>>(new Set());
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, totalPages: 0 });
 
   useEffect(() => {
     fetchUserAndResults();
-  }, []);
+  }, [pagination.page]);
 
   useEffect(() => {
     filterAndSortResults();
@@ -187,27 +191,38 @@ export default function ExamResultsPage() {
         throw new Error(`Failed to fetch user: ${userResponse.status}`);
       }
       const userData = await userResponse.json();
-      setUser(userData);
+      setUser(userData.user || userData);
 
-      // Fetch results based on user role
-      const resultsResponse = await fetch('/api/exams/results/all', {
+      // Fetch results based on user role and pagination
+      const queryParams = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
+      });
+
+      const resultsResponse = await fetch(`/api/exams/results/all?${queryParams.toString()}`, {
         credentials: 'include'
       });
+
       if (resultsResponse.ok) {
         const resultsData = await resultsResponse.json();
 
-        // Handle different possible data structures
-        let examResults = [];
-        if (Array.isArray(resultsData)) examResults = resultsData;
-        else if (Array.isArray(resultsData.examResults)) examResults = resultsData.examResults;
-        else if (Array.isArray(resultsData.results)) examResults = resultsData.results;
-        else if (Array.isArray(resultsData.data)) examResults = resultsData.data;
-        else if (resultsData.data?.examResults && Array.isArray(resultsData.data.examResults)) examResults = resultsData.data.examResults;
-        else if (resultsData.data?.results && Array.isArray(resultsData.data.results)) examResults = resultsData.data.results;
+        // Handle new paginated data structure
+        let examResultsData = [];
+        if (resultsData.examResults) {
+          examResultsData = resultsData.examResults;
+        } else if (Array.isArray(resultsData)) {
+          examResultsData = resultsData;
+        }
 
-        console.log('📊 API Response:', resultsData);
-        console.log('📊 Processed exam results:', examResults);
-        setExamResults(examResults);
+        setExamResults(examResultsData as ExamResults[]);
+
+        if (resultsData.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            total: resultsData.pagination.total,
+            totalPages: resultsData.pagination.totalPages
+          }));
+        }
       } else {
         console.error('Failed to fetch results:', resultsResponse.status);
         toast.error('Failed to load exam results');
@@ -226,15 +241,15 @@ export default function ExamResultsPage() {
 
     // Filter by exam
     if (selectedExam !== 'all') {
-      filtered = filtered.filter(result => result.exam?.id === selectedExam);
+      filtered = filtered.filter((result: ExamResults) => result.exam?.id === selectedExam);
     }
 
     // Filter by search term
     if (searchTerm) {
-      filtered = filtered.filter(result =>
+      filtered = filtered.filter((result: ExamResults) =>
         result.exam?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         result.exam?.class?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        result.results?.some(r =>
+        result.results?.some((r: Result) =>
           r.student?.user?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
           r.student?.roll?.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -242,7 +257,7 @@ export default function ExamResultsPage() {
     }
 
     // Sort results
-    filtered.sort((a, b) => {
+    filtered.sort((a: ExamResults, b: ExamResults) => {
       let comparison = 0;
 
       switch (sortBy) {
@@ -271,7 +286,7 @@ export default function ExamResultsPage() {
     }
 
     try {
-      setDownloading(prev => new Set(prev).add(downloadKey));
+      setDownloading((prev: Set<string>) => new Set(prev).add(downloadKey));
       const loadingToast = toast.loading(`Generating ${format.toUpperCase()} results sheet...`);
 
       const endpoint = format === 'pdf'
@@ -319,7 +334,7 @@ export default function ExamResultsPage() {
       console.error(`Error downloading ${format} results sheet:`, error);
       toast.error(`Failed to download ${format.toUpperCase()} results sheet: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setDownloading(prev => {
+      setDownloading((prev: Set<string>) => {
         const newSet = new Set(prev);
         newSet.delete(downloadKey);
         return newSet;
@@ -328,33 +343,33 @@ export default function ExamResultsPage() {
   };
 
   const getGradeColor = (grade?: string) => {
-    if (!grade) return 'bg-gray-100 text-gray-800';
+    if (!grade) return 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200';
 
     switch (grade.toUpperCase()) {
       case 'A+':
       case 'A':
-        return 'bg-green-100 text-green-800';
+        return 'bg-emerald-100 dark:bg-emerald-500/20 text-emerald-800 dark:text-emerald-400';
       case 'A-':
       case 'B+':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 dark:bg-blue-500/20 text-blue-800 dark:text-blue-400';
       case 'B':
       case 'B-':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-400';
       case 'C+':
       case 'C':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-orange-100 dark:bg-orange-500/20 text-orange-800 dark:text-orange-400';
       default:
-        return 'bg-red-100 text-red-800';
+        return 'bg-rose-100 dark:bg-rose-500/20 text-rose-800 dark:text-rose-400';
     }
   };
 
   const getRankBadge = (rank?: number) => {
     if (!rank) return null;
 
-    if (rank === 1) return <Badge className="bg-yellow-100 text-yellow-800"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
-    if (rank === 2) return <Badge className="bg-gray-100 text-gray-800"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
-    if (rank === 3) return <Badge className="bg-orange-100 text-orange-800"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
-    return <Badge variant="outline">{rank}</Badge>;
+    if (rank === 1) return <Badge className="bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-400 border-amber-200 dark:border-amber-500/30"><Trophy className="w-3 h-3 mr-1" />1st</Badge>;
+    if (rank === 2) return <Badge className="bg-slate-100 dark:bg-slate-500/20 text-slate-900 dark:text-slate-400 border-slate-200 dark:border-slate-500/30"><Award className="w-3 h-3 mr-1" />2nd</Badge>;
+    if (rank === 3) return <Badge className="bg-orange-100 dark:bg-orange-500/20 text-orange-900 dark:text-orange-400 border-orange-200 dark:border-orange-500/30"><Award className="w-3 h-3 mr-1" />3rd</Badge>;
+    return <Badge variant="outline" className="border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-400">{rank}</Badge>;
   };
 
   const getPerformanceAnalysis = (result: Result) => {
@@ -389,7 +404,7 @@ export default function ExamResultsPage() {
   };
 
   const toggleExpandedResult = (examId: string) => {
-    setExpandedResults(prev => {
+    setExpandedResults((prev: Set<string>) => {
       const newSet = new Set(prev);
       if (newSet.has(examId)) {
         newSet.delete(examId);
@@ -400,11 +415,23 @@ export default function ExamResultsPage() {
     });
   };
 
+  // Helper for rank styling
+  const getRankData = (rank?: number) => {
+    if (rank === 1) return { color: 'from-amber-400 to-yellow-600', icon: Crown, label: 'Champion' };
+    if (rank === 2) return { color: 'from-slate-300 to-slate-500', icon: Medal, label: 'Runner Up' };
+    if (rank === 3) return { color: 'from-orange-400 to-amber-700', icon: Medal, label: '3rd Place' };
+    return { color: 'from-indigo-400 to-blue-600', icon: Star, label: `Rank #${rank}` };
+  };
+
+  const isStudent = user?.role === 'STUDENT';
+  const canViewAllResults = user && ['SUPER_USER', 'ADMIN', 'TEACHER'].includes(user.role);
+
   if (loading) {
     return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center">
+        <div className="relative">
+          <div className="absolute inset-0 bg-indigo-500/10 dark:bg-indigo-500/20 blur-3xl rounded-full" />
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-500 relative z-10"></div>
         </div>
       </div>
     );
@@ -412,20 +439,21 @@ export default function ExamResultsPage() {
 
   if (error) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert>
-          <AlertDescription>
-            Error: {error}
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center p-6">
+        <Alert className="max-w-md bg-white dark:bg-rose-500/10 border-slate-200 dark:border-rose-500/20 text-slate-900 dark:text-rose-200 backdrop-blur-xl shadow-xl">
+          <AlertDescription className="flex flex-col items-center gap-4 py-6">
+            <XCircle className="w-12 h-12 text-rose-500" />
+            <span className="text-center font-bold text-lg">Oops! Something went wrong</span>
+            <span className="text-center text-slate-500 dark:text-slate-400 text-sm">{error}</span>
             <Button
-              variant="outline"
-              size="sm"
-              className="ml-2"
+              variant="default"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white w-full shadow-lg shadow-indigo-500/20"
               onClick={() => {
                 setError(null);
                 fetchUserAndResults();
               }}
             >
-              Retry
+              Try Again
             </Button>
           </AlertDescription>
         </Alert>
@@ -435,580 +463,436 @@ export default function ExamResultsPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto p-6">
-        <Alert>
-          <AlertDescription>Please log in to view results.</AlertDescription>
-        </Alert>
+      <div className="min-h-screen bg-slate-50 dark:bg-[#020617] flex items-center justify-center p-6 text-slate-500 dark:text-slate-400">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 bg-white dark:bg-white/5 rounded-2xl flex items-center justify-center mx-auto border border-slate-200 dark:border-white/10 shadow-sm">
+            <FileText className="w-8 h-8 opacity-40 dark:opacity-20 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <p className="text-lg font-medium text-slate-700 dark:text-slate-400">Please login to view your results</p>
+          <Button onClick={() => router.push('/login')} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+            Login Now
+          </Button>
+        </div>
       </div>
     );
   }
 
-  const isStudent = user.role === 'STUDENT';
-  const canViewAllResults = ['SUPER_USER', 'ADMIN', 'TEACHER'].includes(user.role);
-
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-xl md:text-3xl font-bold tracking-tight">Exam Results</h1>
-          <p className="text-muted-foreground">
-            {isStudent
-              ? 'View your exam results and performance analysis'
-              : 'Manage and view all exam results'
-            }
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.push('/exams/online')}
-            className="mr-2 gap-2"
-          >
-            <ArrowRight className="w-4 h-4 rotate-180" />
-            Back to Online Exams
-          </Button>
-
-          {isStudent && (
-            <>
-              <Badge variant="outline">
-                <Users className="w-3 h-3 mr-1" />
-                {user.studentProfile?.class.name} {user.studentProfile?.class.section}
-              </Badge>
-              <Badge variant="outline">
-                <FileText className="w-3 h-3 mr-1" />
-                Roll: {user.studentProfile?.roll}
-              </Badge>
-            </>
-          )}
-        </div>
+    <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-900 dark:text-slate-50 selection:bg-indigo-500/30">
+      {/* Dynamic Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] bg-indigo-500/[0.08] dark:bg-indigo-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-[20%] -right-[10%] w-[35%] h-[35%] bg-purple-500/[0.08] dark:bg-purple-500/10 blur-[120px] rounded-full" />
+        <div className="absolute -bottom-[10%] left-[20%] w-[30%] h-[30%] bg-rose-500/[0.05] dark:bg-rose-500/5 blur-[100px] rounded-full" />
       </div>
 
-      {/* Filters and Search - Only for non-students */}
-      {canViewAllResults && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Filters & Search
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-10"
-                />
-              </div>
-              <Select value={selectedExam} onValueChange={setSelectedExam}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Exam" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Exams</SelectItem>
-                  {examResults.map((result) => (
-                    <SelectItem key={result.exam.id} value={result.exam.id}>
-                      {result.exam.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sortBy} onValueChange={(value: 'date' | 'name' | 'class') => setSortBy(value)}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Sort" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="date">Date</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="class">Class</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button
-                variant="outline"
-                className="h-10 w-full"
-                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-              >
-                {sortOrder === 'asc' ? '↑ Ascending' : '↓ Descending'}
-              </Button>
+      <div className="container mx-auto p-4 md:p-8 relative z-10 space-y-8">
+        {/* Header Section */}
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold tracking-wider uppercase">
+              <GraduationCap className="w-3.5 h-3.5" />
+              Academic Excellence
             </div>
-          </CardContent>
-        </Card>
-      )}
+            <h1 className="text-3xl md:text-5xl font-black tracking-tight bg-gradient-to-r from-slate-900 via-slate-700 to-slate-500 dark:from-white dark:via-slate-300 dark:to-slate-500 bg-clip-text text-transparent">
+              Exam Results
+            </h1>
+            <p className="text-slate-500 dark:text-slate-400 max-w-md">
+              Detailed performance metrics and competitive class standings.
+            </p>
+          </div>
 
-      {/* Results Display */}
-      {isStudent ? (
-        // Student View - Individual Results with Detailed Analysis
-        <div className="space-y-6">
-          {filteredResults.length === 0 ? (
-            <Card>
-              <CardContent className="flex items-center justify-center py-12">
-                <div className="text-center space-y-2">
-                  <FileText className="w-12 h-12 text-muted-foreground mx-auto" />
-                  <p className="text-muted-foreground">No results available yet.</p>
-                  <p className="text-sm text-muted-foreground">Your results will appear here once they are published.</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={() => router.push('/exams/online')}
+              className="text-slate-400 hover:text-white hover:bg-white/5 border border-white/5"
+            >
+              <ArrowRight className="w-4 h-4 mr-2 rotate-180" />
+              Back
+            </Button>
+            {isStudent && user.studentProfile && (
+              <div className="flex items-center gap-2 p-1 pl-3 rounded-full bg-slate-100/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Class {user.studentProfile.class.name}</span>
+                <div className="h-4 w-px bg-slate-200 dark:bg-white/10" />
+                <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/30 border-none">
+                  Roll: {user.studentProfile.roll}
+                </Badge>
+              </div>
+            )}
+          </div>
+        </header>
+
+        {/* Filters - Advanced Glassmorphism */}
+        {canViewAllResults && (
+          <Card className="bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-xl overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-transparent to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+            <CardContent className="p-6 relative z-10">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="relative group/input">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within/input:text-indigo-400 transition-colors" />
+                  <Input
+                    placeholder="Search students or exams..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                  />
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredResults.map((examResult) => {
-              const studentResult = examResult.results?.[0];
-              if (!studentResult) return null;
+                <Select value={selectedExam} onValueChange={setSelectedExam}>
+                  <SelectTrigger className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200">
+                    <SelectValue placeholder="Select Exam" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-200">
+                    <SelectItem value="all">All Exams</SelectItem>
+                    {examResults.map((result: ExamResults) => (
+                      <SelectItem key={result.exam.id} value={result.exam.id}>
+                        {result.exam.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                  <SelectTrigger className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 focus:ring-indigo-500/20 text-slate-900 dark:text-slate-200">
+                    <SelectValue placeholder="Sort By" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-white/10 text-slate-900 dark:text-slate-200">
+                    <SelectItem value="date">Date Published</SelectItem>
+                    <SelectItem value="name">Exam Name</SelectItem>
+                    <SelectItem value="class">Classroom</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  variant="outline"
+                  className="h-11 bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-600 dark:text-slate-300"
+                  onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                >
+                  {sortOrder === 'asc' ? <ChevronUp className="w-4 h-4 mr-2" /> : <ChevronDown className="w-4 h-4 mr-2" />}
+                  {sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-              const performanceAnalysis = getPerformanceAnalysis(studentResult);
-              const isExpanded = expandedResults.has(examResult.exam.id);
+        {/* Main Content Area */}
+        <div className="space-y-12">
+          {filteredResults.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 bg-white dark:bg-white/[0.02] rounded-3xl border border-dashed border-slate-200 dark:border-white/10 backdrop-blur-sm shadow-sm">
+              <div className="relative mb-6">
+                <div className="absolute inset-0 bg-indigo-500/10 dark:bg-indigo-500/20 blur-2xl rounded-full animate-pulse" />
+                <FileText className="w-16 h-16 text-slate-300 dark:text-slate-600 relative z-10" />
+              </div>
+              <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">No outcomes found</h3>
+              <p className="text-slate-400 dark:text-slate-500 mt-2">Check back later or adjust your filters.</p>
+            </div>
+          ) : (
+            filteredResults.map((examResult: ExamResults) => {
+              const myResult = isStudent ? examResult.results.find((r: Result) => r.student?.id === user.studentProfile?.id) : null;
+              const classmatesResults = isStudent
+                ? examResult.results.filter((r: Result) => r.student?.id !== user.studentProfile?.id)
+                  .sort((a: Result, b: Result) => (b.total || 0) - (a.total || 0))
+                : examResult.results;
 
               return (
-                <Card key={examResult.exam?.id || 'unknown'} className="overflow-hidden">
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <CardTitle className="flex items-center gap-2 text-base md:text-lg">
-                          <FileText className="w-5 h-5 text-primary" />
-                          {examResult.exam?.name || 'Unknown Exam'}
-                        </CardTitle>
-                        <CardDescription className="flex flex-wrap items-center gap-x-2">
-                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
-                          <span className="text-muted-foreground hidden sm:inline">•</span>
-                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
-                        </CardDescription>
+                <div key={examResult.exam.id} className="space-y-6">
+                  {/* Exam Banner */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-indigo-500/20 shadow-sm backdrop-blur-xl">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-indigo-50 dark:bg-indigo-500/20 flex items-center justify-center border border-indigo-100 dark:border-indigo-500/30 shadow-inner">
+                        <Trophy className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
                       </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
-                        <Badge variant={studentResult.isPublished ? "default" : "secondary"} className="px-3">
-                          {studentResult.isPublished ? "Published" : "Draft"}
-                        </Badge>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">{examResult.exam.name}</h2>
+                        <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {new Date(examResult.exam.date).toLocaleDateString(undefined, { dateStyle: 'long' })}
+                          <span className="mx-1 opacity-20 dark:opacity-30">|</span>
+                          <span className="font-semibold text-slate-600 dark:text-slate-300">{examResult.exam.totalMarks} Total Marks</span>
+                        </div>
+                      </div>
+                    </div>
+                    {!isStudent && (
+                      <div className="flex gap-2">
                         <Button
-                          variant="ghost"
                           size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={() => toggleExpandedResult(examResult.exam.id)}
+                          variant="outline"
+                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-500/10 border-slate-200 dark:border-white/5 shadow-sm"
+                          onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
                         >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          <Download className="w-4 h-4 mr-2" /> PDF
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="bg-slate-50 dark:bg-transparent text-slate-600 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-500/10 border-slate-200 dark:border-white/5 shadow-sm"
+                          onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
+                        >
+                          <Download className="w-4 h-4 mr-2" /> CSV
                         </Button>
                       </div>
-                    </div>
-                  </CardHeader>
-
-                  {/* Summary Cards */}
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mb-6">
-                      <div className="text-center p-3 md:p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
-                        <div className="text-xl md:text-2xl font-bold text-blue-600 dark:text-blue-400">
-                          {studentResult.total || 0}
-                        </div>
-                        <div className="text-xs md:text-sm text-blue-600 dark:text-blue-400">Score</div>
-                        <div className="text-[10px] md:text-xs text-muted-foreground whitespace-nowrap">
-                          out of {examResult.exam?.totalMarks || 0}
-                        </div>
-                      </div>
-                      <div className="text-center p-3 md:p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
-                        <div className="text-xl md:text-2xl font-bold text-green-600 dark:text-green-400">
-                          {studentResult.percentage?.toFixed(1) || 0}%
-                        </div>
-                        <div className="text-xs md:text-sm text-green-600 dark:text-green-400">Percentage</div>
-                      </div>
-                      <div className="text-center p-3 md:p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
-                        <div className="text-xl md:text-2xl font-bold text-purple-600 dark:text-purple-400">
-                          {studentResult.grade || 'N/A'}
-                        </div>
-                        <div className="text-xs md:text-sm text-purple-600 dark:text-purple-400">Grade</div>
-                      </div>
-                      <div className="text-center p-3 md:p-4 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-100/50 dark:border-orange-800/20">
-                        <div className="text-xl md:text-2xl font-bold text-orange-600 dark:text-orange-400">
-                          {studentResult.rank || 'N/A'}
-                        </div>
-                        <div className="text-xs md:text-sm text-orange-600 dark:text-orange-400">Rank</div>
-                      </div>
-                    </div>
-
-                    {/* Detailed Breakdown */}
-                    <div className="space-y-4">
-                      <h4 className="font-semibold flex items-center gap-2">
-                        <BarChart3 className="w-4 h-4" />
-                        Detailed Breakdown
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
-                        <div className="p-3 md:p-4 border rounded-lg">
-                          <div className="text-xs md:text-sm text-muted-foreground">MCQ Marks</div>
-                          <div className="text-lg md:text-xl font-semibold">
-                            {studentResult.mcqMarks || 0}
-                          </div>
-                          <Progress
-                            value={((studentResult.mcqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2 h-1.5 md:h-2"
-                          />
-                        </div>
-                        <div className="p-3 md:p-4 border rounded-lg">
-                          <div className="text-xs md:text-sm text-muted-foreground">CQ Marks</div>
-                          <div className="text-lg md:text-xl font-semibold">{studentResult.cqMarks || 0}</div>
-                          <Progress
-                            value={((studentResult.cqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2 h-1.5 md:h-2"
-                          />
-                        </div>
-                        <div className="p-3 md:p-4 border rounded-lg">
-                          <div className="text-xs md:text-sm text-muted-foreground">SQ Marks</div>
-                          <div className="text-lg md:text-xl font-semibold">{studentResult.sqMarks || 0}</div>
-                          <Progress
-                            value={((studentResult.sqMarks || 0) / (examResult.exam?.totalMarks || 1) * 100)}
-                            className="mt-2 h-1.5 md:h-2"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Expanded Detailed Analysis */}
-                    {isExpanded && (
-                      <div className="mt-6 space-y-6">
-                        <Separator />
-
-                        {/* Performance Analysis */}
-                        <div className="space-y-4">
-                          <h4 className="font-semibold flex items-center gap-2">
-                            <Target className="w-4 h-4" />
-                            Performance Analysis
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {performanceAnalysis.strength && (
-                              <div className="p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                                  <span className="font-medium text-green-800 dark:text-green-200">Strengths</span>
-                                </div>
-                                <p className="text-sm text-green-700 dark:text-green-300">{performanceAnalysis.strength}</p>
-                              </div>
-                            )}
-                            {performanceAnalysis.weakness && (
-                              <div className="p-4 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-100/50 dark:border-red-800/20">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <XCircle className="w-4 h-4 text-red-600 dark:text-red-400" />
-                                  <span className="font-medium text-red-800 dark:text-red-200">Areas for Improvement</span>
-                                </div>
-                                <p className="text-sm text-red-700 dark:text-red-300">{performanceAnalysis.weakness}</p>
-                              </div>
-                            )}
-                            <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-100/50 dark:border-blue-800/20">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Star className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                <span className="font-medium text-blue-800 dark:text-blue-200">Recommendation</span>
-                              </div>
-                              <p className="text-sm text-blue-700 dark:text-blue-300">{performanceAnalysis.recommendation}</p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Class Performance Comparison */}
-                        <div className="space-y-4">
-                          <h4 className="font-semibold flex items-center gap-2">
-                            <Users className="w-4 h-4" />
-                            Class Performance
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <div className="text-center p-4 bg-muted/30 rounded-lg border border-border/50">
-                              <div className="text-lg font-semibold">{examResult.averageScore?.toFixed(1) || 0}</div>
-                              <div className="text-sm text-muted-foreground">Class Average</div>
-                            </div>
-                            <div className="text-center p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-lg border border-yellow-100/50 dark:border-yellow-800/20">
-                              <div className="text-lg font-semibold text-yellow-700 dark:text-yellow-400">{examResult.highestScore || 0}</div>
-                              <div className="text-sm text-yellow-600 dark:text-yellow-400">Highest Score</div>
-                            </div>
-                            <div className="text-center p-4 bg-green-50 dark:bg-green-950/30 rounded-lg border border-green-100/50 dark:border-green-800/20">
-                              <div className="text-lg font-semibold text-green-700 dark:text-green-400">{examResult.passRate?.toFixed(1) || 0}%</div>
-                              <div className="text-sm text-green-600 dark:text-green-400">Pass Rate</div>
-                            </div>
-                            <div className="text-center p-4 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-100/50 dark:border-purple-800/20">
-                              <div className="text-lg font-semibold text-purple-700 dark:text-purple-400">{examResult.totalStudents || 0}</div>
-                              <div className="text-sm text-purple-600 dark:text-purple-400">Total Students</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Items */}
-                        <div className="space-y-4">
-                          <h4 className="font-semibold flex items-center gap-2">
-                            <BookOpen className="w-4 h-4" />
-                            Next Steps
-                          </h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
-                            <Button
-                              variant="outline"
-                              className="w-full h-10 md:h-11"
-                              onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
-                            >
-                              <Eye className="w-4 h-4 mr-2" />
-                              View Detailed Answers
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="w-full h-10 md:h-11"
-                              onClick={() => {
-                                toggleExpandedResult(examResult.exam.id);
-                                setTimeout(() => {
-                                  toast.info("Scroll down to provide comments for review.");
-                                }, 100);
-                              }}
-                            >
-                              <MessageSquare className="w-4 h-4 mr-2" />
-                              Request Review
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
+
+                  {/* Desktop Grid Layout */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    {/* LEFT COLUMN: Analytics & Personal Result */}
+                    <div className="lg:col-span-4 space-y-6">
+                      {isStudent && myResult ? (
+                        <Card className="bg-indigo-600 dark:bg-indigo-700 border-none shadow-2xl shadow-indigo-500/30 overflow-hidden relative group">
+                          {/* Decorative Rings */}
+                          <div className="absolute top-0 right-0 -mr-10 -mt-10 w-40 h-40 bg-white/20 dark:bg-white/10 rounded-full blur-3xl opacity-50 dark:opacity-100" />
+                          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-40 h-40 bg-white/20 dark:bg-white/10 rounded-full blur-3xl opacity-50 dark:opacity-100" />
+
+                          <CardHeader className="relative z-10 pb-2">
+                            <CardTitle className="text-white flex items-center justify-between font-black tracking-tight">
+                              Your Standing
+                              <Crown className="w-5 h-5 text-indigo-100 dark:text-indigo-200" />
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent className="relative z-10 space-y-6">
+                            <div className="flex items-end justify-between">
+                              <div>
+                                <div className="text-4xl font-black text-white drop-shadow-sm">{myResult.total}</div>
+                                <div className="text-sm text-indigo-100 dark:text-indigo-200 font-medium">Earned Points</div>
+                              </div>
+                              <div className="text-right">
+                                <div className="text-4xl font-black text-white drop-shadow-sm">#{myResult.rank || '--'}</div>
+                                <div className="text-sm text-indigo-100 dark:text-indigo-200 font-medium">Class Rank</div>
+                              </div>
+                            </div>
+
+                            <div className="space-y-4 pt-4 border-t border-white/20 dark:border-white/10">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-indigo-50 dark:text-indigo-100">Grade: <span className="font-bold text-white">{myResult.grade}</span></span>
+                                <span className="text-indigo-50 dark:text-indigo-100">Accuracy: <span className="font-bold text-white">{myResult.percentage?.toFixed(1)}%</span></span>
+                              </div>
+                              <div className="relative h-2 bg-black/10 dark:bg-white/10 rounded-full overflow-hidden">
+                                <div
+                                  className="absolute inset-y-0 left-0 bg-white rounded-full transition-all duration-1000 shadow-[0_0_15px_rgba(255,255,255,0.8)]"
+                                  style={{ width: `${myResult.percentage}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <Button
+                              onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
+                              className="w-full bg-white text-indigo-600 hover:bg-slate-50 font-bold transition-transform active:scale-95 shadow-lg shadow-indigo-900/20"
+                            >
+                              View Full Review <Eye className="w-4 h-4 ml-2" />
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ) : null}
+
+                      {/* Performance Insights Card */}
+                      <Card className="bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-xl hidden md:block">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                            <TrendingUp className="w-4 h-4 text-rose-500 dark:text-rose-400" /> Performance Insights
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-2">
+                          {myResult ? (
+                            <>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                  <span>Objective Accuracy</span>
+                                  <span>{((myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100).toFixed(0)}%</span>
+                                </div>
+                                <Progress value={(myResult.mcqMarks / (examResult.mcqTotal || 1)) * 100} className="h-1.5 bg-slate-100 dark:bg-white/5" />
+                              </div>
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+                                  <span>Creative Accuracy</span>
+                                  <span>{((myResult.cqMarks / (examResult.cqTotal || 1)) * 100).toFixed(0)}%</span>
+                                </div>
+                                <Progress value={(myResult.cqMarks / (examResult.cqTotal || 1)) * 100} className="h-1.5 bg-slate-100 dark:bg-white/5" />
+                              </div>
+                              <Alert className="bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-800 dark:text-amber-200 mt-4 py-3">
+                                <Star className="w-4 h-4 shrink-0" />
+                                <AlertDescription className="text-[11px] font-medium leading-relaxed">
+                                  {getPerformanceAnalysis(myResult).recommendation}
+                                </AlertDescription>
+                              </Alert>
+                            </>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center py-8 text-center bg-slate-50/50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
+                              <BarChart3 className="w-8 h-8 text-slate-300 dark:text-slate-700 mb-2" />
+                              <p className="text-xs text-slate-500 dark:text-slate-500 px-4">Aggregate analytics for teacher review.</p>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
+
+                    {/* RIGHT COLUMN: Leaderboard / Class Standing */}
+                    <div className="lg:col-span-8">
+                      <Card className="bg-white dark:bg-white/[0.02] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-md overflow-hidden h-full">
+                        <CardHeader className="border-b border-slate-200 dark:border-white/5 bg-slate-50/50 dark:bg-white/[0.01]">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-slate-800 dark:text-slate-300 flex items-center gap-2 font-black">
+                              <Users className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Class Standings
+                            </CardTitle>
+                            <Badge variant="outline" className="text-[10px] text-slate-500 dark:text-slate-500 border-slate-200 dark:border-white/10 font-bold uppercase tracking-wider">
+                              {examResult.results.length} Students
+                            </Badge>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto overflow-y-auto max-h-[600px] no-scrollbar">
+                            <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-hide">
+                              <Table>
+                                <TableHeader className="bg-slate-100/50 dark:bg-slate-900/50">
+                                  <TableRow className="hover:bg-transparent border-slate-200 dark:border-slate-800">
+                                    <TableHead className="w-[60px] font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Rank</TableHead>
+                                    <TableHead className="min-w-[150px] font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Student Name</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Objective</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">CQ</TableHead>
+                                    <TableHead className="text-center font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">SQ</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Total</TableHead>
+                                    <TableHead className="text-right hidden md:table-cell font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">%</TableHead>
+                                    <TableHead className="text-right font-bold text-slate-700 dark:text-white uppercase text-[10px] tracking-wider">Grade</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {classmatesResults.length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={8} className="h-32 text-center text-slate-500">
+                                        No classmates results found.
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    classmatesResults.map((res: Result, idx: number) => {
+                                      const isMe = isStudent && res.student.id === user.studentProfile?.id;
+                                      const resRank = res.rank || (idx + 1);
+                                      return (
+                                        <TableRow
+                                          key={res.id}
+                                          className={`group border-slate-100 dark:border-slate-800/50 transition-colors ${isMe ? 'bg-indigo-50/50 dark:bg-indigo-500/5' : 'hover:bg-slate-50 dark:hover:bg-slate-900/30'
+                                            }`}
+                                        >
+                                          <TableCell className="font-medium py-4">
+                                            {getRankBadge(resRank)}
+                                          </TableCell>
+                                          <TableCell>
+                                            <div className="flex flex-col">
+                                              <span className={`font-bold ${isMe ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-900 dark:text-white'}`}>
+                                                {res.student.user.name}
+                                              </span>
+                                              <span className="text-[10px] text-slate-500 font-medium">Roll: {res.student.roll}</span>
+                                            </div>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.mcqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.mcqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.cqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.cqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-center">
+                                            <span className="text-sm font-bold text-slate-700 dark:text-slate-300">{res.sqMarks}</span>
+                                            <span className="text-[10px] text-slate-400 block font-medium">/ {examResult.sqTotal}</span>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <span className="font-black text-slate-900 dark:text-white">{res.total}</span>
+                                          </TableCell>
+                                          <TableCell className="text-right hidden md:table-cell">
+                                            <span className="text-[11px] text-slate-500 font-bold">{res.percentage?.toFixed(1)}%</span>
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            <Badge className={`border-none shadow-sm ${getGradeColor(res.grade)}`}>
+                                              {res.grade}
+                                            </Badge>
+                                          </TableCell>
+                                        </TableRow>
+                                      );
+                                    })
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </div>
+                </div>
               );
             })
           )}
+          {/* Pagination Controls */}
+          {pagination.totalPages > 1 && (
+            <div className="flex items-center justify-between px-2 py-4 border-t border-slate-200 dark:border-white/10">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Showing page <span className="font-semibold text-slate-900 dark:text-white">{pagination.page}</span> of <span className="font-semibold text-slate-900 dark:text-white">{pagination.totalPages}</span>
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+                  disabled={pagination.page === 1}
+                  className="bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"
+                >
+                  Previous
+                </Button>
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    let pageNum = pagination.page;
+                    if (pagination.totalPages <= 5) pageNum = i + 1;
+                    else if (pagination.page <= 3) pageNum = i + 1;
+                    else if (pagination.page >= pagination.totalPages - 2) pageNum = pagination.totalPages - 4 + i;
+                    else pageNum = pagination.page - 2 + i;
+
+                    return (
+                      <Button
+                        key={pageNum}
+                        variant={pagination.page === pageNum ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setPagination(prev => ({ ...prev, page: pageNum }))}
+                        className={pagination.page === pageNum ? "bg-indigo-600" : "bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"}
+                      >
+                        {pageNum}
+                      </Button>
+                    );
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPagination(prev => ({ ...prev, page: Math.min(pagination.totalPages, prev.page + 1) }))}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="bg-white dark:bg-white/5 border-slate-200 dark:border-white/10"
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        // Admin/Teacher View - All Results
-        <Tabs defaultValue="overview" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="detailed">Detailed Results</TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            {/* Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-2">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Exams</p>
-                      <p className="text-2xl font-bold">{filteredResults.length}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-5 h-5 text-green-600" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Students</p>
-                      <p className="text-2xl font-bold">
-                        {filteredResults.reduce((sum, result) => sum + (result.totalStudents || 0), 0)}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Avg. Pass Rate</p>
-                      <p className="text-2xl font-bold">
-                        {filteredResults.length > 0
-                          ? (filteredResults.reduce((sum, result) => sum + (result.passRate || 0), 0) / filteredResults.length).toFixed(1)
-                          : 0
-                        }%
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center space-x-2">
-                    <Award className="w-5 h-5 text-orange-600" />
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Avg. Score</p>
-                      <p className="text-2xl font-bold">
-                        {filteredResults.length > 0
-                          ? (filteredResults.reduce((sum, result) => sum + (result.averageScore || 0), 0) / filteredResults.length).toFixed(1)
-                          : 0
-                        }
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Exam Results Summary */}
-            <div className="space-y-4">
-              {filteredResults.map((examResult) => (
-                <Card key={examResult.exam?.id || 'unknown'}>
-                  <CardHeader>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <CardTitle className="flex items-center gap-2 text-lg">
-                          <FileText className="w-5 h-5 text-primary" />
-                          {examResult.exam?.name || 'Unknown Exam'}
-                        </CardTitle>
-                        <CardDescription className="flex flex-wrap items-center gap-x-2">
-                          <span className="font-medium text-foreground">{examResult.exam?.class?.name || 'Unknown Class'} {examResult.exam?.class?.section || ''}</span>
-                          <span className="text-muted-foreground hidden sm:inline">•</span>
-                          <span className="text-muted-foreground">{examResult.exam?.date ? new Date(examResult.exam.date).toLocaleDateString() : 'No Date'}</span>
-                          <span className="text-muted-foreground hidden sm:inline">•</span>
-                          <span className="text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {examResult.totalStudents || 0} students</span>
-                        </CardDescription>
-                      </div>
-                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 sm:flex-none h-9"
-                          onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
-                          disabled={downloading.has(`${examResult.exam.id}-pdf`)}
-                        >
-                          {downloading.has(`${examResult.exam.id}-pdf`) ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                          ) : (
-                            <Download className="w-4 h-4 mr-2" />
-                          )}
-                          PDF
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1 sm:flex-none h-9"
-                          onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
-                          disabled={downloading.has(`${examResult.exam.id}-csv`)}
-                        >
-                          {downloading.has(`${examResult.exam.id}-csv`) ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                          ) : (
-                            <Download className="w-4 h-4 mr-2" />
-                          )}
-                          CSV
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">{examResult.averageScore.toFixed(1)}</div>
-                        <div className="text-sm text-muted-foreground">Average Score</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">{examResult.highestScore}</div>
-                        <div className="text-sm text-muted-foreground">Highest Score</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-red-600">{examResult.lowestScore}</div>
-                        <div className="text-sm text-muted-foreground">Lowest Score</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-600">{examResult.passRate.toFixed(1)}%</div>
-                        <div className="text-sm text-muted-foreground">Pass Rate</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="detailed" className="space-y-6">
-            {filteredResults.map((examResult) => (
-              <Card key={examResult.exam.id}>
-                <CardHeader>
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-lg">{examResult.exam.name}</CardTitle>
-                      <CardDescription>
-                        {examResult.exam.class.name} {examResult.exam.class.section} •
-                        {new Date(examResult.exam.date).toLocaleDateString()}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 sm:flex-none h-9"
-                        onClick={() => downloadResultsSheet(examResult.exam.id, 'pdf')}
-                        disabled={downloading.has(`${examResult.exam.id}-pdf`)}
-                      >
-                        {downloading.has(`${examResult.exam.id}-pdf`) ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                        ) : (
-                          <Download className="w-4 h-4 mr-2" />
-                        )}
-                        PDF
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1 sm:flex-none h-9"
-                        onClick={() => downloadResultsSheet(examResult.exam.id, 'csv')}
-                        disabled={downloading.has(`${examResult.exam.id}-csv`)}
-                      >
-                        {downloading.has(`${examResult.exam.id}-csv`) ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                        ) : (
-                          <Download className="w-4 h-4 mr-2" />
-                        )}
-                        CSV
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 sm:p-6">
-                  <div className="rounded-md border overflow-x-auto no-scrollbar">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="min-w-[80px]">Rank</TableHead>
-                          <TableHead className="min-w-[100px]">Roll</TableHead>
-                          <TableHead className="min-w-[150px]">Student Name</TableHead>
-                          <TableHead className="min-w-[80px]">MCQ</TableHead>
-                          <TableHead className="min-w-[80px]">CQ</TableHead>
-                          <TableHead className="min-w-[80px]">SQ</TableHead>
-                          <TableHead className="min-w-[80px]">Total</TableHead>
-                          <TableHead className="min-w-[100px]">Percentage</TableHead>
-                          <TableHead className="min-w-[100px]">Grade</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {examResult.results?.map((result) => (
-                          <TableRow key={result.id}>
-                            <TableCell>
-                              {getRankBadge(result.rank)}
-                            </TableCell>
-                            <TableCell className="font-medium">{result.student?.roll || 'N/A'}</TableCell>
-                            <TableCell className="whitespace-nowrap font-medium">{result.student?.user?.name || 'Unknown'}</TableCell>
-                            <TableCell>{result.mcqMarks || 0}</TableCell>
-                            <TableCell>{result.cqMarks || 0}</TableCell>
-                            <TableCell>{result.sqMarks || 0}</TableCell>
-                            <TableCell className="font-bold text-primary">{result.total || 0}</TableCell>
-                            <TableCell>{result.percentage?.toFixed(1) || 0}%</TableCell>
-                            <TableCell>
-                              <Badge className={getGradeColor(result.grade)}>
-                                {result.grade || 'N/A'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        )) || (
-                            <TableRow>
-                              <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                                No results available
-                              </TableCell>
-                            </TableRow>
-                          )}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
-      )}
+        <style jsx global>{`
+          .no-scrollbar::-webkit-scrollbar {
+            display: none;
+          }
+          .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          ::selection {
+            background-color: rgba(99, 102, 241, 0.2);
+            color: inherit;
+          }
+        `}</style>
+      </div>
     </div>
   );
 }

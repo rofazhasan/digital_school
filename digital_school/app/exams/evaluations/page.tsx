@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ActivityTab } from "./ActivityTab";
 
 import { useRouter } from "next/navigation";
 import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, LayoutDashboard } from "lucide-react";
@@ -325,209 +327,226 @@ export default function EvaluationsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
-          <div className="relative w-full sm:w-64">
-            <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search Exam Name..."
-              value={searchName}
-              onChange={(e) => setSearchName(e.target.value)}
-              className="pl-10 pr-4 py-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
-            />
+      <Tabs defaultValue="manage" className="w-full">
+        <div className="mb-8">
+          <TabsList className="grid w-full grid-cols-2 max-w-sm rounded-xl p-1 bg-slate-100/50 dark:bg-slate-800/50 border border-slate-200/50 dark:border-slate-700/50 shadow-sm">
+            <TabsTrigger value="manage" className="rounded-lg font-semibold shadow-none data-[state=active]:shadow-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 transition-all">Manage Exams</TabsTrigger>
+            <TabsTrigger value="activity" className="rounded-lg font-semibold shadow-none data-[state=active]:shadow-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 transition-all flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+              Live Activity
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="manage" className="space-y-6 focus-visible:outline-none focus-visible:ring-0">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div className="flex flex-col sm:flex-row gap-4 w-full md:w-auto">
+              <div className="relative w-full sm:w-64">
+                <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <input
+                  type="text"
+                  placeholder="Search Exam Name..."
+                  value={searchName}
+                  onChange={(e) => setSearchName(e.target.value)}
+                  className="pl-10 pr-4 py-2 w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all"
+                />
+              </div>
+
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                  <SelectValue placeholder="All Classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Classes</SelectItem>
+                  {classes.map((cls) => (
+                    <SelectItem key={cls.id} value={cls.id}>
+                      {cls.name} - {cls.section}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                  <SelectValue placeholder="All Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Status</SelectItem>
+                  <SelectItem value="PENDING">Pending</SelectItem>
+                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
+                  <SelectItem value="COMPLETED">Completed</SelectItem>
+                  <SelectItem value="APPROVED">Approved</SelectItem>
+                  <SelectItem value="REJECTED">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+              {["ALL", "PENDING", "IN_PROGRESS", "COMPLETED"].includes(selectedStatus) && (
+                <Badge variant="outline" className="whitespace-nowrap rounded-lg px-3 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
+                  {selectedStatus === "ALL" ? `${exams.length} Exams` : `${exams.filter(e => e.status === selectedStatus).length} ${selectedStatus}`}
+                </Badge>
+              )}
+              {isSuperUser && (
+                <div className="text-sm text-muted-foreground flex items-center gap-2 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
+                  <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                  <span>Manager View</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-              <SelectValue placeholder="All Classes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Classes</SelectItem>
-              {classes.map((cls) => (
-                <SelectItem key={cls.id} value={cls.id}>
-                  {cls.name} - {cls.section}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="grid gap-6">
+            {exams.map((exam) => (
+              <Card key={exam.id} className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
+                      <p className="text-muted-foreground mt-1 line-clamp-2">{exam.description || "No description available."}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+                      <Badge className={getStatusColor(exam.status)}>
+                        <div className="flex items-center gap-1">
+                          {getStatusIcon(exam.status)}
+                          {exam.status.replace("_", " ")}
+                        </div>
+                      </Badge>
+                      {isSuperUser && (
+                        <Badge className={exam.isActive
+                          ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400 border-green-200/50 dark:border-green-800/50"
+                          : "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400 border-gray-200/50 dark:border-slate-700/50"}>
+                          {exam.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                      <Calendar className="h-5 w-5 text-indigo-500" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground uppercase font-semibold">Date</span>
+                        <span className="text-sm font-medium">
+                          {new Date(exam.date).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                      <Users className="h-5 w-5 text-blue-500" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground uppercase font-semibold">Submissions</span>
+                        <span className="text-sm font-medium">
+                          {exam.submittedStudents}/{exam.totalStudents} students
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                      <FileText className="h-5 w-5 text-emerald-500" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground uppercase font-semibold">Published</span>
+                        <span className="text-sm font-medium">
+                          {exam.publishedResults} results
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
+                      <LayoutDashboard className="h-5 w-5 text-amber-500" />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground uppercase font-semibold">Class info</span>
+                        <span className="text-sm font-medium">
+                          {exam.class.name} {exam.class.section}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ALL">All Status</SelectItem>
-              <SelectItem value="PENDING">Pending</SelectItem>
-              <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-              <SelectItem value="COMPLETED">Completed</SelectItem>
-              <SelectItem value="APPROVED">Approved</SelectItem>
-              <SelectItem value="REJECTED">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+                  {exam.publishedResults > 0 && (
+                    <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-600 dark:text-green-400">
+                      <CheckCircle className="h-5 w-5" />
+                      <span className="font-medium">Results Released</span>
+                      <span className="text-sm">({exam.publishedResults} results published)</span>
+                    </div>
+                  )}
 
-        <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-          {["ALL", "PENDING", "IN_PROGRESS", "COMPLETED"].includes(selectedStatus) && (
-            <Badge variant="outline" className="whitespace-nowrap rounded-lg px-3 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-              {selectedStatus === "ALL" ? `${exams.length} Exams` : `${exams.filter(e => e.status === selectedStatus).length} ${selectedStatus}`}
-            </Badge>
-          )}
-          {isSuperUser && (
-            <div className="text-sm text-muted-foreground flex items-center gap-2 bg-blue-500/10 px-3 py-1.5 rounded-full border border-blue-500/20">
-              <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
-              <span>Manager View</span>
+                  {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
+                    <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-3">
+                      <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
+                      {exam.evaluationAssignments.map((assignment: any) => (
+                        <div key={assignment.id} className="border-b border-border last:border-0 pb-2 last:pb-0 text-sm">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            <div>
+                              <span className="text-muted-foreground">Name:</span> {assignment.evaluator.name} <span className="text-xs text-muted-foreground">({assignment.evaluator.role})</span>
+                            </div>
+                            <div>
+                              <span className="text-muted-foreground">Status:</span>
+                              <Badge variant="outline" className={`ml-2 ${getStatusColor(assignment.status)}`}>
+                                {assignment.status.replace("_", " ")}
+                              </Badge>
+                            </div>
+                          </div>
+                          {assignment.notes && <div className="text-xs text-muted-foreground mt-1 italic">Note: {assignment.notes}</div>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {(!isAdmin || isSuperUser) && (
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                        onClick={() => router.push(`/exams/evaluations/${exam.id}`)}
+                      >
+                        <Eye className="h-4 w-4 mr-2" />
+                        View Evaluation
+                      </Button>
+                    )}
+
+                    {(isSuperUser || isAdmin) && (
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-auto text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
+                        onClick={() => {
+                          setSelectedExam(exam);
+                          setAssignDialogOpen(true);
+                        }}
+                      >
+                        <UserCheck className="h-4 w-4 mr-2" />
+                        Assign Evaluator
+                      </Button>
+                    )}
+
+                    {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some((a: any) => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
+                      <Button
+                        variant="outline"
+                        className="w-full sm:w-auto text-green-600 dark:text-green-400 border-green-200 dark:border-green-800/50 hover:bg-green-50 dark:hover:bg-green-900/20"
+                        onClick={() => releaseResults(exam.id)}
+                      >
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Release Results
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {exams.length === 0 && (
+            <div className="text-center py-12">
+              <div className="text-muted-foreground text-lg">No exams found</div>
+              <p className="text-muted-foreground/60 mt-2">
+                Try adjusting your filters to find what you're looking for.
+              </p>
             </div>
           )}
-        </div>
-      </div>
-
-      <div className="grid gap-6">
-        {exams.map((exam) => (
-          <Card key={exam.id} className="hover:shadow-md transition-shadow">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
-                <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl truncate">{exam.name}</CardTitle>
-                  <p className="text-muted-foreground mt-1 line-clamp-2">{exam.description || "No description available."}</p>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
-                  <Badge className={getStatusColor(exam.status)}>
-                    <div className="flex items-center gap-1">
-                      {getStatusIcon(exam.status)}
-                      {exam.status.replace("_", " ")}
-                    </div>
-                  </Badge>
-                  {isSuperUser && (
-                    <Badge className={exam.isActive
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400 border-green-200/50 dark:border-green-800/50"
-                      : "bg-gray-100 text-gray-800 dark:bg-slate-800 dark:text-slate-400 border-gray-200/50 dark:border-slate-700/50"}>
-                      {exam.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
-                  <Calendar className="h-5 w-5 text-indigo-500" />
-                  <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Date</span>
-                    <span className="text-sm font-medium">
-                      {new Date(exam.date).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
-                  <Users className="h-5 w-5 text-blue-500" />
-                  <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Submissions</span>
-                    <span className="text-sm font-medium">
-                      {exam.submittedStudents}/{exam.totalStudents} students
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
-                  <FileText className="h-5 w-5 text-emerald-500" />
-                  <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Published</span>
-                    <span className="text-sm font-medium">
-                      {exam.publishedResults} results
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 bg-muted/30 p-3 rounded-lg border border-border/50">
-                  <LayoutDashboard className="h-5 w-5 text-amber-500" />
-                  <div className="flex flex-col">
-                    <span className="text-xs text-muted-foreground uppercase font-semibold">Class info</span>
-                    <span className="text-sm font-medium">
-                      {exam.class.name} {exam.class.section}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {exam.publishedResults > 0 && (
-                <div className="bg-green-500/10 border border-green-500/20 p-3 rounded-lg mb-4 flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-5 w-5" />
-                  <span className="font-medium">Results Released</span>
-                  <span className="text-sm">({exam.publishedResults} results published)</span>
-                </div>
-              )}
-
-              {exam.evaluationAssignments && exam.evaluationAssignments.length > 0 && (
-                <div className="bg-muted/30 p-3 rounded-lg mb-4 space-y-3">
-                  <h4 className="font-medium text-sm">Evaluators ({exam.evaluationAssignments.length})</h4>
-                  {exam.evaluationAssignments.map((assignment: any) => (
-                    <div key={assignment.id} className="border-b border-border last:border-0 pb-2 last:pb-0 text-sm">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div>
-                          <span className="text-muted-foreground">Name:</span> {assignment.evaluator.name} <span className="text-xs text-muted-foreground">({assignment.evaluator.role})</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Status:</span>
-                          <Badge variant="outline" className={`ml-2 ${getStatusColor(assignment.status)}`}>
-                            {assignment.status.replace("_", " ")}
-                          </Badge>
-                        </div>
-                      </div>
-                      {assignment.notes && <div className="text-xs text-muted-foreground mt-1 italic">Note: {assignment.notes}</div>}
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex flex-col sm:flex-row gap-2">
-                {(!isAdmin || isSuperUser) && (
-                  <Button
-                    variant="outline"
-                    className="w-full sm:w-auto"
-                    onClick={() => router.push(`/exams/evaluations/${exam.id}`)}
-                  >
-                    <Eye className="h-4 w-4 mr-2" />
-                    View Evaluation
-                  </Button>
-                )}
-
-                {(isSuperUser || isAdmin) && (
-                  <Button
-                    variant="outline"
-                    className="w-full sm:w-auto text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20"
-                    onClick={() => {
-                      setSelectedExam(exam);
-                      setAssignDialogOpen(true);
-                    }}
-                  >
-                    <UserCheck className="h-4 w-4 mr-2" />
-                    Assign Evaluator
-                  </Button>
-                )}
-
-                {(isSuperUser || (exam.evaluationAssignments && exam.evaluationAssignments.some((a: any) => a.status === 'COMPLETED'))) && exam.submittedStudents > 0 && exam.publishedResults === 0 && (
-                  <Button
-                    variant="outline"
-                    className="w-full sm:w-auto text-green-600 dark:text-green-400 border-green-200 dark:border-green-800/50 hover:bg-green-50 dark:hover:bg-green-900/20"
-                    onClick={() => releaseResults(exam.id)}
-                  >
-                    <CheckCircle className="h-4 w-4 mr-2" />
-                    Release Results
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {exams.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-muted-foreground text-lg">No exams found</div>
-          <p className="text-muted-foreground/60 mt-2">
-            Try adjusting your filters to find what you're looking for.
-          </p>
-        </div>
-      )}
+        </TabsContent>
+        <TabsContent value="activity" className="focus-visible:outline-none focus-visible:ring-0">
+          <ActivityTab />
+        </TabsContent>
+      </Tabs>
 
       {/* Assign Evaluator Dialog */}
       <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>

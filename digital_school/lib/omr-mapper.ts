@@ -26,7 +26,7 @@ export interface OMRTemplate {
     bubbles: OMRBubble[];
 }
 
-export const generateOMRTemplate = (examId: string, setId: string, questions: any): OMRTemplate => {
+export const generateOMRTemplate = (examId: string, setId: string): OMRTemplate => {
     const bubbles: OMRBubble[] = [];
 
     /**

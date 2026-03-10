@@ -3,8 +3,8 @@ import Dexie, { Table } from 'dexie';
 export interface LocalExam {
     id: string;
     title: string;
-    templateJson: any;
-    questionsJson: any;
+    templateJson: unknown;
+    questionsJson: unknown;
     downloadedAt: Date;
 }
 

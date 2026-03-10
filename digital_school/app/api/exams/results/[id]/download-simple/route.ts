@@ -162,7 +162,7 @@ function generateCSVResults(data: CSVData): string {
     return `"${str}"`;
   };
 
-  let csv = [];
+  const csv = [];
 
   // Header Info
   csv.push([escape(institute?.name || 'Educational Institute')]);

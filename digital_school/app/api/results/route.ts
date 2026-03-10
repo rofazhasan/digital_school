@@ -5,7 +5,7 @@ import { getTokenFromRequest } from '@/lib/auth';
 export async function GET(request: NextRequest) {
   try {
     const token = await getTokenFromRequest(request);
-    
+
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user || !user.studentProfile) {
-      return NextResponse.json({ error: 'Student profile not found' }, { status: 404 });
+      console.log(`[API_RESULTS] No student profile found for user ${token.user.id}, returning empty results`);
+      return NextResponse.json({ results: [] });
     }
 
     // Fetch results for this student

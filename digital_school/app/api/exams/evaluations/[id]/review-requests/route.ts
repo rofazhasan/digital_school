@@ -4,33 +4,42 @@ import { getTokenFromRequest } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  context: any
 ) {
   try {
-    const { id: examId } = await params;
-    const token = await getTokenFromRequest(request);
+    // Extremely robust params handling for Next.js 14/15
+    const params = await (context.params || {});
+    const examId = params.id;
 
+    if (!examId) {
+      return NextResponse.json({ error: 'Missing exam ID' }, { status: 400 });
+    }
+
+    const token = await getTokenFromRequest(request);
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check if user has permission to view review requests (teacher, admin, super user)
+    // Check if user has permission
     const user = await db.user.findUnique({
-      where: { id: token.user.id }
+      where: { id: token.user.id },
+      select: { role: true }
     });
 
     if (!user || !['TEACHER', 'ADMIN', 'SUPER_USER'].includes(user.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
 
-    // Get all review requests for this exam
+    console.log(`[DEBUG] Fetching reviews for exam: ${examId}`);
+
+    // Fetch review requests with absolute minimum include first to isolate error
     const reviewRequests = await (db as any).resultReview.findMany({
-      where: {
-        examId: examId
-      },
+      where: { examId: examId },
       include: {
         student: {
-          include: {
+          select: {
+            id: true,
+            roll: true,
             user: {
               select: {
                 name: true,
@@ -42,14 +51,9 @@ export async function GET(
         examSubmission: {
           select: {
             id: true,
-            submittedAt: true,
+            objectiveSubmittedAt: true,
+            cqSqSubmittedAt: true,
             score: true
-          }
-        },
-        reviewer: {
-          select: {
-            name: true,
-            email: true
           }
         }
       },
@@ -58,51 +62,30 @@ export async function GET(
       }
     });
 
-    // Transform the data to include student name safely
-    const transformedRequests = reviewRequests.map((request: any) => {
-      try {
-        if (!request.student || !request.student.user) {
-          console.warn(`Review request ${request.id} has missing student or user data`);
-          return {
-            ...request,
-            student: {
-              ...(request.student || {}),
-              name: 'Unknown Student',
-              email: 'N/A'
-            }
-          };
-        }
-
-        return {
-          ...request,
-          student: {
-            ...request.student,
-            name: request.student.user.name,
-            email: request.student.user.email
-          }
-        };
-      } catch (err) {
-        console.error(`Error transforming review request ${request.id}:`, err);
-        return {
-          ...request,
-          student: {
-            ...(request.student || {}),
-            name: 'Error Loading Name',
-            email: 'N/A'
-          }
-        };
-      }
+    // Safe transformation
+    const transformed = (reviewRequests || []).map((r: any) => {
+      return {
+        ...r,
+        student: r.student ? {
+          ...r.student,
+          name: r.student.user?.name || 'Unknown Student',
+          email: r.student.user?.email || 'N/A'
+        } : { name: 'Unknown Student', email: 'N/A' }
+      };
     });
 
-    return NextResponse.json({
-      reviewRequests: transformedRequests
-    });
+    return NextResponse.json({ reviewRequests: transformed });
 
-  } catch (error) {
-    console.error('Error fetching review requests:', error);
+  } catch (error: any) {
+    console.error('CRITICAL Error in review-requests API:', error);
+    // Return error details to help debugging
     return NextResponse.json(
-      { error: 'Internal server error' },
+      {
+        error: 'Internal server error',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
-} 
+}

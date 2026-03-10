@@ -60,7 +60,7 @@ export function ExamContextProvider({
   // --- Section Detection Logic ---
   const { hasObjective, hasCqSq } = useMemo(() => {
     if (!exam.questions) return { hasObjective: false, hasCqSq: false };
-    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric'];
+    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq'];
     const questions = exam.questions || [];
 
     const obj = questions.some((q: any) => {
@@ -77,9 +77,26 @@ export function ExamContextProvider({
     return { hasObjective: obj, hasCqSq: sub };
   }, [exam.questions]);
 
-  const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(
-    exam.objectiveStatus === 'SUBMITTED' || !hasObjective ? 'cqsq' : 'objective'
-  );
+  const [activeSection, setActiveSection] = useState<'objective' | 'cqsq'>(() => {
+    // If explicitly submitted or no objective section, always cqsq
+    if (exam.objectiveStatus === 'SUBMITTED' || !hasObjective) return 'cqsq';
+
+    // Fairness (insaf) check: if objective section was started and time has elapsed
+    // even if it wasn't marked as SUBMITTED yet (e.g. user closed tab),
+    // we should treat it as expired if the objectiveTime has passed.
+    if (exam.objectiveStartedAt && (exam.objectiveTime || exam.duration)) {
+      const objTime = exam.objectiveTime || exam.duration;
+      const startTime = new Date(exam.objectiveStartedAt).getTime();
+      const now = Date.now();
+      const limitMs = objTime * 60 * 1000;
+
+      if (now > startTime + limitMs) {
+        return 'cqsq';
+      }
+    }
+
+    return 'objective';
+  });
   const isOnline = useOnlineStatus();
 
   // Scope to specific submission to prevent retake bleed-over
@@ -145,8 +162,8 @@ export function ExamContextProvider({
   const fullSortedQuestions = useMemo(() => {
     if (!exam.questions) return [];
 
-    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive'];
-    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], other: [] };
+    const types = ['mcq', 'mc', 'ar', 'mtf', 'cq', 'sq', 'int', 'numeric', 'descriptive', 'smcq'];
+    const grouped: any = { mcq: [], mc: [], ar: [], mtf: [], cq: [], sq: [], int: [], numeric: [], descriptive: [], smcq: [], other: [] };
 
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
@@ -159,6 +176,7 @@ export function ExamContextProvider({
       ...grouped.mc,
       ...grouped.ar,
       ...grouped.mtf,
+      ...grouped.smcq,
       ...grouped.cq,
       ...grouped.sq,
       ...grouped.int,
@@ -172,7 +190,7 @@ export function ExamContextProvider({
     if (activeSection === 'objective') {
       return fullSortedQuestions.filter((q: any) => {
         const type = (q.type || q.questionType || '').toLowerCase();
-        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
+        return ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'other'].includes(type) && !['cq', 'sq', 'descriptive'].includes(type);
       });
     } else {
       return fullSortedQuestions.filter((q: any) => {
@@ -257,7 +275,7 @@ export function ExamContextProvider({
 
   const groupedQuestions = useMemo(() => {
     if (!exam.questions) return {};
-    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], cq: [], sq: [], descriptive: [], other: [] };
+    const g: any = { mcq: [], mc: [], ar: [], mtf: [], int: [], numeric: [], smcq: [], cq: [], sq: [], descriptive: [], other: [] };
     exam.questions.forEach((q: any) => {
       const type = (q.type || q.questionType || '').toLowerCase();
       if (g[type]) g[type].push(q);
@@ -266,7 +284,7 @@ export function ExamContextProvider({
     return {
       creative: [...g.cq, ...g.descriptive],
       short: [...g.sq],
-      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.other]
+      objective: [...g.mcq, ...g.mc, ...g.ar, ...g.mtf, ...g.int, ...g.numeric, ...g.smcq, ...g.other]
     };
   }, [exam.questions]);
 

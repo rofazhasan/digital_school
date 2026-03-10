@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { validateSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
-    title: "Teacher Dashboard | Digital School",
+    title: "Teacher Dashboard",
     description: "Manage exams, students, and question banks",
 };
 

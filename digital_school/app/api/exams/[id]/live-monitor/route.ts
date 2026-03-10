@@ -77,6 +77,12 @@ export async function GET(
         // Helper: Normalize String for comparison
         const normalize = (s: string) => String(s).trim().toLowerCase().normalize();
 
+        // Import evaluation utilities dynamically to avoid startup overhead or circular deps
+        const { evaluateMCQuestion } = await import("@/lib/evaluation/mcEvaluation");
+        const { evaluateINTQuestion } = await import("@/lib/evaluation/intEvaluation");
+        const { evaluateARQuestion } = await import("@/lib/evaluation/arEvaluation");
+        const { evaluateMTFQuestion } = await import("@/lib/evaluation/mtfEvaluation");
+
         // 2. Process Submissions for Live Monitor
         const liveData = await Promise.all(
             exam.examSubmissions.map(async (submission) => {
@@ -84,7 +90,6 @@ export async function GET(
                 let studentQuestions = defaultQuestions;
                 let examSetId = submission.examSetId;
 
-                // If no explicit set in submission (rare), try to find from map (if needed, but usually submission.examSetId is key)
                 if (!examSetId) {
                     const map = await prisma.examStudentMap.findUnique({
                         where: { studentId_examId: { studentId: submission.studentId, examId } }
@@ -96,63 +101,105 @@ export async function GET(
                     studentQuestions = studentQuestionsMap.get(examSetId);
                 }
 
-                // If still empty (e.g. no generated set and no mapped set), fallback to first available set
                 if (studentQuestions.length === 0 && studentQuestionsMap.size > 0) {
                     studentQuestions = studentQuestionsMap.values().next().value;
                 }
 
                 // Calculate Stats
                 const answers = submission.answers as Record<string, any>;
-                let totalQuestions = studentQuestions.length;
+                const totalQuestions = studentQuestions.length;
                 let answeredQuestions = 0;
-                let score = 0;
-                let maxScore = 0;
+                let objectiveScore = 0;
+                let maxObjectiveScore = 0;
 
                 for (const q of studentQuestions) {
-                    maxScore += q.marks;
+                    const type = (q.type || '').toUpperCase();
+                    const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'NUMERIC', 'MTF', 'SMCQ'].includes(type);
+
+                    if (isObjective) {
+                        maxObjectiveScore += q.marks;
+                    }
+
                     const ans = answers[q.id];
-                    if (ans !== undefined && ans !== null && ans !== "") {
+                    const hasAnswer = ans !== undefined && ans !== null && ans !== "";
+
+                    // For SMCQ, we need to check sub-answers
+                    let hasSMCQAnswer = false;
+                    if (type === 'SMCQ') {
+                        const subs = q.subQuestions || q.sub_questions || [];
+                        hasSMCQAnswer = subs.some((_: any, idx: number) => {
+                            const subAns = answers[`${q.id}_sub_${idx}`];
+                            return subAns !== undefined && subAns !== null && subAns !== "";
+                        });
+                    }
+
+                    if (hasAnswer || hasSMCQAnswer) {
                         answeredQuestions++;
 
-                        // Auto-grading logic (Simplified from main route)
-                        if (q.type === 'MCQ') {
+                        if (type === 'MCQ') {
                             let isCorrect = false;
                             const userAns = normalize(ans);
-
-                            // Check options
                             if (q.options && Array.isArray(q.options)) {
                                 const correctOpt = q.options.find((o: any) => o.isCorrect);
                                 if (correctOpt) isCorrect = userAns === normalize(correctOpt.text || String(correctOpt));
                             }
-
-                            // Check correct field
-                            if (!isCorrect && q.correct) {
-                                isCorrect = userAns === normalize(String(q.correct));
-                            }
-
-                            // Check correctAnswer field
-                            if (!isCorrect && q.correctAnswer) {
-                                isCorrect = userAns === normalize(String(q.correctAnswer));
+                            if (!isCorrect && (q.correctAnswer || q.correct)) {
+                                isCorrect = userAns === normalize(String(q.correctAnswer || q.correct));
                             }
 
                             if (isCorrect) {
-                                score += q.marks;
+                                objectiveScore += q.marks;
                             } else if (exam.mcqNegativeMarking) {
-                                score -= (q.marks * exam.mcqNegativeMarking) / 100;
+                                objectiveScore -= (q.marks * exam.mcqNegativeMarking) / 100;
                             }
-                        } else {
-                            // For non-MCQ, if we have manual marks in answers (rare during live, but possible if partially graded)
-                            // live monitor usually shows auto-score.
-                            // We'll skip adding manual marks here for "Live" score unless it's available.
-                            // But actually, for live monitoring, usually we only know objective.
+                        } else if (type === 'MC') {
+                            objectiveScore += evaluateMCQuestion(q, ans || { selectedOptions: [] }, {
+                                negativeMarking: exam.mcqNegativeMarking || 0,
+                                partialMarking: true
+                            });
+                        } else if (type === 'INT' || type === 'NUMERIC') {
+                            const res = evaluateINTQuestion(q, ans);
+                            objectiveScore += res.score;
+                        } else if (type === 'AR') {
+                            const res = evaluateARQuestion(q, ans);
+                            objectiveScore += res.score;
+                        } else if (type === 'MTF') {
+                            const res = evaluateMTFQuestion(q, ans || {});
+                            objectiveScore += res.score;
+                        } else if (type === 'SMCQ') {
+                            const subs = q.subQuestions || q.sub_questions || [];
+                            let smcqScore = 0;
+                            subs.forEach((subQ: any, sIdx: number) => {
+                                const subAns = answers[`${q.id}_sub_${sIdx}`];
+                                if (!subAns) return;
+
+                                let isSubCorrect = false;
+                                const subNorm = (s: any) => String(s || "").trim().toLowerCase();
+                                const userSubAns = subNorm(subAns);
+
+                                if (subQ.options && Array.isArray(subQ.options)) {
+                                    const correctOpt = subQ.options.find((o: any) => o.isCorrect);
+                                    if (correctOpt) isSubCorrect = userSubAns === subNorm(correctOpt.text || String(correctOpt));
+                                }
+                                if (!isSubCorrect && (subQ.correctAnswer || subQ.correct)) {
+                                    isSubCorrect = userSubAns === subNorm(String(subQ.correctAnswer || subQ.correct));
+                                }
+                                if (isSubCorrect) smcqScore += (Number(subQ.marks) || 1);
+                            });
+                            objectiveScore += smcqScore;
                         }
                     }
                 }
 
-                // NOTE: On the Evaluation page, all students have submission.status === 'SUBMITTED'
-                // (only submitted students are shown here). So we use evaluation state instead:
-                // - 'IN_PROGRESS' = submitted but not yet evaluated
-                // - 'COMPLETED'   = teacher has evaluated this student
+                // Get manual marks from Result table if already evaluated
+                const result = await prisma.result.findUnique({
+                    where: { studentId_examId: { studentId: submission.studentId, examId } }
+                });
+
+                const cqMarks = result?.cqMarks || 0;
+                const sqMarks = result?.sqMarks || 0;
+                const totalScore = Math.max(0, objectiveScore) + cqMarks + sqMarks;
+
                 const evaluationStatus = submission.evaluatedAt ? 'COMPLETED' : 'IN_PROGRESS';
 
                 return {
@@ -165,8 +212,11 @@ export async function GET(
                     progress: Math.round((answeredQuestions / totalQuestions) * 100) || 0,
                     answered: answeredQuestions,
                     totalQuestions: totalQuestions,
-                    score: Math.max(0, parseFloat(score.toFixed(2))),
-                    maxScore,
+                    score: parseFloat(totalScore.toFixed(2)),
+                    objectiveScore: parseFloat(Math.max(0, objectiveScore).toFixed(2)),
+                    cqMarks,
+                    sqMarks,
+                    maxScore: exam.totalMarks,
                     lastActive: submission.evaluatedAt || submission.cqSqSubmittedAt || submission.objectiveSubmittedAt || null,
                     answers: answers
                 };

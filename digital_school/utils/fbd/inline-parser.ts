@@ -148,8 +148,8 @@ export function renderTextWithFBDs(
 
     if (!text) return parts;
 
-    let currentText = text;
-    let fbdIndex = 0;
+    const currentText = text;
+    const fbdIndex = 0;
 
     // Split by FBD placeholders
     const placeholderRegex = /__FBD_(\d+)__/g;

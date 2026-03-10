@@ -42,7 +42,8 @@ import {
   Sparkles,
   Search,
   Zap,
-  Calendar
+  Calendar,
+  Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -52,6 +53,7 @@ import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
+import { hasStudentAnswered, isAnswerCorrect } from "@/lib/exam-result-utils";
 import { useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
 import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
@@ -120,6 +122,18 @@ interface SubmissionInfo {
   cqSqSubmittedAt?: string;
 }
 
+interface SubQuestion {
+  id: string;
+  questionText: string;
+  marks: number;
+  awardedMarks: number;
+  isCorrect: boolean;
+  studentAnswer: string | string[] | any;
+  studentImages: string[];
+  options?: { text: string; isCorrect: boolean; originalIndex?: number }[];
+  correctAnswer?: string | number;
+}
+
 interface Question {
   id: string;
   type: string;
@@ -127,7 +141,7 @@ interface Question {
   marks: number;
   awardedMarks: number;
   isCorrect: boolean;
-  studentAnswer?: any;
+  studentAnswer?: any; // Reverting to any for flexible student answer structures
   studentAnswerImages?: string[];
   drawingData?: {
     imageData: string;
@@ -138,13 +152,19 @@ interface Question {
     imageData: string;
     originalImagePath: string;
   }[];
-  options?: any[];
+  options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
   modelAnswer?: string;
   explanation?: string;
-  subQuestions?: any[];
-  sub_questions?: any[];
+  subQuestions?: SubQuestion[];
+  sub_questions?: SubQuestion[];
   feedback?: string;
   images?: string[];
+  assertion?: string;
+  reason?: string;
+  correctOption?: number;
+  leftColumn?: string[];
+  rightColumn?: string[];
+  matches?: Record<string, number>;
 }
 
 interface Statistics {
@@ -237,7 +257,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       triggerHaptic(ImpactStyle.Medium);
     }
   } as any);
-
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -505,7 +524,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         setNotifications(data.notifications || []);
 
         // Check for review response notifications
-        const reviewNotifications = data.notifications?.filter((n: any) =>
+        const reviewNotifications = (data.notifications as any[] || []).filter((n: any) =>
           n.type === 'REVIEW_RESPONSE' && n.relatedType === 'result_review'
         ) || [];
 
@@ -695,62 +714,143 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-4">
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center"
+          animate={{
+            scale: [1, 1.1, 1],
+            rotate: [0, 5, -5, 0],
+          }}
+          transition={{
+            duration: 2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="relative mb-8"
         >
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-lg text-muted-foreground">Loading your result...</p>
+          <div className="absolute inset-0 bg-blue-500 blur-2xl opacity-20 animate-pulse"></div>
+          <div className="relative p-6 rounded-3xl bg-white dark:bg-slate-900 shadow-xl border border-slate-200 dark:border-slate-800">
+            <GraduationCap className="h-12 w-12 text-blue-600 dark:text-blue-400" />
+          </div>
         </motion.div>
+        <div className="space-y-3 text-center">
+          <h2 className="text-xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Preparing Report</h2>
+          <div className="flex items-center gap-1 justify-center">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                animate={{
+                  scale: [1, 1.5, 1],
+                  opacity: [0.3, 1, 0.3],
+                }}
+                transition={{
+                  duration: 1,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                }}
+                className="w-1.5 h-1.5 rounded-full bg-blue-600 dark:bg-blue-400"
+              />
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Notification banner for review responses
   const reviewNotifications = notifications.filter(n =>
     n.type === 'REVIEW_RESPONSE' && n.relatedType === 'result_review'
   );
 
-  // Debug: Log notifications to see what's actually there
-  console.log('All notifications:', notifications);
-  console.log('Review notifications:', reviewNotifications);
-
-  // More detailed debugging
-  notifications.forEach((n, index) => {
-    console.log(`Notification ${index}:`, {
-      id: n.id,
-      type: n.type,
-      relatedType: n.relatedType,
-      title: n.title,
-      message: n.message,
-      isRead: n.isRead
-    });
-  });
-
-
-  if (!result) {
+  // --- STRICT PRIVACY CHECK START ---
+  if (!result || !result.exam || !result.submission) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-2 border-dashed border-slate-200 dark:border-slate-800 bg-transparent shadow-none rounded-[2rem]">
+          <CardContent className="p-12 text-center space-y-6">
+            <div className="inline-flex p-5 rounded-full bg-slate-100 dark:bg-slate-900 text-slate-400">
+              <Eye className="h-10 w-10 opacity-50" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-800 dark:text-white uppercase tracking-tighter">Result Not Found</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium leading-relaxed">The requested assessment report could not be located or you do not have permission to view it.</p>
+            </div>
+            <Button asChild className="w-full rounded-2xl bg-black dark:bg-white text-white dark:text-black hover:scale-105 transition-transform">
+              <Link href="/student/dashboard">Return to Dashboard</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (result.result && !result.result.isPublished && userRole === 'STUDENT') {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 sm:p-12 relative overflow-hidden">
+        {/* Background Decorative Elements */}
+        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none opacity-20">
+          <div className="absolute top-1/4 -left-20 w-80 h-80 bg-blue-500 rounded-full blur-[100px]" />
+          <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-purple-500 rounded-full blur-[100px]" />
+        </div>
+
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
+          initial={{ opacity: 0, scale: 0.9, y: 30 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 100 }}
+          className="relative z-10 max-w-2xl w-full"
         >
-          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">Result Not Found</h2>
-          <p className="text-gray-600 mb-4">This exam result is not available yet.</p>
-          <Button asChild>
-            <Link href="/exams/online">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Exams
-            </Link>
-          </Button>
+          <Card className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-3xl border border-white dark:border-slate-800 shadow-2xl rounded-[3rem] overflow-hidden">
+            <div className="h-3 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+            <CardContent className="p-10 sm:p-16 flex flex-col items-center text-center space-y-10">
+              <div className="relative">
+                <div className="absolute inset-0 bg-blue-500 rounded-full blur-2xl opacity-20 animate-pulse" />
+                <div className="relative p-8 rounded-[2.5rem] bg-gradient-to-br from-blue-50 via-indigo-50 to-white dark:from-slate-800 dark:via-slate-800 dark:to-slate-900 border border-white dark:border-slate-700 shadow-xl group">
+                  <Lock className="h-16 w-16 text-blue-600 dark:text-blue-400 group-hover:rotate-12 transition-transform duration-500" />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 text-[10px] font-black uppercase tracking-widest border border-blue-200 dark:border-blue-800">
+                  <Sparkles className="h-3 w-3" /> Status: Evaluation Ongoing
+                </div>
+                <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white leading-[0.9] tracking-tighter">
+                  Assessment results <br />
+                  <span className="text-blue-600 dark:text-blue-400">are strictly private.</span>
+                </h2>
+                <p className="text-slate-500 dark:text-slate-400 text-lg font-medium max-w-md mx-auto leading-relaxed">
+                  Your performance in <span className="font-bold text-slate-800 dark:text-slate-200">{result.exam.name}</span> is currently being reviewed by the department.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 w-full">
+                <div className="p-6 rounded-[2rem] bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-700">
+                  <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mb-1">Submitted</p>
+                  <p className="text-lg font-black text-slate-700 dark:text-slate-300">
+                    {result.submission.submittedAt ? new Date(result.submission.submittedAt).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+                <div className="p-6 rounded-[2rem] bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900/30">
+                  <p className="text-[10px] uppercase font-black text-blue-400 tracking-widest mb-1">Visibility</p>
+                  <p className="text-lg font-black text-blue-700 dark:text-blue-300 italic">Pending Release</p>
+                </div>
+              </div>
+
+              <div className="space-y-4 w-full">
+                <Button asChild className="w-full h-16 rounded-[1.5rem] bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg shadow-xl shadow-blue-500/20 group transition-all duration-300">
+                  <Link href="/student/dashboard" className="flex items-center justify-center gap-2">
+                    Back to Academic Dashboard
+                    <ArrowLeft className="h-5 w-5 rotate-180 group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </Button>
+                <p className="text-[9px] uppercase font-black text-slate-400 dark:text-slate-500 tracking-[0.2em]">
+                  Copyright © 2026 Academic Information System
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </motion.div>
       </div>
     );
   }
+  // --- STRICT PRIVACY CHECK END ---
 
   // Calculate marks breakdown
   const mcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'MCQ') || [];
@@ -1315,8 +1415,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               <p className="text-[10px] uppercase tracking-widest text-slate-500 font-black">Accuracy</p>
                               <p className="text-lg font-black">
                                 {(() => {
-                                  const answered = result.questions.filter(q => q.studentAnswer && q.studentAnswer !== 'No answer provided').length;
-                                  const correct = result.questions.filter(q => q.isCorrect).length;
+                                  const answered = result.questions.filter(q => hasStudentAnswered(q.type, q.studentAnswer, q.subQuestions || q.sub_questions)).length;
+                                  const correct = result.questions.filter(q => isAnswerCorrect(q.awardedMarks, q.marks)).length;
                                   return answered > 0 ? ((correct / answered) * 100).toFixed(0) : '0';
                                 })()}%
                               </p>
@@ -1525,8 +1625,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
 
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(type, q.studentAnswer, q.subQuestions || q.sub_questions);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -1557,8 +1657,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                               {paginatedQuestions.map((question, index) => {
                                 const type = (question.type || "").toUpperCase();
                                 const globalIndex = startIndex + index;
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                                const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
+                                const hasAnswer = hasStudentAnswered(type, question.studentAnswer, question.subQuestions || question.sub_questions);
 
                                 return (
                                   <motion.div
@@ -1600,13 +1700,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <Sparkles className="h-3 w-3" /> Scenario Context
                                             </div>
                                             <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
-                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                             </div>
                                           </div>
                                         </div>
 
                                         <div className="space-y-10 pl-2 md:pl-10 border-l-4 border-dashed border-indigo-500/20">
-                                          {(question.subQuestions || []).map((subQ: any, subIdx: number) => (
+                                          {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
                                             <div key={subIdx} className="relative space-y-6 group">
                                               {/* connector dot */}
                                               <div className="absolute -left-12 top-2 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-4 border-indigo-500 shadow-lg shadow-indigo-500/50 z-10" />
@@ -1622,11 +1722,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                     </Badge>
                                                   </div>
                                                   <div className="text-lg font-bold text-slate-700 dark:text-slate-200 leading-snug">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax>
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
                                                   </div>
                                                 </div>
 
-                                                {subQ.studentAnswer && (
+                                                {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
                                                   <div className={cn(
                                                     "px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border whitespace-nowrap",
                                                     subQ.isCorrect
@@ -1641,8 +1741,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 {(subQ.options || []).map((opt: any, oi: number) => {
                                                   const optText = typeof opt === 'object' ? opt.text : opt;
-                                                  const isSelected = String(subQ.studentAnswer) === String(optText);
-                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && (String(subQ.correctAnswer) === String(optText) || Number(subQ.correctAnswer) === oi)));
+                                                  const isSelected = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && String(subQ.studentAnswer).trim() === String(optText).trim();
+                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null && (String(subQ.correctAnswer).trim() === String(optText).trim() || Number(subQ.correctAnswer) === oi)));
 
                                                   let style = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
                                                   let icon = null;
@@ -1674,6 +1774,42 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                   );
                                                 })}
                                               </div>
+
+                                              {/* Sub-question Uploaded Images (Isolated) */}
+                                              {subQ.studentImages && subQ.studentImages.length > 0 && (
+                                                <div className="mt-4 p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 shadow-sm relative overflow-hidden group">
+                                                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:rotate-12 transition-transform">
+                                                    <ImageIcon className="h-10 w-10 text-emerald-500" />
+                                                  </div>
+                                                  <div className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/50 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                                    Visual Evidence (Part {subIdx + 1})
+                                                  </div>
+                                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                    {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
+                                                      const annotation = subQ.allDrawings?.find((d: any) => d.originalImagePath === imageUrl || d.imageIndex === imgIdx);
+                                                      return (
+                                                        <div
+                                                          key={imgIdx}
+                                                          className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm hover:shadow-xl transition-all"
+                                                          onClick={() => handleImageZoom(imageUrl, `Question ${globalIndex + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, annotation)}
+                                                        >
+                                                          <img src={imageUrl} alt={`Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                          {annotation && (
+                                                            <div className="absolute inset-0 bg-emerald-500/10 pointer-events-none" />
+                                                          )}
+                                                          {annotation && (
+                                                            <div className="absolute top-2 right-2 flex items-center gap-1 bg-emerald-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full shadow-lg ring-2 ring-white animate-bounce-subtle">
+                                                              <Zap className="h-2 w-2 fill-white" /> ANNOTATED
+                                                            </div>
+                                                          )}
+                                                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </div>
+                                                      );
+                                                    })}
+                                                  </div>
+                                                </div>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
@@ -1701,7 +1837,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     ) : type === 'MTF' ? (
                                       <div className="mb-4">
                                         <div className="text-foreground mb-4 font-medium">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                                           {(question as any).pairs?.map((p: any, pidx: number) => (
@@ -1713,13 +1849,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           ))}
                                         </div>
                                       </div>
-                                    ) : (
+                                    ) : type !== 'SMCQ' ? (
                                       <div className="mb-4 overflow-x-auto max-w-full scrollbar-thin">
                                         <div className="text-lg font-medium text-foreground">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
+                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                         </div>
                                       </div>
-                                    )}
+                                    ) : null}
 
                                     {/* Result Rendering Logic */}
                                     {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
@@ -1738,32 +1874,46 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           }
 
                                           return (optionsToRender || []).map((option, optIndex) => {
-                                            const isSelected =
-                                              // Check for object format (e.g. MC, AR)
-                                              question.studentAnswer?.selectedOptions?.includes(optIndex) ||
-                                              question.studentAnswer?.selectedOption === optIndex ||
-                                              // Check for primitive format (e.g. standard MCQ text or index)
-                                              question.studentAnswer === option.text ||
-                                              question.studentAnswer === optIndex;
+                                            const optText = typeof option === 'object' ? option.text : option;
+                                            const rawAnswer = question.studentAnswer;
 
-                                            // Determine correctness
+                                            // --- PRECISE isSelected DETECTION ---
+                                            let isSelected = false;
+                                            if (type === 'MC') {
+                                              // MC stores selectedOptions as index array
+                                              isSelected = rawAnswer?.selectedOptions?.includes(optIndex) ?? false;
+                                            } else if (type === 'AR') {
+                                              // AR stores selectedOption as 1-indexed number
+                                              isSelected = (rawAnswer?.selectedOption === optIndex + 1) ||
+                                                (Number(rawAnswer) === optIndex + 1);
+                                            } else {
+                                              // MCQ: studentAnswer is the chosen option text (string)
+                                              const isTextMatch = typeof rawAnswer === 'string' &&
+                                                rawAnswer.trim() !== '' &&
+                                                rawAnswer.trim() === String(optText).trim();
+                                              // Fallback: if stored as 0-based index number
+                                              const isIndexMatch = typeof rawAnswer === 'number' && rawAnswer === optIndex;
+                                              isSelected = isTextMatch || isIndexMatch;
+                                            }
+
+                                            // --- PRECISE isCorrectOpt DETECTION ---
                                             let isCorrectOpt = false;
-                                            if (type === 'MCQ' || type === 'AR') {
-                                              const correctIndex = (question as any).correctOption !== undefined ? (question as any).correctOption :
-                                                (question as any).correct;
-                                              // Handle case where correct is inside options array (legacy)
-                                              if (correctIndex === undefined && question.options) {
-                                                isCorrectOpt = question.options[optIndex]?.isCorrect;
+                                            if (type === 'MC') {
+                                              isCorrectOpt = !!(option as any).isCorrect;
+                                            } else if (type === 'AR') {
+                                              // AR: correctOption is 1-indexed
+                                              const correctIdx = (question as any).correctOption ?? (question as any).correct;
+                                              isCorrectOpt = Number(correctIdx) === optIndex + 1;
+                                            } else {
+                                              // MCQ: first check option.isCorrect flag, then fallback to correctOption index
+                                              if ((option as any).isCorrect !== undefined) {
+                                                isCorrectOpt = !!(option as any).isCorrect;
                                               } else {
-                                                const originalIdx = question.options?.[optIndex]?.originalIndex;
-                                                if (originalIdx !== undefined) {
-                                                  isCorrectOpt = Number(correctIndex) === originalIdx;
-                                                } else {
-                                                  isCorrectOpt = Number(correctIndex) === optIndex;
+                                                const correctIdx = (question as any).correctOption ?? (question as any).correct ?? (question as any).correctAnswer;
+                                                if (correctIdx !== undefined && correctIdx !== null) {
+                                                  isCorrectOpt = Number(correctIdx) === optIndex;
                                                 }
                                               }
-                                            } else if (type === 'MC') {
-                                              isCorrectOpt = option.isCorrect;
                                             }
 
                                             let containerStyle = "";
@@ -1807,7 +1957,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                       "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা",
                                                       "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক",
                                                       "Assertion (A) ও Reason (R) উভয়ই মিথ্যা"
-                                                    ][optIndex] : cleanupMath(option.text)}
+                                                    ][optIndex] : cleanupMath(optText)}
                                                   </UniversalMathJax>
                                                 </span>
                                                 {icon}
@@ -1822,7 +1972,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           <div className="flex items-center gap-4">
                                             <div className="text-sm font-bold text-gray-600">
                                               Your Answer:
-                                              {(question.studentAnswer as any)?.answer !== undefined || (typeof question.studentAnswer === 'string' && question.studentAnswer) ? (
+                                              {((question.studentAnswer as any)?.answer !== undefined || (question.studentAnswer !== undefined && question.studentAnswer !== null && question.studentAnswer !== '')) ? (
                                                 <span className={`ml-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
                                                   {(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : question.studentAnswer}
                                                 </span>
@@ -1977,45 +2127,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
 
                             {/* Pagination Controls */}
-                            {totalPages > 1 && (
-                              <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (currentPage > 1) {
-                                      setCurrentPage(curr => curr - 1);
-                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                    }
-                                  }}
-                                  disabled={currentPage === 1}
-                                  className="w-24"
-                                >
-                                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                                </Button>
+                            {
+                              totalPages > 1 && (
+                                <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (currentPage > 1) {
+                                        setCurrentPage(curr => curr - 1);
+                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }
+                                    }}
+                                    disabled={currentPage === 1}
+                                    className="w-24"
+                                  >
+                                    <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+                                  </Button>
 
-                                <div className="flex items-center gap-1 mx-4">
-                                  <span className="text-sm font-medium text-gray-600">
-                                    Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
-                                  </span>
+                                  <div className="flex items-center gap-1 mx-4">
+                                    <span className="text-sm font-medium text-gray-600">
+                                      Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
+                                    </span>
+                                  </div>
+
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      if (currentPage < totalPages) {
+                                        setCurrentPage(curr => curr + 1);
+                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
+                                      }
+                                    }}
+                                    disabled={currentPage === totalPages}
+                                    className="w-24"
+                                  >
+                                    Next <ChevronRight className="h-4 w-4 ml-1" />
+                                  </Button>
                                 </div>
-
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    if (currentPage < totalPages) {
-                                      setCurrentPage(curr => curr + 1);
-                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                    }
-                                  }}
-                                  disabled={currentPage === totalPages}
-                                  className="w-24"
-                                >
-                                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
-                              </div>
-                            )}
+                              )
+                            }
                           </div>
                         );
                       })()}
@@ -2027,8 +2179,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {(() => {
                         const filteredQuestions = result.questions.filter(q => {
                           if (q.type?.toUpperCase() !== 'CQ') return false;
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -2058,8 +2210,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <div className="space-y-6">
                               {paginatedQuestions.map((question, index) => {
                                 const globalIndex = startIndex + index;
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
-                                const hasAnswer = question.studentAnswer && (typeof question.studentAnswer === 'string' ? question.studentAnswer.trim() !== '' : true) && question.studentAnswer !== 'No answer provided';
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
+                                const hasAnswer = hasStudentAnswered(question.type, question.studentAnswer);
 
                                 return (
                                   <motion.div
@@ -2105,28 +2257,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       )}
                                     </div>
 
-                                    {/* Student Answer Images */}
-                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
-                                      <div className="mb-4">
-                                        <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
-                                        <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
-                                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                            {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
-                                              <div
-                                                key={imgIdx}
-                                                className="relative group cursor-pointer"
-                                                onClick={() => {
-                                                  const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
-                                                  handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, annotation);
-                                                }}
-                                              >
-                                                <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
-                                              </div>
-                                            ))}
+                                    {/* Student Answer Images - Only show if not CQ/SQ with sub-questions */}
+                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && !(
+                                      (question.type === 'CQ' || question.type === 'SQ') &&
+                                      (question.subQuestions || question.sub_questions || []).length > 0
+                                    ) && (
+                                        <div className="mb-4">
+                                          <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
+                                          <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                              {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
+                                                <div
+                                                  key={imgIdx}
+                                                  className="relative group cursor-pointer"
+                                                  onClick={() => {
+                                                    const annotation = question.allDrawings?.find(d => d.imageIndex === imgIdx);
+                                                    handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, annotation);
+                                                  }}
+                                                >
+                                                  <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
+                                                </div>
+                                              ))}
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
                                     {/* Sub-questions breakdown for CQ */}
                                     {(question.subQuestions || question.sub_questions) && (question.subQuestions || question.sub_questions || []).length > 0 && (
@@ -2136,7 +2291,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="flex items-start gap-2">
                                               <span className="shrink-0 font-bold text-indigo-600 dark:text-indigo-400">{subIdx + 1}.</span>
                                               <div className="text-sm font-medium">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question)}</UniversalMathJax>
+                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
                                               </div>
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>
@@ -2173,8 +2328,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                 </div>
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                                   {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
-                                                    const annotation = question.allDrawings?.find(d =>
-                                                      d.originalImagePath === imageUrl || (d.imageIndex === imgIdx && (question.type === 'CQ' || question.type === 'SQ'))
+                                                    const annotation = subQ.allDrawings?.find((d: any) =>
+                                                      d.originalImagePath === imageUrl || d.imageIndex === imgIdx
                                                     );
                                                     return (
                                                       <div
@@ -2255,8 +2410,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {(() => {
                         const filteredQuestions = result.questions.filter(q => {
                           if (q.type?.toUpperCase() !== 'SQ') return false;
-                          const hasAnswer = q.studentAnswer && (typeof q.studentAnswer === 'string' ? q.studentAnswer.trim() !== '' : true) && q.studentAnswer !== 'No answer provided';
-                          const isCorrect = q.awardedMarks === q.marks && q.marks > 0;
+                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
+                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
                           switch (filterStatus) {
                             case 'CORRECT': return isCorrect;
@@ -2281,7 +2436,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             </div>
                             <div className="space-y-6">
                               {filteredQuestions.map((question, index) => {
-                                const isCorrect = question.awardedMarks === question.marks && question.marks > 0;
+                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
                                 return (
                                   <motion.div
                                     key={question.id}
@@ -2404,209 +2559,211 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Modals and Print Utility */}
-      {result && (
-        <>
-          {/* Review Request Modal */}
-          <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
-                  Request Mark Review
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-foreground mb-2 block">
-                    Explain why you think your marks should be reviewed:
-                  </label>
-                  <Textarea
-                    value={studentComment}
-                    onChange={(e) => setStudentComment(e.target.value)}
-                    placeholder="Please provide specific details about which questions you think were marked incorrectly and why..."
-                    rows={6}
-                    className="w-full"
-                  />
-                </div>
-                <div className="text-sm text-blue-800 dark:text-blue-200 bg-blue-500/10 dark:bg-blue-500/20 p-3 rounded-lg border border-blue-500/20">
-                  <div className="font-bold mb-1">Review Process:</div>
-                  <ul className="list-disc list-inside space-y-1 opacity-90">
-                    <li>Your request will be sent to the teacher/evaluator</li>
-                    <li>They will review your submission and comment</li>
-                    <li>You&apos;ll be notified when the review is complete</li>
-                    <li>Marks may be adjusted if errors are found</li>
-                  </ul>
-                </div>
-                <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowReviewModal(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={submitReviewRequest}
-                    disabled={submittingReview || !studentComment.trim()}
-                    className="bg-yellow-600 hover:bg-yellow-700"
-                  >
-                    {submittingReview ? 'Submitting...' : 'Submit Review Request'}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Zoom Modal */}
-          <Dialog open={showZoomModal} onOpenChange={setShowZoomModal}>
-            <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-950/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-[2.5rem]">
-              <DialogHeader className="p-6 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
-                <div className="flex flex-col gap-1">
-                  <DialogTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
-                    <Eye className="w-5 h-5 text-indigo-400" />
-                    {zoomedImageTitle}
+      {
+        result && (
+          <>
+            {/* Review Request Modal */}
+            <Dialog open={showReviewModal} onOpenChange={setShowReviewModal}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5" />
+                    Request Mark Review
                   </DialogTitle>
-                  <DialogDescription className="text-[10px] text-white/40 uppercase font-black tracking-[0.2em] flex items-center gap-2">
-                    Result Explorer <Search className="w-2.5 h-2.5" /> Subjective Detail
-                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-foreground mb-2 block">
+                      Explain why you think your marks should be reviewed:
+                    </label>
+                    <Textarea
+                      value={studentComment}
+                      onChange={(e) => setStudentComment(e.target.value)}
+                      placeholder="Please provide specific details about which questions you think were marked incorrectly and why..."
+                      rows={6}
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 bg-blue-500/10 dark:bg-blue-500/20 p-3 rounded-lg border border-blue-500/20">
+                    <div className="font-bold mb-1">Review Process:</div>
+                    <ul className="list-disc list-inside space-y-1 opacity-90">
+                      <li>Your request will be sent to the teacher/evaluator</li>
+                      <li>They will review your submission and comment</li>
+                      <li>You&apos;ll be notified when the review is complete</li>
+                      <li>Marks may be adjusted if errors are found</li>
+                    </ul>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowReviewModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={submitReviewRequest}
+                      disabled={submittingReview || !studentComment.trim()}
+                      className="bg-yellow-600 hover:bg-yellow-700"
+                    >
+                      {submittingReview ? 'Submitting...' : 'Submit Review Request'}
+                    </Button>
+                  </div>
                 </div>
+              </DialogContent>
+            </Dialog>
 
-                <div className="flex items-center gap-3">
-                  {showComparison && (
-                    <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex items-center gap-2">
-                      <Button
-                        size="sm"
-                        variant={!annotatedImageFailed ? "secondary" : "ghost"}
-                        onClick={() => setAnnotatedImageFailed(false)}
-                        className={cn(
-                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
-                          !annotatedImageFailed ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-600" : "text-white/60 hover:text-white"
-                        )}
+            {/* Zoom Modal */}
+            <Dialog open={showZoomModal} onOpenChange={setShowZoomModal}>
+              <DialogContent className="max-w-5xl w-[95vw] h-[90vh] flex flex-col p-0 overflow-hidden bg-slate-950/40 backdrop-blur-2xl border-white/10 shadow-2xl rounded-[2.5rem]">
+                <DialogHeader className="p-6 border-b border-white/10 flex flex-row items-center justify-between space-y-0">
+                  <div className="flex flex-col gap-1">
+                    <DialogTitle className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
+                      <Eye className="w-5 h-5 text-indigo-400" />
+                      {zoomedImageTitle}
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] text-white/40 uppercase font-black tracking-[0.2em] flex items-center gap-2">
+                      Result Explorer <Search className="w-2.5 h-2.5" /> Subjective Detail
+                    </DialogDescription>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    {showComparison && (
+                      <div className="bg-white/5 p-1.5 rounded-2xl border border-white/10 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant={!annotatedImageFailed ? "secondary" : "ghost"}
+                          onClick={() => setAnnotatedImageFailed(false)}
+                          className={cn(
+                            "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                            !annotatedImageFailed ? "bg-indigo-500 text-white shadow-lg shadow-indigo-500/30 hover:bg-indigo-600" : "text-white/60 hover:text-white"
+                          )}
+                        >
+                          <Zap className="w-3.5 h-3.5 mr-2 fill-current" /> Teacher Feedback
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant={annotatedImageFailed ? "secondary" : "ghost"}
+                          onClick={() => setAnnotatedImageFailed(true)}
+                          className={cn(
+                            "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
+                            annotatedImageFailed ? "bg-slate-700 text-white shadow-lg" : "text-white/60 hover:text-white"
+                          )}
+                        >
+                          <User className="w-3.5 h-3.5 mr-2" /> Original Response
+                        </Button>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setShowZoomModal(false);
+                        setZoomedImage('');
+                        setZoomedImageTitle('');
+                        setAnnotatedImageFailed(false);
+                        setOriginalImageFallback('');
+                      }}
+                      className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all border border-white/10 group"
+                      aria-label="Close zoom"
+                    >
+                      <XCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
+                    </button>
+                  </div>
+                </DialogHeader>
+
+                <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
+                  {isApplyingDrawing ? (
+                    <div className="flex flex-col items-center gap-4 text-white/60">
+                      <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
+                      <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
+                    </div>
+                  ) : (
+                    <div className="relative max-w-full max-h-full">
+                      {/* Floating Hint */}
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
                       >
-                        <Zap className="w-3.5 h-3.5 mr-2 fill-current" /> Teacher Feedback
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant={annotatedImageFailed ? "secondary" : "ghost"}
-                        onClick={() => setAnnotatedImageFailed(true)}
-                        className={cn(
-                          "rounded-xl px-4 py-1.5 text-xs font-bold transition-all",
-                          annotatedImageFailed ? "bg-slate-700 text-white shadow-lg" : "text-white/60 hover:text-white"
-                        )}
-                      >
-                        <User className="w-3.5 h-3.5 mr-2" /> Original Response
-                      </Button>
+                        Pinch or scroll to zoom • Click and drag to pan
+                      </motion.div>
+
+                      <img
+                        src={annotatedImageFailed ? originalImageFallback : zoomedImage}
+                        alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
+                        className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
+                        onError={() => {
+                          if (!annotatedImageFailed && originalImageFallback) {
+                            setAnnotatedImageFailed(true);
+                          }
+                        }}
+                      />
+
+                      {/* Badge Overlay */}
+                      <div className="absolute top-6 left-6 pointer-events-none">
+                        <div className={cn(
+                          "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
+                          annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
+                        )}>
+                          {annotatedImageFailed ? (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
+                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
-
-                  <button
-                    onClick={() => {
-                      setShowZoomModal(false);
-                      setZoomedImage('');
-                      setZoomedImageTitle('');
-                      setAnnotatedImageFailed(false);
-                      setOriginalImageFallback('');
-                    }}
-                    className="p-3 bg-white/10 text-white rounded-2xl hover:bg-white/20 transition-all border border-white/10 group"
-                    aria-label="Close zoom"
-                  >
-                    <XCircle className="h-6 w-6 group-hover:scale-110 transition-transform" />
-                  </button>
                 </div>
-              </DialogHeader>
 
-              <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
-                {isApplyingDrawing ? (
-                  <div className="flex flex-col items-center gap-4 text-white/60">
-                    <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
-                    <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
-                  </div>
-                ) : (
-                  <div className="relative max-w-full max-h-full">
-                    {/* Floating Hint */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
-                    >
-                      Pinch or scroll to zoom • Click and drag to pan
-                    </motion.div>
-
-                    <img
-                      src={annotatedImageFailed ? originalImageFallback : zoomedImage}
-                      alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
-                      className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
-                      onError={() => {
-                        if (!annotatedImageFailed && originalImageFallback) {
-                          setAnnotatedImageFailed(true);
-                        }
-                      }}
-                    />
-
-                    {/* Badge Overlay */}
-                    <div className="absolute top-6 left-6 pointer-events-none">
-                      <div className={cn(
-                        "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
-                        annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
-                      )}>
-                        {annotatedImageFailed ? (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
-                          </>
-                        ) : (
-                          <>
-                            <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
-                            <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
-                          </>
-                        )}
+                <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
+                      <Camera className="w-5 h-5 text-indigo-400" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white uppercase tracking-wider">Submission Quality</div>
+                      <div className="text-[10px] text-white/40 flex items-center gap-2">
+                        Verified by System <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
                       </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              <div className="p-6 bg-white/5 border-t border-white/10 backdrop-blur-xl flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 flex items-center justify-center border border-indigo-500/30">
-                    <Camera className="w-5 h-5 text-indigo-400" />
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white uppercase tracking-wider">Submission Quality</div>
-                    <div className="text-[10px] text-white/40 flex items-center gap-2">
-                      Verified by System <CheckCircle className="w-2.5 h-2.5 text-emerald-500" />
-                    </div>
+                  <div className="text-right">
+                    <div className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">Exam Reference</div>
+                    <div className="text-xs font-mono text-indigo-300">#{id.slice(-8).toUpperCase()}</div>
                   </div>
                 </div>
+              </DialogContent>
+            </Dialog>
 
-                <div className="text-right">
-                  <div className="text-[10px] text-white/40 font-black uppercase tracking-widest mb-1">Exam Reference</div>
-                  <div className="text-xs font-mono text-indigo-300">#{id.slice(-8).toUpperCase()}</div>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          {/* Hidden Print Component */}
-          <div style={{ display: 'none' }}>
-            {printData && (
-              <MarkedQuestionPaper
-                ref={printRef}
-                examInfo={printData.examInfo}
-                questions={printData.questions}
-                submission={printData.submission}
-                rank={result.result?.rank}
-                totalStudents={result.statistics.totalStudents}
-                qrData={{
-                  id: result.submission.id,
-                  student: result.student.name,
-                  exam: result.exam.name,
-                  score: result.submission.score
-                }}
-              />
-            )}
-          </div>
-        </>
-      )}
-    </MathJaxContext>
+            {/* Hidden Print Component */}
+            <div style={{ display: 'none' }}>
+              {printData && (
+                <MarkedQuestionPaper
+                  ref={printRef}
+                  examInfo={printData.examInfo}
+                  questions={printData.questions}
+                  submission={printData.submission}
+                  rank={result.result?.rank}
+                  totalStudents={result.statistics.totalStudents}
+                  qrData={{
+                    id: result.submission.id,
+                    student: result.student.name,
+                    exam: result.exam.name,
+                    score: result.submission.score
+                  }}
+                />
+              )}
+            </div>
+          </>
+        )
+      }
+    </MathJaxContext >
   );
 }

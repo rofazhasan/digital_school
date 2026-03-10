@@ -34,6 +34,10 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ message: 'Invalid or expired token.' }, { status: 400 });
         }
 
+        if (!user.passwordResetApproved) {
+            return NextResponse.json({ message: 'This password reset request has not been approved by an administrator yet.' }, { status: 403 });
+        }
+
         // Hash the new password
         const hashedPassword = await bcrypt.hash(password, 12);
 

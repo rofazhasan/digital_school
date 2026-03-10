@@ -42,7 +42,8 @@ export async function GET(
         mcqMarks: true,
         cqMarks: true,
         sqMarks: true,
-        total: true
+        total: true,
+        isPublished: true
       }
     });
 
@@ -66,6 +67,10 @@ export async function GET(
       });
       if (preFetchedStudentMap?.examSetId) {
         targetExamSetId = preFetchedStudentMap.examSetId;
+      } else if (studentId) {
+        // Fix inconsistency: If not assigned but we are evaluating, assign now
+        const { assignBalancedExamSet } = await import("@/lib/exam-logic");
+        targetExamSetId = (await assignBalancedExamSet(studentId, examId)) || undefined;
       }
     }
 
@@ -271,7 +276,8 @@ export async function GET(
 
     for (const submission of (exam as any).examSubmissions) {
       try {
-        const evaluation = await evaluateSubmission(submission, exam, examSets);
+        // Pass false for saveToDb so we don't forcefully auto-submit active exams when viewing them
+        const evaluation = await evaluateSubmission(submission, exam, examSets, false);
 
         let evaluationStatus = 'PENDING';
         const hasManualGrading = Object.keys(submission.answers).some(key =>
@@ -310,7 +316,8 @@ export async function GET(
             mcqMarks: evaluation.mcqMarks,
             cqMarks: evaluation.cqMarks,
             sqMarks: evaluation.sqMarks,
-            total: evaluation.totalScore
+            total: evaluation.totalScore,
+            isPublished: studentResultMap.get(submission.studentId)?.isPublished || false
           },
           submissionStatus: submission.status
         });

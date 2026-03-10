@@ -4,8 +4,8 @@ import { redirect } from 'next/navigation';
 import { validateSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
-    title: "Admin Dashboard | Digital School",
-    description: "System administration and user management",
+    title: "Update Settings",
+    description: "Manage institute settings and appearance",
 };
 
 export default async function Layout({
