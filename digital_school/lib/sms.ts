@@ -21,9 +21,8 @@
  *   1032  IP not whitelisted
  */
 
-const SMS_URL = 'http://bulksmsbd.net/api/smsapi';
-const SMS_USER = process.env.SMS_API_USER || '';
-const SMS_PASS = process.env.SMS_API_PASS || '';
+const SMS_URL = process.env.SMS_API_URL || 'http://bulksmsbd.net/api/smsapi';
+const SMS_KEY = process.env.SMS_API_KEY || process.env.SMS_API_USER || '';
 const SMS_SID = process.env.SMS_SENDER_ID || '8809617614084';
 
 export interface SMSResult {
@@ -70,16 +69,15 @@ function normaliseForGateway(phone: string): string {
  * Send a single SMS via bulksmsbd.net.
  */
 export async function sendSMS(to: string, message: string): Promise<SMSResult> {
-    if (!SMS_USER || !SMS_PASS) {
-        console.warn('[SMS] SMS_API_USER or SMS_API_PASS not configured — skipping SMS.');
+    if (!SMS_KEY) {
+        console.warn('[SMS] SMS_API_KEY not configured — skipping SMS.');
         return { success: false, error: 'SMS credentials not configured' };
     }
 
     const number = normaliseForGateway(to);
 
     const params = new URLSearchParams({
-        api_key: SMS_USER,
-        api_password: SMS_PASS,
+        api_key: SMS_KEY,
         senderid: SMS_SID,
         number,
         message,
