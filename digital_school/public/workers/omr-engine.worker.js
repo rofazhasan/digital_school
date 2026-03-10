@@ -29,6 +29,38 @@ const decodeQR = (mat) => {
     return null;
 };
 
+const findPaperContour = (gray) => {
+    let blurred = new cv.Mat();
+    cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
+    let edges = new cv.Mat();
+    cv.Canny(blurred, edges, 75, 200);
+
+    let contours = new cv.MatVector();
+    let hierarchy = new cv.Mat();
+    cv.findContours(edges, contours, hierarchy, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+
+    let maxArea = 0;
+    let paperContour = null;
+
+    for (let i = 0; i < contours.size(); ++i) {
+        let cnt = contours.get(i);
+        let area = cv.contourArea(cnt);
+        let peri = cv.arcLength(cnt, true);
+        let approx = new cv.Mat();
+        cv.approxPolyDP(cnt, approx, 0.02 * peri, true);
+
+        if (approx.rows === 4 && area > maxArea) {
+            paperContour = approx;
+            maxArea = area;
+        } else {
+            approx.delete();
+        }
+    }
+
+    blurred.delete(); edges.delete(); contours.delete(); hierarchy.delete();
+    return paperContour;
+};
+
 const processFrame = (imageData, template) => {
     if (!isCvReady) return { error: 'CV not ready' };
 
@@ -36,49 +68,71 @@ const processFrame = (imageData, template) => {
     let gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
 
+    // 0. Pre-processing: CLAHE for uniform lighting
+    let clahe = new cv.createCLAHE(2.0, new cv.Size(8, 8));
+    let equalized = new cv.Mat();
+    clahe.apply(gray, equalized);
+    clahe.delete();
+
     // 1. Detect ArUco Markers
     let dictionary = cv.getPredefinedDictionary(cv.DICT_4X4_50);
     let corners = new cv.MatVector();
     let ids = new cv.Mat();
     let parameters = new cv.DetectorParameters();
 
-    cv.detectMarkers(gray, dictionary, corners, ids, parameters);
+    cv.detectMarkers(equalized, dictionary, corners, ids, parameters);
 
-    if (ids.rows < 4) {
-        // Not enough markers found
-        src.delete(); gray.delete(); corners.delete(); ids.delete();
-        return { type: 'searching', markersFound: ids.rows };
-    }
-
-    // Sort markers by ID to ensure correct orientation (0=TL, 1=TR, 2=BR, 3=BL)
     let markerPoints = {};
-    for (let i = 0; i < ids.rows; i++) {
-        let id = ids.data32S[i];
-        if (id >= 0 && id <= 3) {
-            let corner = corners.get(i).data32F;
-            // Get center of marker
-            let centerX = (corner[0] + corner[2] + corner[4] + corner[6]) / 4;
-            let centerY = (corner[1] + corner[3] + corner[5] + corner[7]) / 4;
-            markerPoints[id] = { x: centerX, y: centerY };
+    let srcTri = null;
+
+    if (ids.rows >= 4) {
+        // Sort markers by ID to ensure correct orientation (0=TL, 1=TR, 2=BR, 3=BL)
+        for (let i = 0; i < ids.rows; i++) {
+            let id = ids.data32S[i];
+            if (id >= 0 && id <= 3) {
+                let corner = corners.get(i).data32F;
+                let centerX = (corner[0] + corner[2] + corner[4] + corner[6]) / 4;
+                let centerY = (corner[1] + corner[3] + corner[5] + corner[7]) / 4;
+                markerPoints[id] = { x: centerX, y: centerY };
+            }
         }
     }
 
-    if (Object.keys(markerPoints).length < 4) {
-        src.delete(); gray.delete(); corners.delete(); ids.delete();
-        return { type: 'searching', markersFound: Object.keys(markerPoints).length };
+    if (Object.keys(markerPoints).length === 4) {
+        srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+            markerPoints[0].x, markerPoints[0].y,
+            markerPoints[1].x, markerPoints[1].y,
+            markerPoints[2].x, markerPoints[2].y,
+            markerPoints[3].x, markerPoints[3].y
+        ]);
+    } else {
+        // Fallback: Detection via document contours
+        let paper = findPaperContour(equalized);
+        if (paper) {
+            // Re-order paper points (TL, TR, BR, BL)
+            let pts = [];
+            for (let i = 0; i < 4; i++) pts.push({ x: paper.data32F[i * 2], y: paper.data32F[i * 2 + 1] });
+            pts.sort((a, b) => a.y - b.y);
+            let tl_tr = pts.slice(0, 2).sort((a, b) => a.x - b.x);
+            let bl_br = pts.slice(2, 4).sort((a, b) => a.x - b.x);
+            srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
+                tl_tr[0].x, tl_tr[0].y,
+                tl_tr[1].x, tl_tr[1].y,
+                bl_br[1].x, bl_br[1].y,
+                bl_br[0].x, bl_br[0].y
+            ]);
+            paper.delete();
+        }
+    }
+
+    if (!srcTri) {
+        src.delete(); gray.delete(); equalized.delete(); corners.delete(); ids.delete();
+        return { type: 'searching', markersFound: ids.rows };
     }
 
     // 2. Perspective Warp
-    let srcTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        markerPoints[0].x, markerPoints[0].y,
-        markerPoints[1].x, markerPoints[1].y,
-        markerPoints[2].x, markerPoints[2].y,
-        markerPoints[3].x, markerPoints[3].y
-    ]);
-
-    // Target dimensions (standardized to template or aspect ratio)
     const outWidth = 800;
-    const outHeight = 1131; // A4 aspect ratio approx
+    const outHeight = 1131;
     let dstTri = cv.matFromArray(4, 1, cv.CV_32FC2, [
         0, 0,
         outWidth, 0,
@@ -88,7 +142,7 @@ const processFrame = (imageData, template) => {
 
     let M = cv.getPerspectiveTransform(srcTri, dstTri);
     let rectified = new cv.Mat();
-    cv.warpPerspective(gray, rectified, M, new cv.Size(outWidth, outHeight));
+    cv.warpPerspective(equalized, rectified, M, new cv.Size(outWidth, outHeight));
 
     // 3. Quality Metrics & Adaptive Thresholding
     let binary = new cv.Mat();
@@ -159,7 +213,9 @@ const processFrame = (imageData, template) => {
                 detectedBubbles.push({
                     center: { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 },
                     fillRatio,
-                    variance
+                    variance,
+                    circularity,
+                    radius
                 });
             }
         }
@@ -206,48 +262,57 @@ const processFrame = (imageData, template) => {
             const strongest = options[0];
             const secondStrongest = options[1] || { fillRatio: 0, variance: 0 };
 
-            // AI/ML RULE 1: Detect Erasures via Variance
-            // Solid marks have lower variance in the binary ROI compared to incomplete erasures
+            // SOLIDITY & EDGE QUALITY CHECK
             const isStrongSolid = strongest.fillRatio > dynamicThreshold && strongest.variance < 2500;
-            const isErasure = strongest.fillRatio > dynamicThreshold * 0.6 && strongest.variance > 3500;
+            const isAmbiguous = strongest.fillRatio > dynamicThreshold * 0.7 && strongest.fillRatio < dynamicThreshold * 1.3;
 
-            if (isErasure && !isStrongSolid) {
-                results.confidence *= 0.95; // Faint hit to confidence for ambiguity
-                return null; // Treat as unmarked if it looks like an erasure
-            }
+            // Confidence per mark
+            let markConfidence = 1.0;
+            if (isAmbiguous) markConfidence *= 0.8;
+            if (strongest.variance > 3500) markConfidence *= 0.9; // Grainy/Erasure
+
+            const gap = strongest.fillRatio / Math.max(0.01, secondStrongest.fillRatio);
+            if (gap < 2.0) markConfidence *= 0.85;
 
             // WORLD CLASS CONFLICT DETECTION
-            if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.85) {
+            if (strongest.fillRatio > dynamicThreshold && secondStrongest.fillRatio > dynamicThreshold * 0.8) {
                 results.conflicts.push({ qId, type, issue: 'MULTIPLE_MARKS' });
-                results.confidence *= 0.75;
-                return strongest.option;
+                results.confidence *= 0.7;
+                return { option: strongest.option, confidence: markConfidence * 0.5 };
             }
 
             if (strongest.fillRatio > dynamicThreshold) {
-                const gap = strongest.fillRatio / Math.max(0.01, secondStrongest.fillRatio);
-                if (gap < 2.2) results.confidence *= 0.98;
-                return strongest.option;
+                return { option: strongest.option, confidence: markConfidence };
             }
             return null;
         };
 
         // Post-process sections
         for (let i = 0; i < 6; i++) {
-            const rollDigit = resolveGroup(results.sections.ROLL[i], i, 'ROLL');
-            results.roll += rollDigit !== null ? rollDigit : "?";
-
-            const regDigit = resolveGroup(results.sections.REG[i], i, 'REG');
-            results.registration += regDigit !== null ? regDigit : "?";
+            const res = resolveGroup(results.sections.ROLL[i], i, 'ROLL');
+            results.roll += res ? res.option : "?";
+            if (res) results.confidence *= res.confidence;
         }
 
-        const setCode = resolveGroup(results.sections.SET['set'], 'set', 'SET');
-        results.set = setCode !== null ? setCode : "?";
+        for (let i = 0; i < 10; i++) {
+            const res = resolveGroup(results.sections.REG[i], i, 'REG');
+            results.registration += res ? res.option : "?";
+            if (res) results.confidence *= res.confidence;
+        }
+
+        const setRes = resolveGroup(results.sections.SET['set'], 'set', 'SET');
+        results.set = setRes ? setRes.option : "?";
+        if (setRes) results.confidence *= setRes.confidence;
 
         Object.keys(results.sections.MCQ).forEach(qId => {
-            const opt = resolveGroup(results.sections.MCQ[qId], qId, 'MCQ');
-            if (opt !== null) {
+            const res = resolveGroup(results.sections.MCQ[qId], qId, 'MCQ');
+            if (res) {
                 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ'];
-                results.answers[qId] = MCQ_LABELS[parseInt(opt)] || opt;
+                results.answers[qId] = {
+                    option: MCQ_LABELS[parseInt(res.option)] || res.option,
+                    confidence: res.confidence
+                };
+                results.confidence *= res.confidence;
             }
         });
 

@@ -2,15 +2,39 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Camera, Upload, RefreshCw, CheckCircle, AlertTriangle, ScanLine, FileText, Info, Zap, ShieldCheck, Sun, Eye } from "lucide-react";
+import {
+    Loader2,
+    Upload,
+    RefreshCw,
+    CheckCircle,
+    AlertTriangle,
+    ScanLine,
+    FileText,
+    Zap,
+    ShieldCheck,
+    Eye
+} from "lucide-react";
 import { toast } from "sonner";
 import { db } from "@/lib/dexie-db";
 import { useLiveQuery } from "dexie-react-hooks";
 import { motion, AnimatePresence } from "framer-motion";
+
+interface OMRResult {
+    roll: string;
+    registration: string;
+    set: string;
+    answers: Record<string, { option: string; confidence: number }>;
+    confidence: number;
+    quality?: { sharpness: number; brightness: number };
+    qrData?: { examId: string; setId: string; studentId?: string };
+    grading?: { score: number; examName: string; details: any[] };
+    conflicts?: any[];
+    markers?: any;
+    sections?: any;
+}
 
 export default function OMRScannerPage() {
     const [activeTab, setActiveTab] = useState("camera");
@@ -29,77 +53,55 @@ export default function OMRScannerPage() {
     const workerRef = useRef<Worker | null>(null);
     const [cameraActive, setCameraActive] = useState(false);
 
+    const [processingQueue, setProcessingQueue] = useState<File[]>([]);
+    const [queueIndex, setQueueIndex] = useState(0);
+
     const pendingExams = useLiveQuery(() => db.exams.toArray());
 
-    // --- Engine Initialization ---
-    useEffect(() => {
-        const worker = new Worker('/workers/omr-engine.worker.js');
-        worker.onmessage = (e) => {
-            if (e.data.type === 'ready') {
-                setIsEngineReady(true);
-                toast.success("AI OMR Engine Initialized", {
-                    icon: <Zap className="w-4 h-4 text-yellow-500" />
-                });
-            } else if (e.data.type === 'result') {
-                handleWorkerResult(e.data.result);
-            }
-        };
-        workerRef.current = worker;
-        return () => worker.terminate();
+    const syncOfflineData = useCallback(async () => {
+        setIsSyncing(true);
+        try {
+            const res = await fetch('/api/omr/sync');
+            const data = await res.json();
+            await db.exams.clear();
+            await db.exams.bulkAdd(data);
+            toast.success("Offline Exams Synced!");
+        } catch (error) {
+            toast.error("Sync failed");
+        } finally {
+            setIsSyncing(false);
+        }
     }, []);
 
-    const handleWorkerResult = async (result: any) => {
-        setIsProcessing(false);
-        if (result.type === 'searching') {
-            setMarkersFound(result.markersFound);
-            drawOverlay(null);
-        } else if (result.type === 'success') {
-            const data = result.data;
+    const drawOverlay = useCallback((markers: any, sections: any = null) => {
+        if (!overlayRef.current || !videoRef.current) return;
+        const canvas = overlayRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-            // --- AUTO IDENTIFICATION ---
-            if (data.qrData && data.qrData.setId && selectedExamId !== data.qrData.setId) {
-                console.log("Auto-Identified Exam Set:", data.qrData.setId);
-                setSelectedExamId(data.qrData.setId);
-                toast.success(`Exam Identified: ${data.qrData.examId || data.qrData.setId}`, {
-                    icon: <FileText className="w-4 h-4 text-primary" />
-                });
-            }
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!markers) return;
 
-            setScanResult(data);
-            setQualityMetrics(data.quality);
-            setMarkersFound(4);
-            drawOverlay(data.markers, data.sections);
+        // Custom visualization for "Top Notch" feel
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#10b981';
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        // Visual indicator logic here...
+    }, []);
 
-            // --- AUTO SUBMISSION (High Confidence) ---
-            if (data.confidence > 0.99 && data.qrData) {
-                handleSubmitScan(data);
-            }
-
-            // Only toast if it's a high-confidence scan or a manual upload
-            if (activeTab === 'upload' || data.confidence > 0.98) {
-                toast.success("Sheet Analyzed with 100% Precision", {
-                    icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                });
-            }
-
-            // Haptic feedback
-            if (window.navigator.vibrate) window.navigator.vibrate(200);
-        }
-    };
-
-    const handleSubmitScan = async (data: any) => {
-        // Prevent multiple submissions
+    const handleSubmitScan = useCallback(async (data: OMRResult) => {
         if (isSyncing) return;
-
         setIsSyncing(true);
         try {
             const response = await fetch('/api/omr/submit', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    examId: data.qrData.examId,
-                    setId: data.qrData.setId,
-                    studentId: data.qrData.studentId,
+                    examId: data.qrData?.examId,
+                    setId: data.qrData?.setId,
+                    studentId: data.qrData?.studentId,
                     roll: data.roll,
                     registration: data.registration,
                     answers: data.answers,
@@ -118,10 +120,94 @@ export default function OMRScannerPage() {
         } finally {
             setIsSyncing(false);
         }
-    };
+    }, [isSyncing]);
 
-    // --- Camera & Processing Loop ---
-    const startCamera = async () => {
+    const processBatchFile = useCallback((file: File) => {
+        const img = new Image();
+        img.src = URL.createObjectURL(file);
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+            if (imageData) {
+                setIsProcessing(true);
+                const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
+                const template = selectedExam?.templateJson || null;
+                workerRef.current?.postMessage({ type: 'process', imageData, template });
+            }
+        };
+    }, [pendingExams, selectedExamId]);
+
+    const handleWorkerResult = useCallback(async (result: any) => {
+        setIsProcessing(false);
+        if (result.type === 'searching') {
+            setMarkersFound(result.markersFound);
+            drawOverlay(null);
+        } else if (result.type === 'success') {
+            const data = result.data as OMRResult;
+
+            if (data.qrData && data.qrData.setId && selectedExamId !== data.qrData.setId) {
+                setSelectedExamId(data.qrData.setId);
+                toast.success(`Exam Identified: ${data.qrData.examId}`, {
+                    icon: <FileText className="w-4 h-4 text-primary" />
+                });
+            }
+
+            setScanResult(data);
+            setQualityMetrics(data.quality);
+            setMarkersFound(4);
+            drawOverlay(data.markers, data.sections);
+
+            if (data.confidence > 0.95 && data.qrData) {
+                await handleSubmitScan(data);
+            }
+
+            if (queueIndex + 1 < processingQueue.length) {
+                const nextIdx = queueIndex + 1;
+                setQueueIndex(nextIdx);
+                toast.info(`Processing Batch: ${nextIdx + 1} of ${processingQueue.length}`);
+                processBatchFile(processingQueue[nextIdx]);
+            } else if (processingQueue.length > 1) {
+                toast.success(`Batch Complete: ${processingQueue.length} sheets processed`);
+                setProcessingQueue([]);
+            }
+
+            if (data.confidence > 0.98) {
+                toast.success("Sheet Analyzed with 100% Precision", {
+                    icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                });
+            }
+        }
+    }, [selectedExamId, queueIndex, processingQueue, handleSubmitScan, drawOverlay, processBatchFile]);
+
+    const processLoop = useCallback(() => {
+        if (!cameraActive || !videoRef.current || !canvasRef.current || !workerRef.current || !isEngineReady) return;
+
+        const video = videoRef.current;
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d', { alpha: false });
+
+        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
+            canvas.width = 1000;
+            canvas.height = (video.videoHeight / video.videoWidth) * 1000;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
+            const template = selectedExam?.templateJson || null;
+
+            workerRef.current.postMessage({
+                type: 'process',
+                imageData: imageData,
+                template: template
+            }, [imageData.data.buffer]);
+        }
+        setTimeout(() => requestAnimationFrame(processLoop), 200);
+    }, [cameraActive, isEngineReady, pendingExams, selectedExamId]);
+
+    const startCamera = useCallback(async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
@@ -134,116 +220,41 @@ export default function OMRScannerPage() {
         } catch (err) {
             toast.error("Camera access denied.");
         }
-    };
+    }, [processLoop]);
 
-    const processLoop = () => {
-        if (!cameraActive || !videoRef.current || !canvasRef.current || !workerRef.current || !isEngineReady) return;
-
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d', { alpha: false });
-
-        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
-            // We upscale slightly for AI analysis precision
-            canvas.width = 1000;
-            canvas.height = (video.videoHeight / video.videoWidth) * 1000;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-            // Get selected template
-            const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
-            const template = selectedExam?.templateJson || null;
-
-            workerRef.current.postMessage({
-                type: 'process',
-                imageData: imageData,
-                template: template
-            }, [imageData.data.buffer]);
-        }
-
-        setTimeout(() => requestAnimationFrame(processLoop), 200); // 5fps for real-time heatmap is enough
-    };
-
-    const drawOverlay = (markers: any, sections: any = null) => {
-        if (!overlayRef.current || !videoRef.current) return;
-        const canvas = overlayRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (!markers) return;
-
-        const video = videoRef.current;
-        const scaleX = canvas.width / video.videoWidth;
-        const scaleY = canvas.height / video.videoHeight;
-
-        // 1. Draw ArUco Bound (Glowing)
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#10b981';
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        // Convert normalized worker coords back to display coords
-        // Actually markers are provided in native worker coords (800x1131 rectified)
-        // For visual overlay, it's easier to just show detection state
-
-        // 2. LIVE HEATMAP (AR OVERLAY)
-        if (sections) {
-            ctx.shadowBlur = 0;
-            Object.values(sections.MCQ).forEach((group: any) => {
-                group.forEach((opt: any) => {
-                    // This is complex because we'd need to re-map logical coords back to video
-                    // For now, let's focus on the general scan success visualization
-                });
-            });
-        }
-    };
-
-    const stopCamera = () => {
+    const stopCamera = useCallback(() => {
         if (videoRef.current && videoRef.current.srcObject) {
             (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
             videoRef.current.srcObject = null;
         }
         setCameraActive(false);
-    };
+    }, []);
 
-    const syncOfflineData = async () => {
-        setIsSyncing(true);
-        try {
-            const res = await fetch('/api/omr/sync');
-            const data = await res.json();
-            await db.exams.clear();
-            await db.exams.bulkAdd(data);
-            toast.success("Offline Exams Synced!");
-        } catch (error) {
-            toast.error("Sync failed");
-        } finally {
-            setIsSyncing(false);
+    const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files.length > 0 && workerRef.current) {
+            const files = Array.from(e.target.files);
+            setProcessingQueue(files);
+            setQueueIndex(0);
+            processBatchFile(files[0]);
         }
-    };
+    }, [processBatchFile]);
 
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0] && workerRef.current) {
-            const file = e.target.files[0];
-            const img = new Image();
-            img.src = URL.createObjectURL(file);
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                ctx?.drawImage(img, 0, 0);
-                const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
-                if (imageData) {
-                    setIsProcessing(true);
-                    const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
-                    const template = selectedExam?.templateJson || null;
-                    workerRef.current?.postMessage({ type: 'process', imageData, template });
-                }
-            };
-        }
-    };
+    // --- Engine Initialization ---
+    useEffect(() => {
+        const worker = new Worker(new URL('../../public/workers/omr-engine.worker.js', import.meta.url));
+        worker.onmessage = (e) => {
+            if (e.data.type === 'ready') {
+                setIsEngineReady(true);
+                toast.success("AI OMR Engine Initialized", {
+                    icon: <Zap className="w-4 h-4 text-yellow-500" />
+                });
+            } else if (e.data.type === 'result') {
+                handleWorkerResult(e.data.result);
+            }
+        };
+        workerRef.current = worker;
+        return () => worker.terminate();
+    }, [handleWorkerResult]);
 
     return (
         <div className="relative min-h-screen bg-[#050505] text-white selection:bg-primary/30 selection:text-white overflow-x-hidden font-exam-online">
@@ -327,10 +338,21 @@ export default function OMRScannerPage() {
                                 </div>
                             </div>
 
-                            {/* Center Guideline */}
+                            {/* Center Guideline & Stability */}
                             <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                                <div className="w-[60%] h-[80%] border-2 border-primary/20 border-dashed rounded-[40px] flex items-center justify-center">
+                                <div className="w-[65%] h-[85%] border-2 border-primary/20 border-dashed rounded-[40px] flex flex-col items-center justify-center relative">
                                     <div className="scanner-line animate-scanner" />
+
+                                    {/* Stability Guide */}
+                                    <div className="absolute top-8 flex flex-col items-center">
+                                        <div className="flex gap-1 mb-1">
+                                            {[1, 2, 3, 4, 5].map(i => (
+                                                <div key={i} className={`w-3 h-1 rounded-full ${markersFound >= 4 ? 'bg-emerald-500' : 'bg-white/10'}`} />
+                                            ))}
+                                        </div>
+                                        <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Alignment Stability</span>
+                                    </div>
+
                                     {markersFound < 4 && !isProcessing && (
                                         <motion.div
                                             initial={{ opacity: 0 }}
@@ -338,8 +360,8 @@ export default function OMRScannerPage() {
                                             className="glass-heavy px-8 py-4 rounded-3xl border-primary/30 flex flex-col items-center gap-2 text-center"
                                         >
                                             <ScanLine className="w-8 h-8 text-primary animate-pulse" />
-                                            <h3 className="text-sm font-black uppercase tracking-widest">Alignment Required</h3>
-                                            <p className="text-[10px] text-white/40">Center the OMR sheet within the AR bounds</p>
+                                            <h3 className="text-sm font-black uppercase tracking-widest">Target markers</h3>
+                                            <p className="text-[10px] text-white/40">Hold steady for AI optimization</p>
                                         </motion.div>
                                     )}
                                 </div>
@@ -392,7 +414,7 @@ export default function OMRScannerPage() {
                                                 </div>
                                                 <h3 className="text-xl font-bold mb-2">Upload OMR Asset</h3>
                                                 <p className="text-white/40 text-sm">Supports high-res JPG, PNG or OMR-PDF</p>
-                                                <Input type="file" className="hidden" accept="image/*,application/pdf" onChange={handleFileUpload} />
+                                                <Input type="file" className="hidden" accept="image/*,application/pdf" multiple onChange={handleFileUpload} />
                                             </label>
                                         )}
                                     </div>
@@ -492,7 +514,9 @@ export default function OMRScannerPage() {
                                             <div className="grid grid-cols-4 gap-2">
                                                 {Array.from({ length: 100 }).map((_, i) => {
                                                     const qNum = i + 1;
-                                                    const ans = scanResult.answers[qNum];
+                                                    const res = scanResult.answers[qNum];
+                                                    const ans = typeof res === 'object' ? res.option : res;
+                                                    const confidence = typeof res === 'object' ? res.confidence : 1.0;
                                                     const conflict = scanResult.conflicts?.find((c: any) => c.qId == qNum && c.type === 'MCQ');
                                                     const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
 
@@ -502,8 +526,14 @@ export default function OMRScannerPage() {
                                                         stateColor = "text-red-500";
                                                         bgCircle = "bg-red-500 shadow-glow shadow-red-500/20";
                                                     } else if (ans) {
-                                                        stateColor = "text-emerald-500";
-                                                        bgCircle = "bg-emerald-500 shadow-glow shadow-emerald-500/20";
+                                                        if (confidence < 0.90) {
+                                                            stateColor = "text-yellow-500";
+                                                            bgCircle = "bg-yellow-500/20 border border-yellow-500/50";
+                                                        } else {
+                                                            stateColor = "text-emerald-500";
+                                                            bgCircle = "bg-emerald-500 shadow-glow shadow-emerald-500/20";
+                                                        }
+
                                                         if (grade && grade.status === 'wrong') {
                                                             stateColor = "text-rose-400";
                                                             bgCircle = "bg-rose-400";
@@ -511,11 +541,12 @@ export default function OMRScannerPage() {
                                                     }
 
                                                     return (
-                                                        <div key={qNum} className="flex flex-col items-center bg-white/[0.02] p-2 rounded-2xl border border-white/5">
+                                                        <div key={qNum} className={`flex flex-col items-center bg-white/[0.02] p-2 rounded-2xl border transition-all ${confidence < 0.90 && ans ? 'border-yellow-500/30' : 'border-white/5'}`}>
                                                             <span className="text-[8px] font-black text-white/20 mb-1">{qNum}</span>
-                                                            <div className={`w-8 h-8 rounded-full ${bgCircle} flex items-center justify-center text-xs font-black`}>
+                                                            <div className={`w-8 h-8 rounded-full ${bgCircle} flex items-center justify-center text-xs font-black ${stateColor}`}>
                                                                 {ans || "—"}
                                                             </div>
+                                                            {confidence < 0.90 && ans && <span className="text-[6px] font-bold text-yellow-500 mt-1 uppercase">Doubtful</span>}
                                                         </div>
                                                     );
                                                 })}
