@@ -44,7 +44,8 @@ export async function sendOTPNotification({
 
     // 2. If email failed OR no email, try SMS
     if (user.phone) {
-        const smsMessage = `Your ${brandName} OTP is ${otp}`;
+        const { buildOtpMessage } = await import('./sms');
+        const smsMessage = buildOtpMessage(otp, brandName);
         console.log(`[Notification] Sending OTP via SMS to ${user.phone}`);
 
         const smsResult = await sendSMS(user.phone, smsMessage);

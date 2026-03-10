@@ -110,12 +110,29 @@ export async function PATCH(request: NextRequest) {
                 return NextResponse.json({ error: "Phone number already in use" }, { status: 400 });
             }
 
+            // Generate and Send OTP
+            const { generateOTP, sendSMS, buildOtpMessage } = await import('@/lib/sms');
+            const otp = generateOTP();
+            const hashedOtp = await bcrypt.hash(otp, 12);
+            const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
             await (prismadb.user as any).update({
                 where: { id: user.id },
-                data: { pendingPhone: newPhone }
+                data: {
+                    pendingPhone: newPhone,
+                    phoneOtp: hashedOtp,
+                    phoneOtpExpiry: otpExpiry
+                }
             });
 
-            return NextResponse.json({ message: "Phone change request submitted for admin approval" });
+            const instName = user.institute?.name || 'Digital School';
+            const smsMessage = buildOtpMessage(otp, instName);
+            await sendSMS(newPhone, smsMessage);
+
+            return NextResponse.json({
+                message: "OTP sent to your new phone number. Please verify to complete the change.",
+                step: 'verify_otp'
+            });
         }
 
         return NextResponse.json({ error: "Invalid update type" }, { status: 400 });

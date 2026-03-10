@@ -95,8 +95,9 @@ export async function POST(request: NextRequest) {
             });
 
             try {
+                const { buildOtpMessage } = await import('@/lib/sms');
                 const instName = user.institute?.name || 'Digital School';
-                const message = `Your ${instName} OTP is ${token}`;
+                const message = buildOtpMessage(token, instName);
                 const smsResult = await sendSMS(user.phone, message);
 
                 if (smsResult.success) {
