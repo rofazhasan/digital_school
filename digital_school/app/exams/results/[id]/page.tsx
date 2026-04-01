@@ -44,7 +44,8 @@ import {
   Search,
   Zap,
   Calendar,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -255,8 +256,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
 
-  // Helper to render advanced descriptive sub-questions
-  const renderDescriptiveSubQuestion = (subQ: any, subIdx: number, questionId: string) => {
+  // Helper to render advanced descriptive sub-questions content
+  const renderSubQuestionContent = (subQ: any, subIdx: number, questionId: string) => {
     const subType = subQ.subType || 'writing';
     const studentAnswer = subQ.studentAnswer;
 
@@ -293,9 +294,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
                   {segments.map((seg, si) => (
                     <div key={si} className="flex flex-col gap-1">
-                      <div className="text-xs text-muted-foreground font-medium italic">
-                        <UniversalMathJax inline dynamic>{cleanupMath(seg)}</UniversalMathJax>
-                      </div>
+                        <div className="text-xs text-muted-foreground font-medium italic whitespace-pre-wrap">
+                          <UniversalMathJax inline dynamic>{cleanupMath(seg.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                        </div>
                       {si < segments.length - 1 && (
                         <div className="space-y-1">
                           <div className={cn(
@@ -341,7 +342,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 const isCorrect = normalize(ans) === normalize(correct);
                 return (
                   <span key={pi}>
-                    <UniversalMathJax inline dynamic>{cleanupMath(part)}</UniversalMathJax>
+                    <UniversalMathJax inline dynamic>{cleanupMath(part.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                     {pi < arr.length - 1 && (
                       <span className="relative group inline-block mx-1">
                         <span className={cn(
@@ -382,7 +383,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     {(subQ[col.key] || []).map((item: any, i: number) => (
                       <div key={i} className="p-2 text-[11px] bg-card/50 border border-border/50 rounded-lg flex items-start gap-2 shadow-sm">
                         <Badge variant="secondary" className="h-4 min-w-[16px] rounded bg-muted text-[9px] p-0 flex items-center justify-center font-black">{item.id}</Badge>
-                        <div className="flex-1 leading-tight"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
+                        <div className="flex-1 leading-tight whitespace-pre-wrap"><UniversalMathJax inline dynamic>{cleanupMath(item.text.replace(/\|\|/g, '\n'))}</UniversalMathJax></div>
                       </div>
                     ))}
                   </div>
@@ -422,15 +423,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                       return (
                         <tr key={i} className={cn("divide-x divide-slate-100 dark:divide-slate-800 transition-colors", isCorrect ? "bg-green-50/20 hover:bg-green-50/40" : "bg-red-50/20 hover:bg-red-50/40")}>
-                          <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300">
+                          <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
                             <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] mr-2">{l.id}</span>
-                            <UniversalMathJax inline>{cleanupMath(l.text)}</UniversalMathJax>
+                            <UniversalMathJax inline>{cleanupMath(l.text.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                           </td>
-                          <td className={cn("p-2.5 font-black", isCorrect ? "text-green-600" : "text-red-500")}>
-                            {ans ? <UniversalMathJax inline>{cleanupMath(getItemText(ans) || ans)}</UniversalMathJax> : <span className="italic opacity-30">No match</span>}
+                          <td className={cn("p-2.5 font-black whitespace-pre-wrap", isCorrect ? "text-green-600" : "text-red-500")}>
+                            {ans ? <UniversalMathJax inline>{cleanupMath((getItemText(ans) || ans).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="italic opacity-30">No match</span>}
                           </td>
-                          <td className="p-2.5 text-green-600 font-black">
-                            {correct ? <UniversalMathJax inline>{cleanupMath(getItemText(correct) || correct)}</UniversalMathJax> : <span className="opacity-30">—</span>}
+                          <td className="p-2.5 text-green-600 font-black whitespace-pre-wrap">
+                            {correct ? <UniversalMathJax inline>{cleanupMath((getItemText(correct) || correct).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="opacity-30">—</span>}
                           </td>
                         </tr>
                       );
@@ -450,12 +451,16 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               const correct = subQ.correctAnswers?.[i];
               const isCorrect = normalize(ans) === normalize(correct);
               return (
-                <div key={i} className={cn("p-2 rounded border flex flex-col gap-1", isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
-                  <div className="text-[10px] uppercase font-bold opacity-50">Statement {i+1}</div>
-                  <div className="text-xs font-medium"><UniversalMathJax inline>{cleanupMath(stmt)}</UniversalMathJax></div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant={isCorrect ? "default" : "destructive"} className="text-[9px] h-4 px-1.5">{ans || 'Empty'}</Badge>
-                    {!isCorrect && <span className="text-[9px] font-black text-green-600">Key: {correct}</span>}
+                <div key={i} className={cn(
+                  "p-3 rounded-xl border flex items-start gap-3 transition-colors",
+                  isCorrect ? "bg-green-50/50 border-green-200" : "bg-red-50/50 border-red-200"
+                )}>
+                  <div className="flex-1 whitespace-pre-wrap leading-relaxed self-center">
+                    <UniversalMathJax inline dynamic>{cleanupMath(stmt.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge variant={isCorrect ? "default" : "destructive"} className="text-[9px] h-4 px-1.5 uppercase font-bold">{ans || 'Empty'}</Badge>
+                    {!isCorrect && correct && <span className="text-[8px] font-black text-green-600">Key: {correct}</span>}
                   </div>
                 </div>
               );
@@ -495,18 +500,90 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
       default:
         // Standard Writing/Comprehension/Rearranging
-        if (studentAnswer && typeof studentAnswer === 'string') {
-          return (
-            <div className="mt-2 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm text-sm">
-              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
+        const hasText = studentAnswer && typeof studentAnswer === 'string';
+        const hasImages = Array.isArray(subQ.studentImages) && subQ.studentImages.length > 0;
+
+        if (!hasText && !hasImages) return null;
+
+        return (
+          <div className="mt-2 space-y-3">
+            {hasText && (
+              <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm text-sm">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
+                </div>
+                <div className="text-foreground whitespace-pre-wrap">{studentAnswer}</div>
               </div>
-              <div className="text-foreground whitespace-pre-wrap">{studentAnswer}</div>
-            </div>
-          );
-        }
-        return null;
+            )}
+            
+            {hasImages && (
+              <div className="space-y-2">
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2 px-1">
+                  <Camera className="w-3 h-3" /> Submitted Images ({subQ.studentImages.length})
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {subQ.studentImages.map((imgUrl: string, imgIdx: number) => {
+                    // Check for annotation in allDrawings
+                    const annotation = (subQ.allDrawings || []).find((d: any) => 
+                      d.originalImagePath === imgUrl || d.imageIndex === imgIdx
+                    );
+                    const displayUrl = annotation?.imageData || imgUrl;
+                    
+                    return (
+                      <div key={imgIdx} className="relative group cursor-pointer" onClick={() => {
+                        setZoomedImage(displayUrl);
+                        setZoomedImageTitle(`Sub-question ${subIdx + 1} Image ${imgIdx + 1}`);
+                        setShowZoomModal(true);
+                      }}>
+                        <img 
+                          src={displayUrl} 
+                          alt={`Submission ${imgIdx + 1}`} 
+                          className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-105"
+                        />
+                        {annotation && (
+                          <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-bold shadow-sm">
+                             ✓
+                          </div>
+                        )}
+                        <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] px-1 rounded">
+                          {imgIdx + 1}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        );
     }
+  };
+
+  // Main wrapper for descriptive sub-question including model answer/explanation
+  const renderDescriptiveSubQuestion = (subQ: any, subIdx: number, questionId: string) => {
+    return (
+      <div className="space-y-4">
+        {renderSubQuestionContent(subQ, subIdx, questionId)}
+        
+        {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
+          <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
+            <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
+              <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+            </div>
+            <UniversalMathJax dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+          </div>
+        )}
+        
+        {subQ.explanation && (
+          <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 mt-2 text-[10px] text-blue-800 flex flex-col gap-1 whitespace-pre-wrap">
+            <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
+              <Info className="w-2.5 h-2.5" /> Explanation
+            </div>
+            <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Print Handler
@@ -595,6 +672,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         questionText: q.questionText,
         marks: q.marks,
         modelAnswer: q.modelAnswer
+      })),
+      smcq: result.questions.filter(q => q.type?.toUpperCase() === 'SMCQ').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks,
+        subQuestions: q.subQuestions || []
+      })),
+      descriptive: result.questions.filter(q => q.type?.toUpperCase() === 'DESCRIPTIVE').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks,
+        subQuestions: q.subQuestions || []
       }))
     };
 
@@ -603,7 +692,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       if (q.studentAnswer) {
         answers[q.id] = q.studentAnswer;
       }
-      if (q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'SQ') {
+      const type = q.type?.toUpperCase();
+      if (type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE' || type === 'SMCQ') {
         answers[`${q.id}_marks`] = q.awardedMarks;
       }
     });
@@ -1127,9 +1217,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const arQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'ar') || [];
   const mtfQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'mtf') || [];
   const intQuestions = result.questions?.filter((q: Question) => (q.type || "").toLowerCase() === 'int' || (q.type || "").toLowerCase() === 'numeric') || [];
-  const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ') || [];
+  const smcqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SMCQ') || [];
+  const cqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'CQ' || q.type?.toUpperCase() === 'DESCRIPTIVE') || [];
   const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
-  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions];
+  const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions];
 
   /* Fix: Use required counts for marks breakdown if available */
   const cqMarkPerQuestion = cqQuestions[0]?.marks || 10;
@@ -2447,7 +2538,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       {/* CQ Section */}
                       {(() => {
                         const filteredQuestions = result.questions.filter(q => {
-                          if (q.type?.toUpperCase() !== 'CQ') return false;
+                          const type = q.type?.toUpperCase();
+                          if (type !== 'CQ' && type !== 'DESCRIPTIVE') return false;
                           const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
                           const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
 
@@ -2497,7 +2589,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                   >
                                     <div className="flex items-center justify-between mb-4">
                                       <div className="flex items-center gap-3">
-                                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none">CQ</Badge>
+                                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none">{question.type?.toUpperCase() === 'DESCRIPTIVE' ? 'DESCRIPTIVE' : 'CQ'}</Badge>
                                         <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -2559,7 +2651,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                           <div key={subIdx} className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20">
                                             <div className="flex items-start gap-2">
                                               <span className="shrink-0 font-bold text-indigo-600 dark:text-indigo-400">{subIdx + 1}.</span>
-                                              <div className="text-sm font-medium">
+                                              <div className="text-sm font-medium whitespace-pre-wrap break-words">
                                                 <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
                                               </div>
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
@@ -2573,14 +2665,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             )}
 
                                             {/* Sub-question Model Answer (Correct Answer) */}
-                                            {(subQ.answer || subQ.modelAnswer) && (
+                                            {(subQ.answer || subQ.modelAnswer || subQ.explanation) && (
                                               <div className="mt-2 p-3 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 shadow-sm text-sm">
                                                 <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1 flex items-center gap-2">
                                                   <CheckCircle className="h-3 w-3" /> Model Answer / Explanation
                                                 </div>
-                                                <div className="text-foreground italic font-medium">
-                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.answer || subQ.modelAnswer)}</UniversalMathJax>
+                                                <div className="text-foreground italic font-medium whitespace-pre-wrap">
+                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.answer || subQ.modelAnswer || "")}</UniversalMathJax>
                                                 </div>
+                                                {subQ.explanation && (
+                                                  <div className="mt-2 pt-2 border-t border-emerald-500/20 text-foreground italic font-medium whitespace-pre-wrap">
+                                                    <span className="font-bold mr-1 text-emerald-700/80 uppercase text-[10px]">Explanation:</span>
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation)}</UniversalMathJax>
+                                                  </div>
+                                                )}
                                               </div>
                                             )}
 

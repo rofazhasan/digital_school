@@ -3,7 +3,7 @@ import QRCode from "react-qr-code";
 import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
-import { CheckCircle, XCircle, MinusCircle } from "lucide-react";
+import { CheckCircle, XCircle, MinusCircle, Check, X, BookOpen, Info } from "lucide-react";
 import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from "@/utils/numeralConverter";
 
@@ -56,6 +56,8 @@ interface SQ {
     leftColumn?: any[];
     rightColumn?: any[];
     matches?: Record<string, string>;
+    correctAnswer?: any;
+    explanation?: string;
 }
 
 interface AR {
@@ -130,6 +132,8 @@ interface MarkedQuestionPaperProps {
         int: INT[];
         cq: CQ[];
         sq: SQ[];
+        smcq?: any[];
+        descriptive?: CQ[];
     };
     submission: StudentSubmission;
     rank?: number;
@@ -140,11 +144,14 @@ interface MarkedQuestionPaperProps {
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
-const Text = ({ children }: { children: React.ReactNode }) => (
-    <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper">
-        <UniversalMathJax inline dynamic>{typeof children === 'string' ? cleanupMath(children) : children}</UniversalMathJax>
-    </div>
-);
+const Text = ({ children }: { children: React.ReactNode }) => {
+    const content = typeof children === 'string' ? children.replace(/\|\|/g, '\n') : children;
+    return (
+        <div className="inline-block align-middle max-w-full overflow-x-auto custom-mathjax-wrapper whitespace-pre-wrap break-words">
+            <UniversalMathJax inline dynamic>{typeof content === 'string' ? cleanupMath(content) : content}</UniversalMathJax>
+        </div>
+    );
+};
 
 const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>(
     ({ examInfo, questions, submission, rank, totalStudents, qrData }, ref) => {
@@ -161,6 +168,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
         const cqs = questions.cq || [];
         const sqs = questions.sq || [];
+        const smcqs = questions.smcq || [];
+        const descriptives = questions.descriptive || [];
         const cqRequired = examInfo.cqRequiredQuestions || 0;
         const sqRequired = examInfo.sqRequiredQuestions || 0;
 
@@ -237,8 +246,6 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
         const getMTFMark = (q: MTF, userAnswer: any) => {
             try {
-                const matches = Array.isArray(userAnswer?.matches) ? userAnswer.matches : (Array.isArray(userAnswer) ? userAnswer : []);
-
                 // 1. New Schema (left/right columns + matches)
                 if (q.leftColumn && q.rightColumn) {
                     const stdMatches = userAnswer || {};
@@ -248,22 +255,21 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                     const marksPerPair = (q.marks || 1) / totalPairs;
 
                     // Normalize student answer check
-                    if (!Array.isArray(stdMatches.matches)) {
-                        q.leftColumn.forEach((leftItem: any) => {
-                            const studentRightId = stdMatches[leftItem.id];
-                            // Use correctMatches from q if available, fallback to finding pairs logic if structure implies it
-                            const correctMatches = (q.matches || {});
-                            const correctRightId = correctMatches[leftItem.id];
+                    const matchesObj = stdMatches.matches || stdMatches;
+                    q.leftColumn.forEach((leftItem: any) => {
+                        const studentRightId = matchesObj[leftItem.id];
+                        const correctMatches = (q.matches || {});
+                        const correctRightId = correctMatches[leftItem.id];
 
-                            if (studentRightId && correctRightId && studentRightId === correctRightId) {
-                                score += marksPerPair;
-                            }
-                        });
-                        return Number(score.toFixed(2));
-                    }
+                        if (studentRightId && correctRightId && studentRightId === correctRightId) {
+                            score += marksPerPair;
+                        }
+                    });
+                    return Number(score.toFixed(2));
                 }
 
                 // 2. Legacy Schema (pairs)
+                const matches = Array.isArray(userAnswer?.matches) ? userAnswer.matches : (Array.isArray(userAnswer) ? userAnswer : []);
                 if (!matches || matches.length === 0) return 0;
                 const pairs = q.pairs || [];
                 if (pairs.length === 0) return 0;
@@ -282,12 +288,29 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                 return 0;
             }
         };
+
+        const getSMCQMark = (q: any, studentAnswer: any) => {
+            if (!q.subQuestions || q.subQuestions.length === 0) return 0;
+            let totalObtained = 0;
+            q.subQuestions.forEach((sub: any, idx: number) => {
+                const subAns = studentAnswer?.[idx] || (typeof studentAnswer === 'object' ? studentAnswer[sub.id] : null);
+                if (!subAns) return;
+                const correctText = sub.correct || sub.options?.find((opt: any) => opt.isCorrect)?.text;
+                if (String(subAns).trim() === String(correctText).trim()) {
+                    totalObtained += (sub.marks || 1);
+                } else {
+                    totalObtained -= ((sub.marks || 1) * negativeRate);
+                }
+            });
+            return totalObtained;
+        };
+
         const formatMark = (m: number) => {
             return Number(m).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
         };
 
         // Helper to render advanced descriptive sub-questions for Print
-        const renderDescriptiveSubQuestionPrint = (subQ: any) => {
+        const renderSubQuestionCore = (subQ: any, subIdx: number, questionId: string) => {
             const subType = subQ.subType || 'writing';
             const studentAnswer = subQ.studentAnswer;
             const normalize = (s: any) => String(s || '').trim().toLowerCase();
@@ -512,16 +535,70 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                     );
 
                 default:
-                    if (studentAnswer && typeof studentAnswer === 'string') {
-                        return (
-                            <div className="mt-2 p-2 border border-slate-200 rounded bg-white text-xs">
-                                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Student Response:</div>
-                                <div className="whitespace-pre-wrap">{studentAnswer}</div>
-                            </div>
-                        );
-                    }
-                    return null;
+                    return (
+                        <div className="space-y-2">
+                            {studentAnswer && (
+                                <div className="mt-2 p-2 border border-slate-200 rounded bg-white text-xs">
+                                    <div className="text-[8px] font-bold text-slate-400 uppercase mb-1 flex items-center gap-1">
+                                        <div className="w-1 h-1 bg-blue-500 rounded-full"></div> Student Response:
+                                    </div>
+                                    <Text>{typeof studentAnswer === 'string' ? studentAnswer : JSON.stringify(studentAnswer)}</Text>
+                                </div>
+                            )}
+
+                            {Array.isArray(subQ.studentImages) && subQ.studentImages.length > 0 && (
+                                <div className="mt-1 flex flex-wrap gap-1 p-1 border border-dashed border-slate-200 rounded bg-slate-50/50">
+                                    <div className="w-full text-[7px] font-bold text-slate-400 uppercase mb-1">Attachments ({subQ.studentImages.length})</div>
+                                    {subQ.studentImages.slice(0, 4).map((imgUrl: string, idx: number) => (
+                                        <div key={idx} className="w-12 h-12 border border-slate-200 rounded bg-white overflow-hidden">
+                                            <img src={imgUrl} alt="Sub" className="w-full h-full object-cover grayscale opacity-70" />
+                                        </div>
+                                    ))}
+                                    {subQ.studentImages.length > 4 && <div className="text-[7px] flex items-center text-slate-400">+{subQ.studentImages.length - 4} more</div>}
+                                </div>
+                            )}
+                        </div>
+                    );
             }
+        };
+
+        // Main sub-question renderer with model answer/explanation wrapper
+        const renderSubQuestion = (subQ: any, subIdx: number, questionId: string) => {
+            return (
+                <div className="mb-4 last:mb-0">
+                    <div className="flex items-start gap-2 mb-2">
+                        <div className="mt-1 w-4 h-4 bg-slate-900 text-white rounded-full flex items-center justify-center text-[8px] font-black shrink-0">
+                            {toBengaliNumerals(subIdx + 1)}
+                        </div>
+                        <div className="flex-1">
+                            <div className="text-[10px] font-bold leading-tight">
+                                <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.question || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                <span className="ml-1 text-[8px] text-slate-400 uppercase tracking-tighter">[{subQ.marks || 0}]</span>
+                            </div>
+                            
+                            {renderSubQuestionCore(subQ, subIdx, questionId)}
+
+                            {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
+                                <div className="mt-2 p-2 bg-green-50 border border-green-100 rounded text-[8px] text-green-800">
+                                    <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
+                                        <BookOpen className="w-2 h-2" /> Model Answer / Key
+                                    </div>
+                                    <UniversalMathJax dynamic inline>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                </div>
+                            )}
+
+                            {subQ.explanation && (
+                                <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-[8px] text-blue-800">
+                                    <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
+                                        <Info className="w-2 h-2" /> Explanation
+                                    </div>
+                                    <UniversalMathJax dynamic inline>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
         };
 
         const MarkDisplay = ({ earned, total }: { earned: number, total: number }) => {
@@ -1059,42 +1136,15 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 </div>
                                             </div>
 
-                                            {q.subQuestions && q.subQuestions.map((sub: any, sidx: number) => {
-                                                const subId = sub.id || `sub_${q.id}_${sidx}`;
-                                                return (
-                                                    <div key={sidx} className="ml-6 mt-2 text-sm text-gray-600">
-                                                        <div className="flex flex-col gap-1">
-                                                            <div className="flex gap-1">
-                                                                <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
-                                                                <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
-                                                            </div>
-                                                            {/* Student Response Rendering */}
-                                                            {renderDescriptiveSubQuestionPrint(sub)}
-
-                                                            {/* Visual Evidence (Student Uploads) */}
-                                                            {sub.studentImages && sub.studentImages.length > 0 && (
-                                                                <div className="ml-6 mt-2 grid grid-cols-3 gap-2">
-                                                                    {sub.studentImages.map((img: string, ii: number) => (
-                                                                        <div key={ii} className="relative aspect-video border rounded overflow-hidden">
-                                                                            <img src={img} alt="Evidence" className="w-full h-full object-cover" />
-                                                                            <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[6px] px-1">Img {ii+1}</div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            )}
-
-                                                            {/* Model Answer for CQ Sub-question */}
-                                                            {(sub.modelAnswer || sub.answer) && (
-                                                                <div className="ml-6 mt-2 p-1.5 bg-green-50 border border-green-100 rounded text-xs">
-                                                                    <span className="text-green-700 font-bold mr-1">Model Answer:</span>
-                                                                    <div className="inline-block text-gray-800"><Text>{sub.modelAnswer || sub.answer}</Text></div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                        {sub.image && <img src={sub.image} alt="Sub-question" className="mt-1 h-32 w-auto object-contain border rounded bg-white" />}
-                                                    </div>
-                                                );
-                                            })}
+                                            {q.subQuestions && (
+                                                <div className="mt-4 space-y-4">
+                                                    {q.subQuestions.map((sub: any, sidx: number) => {
+                                                        const subId = sub.id || `sub_${q.id || 'q'}_${sidx}`;
+                                                        const studentAnswer = submission.answers[subId] || submission.answers[`${q.id || 'q'}_sub_${sidx}`] || submission.answers[`${q.id || 'q'}_desc_${sidx}_answer`];
+                                                        return renderSubQuestion({ ...sub, studentAnswer }, sidx, q.id || 'q');
+                                                    })}
+                                                </div>
+                                            )}
                                         </div>
                                     );
                                 })}
@@ -1102,7 +1152,124 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         </>
                     )}
 
-                    {/* SQ Section */}
+                    {/* SMCQ Section */}
+                    {smcqs.length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
+                                <h3>দৃশ্যপট ভিত্তিক প্রশ্ন (SMCQ)</h3>
+                                <div className="text-right">
+                                    <span>Marks: {smcqs.reduce((sum, q) => sum + getSMCQMark(q, submission.answers[q.id]), 0)} / {smcqs.reduce((sum, q) => sum + (q.marks || 0), 0)}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                {smcqs.map((q, idx) => {
+                                    const studentAnswer = submission.answers[q.id];
+                                    const obtainedMark = getSMCQMark(q, studentAnswer);
+
+                                    return (
+                                        <div key={idx} className="mb-6 border-b border-gray-200 pb-4 break-inside-avoid">
+                                            <div className="flex justify-between items-start mb-4">
+                                                <div className="font-bold text-lg flex gap-2">
+                                                    <span>{idx + 1}.</span>
+                                                    <div className="inline-block whitespace-pre-wrap"><Text>{q.questionText}</Text></div>
+                                                </div>
+                                                <div className="bg-gray-100 px-3 py-1 rounded text-sm font-bold whitespace-nowrap">
+                                                    {obtainedMark} / {q.marks}
+                                                </div>
+                                            </div>
+
+                                            <div className="ml-6 space-y-4">
+                                                {q.subQuestions?.map((sub: any, sidx: number) => {
+                                                    const subAns = studentAnswer?.[sidx] || (typeof studentAnswer === 'object' ? studentAnswer[sub.id] : null);
+                                                    const correctText = sub.correct || sub.options?.find((opt: any) => opt.isCorrect)?.text;
+                                                    const isCorrect = String(subAns).trim() === String(correctText).trim();
+
+                                                    return (
+                                                        <div key={sidx} className="p-3 border rounded-lg bg-gray-50">
+                                                            <div className="font-bold mb-2 flex gap-2">
+                                                                <span className="text-gray-500">{BENGALI_SUB_LABELS[sidx]}.</span>
+                                                                <div className="inline-block"><Text>{sub.questionText}</Text></div>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2 ml-6">
+                                                                {sub.options?.map((opt: any, oidx: number) => {
+                                                                    const isSelected = String(subAns).trim() === String(opt.text).trim();
+                                                                    const isOptCorrect = opt.isCorrect || String(opt.text).trim() === String(correctText).trim();
+                                                                    
+                                                                    let statusClass = "border-gray-200 bg-white";
+                                                                    if (isSelected && isOptCorrect) statusClass = "border-green-500 bg-green-50 text-green-700 shadow-sm ring-1 ring-green-500";
+                                                                    else if (isSelected && !isOptCorrect) statusClass = "border-red-500 bg-red-50 text-red-700";
+                                                                    else if (!isSelected && isOptCorrect) statusClass = "border-green-200 bg-green-50/30 text-green-600";
+
+                                                                    return (
+                                                                        <div key={oidx} className={`p-2 border rounded text-xs flex items-center gap-2 ${statusClass}`}>
+                                                                            <span className="font-bold opacity-50">{MCQ_LABELS[oidx]}.</span>
+                                                                            <div className="flex-1">
+                                                                                <Text>{opt.text}</Text>
+                                                                            </div>
+                                                                            {isSelected && (isOptCorrect ? <Check size={12} strokeWidth={3} /> : <X size={12} strokeWidth={3} />)}
+                                                                        </div>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                            {sub.explanation && (
+                                                                <div className="mt-3 ml-6 p-2 bg-blue-50 border border-blue-100 rounded text-[10px] text-blue-800">
+                                                                    <span className="font-bold mr-1">ব্যাখ্যা:</span>
+                                                                    <div className="inline-block"><Text>{sub.explanation}</Text></div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
+                    {/* Descriptive Section */}
+                    {descriptives.length > 0 && (
+                        <>
+                            <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
+                                <h3>বর্ণনামূলক প্রশ্ন (Descriptive)</h3>
+                                <div className="text-right">
+                                    <span>Marks: {descriptives.reduce((sum, q) => sum + (Number(submission.answers[`${q.id}_marks`]) || 0), 0)} / {descriptives.reduce((sum, q) => sum + (q.marks || 0), 0)}</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-6">
+                                {descriptives.map((q, idx) => {
+                                    const obtainedMark = submission.answers[`${q.id}_marks`];
+                                    return (
+                                        <div key={idx} className="mb-6 border-b border-gray-200 pb-4 break-inside-avoid">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div className="font-bold text-lg flex gap-2">
+                                                    <span>{idx + 1}.</span>
+                                                    <div className="inline-block whitespace-pre-wrap"><Text>{q.questionText}</Text></div>
+                                                </div>
+                                                <div className="bg-gray-100 px-3 py-1 rounded text-sm font-bold whitespace-nowrap">
+                                                    {obtainedMark !== undefined ? obtainedMark : 0} / {q.marks || 10}
+                                                </div>
+                                            </div>
+
+                                            {q.subQuestions && (
+                                                <div className="mt-4 space-y-4">
+                                                    {q.subQuestions.map((sub: any, sidx: number) => {
+                                                        const subId = sub.id || `${q.id || 'q'}_sub_${sidx}`;
+                                                        const studentAnswer = submission.answers[subId] || submission.answers[`${q.id || 'q'}_sub_${sidx}`] || submission.answers[`${q.id || 'q'}_desc_${sidx}_answer`];
+                                                        return renderSubQuestion({ ...sub, studentAnswer }, sidx, q.id || 'q');
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
+
                     {sqs.length > 0 && (
                         <>
                             <div className="flex justify-between items-center font-bold mb-4 text-lg border-b border-dotted border-black pb-1 mt-8 break-before-page">
@@ -1129,38 +1296,51 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 </div>
                                             </div>
 
-                                            {(answer || q.studentAnswer) && (
-                                                <div className="ml-6 p-2 bg-white rounded border border-gray-200 text-sm">
-                                                    <div className="text-xs text-gray-500 mb-1">Student Answer:</div>
-                                                    {q.subType ? (
-                                                        renderDescriptiveSubQuestionPrint(q)
-                                                    ) : (
-                                                        <div className="font-medium text-blue-800">
-                                                            <div className="inline-block"><Text>{String(answer || q.studentAnswer)}</Text></div>
+                                            {q.subType ? (
+                                                renderSubQuestion(q, idx, q.id || 'q')
+                                            ) : (
+                                                <div className="space-y-4">
+                                                    {(answer || q.studentAnswer) && (
+                                                        <div className="ml-6 p-2 bg-white rounded border border-gray-200 text-sm">
+                                                            <div className="text-xs text-gray-500 mb-1">Student Answer:</div>
+                                                            <div className="font-medium text-blue-800">
+                                                                <div className="inline-block"><Text>{String(answer || q.studentAnswer)}</Text></div>
+                                                            </div>
                                                         </div>
                                                     )}
-                                                </div>
-                                            )}
 
-                                            {/* Visual Evidence for SQ */}
-                                            {q.studentImages && q.studentImages.length > 0 && (
-                                                <div className="ml-6 mt-2 grid grid-cols-3 gap-2">
-                                                    {q.studentImages.map((img: string, ii: number) => (
-                                                        <div key={ii} className="relative aspect-video border rounded overflow-hidden">
-                                                            <img src={img} alt="Evidence" className="w-full h-full object-cover" />
-                                                            <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[6px] px-1">Img {ii+1}</div>
+                                                    {q.studentImages && q.studentImages.length > 0 && (
+                                                        <div className="ml-6 mt-2 grid grid-cols-3 gap-2">
+                                                            {q.studentImages.map((img: string, ii: number) => (
+                                                                <div key={ii} className="relative aspect-video border rounded overflow-hidden">
+                                                                    <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                                                                    <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[6px] px-1">Img {ii + 1}</div>
+                                                                </div>
+                                                            ))}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            )}
+                                                    )}
 
-                                            {/* Model Answer for SQ */}
-                                            {(q.modelAnswer || q.answer) && (
-                                                <div className="ml-6 mt-2 p-2 bg-green-50 rounded border border-green-100 text-sm">
-                                                    <div className="text-xs text-green-700 font-bold mb-1">Model Answer:</div>
-                                                    <div className="font-medium text-gray-800">
-                                                        <div className="inline-block"><Text>{q.modelAnswer || q.answer}</Text></div>
-                                                    </div>
+                                                    {(q.modelAnswer || q.answer || q.correctAnswer) && (
+                                                        <div className="ml-6 mt-2 p-2 bg-green-50 rounded border border-green-100 text-sm">
+                                                            <div className="text-xs text-green-700 font-bold mb-1 flex items-center gap-1">
+                                                                <BookOpen className="w-3 h-3" /> Model Answer / Key
+                                                            </div>
+                                                            <div className="font-medium text-gray-800">
+                                                                <div className="inline-block"><Text>{q.modelAnswer || q.answer || q.correctAnswer}</Text></div>
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {q.explanation && (
+                                                        <div className="ml-6 mt-2 p-2 bg-blue-50 rounded border border-blue-100 text-sm">
+                                                            <div className="text-xs text-blue-700 font-bold mb-1 flex items-center gap-1">
+                                                                <Info className="w-3 h-3" /> Explanation
+                                                            </div>
+                                                            <div className="font-medium text-gray-800">
+                                                                <div className="inline-block"><Text>{q.explanation}</Text></div>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

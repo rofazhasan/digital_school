@@ -982,6 +982,57 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                         </table>
                                       </div>
                                     )}
+
+                                    {part.subType === 'true_false' && (
+                                      <div className="space-y-2 mt-2 ml-4">
+                                        {(part.statements || []).map((stmt: string, sIdx: number) => (
+                                          <div key={sIdx} className="flex gap-2 items-start text-sm">
+                                            <span className="font-bold shrink-0">{isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}.</span>
+                                            <div className="flex-1 whitespace-pre-wrap"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
+                                            <span className="w-16 h-6 border border-gray-400 shrink-0 inline-block bg-white"></span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'flowchart' && (
+                                      <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4 flex-wrap">
+                                        {(part.items || []).map((item: string, iIdx: number) => (
+                                          <div key={iIdx} className="flex items-center gap-3">
+                                            <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap">
+                                              {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
+                                              <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
+                                            </div>
+                                            {iIdx < (part.items?.length || 0) - 1 && (
+                                              <span className="text-slate-400 font-bold hidden md:inline-block">→</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'label_diagram' && (
+                                      <div className="mt-4 flex flex-col items-center">
+                                        {part.imageUrl && (
+                                           <div className="relative border rounded inline-block max-w-[80%] bg-white p-2 shadow-sm mb-4">
+                                             <img src={part.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
+                                             {(part.labels || []).map((lbl: any, lIdx: number) => (
+                                               <div key={lIdx} className="absolute w-4 h-4 bg-red-600 text-white flex items-center justify-center rounded-full text-[8px] font-bold" style={{ top: `${lbl.y}%`, left: `${lbl.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                 {lIdx + 1}
+                                               </div>
+                                             ))}
+                                           </div>
+                                        )}
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 w-full">
+                                          {(part.labels || []).map((_: any, lIdx: number) => (
+                                            <div key={lIdx} className="flex gap-2 items-end">
+                                              <span className="font-bold text-sm shrink-0">{lIdx + 1}.</span>
+                                              <div className="border-b border-black flex-1 h-5"></div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
 
                                   <div className="bg-gray-50 p-3 rounded border border-gray-200 shadow-sm leading-relaxed text-sm">
@@ -1109,6 +1160,56 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                             </div>
                                           </div>
                                         ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'true_false' && (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                                        {(part.correctAnswers || []).map((ans: string, aIdx: number) => (
+                                          <div key={aIdx} className="flex gap-2 items-center bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                            <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
+                                            <span className="flex-1 text-emerald-700 font-bold text-sm">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'flowchart' && (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
+                                        {(part.modelAnswers || []).map((ansSet: string, aIdx: number) => (
+                                          <div key={aIdx} className="bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                            <span className="font-bold text-gray-500 text-xs block border-b pb-1 mb-1">{isEn ? `Step ${aIdx + 1}` : `ধাপ ${toBengaliNumerals(aIdx + 1)}`}</span>
+                                            <div className="text-blue-700 font-medium text-xs whitespace-pre-wrap flex flex-col gap-1">
+                                              {ansSet.split('|').map((step: string, si: number) => (
+                                                <div className="bg-blue-50 p-1 rounded border border-blue-100" key={si}><UniversalMathJax dynamic>{step}</UniversalMathJax></div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'label_diagram' && (
+                                      <div className="grid grid-cols-2 gap-x-4 gap-y-2 mt-2">
+                                        {(part.correctLabels || part.answers || []).map((ans: string, aIdx: number) => (
+                                          <div key={aIdx} className="flex gap-2 items-center bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                            <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
+                                            <span className="flex-1 text-purple-700 font-bold text-sm">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.explanation && (
+                                      <div className="mt-3 bg-white p-2 rounded border border-gray-200">
+                                        <div className="font-bold text-[11px] text-gray-600 border-b border-gray-100 pb-1 mb-1">{isEn ? 'Explanation:' : 'ব্যাখ্যা:'}</div>
+                                        <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
+                                          <UniversalMathJax dynamic>{part.explanation}</UniversalMathJax>
+                                        </div>
                                       </div>
                                     )}
                                   </div>

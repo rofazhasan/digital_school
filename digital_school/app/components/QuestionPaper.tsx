@@ -677,7 +677,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
-                              <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
+                              <div className="whitespace-pre-wrap">
+                                <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
+                              </div>
                               {/* Render each sub-part of the descriptive question */}
                               {(q.subQuestions || []).map((part: any, pIdx: number) => (
                                 <div key={pIdx} className="mb-3">
@@ -688,7 +690,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     {part.subType === 'writing' && (
                                       <div className="space-y-2">
                                         {part.sourceText && (
-                                          <div className="p-2 bg-gray-50 border border-gray-200 rounded italic text-xs mb-2">
+                                          <div className="p-2 bg-gray-50 border border-gray-200 rounded italic text-xs mb-2 whitespace-pre-wrap">
                                             <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
                                           </div>
                                         )}
@@ -794,6 +796,57 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'true_false' && (
+                                      <div className="space-y-2 mt-2 ml-4">
+                                        {(part.statements || []).map((stmt: string, sIdx: number) => (
+                                          <div key={sIdx} className="flex gap-2 items-start text-sm">
+                                            <span className="font-bold shrink-0">{isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}.</span>
+                                            <div className="flex-1 whitespace-pre-wrap"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
+                                            <span className="w-16 h-6 border border-gray-400 shrink-0 inline-block bg-white"></span>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'flowchart' && (
+                                      <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4 flex-wrap">
+                                        {(part.items || []).map((item: string, iIdx: number) => (
+                                          <div key={iIdx} className="flex items-center gap-3">
+                                            <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap">
+                                              {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
+                                              <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
+                                            </div>
+                                            {iIdx < (part.items?.length || 0) - 1 && (
+                                              <span className="text-slate-400 font-bold hidden md:inline-block">→</span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'label_diagram' && (
+                                      <div className="mt-4 flex flex-col items-center">
+                                        {part.imageUrl && (
+                                          <div className="relative border rounded inline-block max-w-[80%] bg-white p-2 shadow-sm mb-4">
+                                            <img src={part.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
+                                            {(part.labels || []).map((lbl: any, lIdx: number) => (
+                                              <div key={lIdx} className="absolute w-4 h-4 bg-red-600 text-white flex items-center justify-center rounded-full text-[8px] font-bold" style={{ top: `${lbl.y}%`, left: `${lbl.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                {lIdx + 1}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 w-full">
+                                          {(part.labels || []).map((_: any, lIdx: number) => (
+                                            <div key={lIdx} className="flex gap-2 items-end">
+                                              <span className="font-bold text-sm shrink-0">{lIdx + 1}.</span>
+                                              <div className="border-b border-black flex-1 h-5"></div>
+                                            </div>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
 

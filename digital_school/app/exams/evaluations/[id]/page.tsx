@@ -48,7 +48,9 @@ import {
   LayoutGrid,
   List,
   RefreshCw,
-  ArrowRight
+  ArrowRight,
+  BookOpen,
+  Info
 } from "lucide-react";
 import {
   Tooltip,
@@ -2569,8 +2571,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       )}
                                     </div>
                                   </div>
-                                  <div className="text-base md:text-lg mb-4">
-                                    <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath(currentQuestion?.questionText || currentQuestion?.text || '')}</UniversalMathJax>
+                                  <div className="text-base md:text-lg mb-4 whitespace-pre-wrap">
+                                    <UniversalMathJax key={currentQuestion?.id} dynamic>{cleanupMath((currentQuestion?.questionText || currentQuestion?.text || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                   </div>
 
                                   {/* Subquestions */}
@@ -2581,7 +2583,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         <div key={idx} className="pl-4 border-l-2 border-gray-200">
                                           <div className="flex items-center justify-between mb-1">
                                             <span className="text-sm md:text-base font-medium text-gray-600">
-                                              (a{String.fromCharCode(97 + idx)}) <UniversalMathJax inline dynamic>{cleanupMath(subQ?.questionText || subQ?.text || subQ?.question || '')}</UniversalMathJax>
+                                              (a{String.fromCharCode(97 + idx)}) <div className="inline whitespace-pre-wrap"><UniversalMathJax inline dynamic>{cleanupMath((subQ?.questionText || subQ?.text || subQ?.question || '').replace(/\|\|/g, '\n'))}</UniversalMathJax></div>
                                               {subQ?.image && (
                                                 <div className="mt-1 block">
                                                   <img src={subQ?.image} alt="Sub-question" className="max-h-24 rounded border bg-white object-contain" />
@@ -2593,8 +2595,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                             </span>
                                           </div>
                                           {subQ?.modelAnswer && (
-                                            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
-                                              <strong>Model Answer:</strong> <UniversalMathJax inline dynamic>{cleanupMath(subQ?.modelAnswer)}</UniversalMathJax>
+                                            <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded whitespace-pre-wrap">
+                                              <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ?.modelAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                             </div>
                                           )}
                                         </div>
@@ -2684,8 +2686,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   return (
                                                     <div key={sIdx} className="p-3 bg-card rounded border border-border">
                                                       <div className="flex items-center justify-between mb-3">
-                                                        <div className="text-sm font-semibold text-indigo-700">
-                                                          Part {toBengaliNumerals(sIdx + 1)}: <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || '')}</UniversalMathJax>
+                                                        <div className="text-sm font-semibold text-indigo-700 whitespace-pre-wrap">
+                                                          Part {toBengaliNumerals(sIdx + 1)}: <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                         </div>
                                                         {subAns ? (
                                                           isSubCorrect ? <CheckCircle className="h-4 w-4 text-green-600" /> : <XCircle className="h-4 w-4 text-red-600" />
@@ -2703,15 +2705,25 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                             <div key={oIdx} className={`text-xs p-2 rounded border flex items-center justify-between ${isSelected ? (isCorrect ? 'bg-green-100 border-green-300' : 'bg-red-100 border-red-300') :
                                                               isCorrect ? 'bg-green-50 border-green-200 opacity-80' : 'bg-muted/30 border-border opacity-60'
                                                               }`}>
-                                                              <div className="flex items-center gap-2">
+                                                              <div className="flex items-center gap-2 whitespace-pre-wrap">
                                                                 <span className="font-bold text-gray-500">{MCQ_LABELS?.[oIdx]}.</span>
-                                                                <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                                <UniversalMathJax inline dynamic>{cleanupMath((optText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                               </div>
                                                               {isSelected && (isCorrect ? <CheckCircle className="h-3 w-3 text-green-600" /> : <XCircle className="h-3 w-3 text-red-600" />)}
                                                             </div>
                                                           )
                                                         })}
                                                       </div>
+                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
+                                                        <div className="mt-3 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
+                                                          <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      )}
+                                                      {subQ.explanation && (
+                                                        <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
+                                                          <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      )}
                                                     </div>
                                                   );
                                                 })}
@@ -2834,8 +2846,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                             <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
                                                               <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Quest:
                                                             </div>
-                                                            <div className="text-sm font-semibold text-gray-800 leading-relaxed bg-blue-50/30 p-3 rounded-lg border border-blue-100/50">
-                                                              {part.questionText || "Reference text/question missing in metadata"}
+                                                            <div className="text-sm font-semibold text-gray-800 leading-relaxed bg-blue-50/30 p-3 rounded-lg border border-blue-100/50 whitespace-pre-wrap">
+                                                              <UniversalMathJax dynamic>{cleanupMath((part.questionText || "Reference text/question missing in metadata").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                             </div>
                                                           </div>
 
@@ -2857,7 +2869,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               )}
                                                               <div className="absolute top-0 right-0 px-2 py-1 bg-amber-50 text-[8px] font-black text-amber-400 uppercase tracking-tighter invisible group-hover:visible transition-all">Verified Entry</div>
                                                               {part.subType === 'writing' && (
-                                                                <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">{getAns('ans') || <span className="text-muted-foreground/40">No text provided…</span>}</div>
+                                                                <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
+                                                                  <UniversalMathJax dynamic>{cleanupMath((getAns('ans') || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                  {!getAns('ans') && <span className="text-muted-foreground/40">No text provided…</span>}
+                                                                </div>
                                                               )}
                                                               {part.subType === 'fill_in' && (
                                                                 <div className="space-y-3">
@@ -2913,7 +2928,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   <table className="w-full text-[10px]">
                                                                     <thead className="bg-amber-100/50">
                                                                       <tr>
-                                                                        {(part.tableHeaders || []).map((h: string, hi: number) => <th key={hi} className="border-b border-amber-200 p-2 text-left text-amber-800">{h}</th>)}
+                                                                        {(part.tableHeaders || []).map((h: string, hi: number) => <th key={hi} className="border-b border-amber-200 p-2 text-left text-amber-800 whitespace-pre-wrap"><UniversalMathJax inline>{h.replace(/\|\|/g, '\n')}</UniversalMathJax></th>)}
                                                                       </tr>
                                                                     </thead>
                                                                     <tbody>
@@ -2922,8 +2937,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                           {(part.tableHeaders || []).map((_: string, ci: number) => {
                                                                             const isBlank = !row[ci] || row[ci] === '___';
                                                                             return (
-                                                                              <td key={ci} className="border-b border-amber-100 p-2">
-                                                                                {isBlank ? <span className="font-black text-amber-600">{getAns(`${ri}_${ci}`) || '___'}</span> : <span className="text-gray-500">{row[ci]}</span>}
+                                                                              <td key={ci} className="border-b border-amber-100 p-2 whitespace-pre-wrap">
+                                                                                {isBlank ? <span className="font-black text-amber-600"><UniversalMathJax inline>{(getAns(`${ri}_${ci}`) || '___').replace(/\|\|/g, '\n')}</UniversalMathJax></span> : <span className="text-gray-500"><UniversalMathJax inline>{row[ci].replace(/\|\|/g, '\n')}</UniversalMathJax></span>}
                                                                               </td>
                                                                             );
                                                                           })}
@@ -2955,10 +2970,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                             part.columnD?.length || 0
                                                                           ) }).map((_, i) => (
                                                                             <tr key={i} className="hover:bg-amber-100/30 transition-colors">
-                                                                              {part.leftColumn && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.leftColumn[i]?.id}.</span> {part.leftColumn[i]?.text}</td>}
-                                                                              {part.rightColumn && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.rightColumn[i]?.id}.</span> {part.rightColumn[i]?.text}</td>}
-                                                                              {part.columnC && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.columnC[i]?.id}.</span> {part.columnC[i]?.text}</td>}
-                                                                              {part.columnD && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.columnD[i]?.id}.</span> {part.columnD[i]?.text}</td>}
+                                                                              {part.leftColumn && <td className="p-1.5 border-b border-amber-100/50 whitespace-pre-wrap"><span className="text-amber-600 font-bold mr-1">{part.leftColumn[i]?.id}.</span> <UniversalMathJax inline>{(part.leftColumn[i]?.text || '').replace(/\|\|/g, '\n')}</UniversalMathJax></td>}
+                                                                              {part.rightColumn && <td className="p-1.5 border-b border-amber-100/50 whitespace-pre-wrap"><span className="text-amber-600 font-bold mr-1">{part.rightColumn[i]?.id}.</span> <UniversalMathJax inline>{(part.rightColumn[i]?.text || '').replace(/\|\|/g, '\n')}</UniversalMathJax></td>}
+                                                                              {part.columnC && <td className="p-1.5 border-b border-amber-100/50 whitespace-pre-wrap"><span className="text-amber-600 font-bold mr-1">{part.columnC[i]?.id}.</span> <UniversalMathJax inline>{(part.columnC[i]?.text || '').replace(/\|\|/g, '\n')}</UniversalMathJax></td>}
+                                                                              {part.columnD && <td className="p-1.5 border-b border-amber-100/50 whitespace-pre-wrap"><span className="text-amber-600 font-bold mr-1">{part.columnD[i]?.id}.</span> <UniversalMathJax inline>{(part.columnD[i]?.text || '').replace(/\|\|/g, '\n')}</UniversalMathJax></td>}
                                                                             </tr>
                                                                           ))}
                                                                         </tbody>
@@ -3118,8 +3133,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               {/* Student Image Gallery for Part */}
                                                               {(() => {
                                                                 const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
-                                                                const singleImage = currentStudent?.answers?.[`${keyBase}_image`];
-                                                                const multipleImages = currentStudent?.answers?.[`${keyBase}_images`] || [];
+                                                                const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
+                                                                const singleImage = currentStudent?.answers?.[`${keyBase}_image`] || currentStudent?.answers?.[`${subKeyBase}_image`];
+                                                                const multipleImages = currentStudent?.answers?.[`${keyBase}_images`] || currentStudent?.answers?.[`${subKeyBase}_images`] || [];
                                                                 const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
 
                                                                 if (allImages.length === 0) return null;
@@ -3185,6 +3201,17 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 <div className="flex flex-col items-center justify-center py-6 text-emerald-600/40">
                                                                   <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
                                                                   <span className="text-[10px] font-black uppercase tracking-tighter">No model answer provided</span>
+                                                                </div>
+                                                              )}
+
+                                                              {part.explanation && (
+                                                                <div className="mt-4 p-4 border-t border-emerald-200/50">
+                                                                  <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">
+                                                                    Explanation
+                                                                  </div>
+                                                                  <div className="text-sm font-medium text-emerald-800 leading-relaxed whitespace-pre-wrap">
+                                                                    <UniversalMathJax dynamic>{cleanupMath(part.explanation)}</UniversalMathJax>
+                                                                  </div>
                                                                 </div>
                                                               )}
 
@@ -3260,6 +3287,27 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 </div>
                                                               )}
 
+                                                              {(part.modelAnswer || part.answer || part.correctAnswer) && (
+                                                                <div className="mt-4 p-4 bg-green-50/50 rounded-xl border border-green-200/50 text-xs text-green-800 shadow-sm">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-green-600 tracking-widest flex items-center gap-2">
+                                                                    <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+                                                                  </div>
+                                                                  <div className="whitespace-pre-wrap leading-relaxed">
+                                                                    <UniversalMathJax dynamic>{cleanupMath((part.modelAnswer || part.answer || part.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                  </div>
+                                                                </div>
+                                                              )}
+
+                                                              {part.explanation && (
+                                                                <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-200/50 text-xs text-blue-800 shadow-sm">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-blue-600 tracking-widest flex items-center gap-2">
+                                                                    <Info className="w-2.5 h-2.5" /> Explanation
+                                                                  </div>
+                                                                  <div className="whitespace-pre-wrap leading-relaxed">
+                                                                    <UniversalMathJax dynamic>{cleanupMath(part.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                  </div>
+                                                                </div>
+                                                              )}
                                                             </div>
                                                           </div>
                                                         </div>
@@ -3280,7 +3328,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         {currentAnswer && typeof currentAnswer === 'string' && (
                                           <div>
                                             <div className="text-xs font-semibold text-gray-500 mb-1">Text Answer:</div>
-                                            <div className="whitespace-pre-wrap text-sm md:text-base"><UniversalMathJax dynamic>{cleanupMath(currentAnswer)}</UniversalMathJax></div>
+                                            <div className="whitespace-pre-wrap text-sm md:text-base border border-gray-100 p-2 rounded bg-gray-50/30">
+                                              <UniversalMathJax dynamic>{cleanupMath((currentAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                            </div>
                                           </div>
                                         )}
 
@@ -3355,12 +3405,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                         <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">[{subQ.marks || 0} Marks]</span>
                                                       </div>
                                                       {subQ?.text || subQ?.question || subQ?.questionText ? (
-                                                        <div className="text-gray-800 text-sm font-medium leading-relaxed mb-1">
-                                                          <UniversalMathJax inline dynamic>{cleanupMath(subQ?.text || subQ?.question || subQ?.questionText)}</UniversalMathJax>
+                                                        <div className="text-gray-800 text-sm font-medium leading-relaxed mb-1 whitespace-pre-wrap">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                          {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
+                                                            <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
+                                                              <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                            </div>
+                                                          )}
+                                                          {subQ.explanation && (
+                                                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
+                                                              <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                            </div>
+                                                          )}
                                                         </div>
                                                       ) : null}
-                                                      <div className="mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-2 rounded border border-indigo-50/50">
-                                                        <UniversalMathJax dynamic>{cleanupMath(subText || "")}</UniversalMathJax>
+                                                      <div className="mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-2 rounded border border-indigo-50/50 whitespace-pre-wrap">
+                                                        <UniversalMathJax dynamic>{cleanupMath((subText || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                       </div>
                                                     </div>
 
@@ -4407,8 +4467,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                               rows={4}
                             />
                             <div className="text-xs text-gray-500 mt-2 space-y-1">
-                              <p>• <strong>Approve:</strong> Will automatically submit the student's evaluation with any mark changes you've made</p>
-                              <p>• <strong>Reject:</strong> Will keep the original marks unchanged</p>
+                              <p>• <span className="font-bold">Approve:</span> Will automatically submit the student's evaluation with any mark changes you've made</p>
+                              <p>• <span className="font-bold">Reject:</span> Will keep the original marks unchanged</p>
                             </div>
                           </div>
 
