@@ -1423,17 +1423,28 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       return;
     }
 
-    const targetQuestion = exam?.questions?.find(q => q.id === questionId);
-    const maxMarks = subIndex !== undefined && targetQuestion?.subQuestions?.[subIndex]
-      ? targetQuestion.subQuestions[subIndex].marks
-      : targetQuestion?.marks || 0;
+    const targetQuestion = (exam?.questions || []).find(q => q.id === questionId);
+    let maxMarks = 0;
+
+    if (subIndex !== undefined) {
+      const subQs = targetQuestion?.subQuestions || (targetQuestion as any)?.sub_questions;
+      if (subQs && subQs[subIndex]) {
+        maxMarks = subQs[subIndex].marks || 0;
+      }
+    } else {
+      maxMarks = targetQuestion?.marks || 0;
+    }
 
     if (marks > maxMarks) {
       toast.error(`Cannot give more than ${maxMarks} marks`);
       return;
     }
 
-    const marksKey = subIndex !== undefined ? `${questionId}_sub_${subIndex}_marks` : `${questionId}_marks`;
+    const marksKey = (subIndex !== undefined) 
+      ? (targetQuestion?.type?.toLowerCase() === 'descriptive' 
+          ? `${questionId}_desc_${subIndex}_marks` 
+          : `${questionId}_sub_${subIndex}_marks`)
+      : `${questionId}_marks`;
 
     // OPTIMISTIC UPDATE: Update UI immediately for instant feedback
     const previousMarks = currentStudent?.answers?.[marksKey] || 0;
@@ -1531,7 +1542,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               ...revertedSubmissions[studentIndex],
               answers: {
                 ...revertedSubmissions[studentIndex]?.answers,
-                [`${questionId}_marks`]: previousMarks
+                [marksKey]: previousMarks
               }
             };
             setExam({ ...revertedExam, submissions: revertedSubmissions });
@@ -2923,15 +2934,120 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 </div>
                                                               )}
                                                               {part.subType === 'matching' && (
-                                                                <div className="grid grid-cols-2 gap-2">
-                                                                  {Object.entries((part.matches as Record<string, string>) || {}).map(([l, r], mIdx) => {
-                                                                    const studentR = getAns(l);
-                                                                    const isCorrect = studentR === r;
+                                                                <div className="space-y-4">
+                                                                  {/* Column visualization for complex matching */}
+                                                                  {(part.leftColumn || part.rightColumn || part.columnC || part.columnD) && (
+                                                                    <div className="overflow-x-auto rounded-xl border border-amber-200 bg-amber-50/20 p-2">
+                                                                      <table className="w-full text-[10px] border-collapse">
+                                                                        <thead>
+                                                                          <tr>
+                                                                            {part.leftColumn && <th className="p-1.5 text-left text-amber-800 font-black uppercase border-b border-amber-200">Col A</th>}
+                                                                            {part.rightColumn && <th className="p-1.5 text-left text-amber-800 font-black uppercase border-b border-amber-200">Col B</th>}
+                                                                            {part.columnC && <th className="p-1.5 text-left text-amber-800 font-black uppercase border-b border-amber-200">Col C</th>}
+                                                                            {part.columnD && <th className="p-1.5 text-left text-amber-800 font-black uppercase border-b border-amber-200">Col D</th>}
+                                                                          </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                          {Array.from({ length: Math.max(
+                                                                            part.leftColumn?.length || 0,
+                                                                            part.rightColumn?.length || 0,
+                                                                            part.columnC?.length || 0,
+                                                                            part.columnD?.length || 0
+                                                                          ) }).map((_, i) => (
+                                                                            <tr key={i} className="hover:bg-amber-100/30 transition-colors">
+                                                                              {part.leftColumn && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.leftColumn[i]?.id}.</span> {part.leftColumn[i]?.text}</td>}
+                                                                              {part.rightColumn && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.rightColumn[i]?.id}.</span> {part.rightColumn[i]?.text}</td>}
+                                                                              {part.columnC && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.columnC[i]?.id}.</span> {part.columnC[i]?.text}</td>}
+                                                                              {part.columnD && <td className="p-1.5 border-b border-amber-100/50"><span className="text-amber-600 font-bold mr-1">{part.columnD[i]?.id}.</span> {part.columnD[i]?.text}</td>}
+                                                                            </tr>
+                                                                          ))}
+                                                                        </tbody>
+                                                                      </table>
+                                                                    </div>
+                                                                  )}
+                                                                  <div className="space-y-4">
+                                                                    <div className="rounded-xl border border-indigo-100 overflow-hidden shadow-sm bg-white">
+                                                                      <div className="p-2 bg-indigo-50/50 border-b border-indigo-100 text-[9px] font-black text-indigo-600 uppercase tracking-wider">
+                                                                        Detailed Matching Correspondence
+                                                                      </div>
+                                                                      <div className="overflow-x-auto">
+                                                                        <table className="w-full text-[10px] border-collapse">
+                                                                          <thead>
+                                                                            <tr className="bg-slate-50 divide-x divide-slate-100">
+                                                                              <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Reference Item</th>
+                                                                              <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Student Match</th>
+                                                                              <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Master Key</th>
+                                                                            </tr>
+                                                                          </thead>
+                                                                          <tbody className="divide-y divide-slate-100">
+                                                                            {part.leftColumn?.map((l: any, i: number) => {
+                                                                              const studentMatchStr = getAns('match') as string;
+                                                                              
+                                                                              // Robust parsing of student matches like "1-A-I-a, 2-B-II-b"
+                                                                              const getStudentMatchForId = (id: string) => {
+                                                                                const pairs = studentMatchStr?.split(/[,;]/).map(p => p.trim());
+                                                                                const match = pairs?.find(p => p.startsWith(`${id}-`));
+                                                                                return match || null;
+                                                                              };
+
+                                                                              const ans = getStudentMatchForId(l.id);
+                                                                              const correct = part.matches?.[l.id];
+                                                                              const isCorrect = normalize(ans) === normalize(correct);
+                                                                              
+                                                                              const getItemText = (matchStr: string) => {
+                                                                                if (!matchStr) return null;
+                                                                                const parts = matchStr.split('-');
+                                                                                return parts.map((pid, idx) => {
+                                                                                  const colKey = ['leftColumn', 'rightColumn', 'columnC', 'columnD'][idx];
+                                                                                  const item = part[colKey]?.find((r: any) => r.id === pid);
+                                                                                  return item ? (idx > 0 ? ` → ${item.text}` : item.text) : (idx > 0 ? ` → ${pid}` : pid);
+                                                                                }).join('');
+                                                                              };
+
+                                                                              return (
+                                                                                <tr key={i} className={`divide-x divide-slate-100 transition-colors ${isCorrect ? "bg-green-50/30" : "bg-red-50/30"}`}>
+                                                                                  <td className="p-2 font-bold text-slate-700">
+                                                                                    <span className="inline-flex items-center justify-center w-4 h-4 rounded bg-slate-100 text-[9px] mr-1">{l.id}</span>
+                                                                                    <UniversalMathJax inline>{l.text}</UniversalMathJax>
+                                                                                  </td>
+                                                                                  <td className={`p-2 font-black ${isCorrect ? "text-green-600" : "text-red-500"}`}>
+                                                                                    {ans ? <UniversalMathJax inline>{getItemText(ans) || ans}</UniversalMathJax> : <span className="italic opacity-30">No match</span>}
+                                                                                  </td>
+                                                                                  <td className="p-2 text-green-600 font-black">
+                                                                                    {correct ? <UniversalMathJax inline>{getItemText(correct) || correct}</UniversalMathJax> : <span className="opacity-30">—</span>}
+                                                                                  </td>
+                                                                                </tr>
+                                                                              );
+                                                                            })}
+                                                                          </tbody>
+                                                                        </table>
+                                                                      </div>
+                                                                    </div>
+                                                                    {getAns('match') && (
+                                                                      <div className="p-2 bg-amber-50 rounded border border-dashed border-amber-200 text-[9px] text-amber-700 font-mono italic">
+                                                                        Raw Input: {getAns('match')}
+                                                                      </div>
+                                                                    )}
+                                                                  </div>
+                                                                </div>
+                                                              )}
+                                                              {part.subType === 'flowchart' && (
+                                                                <div className="grid grid-cols-2 gap-3">
+                                                                  {(part.items || []).map((item: string, ii: number) => {
+                                                                    const segments = item.split('___');
                                                                     return (
-                                                                      <div key={mIdx} className={`p-2 rounded border flex flex-col gap-0.5 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                                                        <div className="text-[8px] font-black text-gray-400 uppercase">{l}</div>
-                                                                        <div className="text-xs font-bold">{studentR || <span className="opacity-30">Pending</span>}</div>
-                                                                        {!isCorrect && <div className="text-[8px] text-green-600 mt-1 font-black">Ref: {r}</div>}
+                                                                      <div key={ii} className="p-3 bg-amber-50/50 rounded-xl border border-amber-200 flex flex-col gap-2">
+                                                                        <div className="text-[9px] font-black text-amber-600 uppercase">Step {ii + 1}</div>
+                                                                        {segments.map((seg, si) => (
+                                                                          <React.Fragment key={si}>
+                                                                            <div className="text-xs text-gray-500 font-medium italic">{seg}</div>
+                                                                            {si < segments.length - 1 && (
+                                                                              <div className="p-2 bg-white rounded border border-amber-300 text-sm font-black text-amber-800 shadow-sm">
+                                                                                {getAns(`flow_${ii}_${si}`) || '___'}
+                                                                              </div>
+                                                                            )}
+                                                                          </React.Fragment>
+                                                                        ))}
                                                                       </div>
                                                                     );
                                                                   })}
@@ -2998,6 +3114,57 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   </div>
                                                                 </div>
                                                               )}
+
+                                                              {/* Student Image Gallery for Part */}
+                                                              {(() => {
+                                                                const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
+                                                                const singleImage = currentStudent?.answers?.[`${keyBase}_image`];
+                                                                const multipleImages = currentStudent?.answers?.[`${keyBase}_images`] || [];
+                                                                const allImages = singleImage ? [singleImage, ...multipleImages] : multipleImages;
+
+                                                                if (allImages.length === 0) return null;
+
+                                                                return (
+                                                                  <div className="mt-6 pt-4 border-t border-dashed border-amber-200/50">
+                                                                    <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3 flex items-center justify-between">
+                                                                      <span>Answer Sketches / Uploads</span>
+                                                                      <span className="text-amber-600/60 lowercase italic">{allImages.length} images</span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap gap-3">
+                                                                      {allImages.map((img: string, i: number) => {
+                                                                        const annotationKey = `${currentQuestion.id}_${pIdx * 10 + i}`;
+                                                                        const annImg = annotations[annotationKey] || img;
+                                                                        const isAnnotated = !!annotations[annotationKey];
+
+                                                                        return (
+                                                                          <div key={i} className="relative group">
+                                                                            <img
+                                                                              src={annImg}
+                                                                              alt="Student Answer"
+                                                                              className={`w-28 h-28 object-cover rounded-xl border-2 transition-all cursor-pointer hover:ring-4 hover:ring-amber-500/20 ${isAnnotated ? 'border-indigo-400 shadow-md shadow-indigo-100' : 'border-amber-100 shadow-sm'}`}
+                                                                              onClick={() => openAnnotation(img, currentQuestion.id, pIdx * 10 + i, currentStudent.student.id)}
+                                                                            />
+                                                                            <Button
+                                                                              size="icon"
+                                                                              variant="secondary"
+                                                                              className="absolute -top-1 -right-1 w-7 h-7 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity bg-white hover:bg-amber-50"
+                                                                              onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                openAnnotation(img, currentQuestion.id, pIdx * 10 + i, currentStudent.student.id);
+                                                                              }}
+                                                                            >
+                                                                              <PenTool className="w-3.5 h-3.5 text-amber-600" />
+                                                                            </Button>
+                                                                            {isAnnotated && (
+                                                                              <div className="absolute -bottom-1 -left-1 px-1.5 py-0.5 bg-indigo-600 text-white text-[8px] font-black uppercase rounded shadow-sm">Annotated</div>
+                                                                            )}
+                                                                          </div>
+                                                                        );
+                                                                      })}
+                                                                    </div>
+                                                                  </div>
+                                                                );
+                                                              })()}
                                                             </div>
                                                           </div>
                                                         </div>
@@ -3033,18 +3200,66 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 </div>
                                                               )}
                                                               {part.subType === 'matching' && (
-                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500">Correct Pairing Matrix</div>
-                                                                  <div className="grid grid-cols-2 gap-2">
-                                                                    {Object.entries((part.matches as Record<string, string>) || {}).map(([l, r], mIdx) => (
-                                                                      <div key={mIdx} className="bg-emerald-100/50 p-1.5 rounded border border-emerald-200 flex items-center gap-2">
-                                                                        <span className="font-black text-emerald-700">{l}:</span>
-                                                                        <span className="font-bold">{r}</span>
+                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
+                                                                    <ArrowRight className="w-2.5 h-2.5" /> Correct Pairing Matrix
+                                                                  </div>
+                                                                  <div className="grid grid-cols-1 gap-2">
+                                                                    {Object.entries((part.matches as Record<string, any>) || {}).map(([l, r], mIdx) => (
+                                                                      <div key={mIdx} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center justify-between gap-4 group/match">
+                                                                        <div className="flex items-center gap-2">
+                                                                          <span className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[10px] shadow-sm transform group-hover/match:scale-110 transition-transform">{l}</span>
+                                                                          <ArrowRight className="w-3 h-3 text-emerald-400" />
+                                                                          <span className="font-bold text-emerald-900"><UniversalMathJax inline>{Array.isArray(r) ? r.join(' → ') : r}</UniversalMathJax></span>
+                                                                        </div>
                                                                       </div>
                                                                     ))}
                                                                   </div>
                                                                 </div>
                                                               )}
+                                                              
+                                                              {part.subType === 'flowchart' && (
+                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
+                                                                    <ArrowRight className="w-2.5 h-2.5" /> Flowchart Sequence Key
+                                                                  </div>
+                                                                  <div className="grid grid-cols-1 gap-2">
+                                                                    {(part.items || []).map((item: string, ii: number) => {
+                                                                      const modelAnsRaw = part.modelAnswers?.[ii] || part.correctOrder?.[ii] || "";
+                                                                      const modelAns = Array.isArray(modelAnsRaw) ? modelAnsRaw : modelAnsRaw.split('|');
+                                                                      return (
+                                                                        <div key={ii} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center gap-3">
+                                                                           <Badge variant="outline" className="h-4 px-1 text-[8px] border-emerald-300 text-emerald-600">Step {ii+1}</Badge>
+                                                                           <div className="flex flex-wrap gap-2">
+                                                                             {modelAns.map((val: string, vi: number) => (
+                                                                               <span key={vi} className="font-black text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-100 shadow-sm">
+                                                                                 <UniversalMathJax inline>{val || "—"}</UniversalMathJax>
+                                                                               </span>
+                                                                             ))}
+                                                                           </div>
+                                                                        </div>
+                                                                      );
+                                                                    })}
+                                                                  </div>
+                                                                </div>
+                                                              )}
+
+                                                              {part.subType === 'fill_in' && (
+                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
+                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
+                                                                    <ArrowRight className="w-2.5 h-2.5" /> Gap-Fill Master Key
+                                                                  </div>
+                                                                  <div className="grid grid-cols-1 gap-2">
+                                                                    {(part.answers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                                                      <div key={ai} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center gap-3">
+                                                                         <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[9px]">({ai+1})</span>
+                                                                         <span className="font-black text-emerald-800"><UniversalMathJax inline>{ans}</UniversalMathJax></span>
+                                                                      </div>
+                                                                    ))}
+                                                                  </div>
+                                                                </div>
+                                                              )}
+
                                                             </div>
                                                           </div>
                                                         </div>

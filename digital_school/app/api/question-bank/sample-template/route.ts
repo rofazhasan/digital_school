@@ -26,15 +26,18 @@ export async function GET() {
             ["Step 5", "Save and upload this file back to the system."],
             [""],
             ["FIELD GUIDE BY TYPE:", ""],
-            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C'). Use 'Teacher Note / Explanation' for general notes."],
+            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
             ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
             ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
-            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
-            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields, and 'Sub-Question Explanation' for each part."],
-            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-5 including 'Option A-D' and 'Correct Option' for each part."],
+            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B'). For 3+ columns, use 'Sub X Column C/D' in DESCRIPTIVE mode."],
+            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields 1-10."],
+            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-10 including 'Option A-D' and 'Correct Option'."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'."],
-            ["DESCRIPTIVE", "Flexible format. Use 'Sub 1 Text', 'Sub 1 Type', etc. Use 'Sub 1 Explanation' for per-part notes."],
-            ["Sub-Type Delimiters:", "Use '|' to separate items. For matching/mtf, use '|' for columns and '-' for mapping (e.g. 1-A). For labels: 'Text:x:y|Text:x:y'."],
+            ["DESCRIPTIVE", "Flexible format. Use 'Sub X Type' (writing, fill_in, matching, rearranging, flowchart, comprehension, label_diagram, etc.)."],
+            ["  - Flowchart", "Use 'Sub X Items' for nodes (pipe separated '|') and 'Sub X Correct Order' for sequence."],
+            ["  - Fill-in", "Use 'Sub X Clue Type' (word_box, in_text, none) and 'Sub X Word Box' (pipe separated). Use 'Sub X Passage' with '___' for gaps."],
+            ["  - Matching", "Use 'Sub X Column C' and 'Sub X Column D' for extra columns. Mapping still in 'Matches' (e.g. 1-A-I-X)."],
+            ["Sub-Type Delimiters:", "Use '|' to separate items. For labels: 'Text:x:y|Text:x:y'."],
             [""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
             ["Marks", "Number only."]
@@ -97,62 +100,42 @@ export async function GET() {
             { header: "Matches", key: "matches", width: 15 },
             { header: "Teacher Note / Explanation", key: "explanation", width: 30 },
             { header: "Model Answer", key: "modelAnswer", width: 20 },
-            { header: "Sub-Question 1 Text", key: "sq1Text", width: 25 },
-            { header: "Sub-Question 1 Marks", key: "sq1Marks", width: 12 },
-            { header: "Sub-Question 1 Option A", key: "sq1A", width: 15 },
-            { header: "Sub-Question 1 Option B", key: "sq1B", width: 15 },
-            { header: "Sub-Question 1 Option C", key: "sq1C", width: 15 },
-            { header: "Sub-Question 1 Option D", key: "sq1D", width: 15 },
-            { header: "Sub-Question 1 Correct Option", key: "sq1Correct", width: 15 },
-            { header: "Sub-Question 1 Model Answer", key: "sq1ModelAnswer", width: 25 },
-            { header: "Sub-Question 1 Explanation", key: "sq1Explanation", width: 25 },
-
-            { header: "Sub-Question 2 Text", key: "sq2Text", width: 25 },
-            { header: "Sub-Question 2 Marks", key: "sq2Marks", width: 12 },
-            { header: "Sub-Question 2 Option A", key: "sq2A", width: 15 },
-            { header: "Sub-Question 2 Option B", key: "sq2B", width: 15 },
-            { header: "Sub-Question 2 Option C", key: "sq2C", width: 15 },
-            { header: "Sub-Question 2 Option D", key: "sq2D", width: 15 },
-            { header: "Sub-Question 2 Correct Option", key: "sq2Correct", width: 15 },
-            { header: "Sub-Question 2 Model Answer", key: "sq2ModelAnswer", width: 25 },
-            { header: "Sub-Question 2 Explanation", key: "sq2Explanation", width: 25 },
-
-            { header: "Sub-Question 3 Text", key: "sq3Text", width: 25 },
-            { header: "Sub-Question 3 Marks", key: "sq3Marks", width: 12 },
-            { header: "Sub-Question 3 Option A", key: "sq3A", width: 15 },
-            { header: "Sub-Question 3 Option B", key: "sq3B", width: 15 },
-            { header: "Sub-Question 3 Option C", key: "sq3C", width: 15 },
-            { header: "Sub-Question 3 Option D", key: "sq3D", width: 15 },
-            { header: "Sub-Question 3 Correct Option", key: "sq3Correct", width: 15 },
-            { header: "Sub-Question 3 Model Answer", key: "sq3ModelAnswer", width: 25 },
-            { header: "Sub-Question 3 Explanation", key: "sq3Explanation", width: 25 },
-
-            { header: "Sub-Question 4 Text", key: "sq4Text", width: 25 },
-            { header: "Sub-Question 4 Marks", key: "sq4Marks", width: 12 },
-            { header: "Sub-Question 4 Option A", key: "sq4A", width: 15 },
-            { header: "Sub-Question 4 Option B", key: "sq4B", width: 15 },
-            { header: "Sub-Question 4 Option C", key: "sq4C", width: 15 },
-            { header: "Sub-Question 4 Option D", key: "sq4D", width: 15 },
-            { header: "Sub-Question 4 Correct Option", key: "sq4Correct", width: 15 },
-            { header: "Sub-Question 4 Model Answer", key: "sq4ModelAnswer", width: 25 },
-            { header: "Sub-Question 4 Explanation", key: "sq4Explanation", width: 25 },
-
-            { header: "Sub-Question 5 Text", key: "sq5Text", width: 25 },
-            { header: "Sub-Question 5 Marks", key: "sq5Marks", width: 12 },
-            { header: "Sub-Question 5 Option A", key: "sq5A", width: 15 },
-            { header: "Sub-Question 5 Option B", key: "sq5B", width: 15 },
-            { header: "Sub-Question 5 Option C", key: "sq5C", width: 15 },
-            { header: "Sub-Question 5 Option D", key: "sq5D", width: 15 },
-            { header: "Sub-Question 5 Correct Option", key: "sq5Correct", width: 15 },
-            { header: "Sub-Question 5 Model Answer", key: "sq5ModelAnswer", width: 25 },
-            { header: "Sub-Question 5 Explanation", key: "sq5Explanation", width: 25 },
-            // Descriptive Dynamic Sub-fields (Prefixes used in loop below)
-            { header: "Sub 1 Explanation", key: "s1Explanation", width: 20 },
-            { header: "Sub 2 Explanation", key: "s2Explanation", width: 20 },
-            { header: "Sub 3 Explanation", key: "s3Explanation", width: 20 },
-            { header: "Sub 4 Explanation", key: "s4Explanation", width: 20 },
         ];
+
+        // ADD SUB-QUESTION COLUMNS (1-10)
+        for (let i = 1; i <= 10; i++) {
+            const prefix = `Sub ${i}`;
+            const keyPrefix = `s${i}`;
+            columns.push(
+                { header: `${prefix} Text`, key: `${keyPrefix}Text`, width: 25 },
+                { header: `${prefix} Type`, key: `${keyPrefix}Type`, width: 15 },
+                { header: `${prefix} Marks`, key: `${keyPrefix}Marks`, width: 10 },
+                { header: `${prefix} Label`, key: `${keyPrefix}Label`, width: 15 },
+                { header: `${prefix} Instructions`, key: `${keyPrefix}Instructions`, width: 25 },
+                { header: `${prefix} Model Answer`, key: `${keyPrefix}ModelAnswer`, width: 25 },
+                { header: `${prefix} Explanation`, key: `${keyPrefix}Explanation`, width: 25 },
+                // Special fields for sub-types
+                { header: `${prefix} Clue Type`, key: `${keyPrefix}ClueType`, width: 12 },
+                { header: `${prefix} Word Box`, key: `${keyPrefix}WordBox`, width: 20 },
+                { header: `${prefix} Passage`, key: `${keyPrefix}Passage`, width: 30 },
+                { header: `${prefix} Column C`, key: `${keyPrefix}ColC`, width: 15 },
+                { header: `${prefix} Column D`, key: `${keyPrefix}ColD`, width: 15 },
+                { header: `${prefix} Items`, key: `${keyPrefix}Items`, width: 20 },
+                { header: `${prefix} Correct Order`, key: `${keyPrefix}Order`, width: 20 },
+                { header: `${prefix} Stem Passage`, key: `${keyPrefix}Stem`, width: 30 },
+                { header: `${prefix} Questions`, key: `${keyPrefix}Questions`, width: 25 },
+                { header: `${prefix} Answers`, key: `${keyPrefix}Answers`, width: 25 },
+                { header: `${prefix} Image URL`, key: `${keyPrefix}Img`, width: 20 },
+                // MCQ specific in SMCQ/CQ
+                { header: `${prefix} Option A`, key: `${keyPrefix}A`, width: 15 },
+                { header: `${prefix} Option B`, key: `${keyPrefix}B`, width: 15 },
+                { header: `${prefix} Option C`, key: `${keyPrefix}C`, width: 15 },
+                { header: `${prefix} Option D`, key: `${keyPrefix}D`, width: 15 },
+                { header: `${prefix} Correct Option`, key: `${keyPrefix}Correct`, width: 15 }
+            );
+        }
         templateSheet.columns = columns;
+
 
         // Header Styling
         const headerRow = templateSheet.getRow(1);

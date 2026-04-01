@@ -25,10 +25,37 @@ interface CQ {
         questionText?: string;
         question?: string;
         text?: string;
-        answer?: string;
+        answer?: string; 
         modelAnswer?: string;
         image?: string;
+        // Advanced Descriptive Fields
+        subType?: string;
+        studentAnswer?: any;
+        studentImages?: string[];
+        items?: any[];
+        clues?: string[];
+        leftColumn?: any[];
+        rightColumn?: any[];
+        matches?: Record<string, string>;
+        statements?: string[];
+        labels?: any[];
     }[];
+}
+interface SQ {
+    id?: string;
+    questionText: string;
+    marks?: number;
+    modelAnswer?: string;
+    answer?: string;
+    // Advanced Descriptive Fields
+    subType?: string;
+    studentAnswer?: any;
+    studentImages?: string[];
+    items?: any[];
+    clues?: string[];
+    leftColumn?: any[];
+    rightColumn?: any[];
+    matches?: Record<string, string>;
 }
 
 interface AR {
@@ -58,13 +85,6 @@ interface INT {
     answer: number | string;
     correctAnswer?: number | string;
     modelAnswer?: number | string;
-}
-interface SQ {
-    id?: string;
-    questionText: string;
-    marks?: number;
-    modelAnswer?: string;
-    answer?: string;
 }
 
 interface StudentSubmission {
@@ -264,6 +284,244 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         };
         const formatMark = (m: number) => {
             return Number(m).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1');
+        };
+
+        // Helper to render advanced descriptive sub-questions for Print
+        const renderDescriptiveSubQuestionPrint = (subQ: any) => {
+            const subType = subQ.subType || 'writing';
+            const studentAnswer = subQ.studentAnswer;
+            const normalize = (s: any) => String(s || '').trim().toLowerCase();
+
+            const getVal = (key: string) => (typeof studentAnswer === 'object' && studentAnswer !== null) ? studentAnswer[key] : null;
+
+            switch (subType) {
+                case 'flowchart':
+                    return (
+                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
+                            {(subQ.items || []).map((item: string, ii: number) => (
+                                <div key={ii} className="p-1 border border-slate-200 rounded">
+                                    <div className="font-bold text-slate-400 mb-1">Step {ii + 1}</div>
+                                    <div className="flex flex-col gap-1">
+                                        {item.split('___').map((seg, si, arr) => {
+                                            const val = getVal(`flow_${ii}_${si}`) || (typeof studentAnswer === 'string' ? null : studentAnswer?.[`flow_${ii}_${si}`]);
+                                            return (
+                                                <div key={si}>
+                                                    <div className="italic text-slate-500"><Text>{seg}</Text></div>
+                                                    {si < arr.length - 1 && (
+                                                        <div className="mt-0.5 p-1 border border-indigo-200 rounded font-bold bg-slate-50">
+                                                            {val || <span className="text-slate-300">Missing</span>}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    );
+
+                case 'fill_in':
+                    return (
+                        <div className="mt-2 p-2 border border-slate-200 rounded bg-slate-50 text-xs text-left">
+                            {(subQ.wordBox || subQ.clues) && (subQ.wordBox?.length > 0 || subQ.clues?.length > 0) && (
+                                <div className="mb-2 flex flex-wrap gap-1">
+                                    <span className="font-bold text-slate-400 mr-1 uppercase text-[8px]">Available Clues:</span>
+                                    {(subQ.wordBox || subQ.clues || []).map((c: string, ci: number) => <span key={ci} className="px-1 border rounded bg-white">{c}</span>)}
+                                </div>
+                            )}
+                            <div className="leading-relaxed">
+                                {(subQ.passage || subQ.questionText || "").split('___').map((part: string, pi: number, arr: any[]) => {
+                                    const val = getVal(pi.toString()) || (typeof studentAnswer === 'string' ? null : studentAnswer?.[pi]);
+                                    return (
+                                        <span key={pi}>
+                                            <Text>{part}</Text>
+                                            {pi < arr.length - 1 && (
+                                                <span className="mx-1 px-1 border-b border-indigo-400 font-bold text-indigo-600 bg-indigo-50">
+                                                    {val || '___'}
+                                                </span>
+                                            )}
+                                        </span>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+
+                case 'matching':
+                    const cols = [
+                        { label: 'Col A', data: subQ.leftColumn },
+                        { label: 'Col B', data: subQ.rightColumn },
+                        { label: 'Col C', data: subQ.columnC },
+                        { label: 'Col D', data: subQ.columnD }
+                    ].filter(c => c.data && c.data.length > 0);
+
+                    return (
+                        <div className="mt-2 border border-slate-200 rounded overflow-hidden">
+                            <table className="w-full text-[8px] border-collapse">
+                                <thead className="bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                        {cols.map((c, ci) => <th key={ci} className="p-1 text-left border-r border-slate-200">{c.label}</th>)}
+                                        <th className="p-1 text-left bg-indigo-50/30">Student Match</th>
+                                        <th className="p-1 text-left bg-green-50/30">Correct Key</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {subQ.leftColumn?.map((l: any, i: number) => {
+                                        const studentMatchStr = typeof studentAnswer === 'string' ? studentAnswer : (studentAnswer?.match || '');
+                                        const pairs = studentMatchStr?.split(/[,;]/).map((p: string) => p.trim());
+                                        const ansIdStr = pairs?.find((p: string) => p.startsWith(`${l.id}-`));
+                                        
+                                        const correctIdStr = subQ.matches?.[l.id];
+                                        const isCorrect = normalize(ansIdStr) === normalize(correctIdStr);
+                                        
+                                        const getItemText = (matchStr: string) => {
+                                            if (!matchStr) return null;
+                                            const parts = matchStr.split('-');
+                                            return parts.map((pid, idx) => {
+                                                const colKey = ['leftColumn', 'rightColumn', 'columnC', 'columnD'][idx];
+                                                const item = subQ[colKey]?.find((r: any) => r.id === pid);
+                                                return item ? (idx > 0 ? `→${pid}` : pid) : pid;
+                                            }).join('');
+                                        };
+
+                                        return (
+                                            <tr key={i} className={`border-b border-slate-100 ${isCorrect ? 'bg-green-50/10' : 'bg-red-50/10'}`}>
+                                                {cols.map((c, ci) => (
+                                                    <td key={ci} className="p-1 border-r border-slate-200">
+                                                        <span className="font-bold text-slate-400 mr-1">{c.data[i]?.id}.</span>
+                                                        <Text>{c.data[i]?.text || '-'}</Text>
+                                                    </td>
+                                                ))}
+                                                <td className={`p-1 border-r border-slate-200 font-black ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                                    {ansIdStr ? getItemText(ansIdStr) : 'None'}
+                                                </td>
+                                                <td className="p-1 text-green-700 font-black">
+                                                    {correctIdStr ? getItemText(correctIdStr) : '-'}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                            {typeof studentAnswer === 'string' && (
+                                <div className="p-1 bg-slate-50 text-[7px] text-slate-400 font-mono italic border-t border-slate-100">
+                                    Raw: {studentAnswer}
+                                </div>
+                            )}
+                        </div>
+                    );
+
+                case 'table':
+                    return (
+                        <div className="mt-2 border border-slate-200 rounded overflow-hidden">
+                            <table className="w-full text-[8px] border-collapse bg-white">
+                                <thead className="bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                        {(subQ.tableHeaders || []).map((h: string, hi: number) => (
+                                            <th key={hi} className="p-1 text-left border-r border-slate-200"><Text>{h}</Text></th>
+                                        ))}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(subQ.tableRows || []).map((row: string[], ri: number) => (
+                                        <tr key={ri} className="border-b border-slate-100">
+                                            {(subQ.tableHeaders || []).map((_: string, ci: number) => {
+                                                const isBlank = !row[ci] || row[ci] === '___';
+                                                const val = getVal(`${ri}_${ci}`);
+                                                return (
+                                                    <td key={ci} className="p-1 border-r border-slate-200">
+                                                        {isBlank ? (
+                                                            <span className="font-bold text-indigo-700 bg-indigo-50/50 px-1 py-0.5 rounded border border-indigo-100">{val || '___'}</span>
+                                                        ) : (
+                                                            <span className="text-slate-600"><Text>{row[ci]}</Text></span>
+                                                        )}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    );
+
+                case 'rearranging':
+                    const orderAns = getVal('order');
+                    return (
+                        <div className="mt-2 p-2 border border-slate-200 rounded bg-slate-50 text-[10px] text-left">
+                            <div className="font-bold text-slate-500 mb-1">Student Sequence:</div>
+                            <div className="font-black text-indigo-700 bg-white p-1 border border-indigo-100 rounded inline-block uppercase tracking-widest">{orderAns || 'None Provided'}</div>
+                            {subQ.correctOrder && (
+                                <div className="mt-2 font-bold text-slate-500">Correct Sequence: <span className="text-green-600 ml-1">{subQ.correctOrder.join(', ')}</span></div>
+                            )}
+                        </div>
+                    );
+
+                case 'true_false':
+                    return (
+                        <div className="mt-2 space-y-1">
+                            {(subQ.statements || []).map((stmt: string, sIdx: number) => {
+                                const ans = getVal(sIdx.toString());
+                                const correctAns = subQ.correctAnswers?.[sIdx] ? "True" : "False";
+                                const isCorrectStr = normalize(ans) === normalize(correctAns);
+                                return (
+                                    <div key={sIdx} className="flex justify-between items-center p-1 border border-slate-200 rounded bg-white text-[9px] text-left">
+                                        <div className="flex gap-1 flex-1 pr-2">
+                                            <span className="font-bold text-slate-400">{sIdx + 1}.</span>
+                                            <span className="text-slate-700 leading-snug"><Text>{stmt}</Text></span>
+                                        </div>
+                                        <div className={`px-1.5 py-0.5 rounded font-black uppercase text-[8px] ${isCorrectStr ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'} border`}>
+                                            {ans || 'Missing'}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    );
+
+                case 'label_diagram':
+                    return (
+                        <div className="mt-2 p-2 border border-slate-200 rounded bg-white flex flex-col items-center">
+                            {subQ.imageUrl && (
+                                <div className="relative border border-slate-200 p-1 mb-2 bg-slate-50 rounded">
+                                    <img src={subQ.imageUrl} alt="Diagram" className="max-w-full max-h-32 object-contain mx-auto" style={{ height: '120px' }} />
+                                    <div className="absolute inset-0 pointer-events-none">
+                                        {(subQ.labels || []).map((l: any, i: number) => (
+                                            <div key={i} className="absolute w-3 h-3 bg-red-500 text-white rounded-full flex items-center justify-center text-[6px] font-black border border-white" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                {i + 1}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-1 w-full text-[8px] text-left">
+                                {(subQ.labels || []).map((l: any, i: number) => {
+                                    const ans = getVal(i.toString());
+                                    const isCorrectStr = normalize(ans) === normalize(l.text);
+                                    return (
+                                        <div key={i} className="flex items-center gap-1 p-1 bg-slate-50 rounded border border-slate-200">
+                                            <span className="shrink-0 w-3 h-3 bg-slate-200 rounded-full flex items-center justify-center font-bold text-[6px] text-slate-500">{i + 1}</span>
+                                            <span className={`font-bold ${isCorrectStr ? 'text-green-700' : 'text-red-700'}`}>{ans || '___'}</span>
+                                            {(!isCorrectStr && l.text) && <span className="text-slate-400"> (Key: {l.text})</span>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+
+                default:
+                    if (studentAnswer && typeof studentAnswer === 'string') {
+                        return (
+                            <div className="mt-2 p-2 border border-slate-200 rounded bg-white text-xs">
+                                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Student Response:</div>
+                                <div className="whitespace-pre-wrap">{studentAnswer}</div>
+                            </div>
+                        );
+                    }
+                    return null;
+            }
         };
 
         const MarkDisplay = ({ earned, total }: { earned: number, total: number }) => {
@@ -810,10 +1068,24 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                 <span className="font-bold mr-1">{BENGALI_SUB_LABELS[sidx]}.</span>
                                                                 <div className="inline-block"><Text>{sub.questionText || sub.question || sub.text}</Text></div>
                                                             </div>
+                                                            {/* Student Response Rendering */}
+                                                            {renderDescriptiveSubQuestionPrint(sub)}
+
+                                                            {/* Visual Evidence (Student Uploads) */}
+                                                            {sub.studentImages && sub.studentImages.length > 0 && (
+                                                                <div className="ml-6 mt-2 grid grid-cols-3 gap-2">
+                                                                    {sub.studentImages.map((img: string, ii: number) => (
+                                                                        <div key={ii} className="relative aspect-video border rounded overflow-hidden">
+                                                                            <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                                                                            <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[6px] px-1">Img {ii+1}</div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
 
                                                             {/* Model Answer for CQ Sub-question */}
                                                             {(sub.modelAnswer || sub.answer) && (
-                                                                <div className="ml-6 p-1.5 bg-green-50 border border-green-100 rounded text-xs">
+                                                                <div className="ml-6 mt-2 p-1.5 bg-green-50 border border-green-100 rounded text-xs">
                                                                     <span className="text-green-700 font-bold mr-1">Model Answer:</span>
                                                                     <div className="inline-block text-gray-800"><Text>{sub.modelAnswer || sub.answer}</Text></div>
                                                                 </div>
@@ -857,12 +1129,28 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 </div>
                                             </div>
 
-                                            {answer && (
+                                            {(answer || q.studentAnswer) && (
                                                 <div className="ml-6 p-2 bg-white rounded border border-gray-200 text-sm">
                                                     <div className="text-xs text-gray-500 mb-1">Student Answer:</div>
-                                                    <div className="font-medium text-blue-800">
-                                                        <div className="inline-block"><Text>{String(answer)}</Text></div>
-                                                    </div>
+                                                    {q.subType ? (
+                                                        renderDescriptiveSubQuestionPrint(q)
+                                                    ) : (
+                                                        <div className="font-medium text-blue-800">
+                                                            <div className="inline-block"><Text>{String(answer || q.studentAnswer)}</Text></div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                            {/* Visual Evidence for SQ */}
+                                            {q.studentImages && q.studentImages.length > 0 && (
+                                                <div className="ml-6 mt-2 grid grid-cols-3 gap-2">
+                                                    {q.studentImages.map((img: string, ii: number) => (
+                                                        <div key={ii} className="relative aspect-video border rounded overflow-hidden">
+                                                            <img src={img} alt="Evidence" className="w-full h-full object-cover" />
+                                                            <div className="absolute bottom-0 right-0 bg-black/50 text-white text-[6px] px-1">Img {ii+1}</div>
+                                                        </div>
+                                                    ))}
                                                 </div>
                                             )}
 

@@ -204,17 +204,43 @@ export async function GET(
       if (rawSubQuestions.length > 0) {
         processedSubQuestions = rawSubQuestions.map((subQ: any, subIdx: number) => {
           const subId = `${questionId}_sub_${subIdx}`;
-          const subAns = (studentAnswers as any)[subId];
+          const descPrefix = `${questionId}_desc_${subIdx}_`;
+          
+          let subAns = (studentAnswers as any)[subId];
+          
+          // Check for advanced descriptive keys (aggregated object)
+          const studentAnsKeys = Object.keys(studentAnswers);
+          const descKeys = studentAnsKeys.filter(k => k.startsWith(descPrefix));
+          
+          if (descKeys.length > 0) {
+            const aggregated: Record<string, any> = {};
+            descKeys.forEach(k => {
+              const field = k.replace(descPrefix, '');
+              aggregated[field] = (studentAnswers as any)[k];
+            });
+            subAns = aggregated;
+          }
 
           // MAP SUB-QUESTION IMAGES
           const subImages: string[] = [];
-          if ((studentAnswers as any)[`${subId}_image`]) subImages.push((studentAnswers as any)[`${subId}_image`]);
-          if (Array.isArray((studentAnswers as any)[`${subId}_images`])) subImages.push(...(studentAnswers as any)[`${subId}_images`]);
+          if ((studentAnswers as any)[`${subId}_image` || `${descPrefix}image` || `${subId}_images` || `${descPrefix}images` ]) {
+             // For advanced ones, we prefer images linked to the descriptive ID but fallback
+          }
+          
+          // Original mapping logic remains similar but more inclusive
+          if ((studentAnswers as any)[`${subId}_image` ]) subImages.push((studentAnswers as any)[`${subId}_image` ]);
+          if ((studentAnswers as any)[`${descPrefix}image` ]) subImages.push((studentAnswers as any)[`${descPrefix}image` ]);
+          if (Array.isArray((studentAnswers as any)[`${subId}_images` ])) subImages.push(...(studentAnswers as any)[`${subId}_images` ]);
+          if (Array.isArray((studentAnswers as any)[`${descPrefix}images` ])) subImages.push(...(studentAnswers as any)[`${descPrefix}images` ]);
+
+          // Ensure unique images
+          const uniqueSubImages = Array.from(new Set(subImages));
 
           // MAP SUB-QUESTION DRAWINGS (Match by original path for accuracy)
           const subDrawingsForPart = allDrawings.filter(d =>
-            subImages.includes(d.originalImagePath) || d.imageIndex === subIdx
+            uniqueSubImages.includes(d.originalImagePath) || d.imageIndex === subIdx
           );
+
 
           // Try pre-calculated marks
           let subAwarded = (studentAnswers as any)[`${subId}_marks`];

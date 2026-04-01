@@ -30,6 +30,7 @@ import {
   User,
   GraduationCap,
   ArrowLeft,
+  ArrowRight,
   FileText,
   CheckSquare,
   MessageSquare,
@@ -132,6 +133,20 @@ interface SubQuestion {
   studentImages: string[];
   options?: { text: string; isCorrect: boolean; originalIndex?: number }[];
   correctAnswer?: string | number;
+  // Advanced Descriptive Fields
+  subType?: string;
+  items?: any[];
+  statements?: string[];
+  labels?: any[];
+  correctLabels?: string[];
+  clues?: string[];
+  clueType?: string;
+  leftColumn?: any[];
+  rightColumn?: any[];
+  matches?: Record<string, string>;
+  flowchartConfig?: any;
+  answer?: string;
+  modelAnswer?: string;
 }
 
 interface Question {
@@ -239,6 +254,260 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
+
+  // Helper to render advanced descriptive sub-questions
+  const renderDescriptiveSubQuestion = (subQ: any, subIdx: number, questionId: string) => {
+    const subType = subQ.subType || 'writing';
+    const studentAnswer = subQ.studentAnswer;
+
+    const normalize = (s: any) => String(s || '').trim().toLowerCase();
+
+    // Helper for matching answers (stored as string or object)
+    const getMatchAns = (leftId: string) => {
+      if (typeof studentAnswer === 'object' && studentAnswer !== null) {
+        return studentAnswer[leftId];
+      }
+      return null;
+    };
+
+    // Helper for flowchart/gapfill (stored as object mapping keys to strings)
+    const getVal = (key: string) => {
+      if (typeof studentAnswer === 'object' && studentAnswer !== null) {
+        return studentAnswer[key];
+      }
+      return null;
+    };
+
+    switch (subType) {
+      case 'flowchart':
+        return (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(subQ.items || []).map((item: string, ii: number) => {
+              const segments = item.split('___');
+              const modelAnswers = (subQ.modelAnswers?.[ii] || '').split('|');
+              return (
+                <div key={ii} className="p-3 bg-amber-50/10 dark:bg-amber-900/5 rounded-xl border border-amber-200/30 flex flex-col gap-2">
+                  <div className="text-[9px] font-black text-amber-600 uppercase flex items-center justify-between">
+                    <span>Step {ii + 1}</span>
+                    {subQ.style && <Badge variant="outline" className="text-[8px] h-3 px-1 border-amber-200 text-amber-500 uppercase">{subQ.style}</Badge>}
+                  </div>
+                  {segments.map((seg, si) => (
+                    <div key={si} className="flex flex-col gap-1">
+                      <div className="text-xs text-muted-foreground font-medium italic">
+                        <UniversalMathJax inline dynamic>{cleanupMath(seg)}</UniversalMathJax>
+                      </div>
+                      {si < segments.length - 1 && (
+                        <div className="space-y-1">
+                          <div className={cn(
+                            "p-2 rounded border text-sm font-bold shadow-sm",
+                            normalize(getVal(`flow_${ii}_${si}`)) === normalize(modelAnswers[si]) 
+                              ? "bg-green-50 dark:bg-green-950/20 border-green-200 text-green-700" 
+                              : "bg-white dark:bg-slate-950 border-amber-200"
+                          )}>
+                            {getVal(`flow_${ii}_${si}`) || <span className="text-muted-foreground italic opacity-30">Missing</span>}
+                          </div>
+                          {normalize(getVal(`flow_${ii}_${si}`)) !== normalize(modelAnswers[si]) && modelAnswers[si] && (
+                            <div className="text-[10px] text-green-600 font-bold px-1 flex items-center gap-1">
+                              <ArrowRight className="w-2.5 h-2.5" /> Key: {modelAnswers[si]}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case 'fill_in':
+        return (
+          <div className="mt-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+            {(subQ.wordBox || subQ.clues) && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                <div className="text-[10px] font-black text-slate-400 uppercase w-full mb-1">
+                  {subQ.clueType === 'box' ? 'Word Box:' : 'Clues:'}
+                </div>
+                {(subQ.wordBox || subQ.clues || []).map((clue: string, ci: number) => (
+                  <Badge key={ci} variant="outline" className="bg-white dark:bg-slate-950 font-bold border-indigo-100">{clue}</Badge>
+                ))}
+              </div>
+            )}
+            <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+              {(subQ.passage || subQ.questionText || '').split('___').map((part: string, pi: number, arr: any[]) => {
+                const ans = getVal(pi.toString());
+                const correct = subQ.answers?.[pi];
+                const isCorrect = normalize(ans) === normalize(correct);
+                return (
+                  <span key={pi}>
+                    <UniversalMathJax inline dynamic>{cleanupMath(part)}</UniversalMathJax>
+                    {pi < arr.length - 1 && (
+                      <span className="relative group inline-block mx-1">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded border-b-2 font-bold transition-all",
+                          ans ? (isCorrect ? "border-green-400 bg-green-50 text-green-700" : "border-red-400 bg-red-50 text-red-700") : "border-indigo-400 bg-indigo-50 text-indigo-600"
+                        )}>
+                          {ans || '___'}
+                        </span>
+                        {!isCorrect && correct && (
+                          <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-10 shadow-sm">
+                            Key: {correct}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'matching':
+        const columns = [
+          { key: 'leftColumn', title: 'Col A', idPrefix: '' },
+          { key: 'rightColumn', title: 'Col B', idPrefix: '' },
+          { key: 'columnC', title: 'Col C', idPrefix: '' },
+          { key: 'columnD', title: 'Col D', idPrefix: '' }
+        ].filter(c => subQ[c.key] && subQ[c.key].length > 0);
+
+        return (
+          <div className="mt-3 space-y-4">
+            <div className={`grid grid-cols-2 md:grid-cols-${Math.min(4, columns.length)} gap-3`}>
+              {columns.map(col => (
+                <div key={col.key} className="space-y-2">
+                  <div className="text-[10px] font-black text-muted-foreground uppercase opacity-60 px-1">{col.title}</div>
+                  <div className="space-y-1.5">
+                    {(subQ[col.key] || []).map((item: any, i: number) => (
+                      <div key={i} className="p-2 text-[11px] bg-card/50 border border-border/50 rounded-lg flex items-start gap-2 shadow-sm">
+                        <Badge variant="secondary" className="h-4 min-w-[16px] rounded bg-muted text-[9px] p-0 flex items-center justify-center font-black">{item.id}</Badge>
+                        <div className="flex-1 leading-tight"><UniversalMathJax inline dynamic>{cleanupMath(item.text)}</UniversalMathJax></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/30 overflow-hidden shadow-md bg-white dark:bg-slate-950">
+              <div className="p-2 bg-indigo-50/50 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-900/30 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                Matching Correspondence Details
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-900 divide-x divide-slate-100 dark:divide-slate-800">
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Reference Item</th>
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Your Response</th>
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Correct Answer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {/* If matches is a Record<string, string>, we map over left elements */}
+                    {subQ.leftColumn?.map((l: any, i: number) => {
+                      const ans = getMatchAns(l.id);
+                      const correct = subQ.matches?.[l.id];
+                      const isCorrect = normalize(ans) === normalize(correct);
+                      
+                      const getItemText = (id: string) => {
+                        if (!id) return null;
+                        const parts = id.split('-');
+                        return parts.map((pid, idx) => {
+                          const colKey = ['leftColumn', 'rightColumn', 'columnC', 'columnD'][idx];
+                          const item = subQ[colKey]?.find((r: any) => r.id === pid);
+                          return item ? (idx > 0 ? ` → ${item.text}` : item.text) : (idx > 0 ? ` → ${pid}` : pid);
+                        }).join('');
+                      };
+
+                      return (
+                        <tr key={i} className={cn("divide-x divide-slate-100 dark:divide-slate-800 transition-colors", isCorrect ? "bg-green-50/20 hover:bg-green-50/40" : "bg-red-50/20 hover:bg-red-50/40")}>
+                          <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300">
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] mr-2">{l.id}</span>
+                            <UniversalMathJax inline>{cleanupMath(l.text)}</UniversalMathJax>
+                          </td>
+                          <td className={cn("p-2.5 font-black", isCorrect ? "text-green-600" : "text-red-500")}>
+                            {ans ? <UniversalMathJax inline>{cleanupMath(getItemText(ans) || ans)}</UniversalMathJax> : <span className="italic opacity-30">No match</span>}
+                          </td>
+                          <td className="p-2.5 text-green-600 font-black">
+                            {correct ? <UniversalMathJax inline>{cleanupMath(getItemText(correct) || correct)}</UniversalMathJax> : <span className="opacity-30">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'true_false':
+        return (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(subQ.statements || []).map((stmt: string, i: number) => {
+              const ans = getVal(i.toString());
+              const correct = subQ.correctAnswers?.[i];
+              const isCorrect = normalize(ans) === normalize(correct);
+              return (
+                <div key={i} className={cn("p-2 rounded border flex flex-col gap-1", isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
+                  <div className="text-[10px] uppercase font-bold opacity-50">Statement {i+1}</div>
+                  <div className="text-xs font-medium"><UniversalMathJax inline>{cleanupMath(stmt)}</UniversalMathJax></div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant={isCorrect ? "default" : "destructive"} className="text-[9px] h-4 px-1.5">{ans || 'Empty'}</Badge>
+                    {!isCorrect && <span className="text-[9px] font-black text-green-600">Key: {correct}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case 'label_diagram':
+        return (
+          <div className="mt-3 space-y-4">
+            {subQ.imageUrl && (
+              <div className="relative inline-block border rounded-xl overflow-hidden shadow-sm max-w-full">
+                <img src={subQ.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
+                {(subQ.labels || []).map((l: any, i: number) => (
+                  <div key={i} className="absolute w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(subQ.labels || []).map((_: any, i: number) => {
+                const ans = getVal(i.toString());
+                const correct = subQ.correctLabels?.[i];
+                const isCorrect = normalize(ans) === normalize(correct);
+                return (
+                  <div key={i} className={cn("p-2 rounded border flex flex-col", isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
+                    <div className="text-[9px] font-bold opacity-50">Label {i+1}</div>
+                    <div className="text-xs font-bold">{ans || '___'}</div>
+                    {!isCorrect && <div className="text-[8px] text-green-600 font-bold">Key: {correct}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      default:
+        // Standard Writing/Comprehension/Rearranging
+        if (studentAnswer && typeof studentAnswer === 'string') {
+          return (
+            <div className="mt-2 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm text-sm">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
+              </div>
+              <div className="text-foreground whitespace-pre-wrap">{studentAnswer}</div>
+            </div>
+          );
+        }
+        return null;
+    }
+  };
 
   // Print Handler
   // No lint error here anymore
@@ -2296,16 +2565,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
                                             </div>
 
-                                            {/* Sub-question Text Answer */}
-                                            {subQ.studentAnswer ? (
-                                              <div className="mt-2 p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm text-sm">
-                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
-                                                </div>
-                                                <div className="text-foreground whitespace-pre-wrap">{subQ.studentAnswer}</div>
-                                              </div>
-                                            ) : (
-                                              <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No text response provided.</div>
+                                            {/* Sub-question Specialized Response Rendering */}
+                                            {renderDescriptiveSubQuestion(subQ, subIdx, question.id)}
+
+                                            {!subQ.studentAnswer && !subQ.subType && (
+                                              <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No response provided.</div>
                                             )}
 
                                             {/* Sub-question Model Answer (Correct Answer) */}

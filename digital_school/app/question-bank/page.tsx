@@ -47,9 +47,10 @@ import { Capacitor } from "@capacitor/core";
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 
 // DESCRIPTIVE sub-type definitions
-type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction';
+type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart';
 type WritingType = 'paragraph' | 'letter' | 'essay' | 'summary' | 'expansion' | 'translation' | 'story' | 'dialogue' | 'composition' | 'report' | 'application' | 'email';
 type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question' | 'prepositions' | 'articles';
+type ClueType = 'none' | 'word_box' | 'in_text';
 type CompAnswerType = 'stem_mcq' | 'qa';
 
 interface DescPart {
@@ -64,9 +65,10 @@ interface DescPart {
   sourceText?: string; // for translation/summary
   // fill_in
   fillType?: FillType;
+  clueType?: ClueType;
   passage?: string;    // for gap_passage
   items?: string[];    // for item-based fill types
-  wordBox?: string[];  // word/verb box for gap_passage, right_form, suffix_prefix
+  wordBox?: string[];  // word/verb box for gap_passage
   // comprehension
   answerType?: CompAnswerType;
   stemPassage?: string;
@@ -80,9 +82,12 @@ interface DescPart {
   // matching
   leftColumn?: { id: string; text: string }[];
   rightColumn?: { id: string; text: string }[];
-  matches?: Record<string, string>;
-  // rearranging
+  columnC?: { id: string; text: string }[];
+  columnD?: { id: string; text: string }[];
+  matches?: Record<string, string | string[]>;
+  // rearranging & flowchart
   correctOrder?: string[];
+  flowchartStyle?: 'vertical' | 'horizontal';
   // true_false
   statements?: string[];
   correctAnswers?: boolean[];
@@ -1371,16 +1376,28 @@ const WRITING_TYPE_LABELS: Record<string, string> = {
 };
 
 const FILL_TYPE_LABELS: Record<string, string> = {
-  gap_passage: 'Gap Filling (Cloze test with/without clues)',
+  gap_passage: 'Gap Passage with blanks',
   right_form: 'Right Form of Verbs',
-  suffix_prefix: 'Suffixes and Prefixes',
-  substitution: 'Substitution Table (Matching phrases to sentences)',
-  punctuation: 'Punctuation and Capitalization',
-  sentence_change: 'Changing Sentences (Voice/Degree/Narrative)',
+  suffix_prefix: 'Suffix / Prefix',
+  connector: 'Connectors / Linking Words',
+  punctuation: 'Punctuation & Capitalization',
+  sentence_change: 'Changing Sentences',
+  substitution: 'Substitution Table',
   tag_question: 'Tag Questions',
   connectors: 'Sentence Connectors',
   articles: 'Articles (a, an, the)',
   prepositions: 'Prepositions',
+};
+
+const CLUE_TYPE_LABELS: Record<string, string> = {
+  none: 'No Clues',
+  word_box: 'Words in a Box (before text)',
+  in_text: 'Dropdown / Inline Clues (within text)',
+};
+
+const FLOWCHART_STYLE_LABELS: Record<string, string> = {
+  vertical: 'Vertical Flow (Top to Down)',
+  horizontal: 'Horizontal Flow (Left to Right)',
 };
 
 function DescriptiveQuestionForm({
@@ -1463,6 +1480,7 @@ function DescriptiveQuestionForm({
                 <SelectItem value="label_diagram">🖼️ Label Diagram</SelectItem>
                 <SelectItem value="rearranging">🔄 Rearranging</SelectItem>
                 <SelectItem value="matching">🧩 Matching</SelectItem>
+                <SelectItem value="flowchart">🗺️ Flowchart</SelectItem>
                 <SelectItem value="short_answer">📝 Short Answer</SelectItem>
                 <SelectItem value="error_correction">❌ Error Correction</SelectItem>
               </SelectContent>
@@ -1475,7 +1493,8 @@ function DescriptiveQuestionForm({
               {part.subType === 'true_false' && "Truth verification of statements based on context."}
               {part.subType === 'label_diagram' && "Image identification using coordinate-based markers."}
               {part.subType === 'rearranging' && "Contextual ordering of jumbled sentences or fragments."}
-              {part.subType === 'matching' && "Pairing items from two columns (e.g., Column A vs Column B)."}
+              {part.subType === 'matching' && "Pairing items from two or more columns."}
+              {part.subType === 'flowchart' && "Sequential steps or process diagrams where students fill in missing parts."}
               {part.subType === 'short_answer' && "Direct short answer questions."}
               {part.subType === 'error_correction' && "Provide incorrect sentences and have students rewrite them correctly."}
             </p>
@@ -1527,22 +1546,35 @@ function DescriptiveQuestionForm({
           {/* ── FILL_IN ── */}
           {part.subType === 'fill_in' && (
             <div className="space-y-2">
-              <div>
-                <Label className="text-xs">Fill-in Type</Label>
-                <Select
-                  value={part.fillType || 'gap_passage'}
-                  onValueChange={(v: FillType) => updatePart(idx, { fillType: v })}
-                >
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(FILL_TYPE_LABELS).map(([v, label]) => (
-                      <SelectItem key={v} value={v}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[10px] text-gray-500 mt-1 italic">
-                  Choose between passage-based gaps or list-based grammar exercises (e.g., Suffix/Prefix, Articles).
-                </p>
+              <div className="grid grid-cols-2 gap-3 pb-2">
+                <div>
+                  <Label className="text-xs">Fill-in Type</Label>
+                  <Select
+                    value={part.fillType || 'gap_passage'}
+                    onValueChange={(v: FillType) => updatePart(idx, { fillType: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(FILL_TYPE_LABELS).map(([v, label]) => (
+                        <SelectItem key={v} value={v}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Clue Type</Label>
+                  <Select
+                    value={part.clueType || 'none'}
+                    onValueChange={(v: ClueType) => updatePart(idx, { clueType: v })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(CLUE_TYPE_LABELS).map(([v, label]) => (
+                        <SelectItem key={v} value={v}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
               <div>
                 <Label className="text-xs">Instructions</Label>

@@ -176,28 +176,31 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
             data.matches = matchMap;
         } else if (data.type === 'CQ') {
             data.subQuestions = [];
-            for (let i = 1; i <= 4; i++) {
-                const q = s(getValue(row, [`Sub-Question ${i} Text`, `Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
-                const m = n(getValue(row, [`Sub-Question ${i} Marks`, `SQ${i} Marks`]));
-                const a = s(getValue(row, [`Sub-Question ${i} Model Answer`, `Sub-Question ${i} Answer`, `SQ${i} Answer`]));
-                const e = s(getValue(row, [`Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
-                if (q) data.subQuestions.push({ question: q, marks: m, modelAnswer: a, explanation: e });
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const q = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `SQ${i}`, `SQ ${i} Text`]));
+                if (!q) continue;
+                const m = n(getValue(row, [`${prefix} Marks`, `Sub-Question ${i} Marks`, `SQ${i} Marks`]));
+                const a = s(getValue(row, [`${prefix} Model Answer`, `Sub-Question ${i} Model Answer`, `SQ${i} Answer`]));
+                const e = s(getValue(row, [`${prefix} Explanation`, `Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
+                data.subQuestions.push({ question: q, marks: m, modelAnswer: a, explanation: e });
             }
 
             if (data.subQuestions.length === 0) throw new Error("CQ requires at least one Sub-Question");
         } else if (data.type === 'SMCQ') {
             data.subQuestions = [];
-            for (let i = 1; i <= 5; i++) {
-                const q = s(getValue(row, [`Sub-Question ${i} Text`, `Sub-Question ${i}`, `SQ${i}`, `SQ ${i} Text`]));
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const q = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `SQ${i}`, `SQ ${i} Text`]));
                 if (!q) continue;
 
-                const m = n(getValue(row, [`Sub-Question ${i} Marks`, `SQ${i} Marks`])) || 1;
-                const optA = s(getValue(row, [`Sub-Question ${i} Option A`, `SQ${i}A`, `Sub ${i} A`]));
-                const optB = s(getValue(row, [`Sub-Question ${i} Option B`, `SQ${i}B`, `Sub ${i} B`]));
-                const optC = s(getValue(row, [`Sub-Question ${i} Option C`, `SQ${i}C`, `Sub ${i} C`]));
-                const optD = s(getValue(row, [`Sub-Question ${i} Option D`, `SQ${i}D`, `Sub ${i} D`]));
+                const m = n(getValue(row, [`${prefix} Marks`, `Sub-Question ${i} Marks`, `SQ${i} Marks`])) || 1;
+                const optA = s(getValue(row, [`${prefix} Option A`, `Sub-Question ${i} Option A`, `SQ${i}A`]));
+                const optB = s(getValue(row, [`${prefix} Option B`, `Sub-Question ${i} Option B`, `SQ${i}B`]));
+                const optC = s(getValue(row, [`${prefix} Option C`, `Sub-Question ${i} Option C`, `SQ${i}C`]));
+                const optD = s(getValue(row, [`${prefix} Option D`, `Sub-Question ${i} Option D`, `SQ${i}D`]));
 
-                const correctOptRaw = s(getValue(row, [`Sub-Question ${i} Correct Option`, `SQ${i} Correct`, `Sub ${i} Ans`])).toUpperCase();
+                const correctOptRaw = s(getValue(row, [`${prefix} Correct Option`, `Sub-Question ${i} Correct Option`, `SQ${i} Correct`])).toUpperCase();
                 let correctIdx = -1;
                 if (/^[A-D]$/.test(correctOptRaw)) {
                     correctIdx = ['A', 'B', 'C', 'D'].indexOf(correctOptRaw);
@@ -234,11 +237,15 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                 const instructions = s(getValue(row, [`${prefix} Instructions`]));
 
                 const subQ: any = { subType, text, marks, modelAnswer, explanation, label, instructions };
+                subQ.imageUrl = s(getValue(row, [`${prefix} Image URL`, `${prefix} Diagram URL`, `${prefix} Image`]));
 
                 // Handle Sub-type specific data from delimited strings
                 if (subType === 'fill_in') {
                     subQ.fillType = s(getValue(row, [`${prefix} Fill Type`])) || 'gap_passage';
+                    subQ.clueType = s(getValue(row, [`${prefix} Clue Type`])) || 'none';
                     subQ.passage = s(getValue(row, [`${prefix} Passage`]));
+                    const wordBoxStr = s(getValue(row, [`${prefix} Word Box`]));
+                    if (wordBoxStr) subQ.wordBox = wordBoxStr.split('|').map(x => x.trim());
                     const answersStr = s(getValue(row, [`${prefix} Answers`]));
                     if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
                 } else if (subType === 'table') {
@@ -249,30 +256,53 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                         subQ.tableRows = rowsStr.split('||').map(r => r.split('|').map(x => x.trim()));
                     }
                 } else if (subType === 'comprehension') {
-                    subQ.stemPassage = s(getValue(row, [`${prefix} Stem Passage`]));
+                    subQ.stemPassage = s(getValue(row, [`${prefix} Stem Passage`, `${prefix} Stem`]));
+                    subQ.passage = s(getValue(row, [`${prefix} Passage`])); // Fallback/Alternative
                     const questionsStr = s(getValue(row, [`${prefix} Questions`]));
                     if (questionsStr) subQ.questions = questionsStr.split('|').map(x => x.trim());
                     const answersStr = s(getValue(row, [`${prefix} Answers`]));
                     if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
                 } else if (subType === 'matching' || subType === 'mtf') {
+                    const getRoman = (num: number) => {
+                        const lookup: any = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+                        let roman = '', i;
+                        for (i in lookup) {
+                            while (num >= lookup[i]) { roman += i; num -= lookup[i]; }
+                        }
+                        return roman;
+                    };
+                    const getSmallAlpha = (num: number) => String.fromCharCode(97 + num);
+
                     const leftStr = s(getValue(row, [`${prefix} Left`]));
                     if (leftStr) subQ.leftColumn = leftStr.split('|').map((t, idx) => ({ id: (idx + 1).toString(), text: t.trim() }));
                     const rightStr = s(getValue(row, [`${prefix} Right`]));
                     if (rightStr) subQ.rightColumn = rightStr.split('|').map((t, idx) => ({ id: String.fromCharCode(65 + idx), text: t.trim() }));
+                    
+                    const colCStr = s(getValue(row, [`${prefix} Column C`]));
+                    if (colCStr) subQ.columnC = colCStr.split('|').map((t, idx) => ({ id: getRoman(idx + 1), text: t.trim() }));
+                    const colDStr = s(getValue(row, [`${prefix} Column D`]));
+                    if (colDStr) subQ.columnD = colDStr.split('|').map((t, idx) => ({ id: getSmallAlpha(idx), text: t.trim() }));
+
                     const matchesStr = s(getValue(row, [`${prefix} Matches`]));
                     if (matchesStr) {
                         const matchMap: any = {};
                         matchesStr.split(',').forEach(p => {
                             const pts = p.split('-');
-                            if (pts.length === 2) matchMap[pts[0].trim()] = pts[1].trim();
+                            if (pts.length >= 2) {
+                                matchMap[pts[0].trim()] = pts.slice(1).map(x => x.trim()).join('-');
+                            }
                         });
                         subQ.matches = matchMap;
                     }
-                } else if (subType === 'rearranging') {
-                    const itemsStr = s(getValue(row, [`${prefix} Rearrange Items`]));
+                } else if (subType === 'rearranging' || subType === 'flowchart') {
+                    const itemsStr = s(getValue(row, [`${prefix} Rearrange Items`, `${prefix} Items`]));
                     if (itemsStr) subQ.items = itemsStr.split('|').map(x => x.trim());
-                    const correctOrderStr = s(getValue(row, [`${prefix} Correct Order`]));
-                    if (correctOrderStr) subQ.correctOrder = correctOrderStr.split('|').map(x => x.trim());
+                    const correctOrderStr = s(getValue(row, [`${prefix} Correct Order`, `${prefix} Model Answer`]));
+                    if (correctOrderStr) {
+                        subQ.correctOrder = correctOrderStr.split('|').map(x => x.trim());
+                        subQ.modelAnswers = correctOrderStr.split('|').map(x => x.trim()); // Double mapping for compatibility
+                    }
+                    subQ.flowchartStyle = s(getValue(row, [`${prefix} Flow Style`])) || 'vertical';
                 } else if (subType === 'true_false') {
                     const statementsStr = s(getValue(row, [`${prefix} Statements`]));
                     if (statementsStr) subQ.statements = statementsStr.split('|').map(x => x.trim());
@@ -284,7 +314,6 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                         });
                     }
                 } else if (subType === 'label_diagram') {
-                    subQ.imageUrl = s(getValue(row, [`${prefix} Image URL`, `${prefix} Diagram URL`, `${prefix} Image`]));
                     const labelsStr = s(getValue(row, [`${prefix} Labels`]));
                     if (labelsStr) {
                         // Expect format: "Name1:x1:y1|Name2:x2:y2"

@@ -4,10 +4,17 @@ import React from "react";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { DebouncedTextarea } from "./SubjectiveSection";
 import { toBengaliAlphabets } from '@/utils/numeralConverter';
+import { ZoomableImage, QuestionImageGallery } from "./shared";
+import { ChevronRight, ArrowDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface DescriptiveSectionProps {
     question: any;
     userAnswer: any;
+    answers: any;
+    setAnswers: (val: any) => void;
+    setIsUploading?: (val: boolean) => void;
+    onCaptureClick: (target: { qId: string, idx?: number }) => void;
     disabled: boolean;
     submitted: boolean;
     onAnswerChange: (value: any) => void;
@@ -16,6 +23,10 @@ interface DescriptiveSectionProps {
 export const DescriptiveSection = ({
     question,
     userAnswer,
+    answers,
+    setAnswers,
+    setIsUploading,
+    onCaptureClick,
     disabled,
     submitted,
     onAnswerChange
@@ -40,7 +51,7 @@ export const DescriptiveSection = ({
 
                         {/* Instructions */}
                         {part.instructions && (
-                            <p className="text-sm text-gray-700 dark:text-gray-300 italic text-left">{part.instructions}</p>
+                            <UniversalMathJax dynamic className="text-sm text-gray-700 dark:text-gray-300 italic text-left">{part.instructions}</UniversalMathJax>
                         )}
 
                         {/* ── WRITING ── */}
@@ -72,9 +83,11 @@ export const DescriptiveSection = ({
                         {/* ── FILL_IN ── */}
                         {part.subType === 'fill_in' && (
                             <div className="space-y-4">
-                                {part.wordBox && part.wordBox.length > 0 && (
+                                {part.wordBox && part.wordBox.length > 0 && part.clueType !== 'in_text' && (
                                     <div className="flex flex-wrap gap-2 p-4 bg-indigo-50/50 dark:bg-indigo-900/10 border border-indigo-200/30 dark:border-indigo-800/30 rounded-2xl shadow-sm">
-                                        <div className="text-[10px] font-bold text-indigo-700/60 dark:text-indigo-300/60 w-full mb-2 uppercase tracking-tight text-left">Available Words:</div>
+                                        <div className="text-[10px] font-bold text-indigo-700/60 dark:text-indigo-300/60 w-full mb-2 uppercase tracking-tight text-left">
+                                            {part.clueType === 'word_box' ? 'Words in Box:' : 'Available Words:'}
+                                        </div>
                                         {part.wordBox.map((w: string, wi: number) => (
                                             <span key={wi} className="px-3 py-1 bg-white dark:bg-gray-800 text-indigo-800 dark:text-indigo-200 rounded-lg text-xs font-bold border border-indigo-100 dark:border-indigo-900/50 shadow-sm">{w}</span>
                                         ))}
@@ -89,14 +102,33 @@ export const DescriptiveSection = ({
                                                 <span key={si}>
                                                     <UniversalMathJax inline dynamic>{seg}</UniversalMathJax>
                                                     {si < segments.length - 1 && (
-                                                        <input
-                                                            type="text"
-                                                            value={getAns(si) as string}
-                                                            onChange={(e) => setAns(si, e.target.value)}
-                                                            disabled={disabled || submitted}
-                                                            className="inline-block w-28 border-b-2 border-primary/40 bg-transparent text-center text-sm font-bold focus:outline-none focus:border-primary focus:bg-primary/5 transition-all mx-1 h-8 rounded-t-md"
-                                                            placeholder={`(${si + 1})`}
-                                                        />
+                                                        part.clueType === 'in_text' ? (
+                                                            <div className="inline-block mx-1">
+                                                                <Select
+                                                                    value={getAns(si) as string}
+                                                                    onValueChange={(val) => setAns(si, val)}
+                                                                    disabled={disabled || submitted}
+                                                                >
+                                                                    <SelectTrigger className="h-8 w-32 border-primary/40 focus:ring-primary/20">
+                                                                        <SelectValue placeholder={`(${si + 1})`} />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {(part.wordBox || []).map((w: string, wi: number) => (
+                                                                            <SelectItem key={wi} value={w}>{w}</SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        ) : (
+                                                            <input
+                                                                type="text"
+                                                                value={getAns(si) as string}
+                                                                onChange={(e) => setAns(si, e.target.value)}
+                                                                disabled={disabled || submitted}
+                                                                className="inline-block w-28 border-b-2 border-primary/40 bg-transparent text-center text-sm font-bold focus:outline-none focus:border-primary focus:bg-primary/5 transition-all mx-1 h-8 rounded-t-md"
+                                                                placeholder={`(${si + 1})`}
+                                                            />
+                                                        )
                                                     )}
                                                 </span>
                                             ))}
@@ -135,9 +167,9 @@ export const DescriptiveSection = ({
                         {/* ── COMPREHENSION ── */}
                         {part.subType === 'comprehension' && (
                             <div className="space-y-4">
-                                {part.passage && (
+                                {(part.passage || part.stemPassage) && (
                                     <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 text-left">
-                                        <UniversalMathJax dynamic>{part.passage}</UniversalMathJax>
+                                        <UniversalMathJax dynamic>{part.passage || part.stemPassage}</UniversalMathJax>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-1 gap-4">
@@ -160,6 +192,225 @@ export const DescriptiveSection = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* ── MATCHING ── */}
+                        {part.subType === 'matching' && (
+                            <div className="overflow-x-auto py-2">
+                                <div className="grid gap-4" style={{ gridTemplateColumns: `repeat(${[part.leftColumn, part.rightColumn, part.columnC, part.columnD].filter(c => c && c.length > 0).length}, minmax(200px, 1fr))` }}>
+                                    {[
+                                        { label: 'Column A', data: part.leftColumn },
+                                        { label: 'Column B', data: part.rightColumn },
+                                        { label: 'Column C', data: part.columnC },
+                                        { label: 'Column D', data: part.columnD }
+                                    ].filter(c => c.data && c.data.length > 0).map((col, ci) => (
+                                        <div key={ci} className="space-y-2">
+                                            <div className="text-xs font-black text-amber-700/60 uppercase tracking-widest px-2">{col.label}</div>
+                                            <div className="space-y-2">
+                                                {col.data.map((item: any, ii: number) => (
+                                                    <div key={ii} className="p-3 bg-white dark:bg-gray-800 border-2 border-amber-100 dark:border-amber-900/30 rounded-xl text-sm font-medium shadow-sm flex gap-2">
+                                                        <span className="text-amber-500 font-bold">{ci === 0 ? (ii + 1) : String.fromCharCode(65 + ii)}{ci > 1 ? (ci === 2 ? '.I' : '.a') : ''}.</span>
+                                                        <UniversalMathJax inline dynamic>{item.text || item}</UniversalMathJax>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-6 p-4 bg-white/50 dark:bg-gray-800/50 border border-amber-200/50 rounded-2xl">
+                                    <div className="text-xs font-bold mb-3 text-amber-800">Match the pairs (e.g. 1-A-I):</div>
+                                    <DebouncedTextarea
+                                        value={getAns('match') as string}
+                                        onChange={(val) => setAns('match', val)}
+                                        disabled={disabled || submitted}
+                                        rows={2}
+                                        placeholder="e.g. 1-A-I, 2-B-II, 3-C-III..."
+                                        className="w-full p-4 rounded-xl border-2 border-amber-100 bg-background text-sm"
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── FLOWCHART ── */}
+                        {part.subType === 'flowchart' && (
+                            <div className="space-y-6 flex flex-col items-center">
+                                {(part.items || []).map((item: string, ii: number) => {
+                                    const isVertical = part.flowchartStyle !== 'horizontal';
+                                    const segments = item.split('___');
+                                    return (
+                                        <React.Fragment key={ii}>
+                                            <div className="p-4 md:p-6 bg-white dark:bg-gray-900 border-2 border-amber-200 dark:border-amber-800 rounded-2xl shadow-md min-w-[200px] max-w-lg text-center relative group">
+                                                <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs ring-4 ring-white dark:ring-gray-950">{ii + 1}</div>
+                                                <div className="text-base font-semibold leading-relaxed">
+                                                    {segments.map((seg, si) => (
+                                                        <React.Fragment key={si}>
+                                                            <UniversalMathJax inline dynamic>{seg}</UniversalMathJax>
+                                                            {si < segments.length - 1 && (
+                                                                <input
+                                                                    type="text"
+                                                                    value={getAns(`flow_${ii}_${si}`) as string}
+                                                                    onChange={(e) => setAns(`flow_${ii}_${si}`, e.target.value)}
+                                                                    disabled={disabled || submitted}
+                                                                    className="mx-2 w-24 border-b-2 border-amber-400 bg-transparent text-center focus:outline-none focus:border-amber-600 font-bold"
+                                                                    placeholder="..."
+                                                                />
+                                                            )}
+                                                        </React.Fragment>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            {ii < (part.items || []).length - 1 && (
+                                                <div className="flex items-center justify-center text-amber-300 dark:text-amber-800 py-1">
+                                                    {isVertical ? <ArrowDown className="w-8 h-8 animate-pulse" /> : <ChevronRight className="w-8 h-8 animate-pulse" />}
+                                                </div>
+                                            )}
+                                        </React.Fragment>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* ── TABLE ── */}
+                        {part.subType === 'table' && (
+                            <div className="overflow-x-auto rounded-xl border border-border mt-4">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-muted/50 border-b border-border">
+                                        <tr>
+                                            {(part.tableHeaders || []).map((h: string, hi: number) => (
+                                                <th key={hi} className="p-3 text-left font-bold text-muted-foreground"><UniversalMathJax inline dynamic>{h}</UniversalMathJax></th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border">
+                                        {(part.tableRows || []).map((row: string[], ri: number) => (
+                                            <tr key={ri} className="hover:bg-muted/20 transition-colors">
+                                                {(part.tableHeaders || []).map((_: string, ci: number) => {
+                                                    const isBlank = !row[ci] || row[ci] === '___';
+                                                    return (
+                                                        <td key={ci} className="p-3">
+                                                            {isBlank ? (
+                                                                <input
+                                                                    type="text"
+                                                                    value={getAns(`${ri}_${ci}`) as string}
+                                                                    onChange={(e) => setAns(`${ri}_${ci}`, e.target.value)}
+                                                                    disabled={disabled || submitted}
+                                                                    className="w-full min-w-[100px] border-b-2 border-primary/40 focus:border-primary focus:outline-none bg-transparent px-2 py-1 transition-all"
+                                                                    placeholder="..."
+                                                                />
+                                                            ) : (
+                                                                <span className="text-foreground/80"><UniversalMathJax inline dynamic>{row[ci]}</UniversalMathJax></span>
+                                                            )}
+                                                        </td>
+                                                    );
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* ── REARRANGING ── */}
+                        {part.subType === 'rearranging' && (
+                            <div className="space-y-4 bg-muted/20 p-4 md:p-6 rounded-2xl border border-border text-left">
+                                <div className="text-xs font-black text-primary/70 uppercase tracking-widest mb-4">Arrange the Following</div>
+                                <div className="space-y-2">
+                                    {(part.items || []).map((item: string, ii: number) => (
+                                        <div key={ii} className="flex gap-3 items-start p-3 bg-card border border-border/50 rounded-xl shadow-sm text-left">
+                                            <span className="w-6 h-6 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold leading-none">{String.fromCharCode(65 + ii)}</span>
+                                            <div className="text-sm font-medium leading-relaxed pt-0.5"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-6 p-4 bg-card border-2 border-primary/20 rounded-xl shadow-inner text-left">
+                                    <div className="text-xs font-bold mb-2 text-foreground/80">Your Sequence (e.g. B, D, A, C ...):</div>
+                                    <input
+                                        type="text"
+                                        value={getAns('order') as string}
+                                        onChange={(e) => setAns('order', e.target.value)}
+                                        disabled={disabled || submitted}
+                                        className="w-full bg-background border border-border/50 rounded-lg px-4 py-3 text-base font-bold focus:outline-none focus:ring-2 focus:ring-primary/30 uppercase"
+                                        placeholder="Enter sequence..."
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── TRUE/FALSE ── */}
+                        {part.subType === 'true_false' && (
+                            <div className="grid grid-cols-1 gap-3">
+                                {(part.statements || []).map((stmt: string, sIdx: number) => (
+                                    <div key={sIdx} className="p-4 bg-card border border-border/50 rounded-xl flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between text-left shadow-sm">
+                                        <div className="flex gap-3 flex-1">
+                                            <span className="text-sm font-bold text-muted-foreground">{sIdx + 1}.</span>
+                                            <div className="text-sm font-medium"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
+                                        </div>
+                                        <div className="shrink-0 w-32">
+                                            <Select
+                                                value={getAns(sIdx) as string}
+                                                onValueChange={(val) => setAns(sIdx, val)}
+                                                disabled={disabled || submitted}
+                                            >
+                                                <SelectTrigger className="w-full bg-background border-primary/30">
+                                                    <SelectValue placeholder="Select..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="True">True</SelectItem>
+                                                    <SelectItem value="False">False</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* ── LABEL DIAGRAM ── */}
+                        {part.subType === 'label_diagram' && (
+                            <div className="space-y-6 text-center">
+                                {part.imageUrl && (
+                                    <div className="relative inline-block border-2 border-border shadow-md rounded-xl overflow-hidden">
+                                        <ZoomableImage src={part.imageUrl} alt="Diagram" className="max-w-full h-auto object-contain max-h-[350px]" />
+                                        <div className="absolute inset-0 pointer-events-none">
+                                            {(part.labels || []).map((l: any, i: number) => (
+                                                <div key={i} className="absolute w-6 h-6 bg-primary text-primary-foreground rounded-full flex items-center justify-center text-xs font-black shadow-md border border-background" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                    {i + 1}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {(part.labels || []).map((_: any, i: number) => (
+                                        <div key={i} className="flex items-center gap-3 p-2 bg-card border border-border/50 rounded-lg shadow-sm text-left">
+                                            <div className="w-8 h-8 shrink-0 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-sm border border-primary/20">{i + 1}</div>
+                                            <input
+                                                type="text"
+                                                value={getAns(i) as string}
+                                                onChange={(e) => setAns(i, e.target.value)}
+                                                disabled={disabled || submitted}
+                                                className="w-full bg-transparent border-b-2 border-muted-foreground/30 focus:border-primary focus:outline-none px-2 py-1 text-sm transition-colors"
+                                                placeholder={`Label ${i + 1}`}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Image Gallery for each part */}
+                        <div className="mt-6 pt-6 border-t border-dashed border-amber-200/50">
+                            <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3">Upload Answers / Sketches</div>
+                            <QuestionImageGallery
+                                qId={question.id}
+                                subIdx={pIdx}
+                                answers={answers}
+                                setAnswers={setAnswers}
+                                disabled={disabled}
+                                submitted={submitted}
+                                setIsUploading={setIsUploading}
+                                onCaptureClick={(target: any) => onCaptureClick(target)}
+                            />
+                        </div>
                     </div>
                 );
             })}
