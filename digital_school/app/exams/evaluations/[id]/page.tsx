@@ -71,6 +71,31 @@ import { Capacitor } from "@capacitor/core";
 import { ShieldCheck, Battery, Wifi, Scan } from "lucide-react";
 import { scanDocument } from "@/lib/native/scanner";
 
+// --- Constants & Utilities ---
+const MCQ_OPTIONS = ['A', 'B', 'C', 'D', 'E'];
+
+// Recursive utility to extract all image URLs from a nested object/array
+function collectAllImages(obj: any): string[] {
+  const images: string[] = [];
+  if (!obj) return images;
+
+  if (typeof obj === 'string') {
+    // Basic check for URLs. Including common extensions and the upload API path.
+    if (obj.startsWith('http') && (
+      obj.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)/i) || 
+      obj.includes('api/upload') || 
+      obj.includes('googleusercontent.com') ||
+      obj.includes('blob.core.windows.net')
+    )) {
+      images.push(obj);
+    }
+  } else if (Array.isArray(obj)) {
+    obj.forEach(item => images.push(...collectAllImages(item)));
+  } else if (typeof obj === 'object') {
+    Object.values(obj).forEach(value => images.push(...collectAllImages(value)));
+  }
+  return Array.from(new Set(images));
+}
 
 const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
@@ -2989,7 +3014,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               {part.subType === 'short_answer' && (
                                                                 <div className="grid grid-cols-1 gap-2">
                                                                   {(part.questions || []).map((q: string, qi: number) => {
-                                                                    const ans = currentAnswer?.[qi] || "";
+                                                                    const ans = getAns(qi);
                                                                     return (
                                                                       <div key={qi} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors">
                                                                         <div className="flex gap-2 items-start opacity-70 mb-1 group-hover:opacity-100">
@@ -3008,18 +3033,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               {part.subType === 'error_correction' && (
                                                                 <div className="grid grid-cols-1 gap-2">
                                                                   {(part.sentences || []).map((s: string, si: number) => {
-                                                                    const ans = currentAnswer?.[si] || "";
+                                                                    const ans = getAns(si);
                                                                     return (
-                                                                      <div key={si} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors">
-                                                                        <div className="flex gap-2 items-start opacity-70 mb-1 group-hover:opacity-100">
-                                                                          <span className="text-[10px] font-bold text-gray-400">S{si+1}.</span>
-                                                                          <span className="text-[11px] font-medium italic opacity-50"><UniversalMathJax inline dynamic>{s}</UniversalMathJax></span>
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 pl-5">
-                                                                           <ArrowRight className="w-3 h-3 text-amber-500 shrink-0" />
-                                                                           <div className="text-sm font-black text-amber-700 leading-relaxed">
-                                                                              {ans ? <UniversalMathJax dynamic>{ans}</UniversalMathJax> : <span className="text-gray-300 italic font-medium">No input</span>}
-                                                                           </div>
+                                                                      <div key={si} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors flex items-center justify-between">
+                                                                        <div className="flex gap-2 items-center">
+                                                                          <span className="text-[10px] font-bold text-gray-400">{String.fromCharCode(97 + si)}.</span>
+                                                                          <span className="text-[11px] font-medium italic text-gray-600 line-through"><UniversalMathJax inline dynamic>{s}</UniversalMathJax></span>
+                                                                          <ArrowRight className="w-3 h-3 text-amber-500" />
+                                                                          <span className="text-sm font-bold text-indigo-900">{ans || <span className="text-gray-300 italic font-medium">No input</span>}</span>
                                                                         </div>
                                                                       </div>
                                                                     );
@@ -3032,39 +3053,22 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
                                                                 const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
                                                                 
-                                                                // 1. Collect potential image sources (Handle both objects and direct strings)
-                                                                const mainPartAns = currentStudent?.answers?.[`${currentQuestion.id}_desc_${pIdx}`];
-                                                                const detailPartAns = getAns('ans');
-                                                                
-                                                                const allImages = [
+                                                                // 1. Collect potential image sources from multiple possible storage patterns
+                                                                const mainPartData = currentStudent?.answers?.[keyBase];
+                                                                const subPartData = currentStudent?.answers?.[subKeyBase];
+                                                                const legacyImageData = currentStudent?.answers?.[`${keyBase}_images`] || currentStudent?.answers?.[`${keyBase}_image`];
+                                                                const legacySubImageData = currentStudent?.answers?.[`${subKeyBase}_images`] || currentStudent?.answers?.[`${subKeyBase}_image`];
+
+                                                                const allImages = collectAllImages([
                                                                   part.attachments,
                                                                   part.studentImages,
                                                                   part.answer?.attachments,
                                                                   part.answer?.studentImages,
-                                                                  currentStudent?.answers?.[`${keyBase}_image`],
-                                                                  currentStudent?.answers?.[`${subKeyBase}_image`],
-                                                                  currentStudent?.answers?.[`${keyBase}_images`],
-                                                                  currentStudent?.answers?.[`${subKeyBase}_images`],
-                                                                  // Check main answer objects
-                                                                  ...(typeof mainPartAns === 'object' && mainPartAns !== null ? [
-                                                                    (mainPartAns as any).responsePic,
-                                                                    (mainPartAns as any).studentUploadedImage,
-                                                                    (mainPartAns as any).imageUrl,
-                                                                    ...(Array.isArray((mainPartAns as any).images) ? (mainPartAns as any).images : []),
-                                                                    ...(Array.isArray((mainPartAns as any).responsePics) ? (mainPartAns as any).responsePics : [])
-                                                                  ] : []),
-                                                                  // Check detailed answer objects
-                                                                  ...(typeof detailPartAns === 'object' && detailPartAns !== null ? [
-                                                                    (detailPartAns as any).responsePic,
-                                                                    (detailPartAns as any).studentUploadedImage,
-                                                                    (detailPartAns as any).imageUrl,
-                                                                    ...(Array.isArray((detailPartAns as any).images) ? (detailPartAns as any).images : []),
-                                                                    ...(Array.isArray((detailPartAns as any).responsePics) ? (detailPartAns as any).responsePics : [])
-                                                                  ] : []),
-                                                                  // Also check if it's a direct URL string
-                                                                  (typeof mainPartAns === 'string' && mainPartAns.startsWith('http')) ? mainPartAns : null,
-                                                                  (typeof detailPartAns === 'string' && detailPartAns.startsWith('http')) ? detailPartAns : null
-                                                                ].flat().filter(img => typeof img === 'string' && img.startsWith('http')).filter(Boolean);
+                                                                  mainPartData,
+                                                                  subPartData,
+                                                                  legacyImageData,
+                                                                  legacySubImageData,
+                                                                ]);
                                                                 
                                                                 const uniqueImages = Array.from(new Set(allImages));
                                                                 const responseText = cleanupMath((getAns('ans') || getAns(0) || '').replace(/\|\|/g, '\n'));

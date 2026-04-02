@@ -58,6 +58,8 @@ interface DescPart {
   label: string;
   marks: number;
   instructions?: string;
+  text?: string;         // general text content
+  questionText?: string; // another name for text content
   modelAnswer?: string; // model answer for this part
   explanation?: string; // explanation for this part
   // writing
@@ -3413,24 +3415,116 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 </div>
               )}
               {type === 'DESCRIPTIVE' && descriptiveParts.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-3">
-                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Descriptive Parts:</p>
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-700 space-y-4">
+                  <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">Question Structure:</p>
                   {descriptiveParts.map((part, idx) => (
-                    <div key={idx} className="p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${idx + 1}`}</span>
-                        <span className="text-xs text-amber-600 font-mono">[{part.marks} marks] · {part.subType}{part.writingType ? `/${part.writingType}` : ''}{part.fillType ? `/${part.fillType}` : ''}{part.answerType ? `/${part.answerType}` : ''}</span>
+                    <div key={idx} className="p-4 bg-amber-50/40 dark:bg-amber-900/10 rounded-xl border border-amber-200 dark:border-amber-800/50 shadow-sm">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-amber-200 dark:bg-amber-800/40 flex items-center justify-center text-[10px] font-black text-amber-700 dark:text-amber-300 border border-amber-300/30">
+                            {part.label || (idx + 1)}
+                          </span>
+                          <span className="text-xs font-bold text-amber-800 dark:text-amber-300 capitalize">{part.subType?.replace('_', ' ')}</span>
+                        </div>
+                        <span className="text-[10px] font-mono px-2 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 rounded-full border border-amber-200/50">
+                          {part.marks} marks
+                        </span>
                       </div>
-                      {part.instructions && <p className="text-xs text-gray-600 dark:text-gray-400 italic">{part.instructions}</p>}
-                      {part.subType === 'fill_in' && part.passage && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{part.passage}</p>
+
+                      {/* Instructions */}
+                      {part.instructions && (
+                        <div className="text-[10px] text-gray-500 dark:text-gray-400 italic mb-2 px-1">
+                          <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                        </div>
                       )}
-                      {part.subType === 'comprehension' && part.stemPassage && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">{part.stemPassage}</p>
-                      )}
-                      {part.subType === 'writing' && part.sourceText && (
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">[Source text provided]</p>
-                      )}
+
+                      {/* Content based on subType */}
+                      <div className="space-y-2 border-l-2 border-amber-200/30 pl-3 py-1">
+                        {part.subType === 'writing' && (
+                          <div className="space-y-1">
+                            {part.writingType && <div className="text-[10px] font-bold text-blue-500 uppercase tracking-tighter">[{part.writingType}]</div>}
+                            {part.sourceText && <p className="text-xs text-gray-600 dark:text-gray-300 italic line-clamp-3"><UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax></p>}
+                          </div>
+                        )}
+
+                        {part.subType === 'fill_in' && (
+                          <div className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed italic">
+                            <UniversalMathJax dynamic>{(part.passage || '').replace(/___/g, ' ________ ')}</UniversalMathJax>
+                          </div>
+                        )}
+
+                        {part.subType === 'comprehension' && (
+                          <div className="space-y-2">
+                            {part.stemPassage && <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-3"><UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax></p>}
+                            <div className="grid grid-cols-1 gap-1 pl-2 border-l border-amber-200/50">
+                              {(part.questions || []).slice(0, 3).map((q: any, qi: number) => (
+                                <p key={qi} className="text-[10px] text-gray-500 dark:text-gray-400 flex gap-1">
+                                  <span className="font-bold opacity-50">{qi+1}.</span>
+                                  <UniversalMathJax inline dynamic>{q.text || q}</UniversalMathJax>
+                                </p>
+                              ))}
+                              {(part.questions || []).length > 3 && <p className="text-[9px] text-gray-400">... and {(part.questions || []).length - 3} more</p>}
+                            </div>
+                          </div>
+                        )}
+
+                        {part.subType === 'matching' && (
+                          <div className="flex gap-4 text-[10px]">
+                            <div className="flex-1 space-y-1">
+                              <span className="font-bold text-amber-700/60 uppercase text-[8px]">Column A</span>
+                              {(part.leftColumn || []).slice(0, 3).map((it: any, ii: number) => <div key={ii} className="truncate text-gray-500"><UniversalMathJax inline dynamic>{it.text || it}</UniversalMathJax></div>)}
+                            </div>
+                            <div className="flex-1 space-y-1">
+                              <span className="font-bold text-amber-700/60 uppercase text-[8px]">Column B</span>
+                              {(part.rightColumn || []).slice(0, 3).map((it: any, ii: number) => <div key={ii} className="truncate text-gray-500"><UniversalMathJax inline dynamic>{it.text || it}</UniversalMathJax></div>)}
+                            </div>
+                          </div>
+                        )}
+
+                        {part.subType === 'table' && (
+                          <div className="overflow-hidden rounded-md border border-amber-200/50 text-[10px]">
+                            <div className="bg-amber-100/50 dark:bg-amber-900/30 px-2 py-1 flex gap-2 font-bold border-b border-amber-200/30">
+                              {(part.tableHeaders || []).slice(0, 3).map((h: string, hi: number) => <div key={hi} className="flex-1 truncate">{h}</div>)}
+                            </div>
+                            <div className="px-2 py-1 flex gap-2 opacity-60 italic">
+                              {(part.tableRows?.[0] || []).slice(0, 3).map((c: string, ci: number) => <div key={ci} className="flex-1 truncate">{c}</div>)}
+                            </div>
+                          </div>
+                        )}
+
+                        {part.subType === 'true_false' && (
+                          <div className="space-y-1">
+                            {(part.statements || []).slice(0, 3).map((s: string, si: number) => (
+                              <p key={si} className="text-[10px] text-gray-500 line-clamp-1 italic">
+                                <span className="font-bold mr-1 opacity-40">{si+1}.</span>
+                                <UniversalMathJax dynamic>{s}</UniversalMathJax>
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {part.subType === 'label_diagram' && (
+                          <div className="space-y-2 text-center">
+                            {part.imageUrl && (
+                              <div className="relative inline-block border rounded-lg overflow-hidden max-w-[200px] mx-auto">
+                                <img src={part.imageUrl} alt="Diagram" className="w-full h-auto" />
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-1 justify-center">
+                              {(part.labels || []).map((l: any, li: number) => (
+                                <span key={li} className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-800/40 text-[8px] rounded border border-amber-200/50">{li + 1}: {l.text}</span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Fallback for other types or text content */}
+                        {(!['writing', 'fill_in', 'comprehension', 'matching', 'table', 'true_false'].includes(part.subType || '')) && (part.text || part.questionText) && (
+                          <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-3">
+                            <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

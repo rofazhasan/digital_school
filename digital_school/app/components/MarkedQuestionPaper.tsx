@@ -602,14 +602,33 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             
                             {renderSubQuestionCore(subQ, subIdx, questionId)}
 
-                            {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
-                                <div className="mt-2 p-2 bg-green-50 border border-green-100 rounded text-[8px] text-green-800">
-                                    <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
-                                        <BookOpen className="w-2 h-2" /> Model Answer / Key
+                            {(() => {
+                                const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null);
+                                const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+
+                                if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
+
+                                return (
+                                    <div className="mt-2 p-2 bg-green-50 border border-green-100 rounded text-[8px] text-green-800">
+                                        <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
+                                            <BookOpen className="w-2 h-2" /> Model Answer / Key
+                                        </div>
+                                        {modelAns && (
+                                            <UniversalMathJax dynamic inline>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                        )}
+                                        {modelAnsArray && modelAnsArray.length > 0 && (
+                                            <div className="flex flex-col gap-1 mt-1">
+                                                {modelAnsArray.map((ans: any, ai: number) => (
+                                                    <div key={ai} className="flex gap-1">
+                                                        <span className="font-black">({ai + 1})</span>
+                                                        <UniversalMathJax inline>{cleanupMath(String(ans))}</UniversalMathJax>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
-                                    <UniversalMathJax dynamic inline>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {subQ.explanation && (
                                 <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded text-[8px] text-blue-800">

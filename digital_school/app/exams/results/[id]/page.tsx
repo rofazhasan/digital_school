@@ -630,7 +630,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             </p>
             <div className="grid grid-cols-1 gap-1.5">
               {(subQ.statements || []).map((stmt: string, si: number) => {
-                const ans = subQ.correctAnswers?.[si];
+                const ans = (subQ.correctAnswers || subQ.answers)?.[si];
                 return (
                   <div key={si} className="flex items-center justify-between gap-4 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
                     <div className="flex items-center gap-2 max-w-[70%]">
@@ -651,7 +651,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <ArrowRight className="w-2.5 h-2.5" /> Short-Answer Keys
             </p>
             <div className="grid grid-cols-1 gap-1.5">
-              {(subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
+              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
                 <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
                   <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
                   <div className="text-[11px] font-black text-emerald-900 leading-tight">
@@ -669,7 +669,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <ArrowRight className="w-2.5 h-2.5" /> Error-Correction Keys
             </p>
             <div className="grid grid-cols-1 gap-1.5">
-              {(subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
+              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
                 <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
                   <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 uppercase font-black">{String.fromCharCode(97+ai)}</span>
                   <div className="text-[11px] font-black text-emerald-900 leading-tight">
@@ -683,12 +683,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
         {renderSubQuestionContent(subQ, subIdx, questionId)}
         
-        {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
+        {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null)) && (
           <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
             <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
               <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
             </div>
-            <UniversalMathJax dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+            <UniversalMathJax dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : '') || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
           </div>
         )}
         

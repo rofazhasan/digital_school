@@ -1159,7 +1159,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {part.subType === 'short_answer' && (
                                       <div className="space-y-1 mt-2 ml-4">
-                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                        {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
                                           <div key={ai} className="flex gap-2">
                                             <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
                                             <div className="flex-1 font-bold">
@@ -1172,7 +1172,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {part.subType === 'error_correction' && (
                                       <div className="space-y-1 mt-2 ml-4">
-                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                        {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
                                           <div key={ai} className="flex gap-2">
                                             <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
                                             <div className="flex-1 font-bold">
@@ -1225,7 +1225,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {part.subType === 'true_false' && (
                                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
-                                        {(part.correctAnswers || []).map((ans: string, aIdx: number) => (
+                                        {(part.correctAnswers || part.answers || []).map((ans: string, aIdx: number) => (
                                           <div key={aIdx} className="flex gap-2 items-center bg-white p-2 rounded border border-gray-100 shadow-sm">
                                             <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
                                             <span className="flex-1 text-emerald-700 font-bold text-sm">
