@@ -1335,7 +1335,7 @@ const QuestionCard: React.FC<{
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white dark:bg-gray-800">
-                        {part.subType?.replace('_', ' ')}
+                        {String(part.subType || part.sub_type || '').replace('_', ' ')}
                       </Badge>
                       <span className="text-xs font-bold text-gray-400">{getLetter(i).toLowerCase()}.</span>
                     </div>
@@ -1343,30 +1343,30 @@ const QuestionCard: React.FC<{
                   </div>
 
                   <div className="space-y-2">
-                    {part.label && (
+                    {(part.label || part.title || part.question) && (
                       <div className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
-                        <UniversalMathJax>{part.label}</UniversalMathJax>
+                        <UniversalMathJax>{part.label || part.title || part.question}</UniversalMathJax>
                       </div>
                     )}
-                    {part.instructions && (
+                    {(part.instructions || part.instruction) && (
                       <div className="text-xs italic text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
-                        <UniversalMathJax>{part.instructions}</UniversalMathJax>
+                        <UniversalMathJax>{part.instructions || part.instruction}</UniversalMathJax>
                       </div>
                     )}
                     
                     {/* Specialized Rendering for Descriptive Types */}
-                    {part.subType === 'writing' && part.sourceText && (
+                    {(part.subType === 'writing' || part.sub_type === 'writing') && (part.sourceText || part.source_text) && (
                       <div className="p-3 rounded-xl bg-blue-50/30 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/50 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap italic">
-                         <UniversalMathJax>{part.sourceText}</UniversalMathJax>
+                         <UniversalMathJax>{part.sourceText || part.source_text}</UniversalMathJax>
                       </div>
                     )}
 
-                    {part.subType === 'fill_in' && part.passage && (
+                    {(part.subType === 'fill_in' || part.sub_type === 'fill_in') && part.passage && (
                       <div className="p-3 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/50 text-sm leading-relaxed whitespace-pre-wrap">
                         <UniversalMathJax>{part.passage}</UniversalMathJax>
-                        {part.wordBox && part.wordBox.length > 0 && (
+                        {(part.wordBox || part.word_box) && (part.wordBox || part.word_box).length > 0 && (
                           <div className="mt-3 pt-3 border-t border-indigo-100/50 flex flex-wrap gap-2">
-                            {part.wordBox.map((w: string, wi: number) => (
+                            {(part.wordBox || part.word_box).map((w: string, wi: number) => (
                               <span key={wi} className="px-2 py-1 bg-white dark:bg-gray-800 border rounded text-[10px] font-medium">{w}</span>
                             ))}
                           </div>
@@ -1374,7 +1374,7 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
-                    {part.subType === 'flowchart' && part.items && (
+                    {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
                       <div className="flex flex-wrap items-center gap-2 py-2">
                         {part.items.map((item: string, ii: number) => (
                           <React.Fragment key={ii}>
@@ -1387,17 +1387,17 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
-                    {part.subType === 'matching' && part.leftColumn && (
+                    {(part.subType === 'matching' || part.sub_type === 'matching') && (part.leftColumn || part.left_column) && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <div className="space-y-1">
-                          {part.leftColumn.map((item: any, ii: number) => (
+                          {(part.leftColumn || part.left_column).map((item: any, ii: number) => (
                             <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
                               <span className="font-bold mr-1">{ii+1}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
                             </div>
                           ))}
                         </div>
                         <div className="space-y-1">
-                          {part.rightColumn?.map((item: any, ii: number) => (
+                          {(part.rightColumn || part.right_column)?.map((item: any, ii: number) => (
                             <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
                               <span className="font-bold mr-1">{String.fromCharCode(65+ii)}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
                             </div>
@@ -1406,9 +1406,9 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
-                    {part.subType === 'label_diagram' && part.imageUrl && (
+                    {(part.subType === 'label_diagram' || part.sub_type === 'label_diagram') && (part.imageUrl || part.image_url || part.image) && (
                       <div className="relative rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 bg-white p-2">
-                        <img src={part.imageUrl} alt="Diagram" className="w-full h-auto max-h-48 object-contain" />
+                        <img src={part.imageUrl || part.image_url || part.image} alt="Diagram" className="w-full h-auto max-h-48 object-contain" />
                         <div className="mt-2 flex flex-wrap gap-2 px-1">
                            {part.labels?.map((label: any, li: number) => (
                              <Badge key={li} variant="outline" className="text-[9px]">{label.text}</Badge>
@@ -1417,20 +1417,20 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
-                    {part.subType === 'interpreting_graph' && part.chartConfig && (
+                    {(part.subType === 'interpreting_graph' || part.sub_type === 'interpreting_graph') && (part.chartConfig || part.chart_config) && (
                       <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
                         <BeautifulChart 
-                          type={part.chartConfig.type} 
-                          data={part.chartConfig.data} 
-                          xAxisLabel={part.chartConfig.xAxisLabel} 
-                          yAxisLabel={part.chartConfig.yAxisLabel}
+                          type={(part.chartConfig || part.chart_config).type} 
+                          data={(part.chartConfig || part.chart_config).data} 
+                          xAxisLabel={(part.chartConfig || part.chart_config).xAxisLabel || (part.chartConfig || part.chart_config).xAxis_label} 
+                          yAxisLabel={(part.chartConfig || part.chart_config).yAxisLabel || (part.chartConfig || part.chart_config).yAxis_label}
                         />
                       </div>
                     )}
 
 
                     {/* Specialized Model Answer Rendering */}
-                    {part.subType === 'matching' && part.matches && (
+                    {(part.subType === 'matching' || part.sub_type === 'matching') && part.matches && (
                       <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
                         <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
                           <ArrowRight className="w-2.5 h-2.5" /> Pairing Matrix

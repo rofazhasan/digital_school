@@ -2848,8 +2848,16 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                             {toBengaliNumerals(pIdx + 1)}
                                                           </div>
                                                           <div>
-                                                            <div className="text-sm font-black text-amber-800 uppercase tracking-widest">{part.subType?.replace('_', ' ') || "Question"} Part</div>
-                                                            <div className="text-xs text-amber-600 font-bold">Allocated: {part.marks} Marks</div>
+                                                            <div className="flex items-center gap-2 mb-1">
+                                                              <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white shadow-sm border-amber-200 text-amber-700">
+                                                                {String(part.subType || part.sub_type || '').replace('_', ' ')}
+                                                              </Badge>
+                                                              <span className="text-[10px] font-bold text-amber-600/60 font-mono">#{part.id?.slice(-4) || pIdx}</span>
+                                                            </div>
+                                                            <div className="text-sm font-black text-amber-900 flex items-center gap-2">
+                                                              <UniversalMathJax inline dynamic>{part.label || part.title || part.question || ''}</UniversalMathJax>
+                                                              <span className="text-xs font-bold text-amber-500/50 px-2 py-0.5 rounded-full bg-amber-100/50 border border-amber-200/50">{toBengaliNumerals(part.marks || 0)} marks</span>
+                                                            </div>
                                                           </div>
                                                         </div>
                                                         <div className="flex flex-wrap items-center gap-2">

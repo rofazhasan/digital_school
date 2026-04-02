@@ -424,7 +424,7 @@ export async function GET(
           correct: q.correct,
           options: q.options,
           subQuestions: parsedSubQuestions,
-          modelAnswer: q.modelAnswer || null,
+          modelAnswer: q.modelAnswer || q.answer || q.q_ans || q.ans || null,
           explanation: explanation || null,
           assertion: q.assertion || null,
           reason: q.reason || null,
@@ -435,7 +435,14 @@ export async function GET(
           rightColumn: q.rightColumn,
           matches: q.matches,
           // New INT field
-          correctAnswer: q.correctAnswer || q.answer
+          correctAnswer: q.correctAnswer || q.answer,
+          // Final Check Robustness for Descriptive
+          sourceText: q.sourceText || q.source_text || null,
+          passage: q.passage || null,
+          label: q.label || null,
+          instructions: q.instructions || null,
+          chartConfig: q.chartConfig || q.chart_config || null,
+          image: q.image || q.imageUrl || q.image_url || null
         };
       }),
       submissions: processedSubmissions

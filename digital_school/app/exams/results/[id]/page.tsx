@@ -590,6 +590,52 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="mt-4 px-2 space-y-4">
         {/* Specialized Sub-Key Rendering (matching the evaluation standard) */}
+        {/* Question Metadata: Label, Instructions, Source, Passage, Graph */}
+        <div className="mb-4 space-y-3">
+          {(subQ.label || subQ.title || subQ.question) && (
+            <div className="text-sm font-black text-gray-800 leading-tight">
+              <UniversalMathJax inline dynamic>{subQ.label || subQ.title || subQ.question}</UniversalMathJax>
+            </div>
+          )}
+          
+          {(subQ.instructions || subQ.instruction) && (
+            <div className="text-[10px] italic text-gray-400 bg-gray-50 p-1.5 rounded border border-gray-100 flex items-start gap-1.5">
+              <Info className="w-2.5 h-2.5 mt-0.5 shrink-0" />
+              <UniversalMathJax dynamic>{subQ.instructions || subQ.instruction}</UniversalMathJax>
+            </div>
+          )}
+
+          {(subQ.subType === 'writing' || subQ.sub_type === 'writing') && (subQ.sourceText || subQ.source_text) && (
+            <div className="p-3 rounded-xl bg-blue-50/30 border border-blue-100/50 text-xs italic text-blue-900/60 leading-relaxed">
+              <UniversalMathJax dynamic>{subQ.sourceText || subQ.source_text}</UniversalMathJax>
+            </div>
+          )}
+
+          {(subQ.subType === 'fill_in' || subQ.sub_type === 'fill_in') && subQ.passage && (
+            <div className="p-3 rounded-xl bg-indigo-50/30 border border-indigo-100/50 text-sm leading-relaxed text-indigo-900/80">
+              <UniversalMathJax dynamic>{subQ.passage}</UniversalMathJax>
+              {(subQ.wordBox || subQ.word_box) && (subQ.wordBox || subQ.word_box).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-indigo-100/30 flex flex-wrap gap-2">
+                  {(subQ.wordBox || subQ.word_box).map((w: string, wi: number) => (
+                    <span key={wi} className="px-2 py-1 bg-white border border-indigo-100 rounded-md text-[10px] font-bold shadow-sm text-indigo-600">{w}</span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {(subQ.subType === 'interpreting_graph' || subQ.sub_type === 'interpreting_graph') && (subQ.chartConfig || subQ.chart_config) && (
+            <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+              <BeautifulChart 
+                type={(subQ.chartConfig || subQ.chart_config).type} 
+                data={(subQ.chartConfig || subQ.chart_config).data} 
+                xAxisLabel={(subQ.chartConfig || subQ.chart_config).xAxisLabel || (subQ.chartConfig || subQ.chart_config).xAxis_label} 
+                yAxisLabel={(subQ.chartConfig || subQ.chart_config).yAxisLabel || (subQ.chartConfig || subQ.chart_config).yAxis_label}
+              />
+            </div>
+          )}
+        </div>
+
         {subQ.subType === 'interpreting_graph' && (
           <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
             <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
