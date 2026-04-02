@@ -118,9 +118,11 @@ function chunkArray<T>(arr: T[], size: number): T[][] {
 
 // Helper to render text with diagrams support
 const Text = ({ children }: { children: string }) => (
-  <UniversalMathJax inline dynamic>
-    {cleanupMath(children)}
-  </UniversalMathJax>
+  <span className="whitespace-pre-wrap">
+    <UniversalMathJax inline dynamic>
+      {cleanupMath((children || "").replace(/\|\|/g, '\n'))}
+    </UniversalMathJax>
+  </span>
 );
 
 
@@ -684,303 +686,284 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
-                              <div className="whitespace-pre-wrap mb-2">
-                                <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
+                              <div className="whitespace-pre-wrap mb-2 font-bold">
+                                <UniversalMathJax dynamic>{(q.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                               </div>
                               {/* Render each sub-part of the descriptive question */}
                               <div className="space-y-4">
                                 {(q.subQuestions || []).map((part: any, pIdx: number) => (
-                                  <div key={pIdx} className="border border-black/20 rounded-md p-3 bg-gray-50/20 break-inside-avoid shadow-sm">
+                                  <div key={pIdx} className="border border-black/10 rounded-md p-3 bg-gray-50/10 break-inside-avoid shadow-sm">
                                     {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
                                     {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
                                     {(part.text || part.questionText) && (
-                                      <div className="font-medium mb-2 leading-relaxed">
-                                        <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                                      <div className="font-medium mb-2 leading-relaxed whitespace-pre-wrap">
+                                        <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                       </div>
                                     )}
 
-                                  <div className="text-sm">
-                                    {part.subType === 'writing' && (
-                                      <div className="space-y-2">
-                                        {part.sourceText && (
-                                          <div className="p-2 bg-gray-50 border border-gray-200 rounded italic text-xs mb-2 whitespace-pre-wrap">
-                                            <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
+                                    <div className="text-sm">
+                                      {part.subType === 'writing' && (
+                                        <div className="space-y-2">
+                                          {part.sourceText && (
+                                            <div className="p-3 bg-gray-50/50 border border-gray-200 rounded-lg italic text-xs mb-3 whitespace-pre-wrap leading-relaxed shadow-sm">
+                                              <UniversalMathJax dynamic>{part.sourceText.replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                            </div>
+                                          )}
+                                          <div className="flex items-center gap-2 text-[11px] font-bold text-gray-500/80 italic mb-2">
+                                            <div className="h-[1px] flex-1 bg-gray-200"></div>
+                                            <span>
+                                              {isEn ? 'Write your response below' : 'নিচে তোমার উত্তর লেখো'}
+                                            </span>
+                                            <div className="h-[1px] flex-1 bg-gray-200"></div>
                                           </div>
-                                        )}
-                                        <div className="font-medium text-[10px] text-gray-400 italic">
-                                          ({isEn ? 'Write your response below' : 'নিচে আপনার উত্তর লিখুন'})
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {part.subType === 'short_answer' && (
-                                      <div className="space-y-3 mt-2">
-                                        {(part.questions || []).map((q: string, qi: number) => (
-                                          <div key={qi} className="flex gap-2 items-start text-sm">
-                                            <span className="font-bold flex-shrink-0">{isEn ? (qi + 1) : toBengaliNumerals(qi + 1)}.</span>
-                                            <div className="flex-1 w-full">
-                                              <UniversalMathJax dynamic>{q}</UniversalMathJax>
-                                              <div className="border-b-2 border-dotted border-gray-400 w-full mt-6 mb-2"></div>
-                                              <div className="border-b-2 border-dotted border-gray-400 w-full mb-2"></div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
+                                      {part.subType === 'fill_in' && (
+                                        <div className="space-y-3 mt-3">
+                                          {/* Word Box for fill_in questions - improved detection and styling */}
+                                          {(() => {
+                                            const wordsData = part.wordBox || part.words || part.options || part.wordList;
+                                            if (!wordsData) return null;
+                                            
+                                            const words = Array.isArray(wordsData) 
+                                              ? wordsData.map(w => typeof w === 'object' ? (w.text || w.word || '') : w)
+                                              : (typeof wordsData === 'string' ? wordsData.split(/[|]|,\s*/) : []);
+                                            
+                                            if (words.length === 0) return null;
 
-                                    {part.subType === 'error_correction' && (
-                                      <div className="space-y-2 mt-2 ml-4">
-                                        {(part.sentences || []).map((s: string, si: number) => (
-                                          <div key={si} className="flex items-start gap-2 mb-3 max-w-2xl">
-                                            <span className="font-bold flex-shrink-0 w-6">({isEn ? String.fromCharCode(97 + si) : BENGALI_SUB_LABELS[si]})</span>
-                                            <div className="flex-1">
-                                              <UniversalMathJax dynamic>{s}</UniversalMathJax>
-                                              <div className="border-b border-black w-full mt-4"></div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'fill_in' && (
-                                      <div className="space-y-2 mt-2">
-                                        {/* Word Box for fill_in questions */}
-                                        {part.wordBox && (
-                                          <div className="mb-4 p-3 border-2 border-black rounded-sm bg-gray-50/50 print:bg-transparent">
-                                            <div className="text-[10px] font-bold uppercase mb-1 text-center border-b border-gray-300 pb-1">
-                                              {isEn ? 'Words for Fill in the Blanks' : 'নিচের বক্স থেকে সঠিক শব্দ নিয়ে শূন্যস্থান পূরণ করো'}
-                                            </div>
-                                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-bold italic">
-                                              {part.wordBox.split('|').map((word: string, wIdx: number) => (
-                                                <span key={wIdx} className="px-2 py-0.5 border border-gray-200 rounded">{word}</span>
-                                              ))}
-                                            </div>
-                                          </div>
-                                        )}
-                                        
-                                        {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (
-                                          <div className="leading-relaxed">
-                                            <UniversalMathJax dynamic>
-                                              {part.passage.split('___').map((segment: string, sIdx: number, array: any[]) => (
-                                                <React.Fragment key={sIdx}>
-                                                  {segment}
-                                                  {sIdx < array.length - 1 && (
-                                                    <span className="font-bold underline px-1">({isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}) _______</span>
-                                                  )}
-                                                </React.Fragment>
-                                              ))}
-                                            </UniversalMathJax>
-                                          </div>
-                                        )}
-                                        {part.fillType && part.fillType !== 'gap_passage' && (
-                                          <div className="grid grid-cols-2 gap-x-12 gap-y-2 ml-4">
-                                            {(part.items || []).map((item: string, iIdx: number) => (
-                                              <div key={iIdx} className="flex items-start gap-2 border-b border-gray-100 pb-1">
-                                                <span className="font-bold shrink-0">{isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}.</span>
-                                                <div className="flex-1"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
-                                                <span className="border-b-2 border-black w-24 shrink-0 mt-3 h-0"></span>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'short_answer' && (
-                                      <div className="space-y-4 mt-2">
-                                        {(part.questions || []).map((q: string, qi: number) => (
-                                          <div key={qi} className="flex gap-2">
-                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + qi)})</span>
-                                            <div className="flex-1">
-                                              <UniversalMathJax dynamic>{q}</UniversalMathJax>
-                                              <div className="border-b border-dotted border-gray-400 w-full mt-6 h-1"></div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'error_correction' && (
-                                      <div className="space-y-2 mt-2">
-                                        {(part.sentences || []).map((s: string, si: number) => (
-                                          <div key={si} className="flex gap-2">
-                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + si)})</span>
-                                            <div className="flex-1">
-                                              <UniversalMathJax dynamic>{s}</UniversalMathJax>
-                                              <div className="border-b border-dotted border-gray-400 w-full mt-4 h-1"></div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'comprehension' && (
-                                      <div className="space-y-3">
-                                        {part.stemPassage && (
-                                          <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
-                                            <UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax>
-                                          </div>
-                                        )}
-                                        {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
-
-                                        {(!part.answerType || part.answerType === 'qa') && (
-                                          <div className="grid grid-cols-1 gap-2 ml-4">
-                                            {(part.questions || []).map((quest: string, qIdx: number) => (
-                                              <div key={qIdx} className="flex items-start gap-2">
-                                                <span className="font-bold">{isEn ? String.fromCharCode(97 + qIdx) : BENGALI_SUB_LABELS[qIdx]}.</span>
-                                                <UniversalMathJax dynamic>{quest}</UniversalMathJax>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-
-                                        {part.answerType === 'stem_mcq' && (
-                                          <div className="grid grid-cols-2 gap-x-8 gap-y-4 ml-4">
-                                            {(part.stemQuestions || []).map((sq: any, sqIdx: number) => (
-                                              <div key={sqIdx} className="break-inside-avoid">
-                                                <div className="font-bold mb-1">{isEn ? (sqIdx + 1) : toBengaliNumerals(sqIdx + 1)}. {sq.question}</div>
-                                                <div className="grid grid-cols-2 text-[10px] gap-2 ml-2">
-                                                  {(sq.options || []).map((opt: string, oIdx: number) => (
-                                                    <div key={oIdx} className="flex items-center gap-1">
-                                                      <span className="font-bold">({isEn ? MCQ_LABELS_EN[oIdx] : MCQ_LABELS_BN[oIdx]})</span>
-                                                      <span>{opt}</span>
+                                            return (
+                                              <div className="mb-6 p-4 border-2 border-slate-800 rounded-lg bg-slate-50/30 relative print:bg-transparent overflow-hidden shadow-sm">
+                                                <div className="absolute top-0 left-0 w-full h-1 bg-slate-800"></div>
+                                                <div className="text-[11px] font-black uppercase mb-3 text-center text-slate-800 tracking-wider">
+                                                  {isEn ? 'Complete the following text with suitable words from the box' : 'নিচের বক্স থেকে সঠিক শব্দ নিয়ে শূন্যস্থান পূরণ করো'}
+                                                </div>
+                                                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-2">
+                                                  {words.filter(Boolean).map((word: string, wIdx: number) => (
+                                                    <div key={wIdx} className="px-3 py-1 border border-slate-300 rounded bg-white font-bold text-sm shadow-sm print:shadow-none min-w-[60px] text-center">
+                                                      <UniversalMathJax inline>{word}</UniversalMathJax>
                                                     </div>
                                                   ))}
                                                 </div>
                                               </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'true_false' && (
-                                      <div className="space-y-2 mt-2 ml-4">
-                                        {(part.statements || []).map((stmt: string, sIdx: number) => (
-                                          <div key={sIdx} className="flex gap-2 items-start text-sm">
-                                            <span className="font-bold shrink-0">{isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}.</span>
-                                            <div className="flex-1 whitespace-pre-wrap"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
-                                            <span className="w-16 h-6 border border-gray-400 shrink-0 inline-block bg-white"></span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'flowchart' && (
-                                      <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4 flex-wrap">
-                                        {(part.items || []).map((item: string, iIdx: number) => (
-                                          <div key={iIdx} className="flex items-center gap-3">
-                                            <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap">
-                                              {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
-                                              <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
-                                            </div>
-                                            {iIdx < (part.items?.length || 0) - 1 && (
-                                              <span className="text-slate-400 font-bold hidden md:inline-block">→</span>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    {part.subType === 'label_diagram' && (
-                                      <div className="mt-4 flex flex-col items-center">
-                                        {part.imageUrl && (
-                                          <div className="relative border rounded inline-block max-w-[80%] bg-white p-2 shadow-sm mb-4">
-                                            <img src={part.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
-                                            {(part.labels || []).map((lbl: any, lIdx: number) => (
-                                              <div key={lIdx} className="absolute w-4 h-4 bg-red-600 text-white flex items-center justify-center rounded-full text-[8px] font-bold" style={{ top: `${lbl.y}%`, left: `${lbl.x}%`, transform: 'translate(-50%, -50%)' }}>
-                                                {lIdx + 1}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 w-full">
-                                          {(part.labels || []).map((_: any, lIdx: number) => (
-                                            <div key={lIdx} className="flex gap-2 items-end">
-                                              <span className="font-bold text-sm shrink-0">{lIdx + 1}.</span>
-                                              <div className="border-b border-black flex-1 h-5"></div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {(part.subType === 'matching' || part.subType === 'mtf') && (
-                                      <div className="mt-3 ml-4">
-                                        <div className="grid grid-cols-2 gap-0 border border-black max-w-2xl mx-auto">
-                                          {/* Header */}
-                                          <div className="border-r border-b border-black p-2 bg-gray-100 font-bold text-center">Column A</div>
-                                          <div className="border-b border-black p-2 bg-gray-100 font-bold text-center">Column B</div>
-
-                                          {/* Rows */}
-                                          {(() => {
-                                            const left = part.leftColumn || [];
-                                            const right = part.rightColumn || [];
-                                            const rows = Math.max(left.length, right.length);
-                                            const res = [];
-                                            for (let i = 0; i < rows; i++) {
-                                              res.push(
-                                                <React.Fragment key={i}>
-                                                  <div className="border-r border-b border-black p-2 flex items-start gap-2">
-                                                    <span className="font-bold w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
-                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{left[i]?.text || ""}</UniversalMathJax></span>
-                                                  </div>
-                                                  <div className="border-b border-black p-2 flex items-start gap-2">
-                                                    <span className="font-bold w-6">({isEn ? String.fromCharCode(105 + i) : toBengaliNumerals(i + 1)})</span>
-                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{right[i]?.text || ""}</UniversalMathJax></span>
-                                                  </div>
-                                                </React.Fragment>
-                                              );
-                                            }
-                                            return res;
+                                            );
                                           })()}
+                                          
+                                          {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (
+                                            <div className="leading-relaxed whitespace-pre-wrap">
+                                              <UniversalMathJax dynamic>
+                                                {part.passage.replace(/\|\|/g, '\n').split('___').map((segment: string, sIdx: number, array: any[]) => (
+                                                  <React.Fragment key={sIdx}>
+                                                    {segment}
+                                                    {sIdx < array.length - 1 && (
+                                                      <span className="font-bold underline px-1">({isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}) _______</span>
+                                                    )}
+                                                  </React.Fragment>
+                                                ))}
+                                              </UniversalMathJax>
+                                            </div>
+                                          )}
+                                          {part.fillType && part.fillType !== 'gap_passage' && (
+                                            <div className="grid grid-cols-2 gap-x-12 gap-y-2 ml-4">
+                                              {(part.items || []).map((item: string, iIdx: number) => (
+                                                <div key={iIdx} className="flex items-start gap-2 border-b border-gray-100 pb-1">
+                                                  <span className="font-bold shrink-0">{isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}.</span>
+                                                  <div className="flex-1"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                                  <span className="border-b-2 border-black w-24 shrink-0 mt-3 h-0"></span>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {part.subType === 'rearranging' && (
-                                      <div className="mt-3 ml-4 bg-gray-50 border-2 border-dashed border-gray-300 p-4 rounded-xl">
-                                        <div className="grid grid-cols-1 gap-2">
-                                          {(part.items || []).map((item: string, iIdx: number) => (
-                                            <div key={iIdx} className="flex items-start gap-3">
-                                              <div className="w-8 h-8 rounded bg-white border border-gray-200 flex items-center justify-center font-bold shadow-sm shrink-0">
-                                                {isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}
+                                      {part.subType === 'short_answer' && (
+                                        <div className="space-y-4 mt-2">
+                                          {(part.questions || []).map((quest: string, qi: number) => (
+                                            <div key={qi} className="flex gap-2">
+                                              <span className="font-bold min-w-[20px]">{isEn ? String.fromCharCode(97 + qi) : (BENGALI_SUB_LABELS[qi] || String.fromCharCode(0x0995 + qi))})</span>
+                                              <div className="flex-1">
+                                                <UniversalMathJax dynamic>{quest}</UniversalMathJax>
+                                                <div className="border-b border-dotted border-gray-400 w-full mt-6 h-1"></div>
+                                                <div className="border-b border-dotted border-gray-400 w-full mt-2 h-1"></div>
                                               </div>
-                                              <div className="pt-1 flex-1 leading-relaxed"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
                                             </div>
                                           ))}
                                         </div>
-                                      </div>
-                                    )}
+                                      )}
 
-                                    {part.subType === 'table' && (
-                                      <div className="mt-2">
-                                        <table className="w-full border-collapse border border-black text-xs">
-                                          <thead>
-                                            <tr>
-                                              {(part.tableHeaders || []).map((h: string, hi: number) => (
-                                                <th key={hi} className="border border-black p-1 bg-gray-50">{h}</th>
+                                      {part.subType === 'error_correction' && (
+                                        <div className="space-y-2 mt-2">
+                                          {(part.sentences || []).map((s: string, si: number) => (
+                                            <div key={si} className="flex gap-2">
+                                              <span className="font-bold min-w-[20px]">{isEn ? String.fromCharCode(97 + si) : BENGALI_SUB_LABELS[si]})</span>
+                                              <div className="flex-1">
+                                                <UniversalMathJax dynamic>{s}</UniversalMathJax>
+                                                <div className="border-b border-dotted border-gray-400 w-full mt-4 h-1"></div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'comprehension' && (
+                                        <div className="space-y-3">
+                                          {part.stemPassage && (
+                                            <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
+                                              <UniversalMathJax dynamic>{part.stemPassage.replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                            </div>
+                                          )}
+                                          {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
+
+                                          {(!part.answerType || part.answerType === 'qa') && (
+                                            <div className="grid grid-cols-1 gap-2 ml-4">
+                                              {(part.questions || []).map((quest: any, qIdx: number) => (
+                                                <div key={qIdx} className="flex flex-col gap-1">
+                                                   <div className="flex items-start gap-2">
+                                                      <span className="font-bold">{isEn ? String.fromCharCode(97 + qIdx) : BENGALI_SUB_LABELS[qIdx]}.</span>
+                                                      <UniversalMathJax dynamic>{typeof quest === 'string' ? quest : quest.text}</UniversalMathJax>
+                                                   </div>
+                                                   <div className="border-b border-dotted border-gray-400 w-full mt-4 h-1 ml-6"></div>
+                                                </div>
                                               ))}
-                                            </tr>
-                                          </thead>
-                                          <tbody>
-                                            {(part.tableRows || []).map((row: string[], ri: number) => (
-                                              <tr key={ri}>
-                                                {row.map((cell: any, ci: number) => (
-                                                  <td key={ci} className="border border-black p-1 text-center">
-                                                    {cell === '___' ? '____________' : cell}
-                                                  </td>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'true_false' && (
+                                        <div className="space-y-2 mt-2 ml-4">
+                                          {(part.statements || []).map((stmt: string, sIdx: number) => (
+                                            <div key={sIdx} className="flex gap-2 items-start text-sm">
+                                              <span className="font-bold shrink-0">{isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}.</span>
+                                              <div className="flex-1 whitespace-pre-wrap leading-relaxed"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
+                                              <span className="w-16 h-6 border border-gray-400 shrink-0 inline-block bg-white ml-2"></span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'flowchart' && (
+                                        <div className="mt-4 flex flex-col md:flex-row items-center justify-center gap-4 flex-wrap">
+                                          {(part.items || []).map((item: string, iIdx: number) => (
+                                            <div key={iIdx} className="flex items-center gap-3">
+                                              <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap bg-white">
+                                                {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
+                                                <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
+                                              </div>
+                                              {iIdx < (part.items?.length || 0) - 1 && (
+                                                <span className="text-slate-400 font-bold hidden md:inline-block">→</span>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'label_diagram' && (
+                                        <div className="mt-4 flex flex-col items-center">
+                                          {part.imageUrl && (
+                                            <div className="relative border rounded inline-block max-w-[80%] bg-white p-2 shadow-sm mb-4">
+                                              <img src={part.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
+                                              {(part.labels || []).map((lbl: any, lIdx: number) => (
+                                                <div key={lIdx} className="absolute w-4 h-4 bg-red-600 text-white flex items-center justify-center rounded-full text-[8px] font-bold shadow-sm" style={{ top: `${lbl.y}%`, left: `${lbl.x}%`, transform: 'translate(-50%, -50%)' }}>
+                                                  {lIdx + 1}
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                          <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4 w-full px-4">
+                                            {(part.labels || []).map((_: any, lIdx: number) => (
+                                              <div key={lIdx} className="flex gap-2 items-end">
+                                                <span className="font-bold text-sm shrink-0">{lIdx + 1}.</span>
+                                                <div className="border-b border-black flex-1 h-5"></div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {(part.subType === 'matching' || part.subType === 'mtf') && (
+                                        <div className="mt-3 ml-4">
+                                          <div className="grid grid-cols-2 gap-0 border-2 border-slate-800 max-w-2xl mx-auto rounded overflow-hidden">
+                                            {/* Header */}
+                                            <div className="border-r border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-xs uppercase tracking-wider">Column A</div>
+                                            <div className="border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-xs uppercase tracking-wider">Column B</div>
+
+                                            {/* Rows */}
+                                            {(() => {
+                                              const left = part.leftColumn || [];
+                                              const right = part.rightColumn || [];
+                                              const rows = Math.max(left.length, right.length);
+                                              const res = [];
+                                              for (let i = 0; i < rows; i++) {
+                                                res.push(
+                                                  <React.Fragment key={i}>
+                                                    <div className="border-r border-b border-slate-300 p-3 flex items-start gap-2 bg-white last:border-b-0">
+                                                      <span className="font-black text-slate-500 w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
+                                                      <span className="flex-1"><UniversalMathJax inline dynamic>{left[i]?.text || ""}</UniversalMathJax></span>
+                                                    </div>
+                                                    <div className="border-b border-slate-300 p-3 flex items-start gap-2 bg-white last:border-b-0">
+                                                      <span className="font-black text-slate-500 w-6">({isEn ? String.fromCharCode(105 + i) : (BENGALI_SUB_LABELS[i] || toBengaliNumerals(i + 1))})</span>
+                                                      <span className="flex-1"><UniversalMathJax inline dynamic>{right[i]?.text || ""}</UniversalMathJax></span>
+                                                    </div>
+                                                  </React.Fragment>
+                                                );
+                                              }
+                                              return res;
+                                            })()}
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'rearranging' && (
+                                        <div className="mt-3 ml-4 bg-gray-50/50 border-2 border-dashed border-gray-300 p-4 rounded-xl">
+                                          <div className="grid grid-cols-1 gap-2">
+                                            {(part.items || []).map((item: string, iIdx: number) => (
+                                              <div key={iIdx} className="flex items-start gap-3 bg-white/60 p-2 rounded-lg shadow-sm border border-gray-100">
+                                                <div className="w-8 h-8 rounded bg-slate-100 border border-slate-200 flex items-center justify-center font-bold text-slate-600 shrink-0">
+                                                  {isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}
+                                                </div>
+                                                <div className="pt-1 flex-1 leading-relaxed"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <div className="mt-4 border border-slate-400 h-10 w-full rounded flex items-center justify-center text-xs font-bold text-slate-500 bg-white">
+                                            Answer Sequence: ____________________________________________________
+                                          </div>
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'table' && (
+                                        <div className="mt-2 overflow-x-auto">
+                                          <table className="w-full border-collapse border border-black text-xs">
+                                            <thead>
+                                              <tr>
+                                                {(part.tableHeaders || []).map((h: string, hi: number) => (
+                                                  <th key={hi} className="border border-black p-2 bg-gray-100 font-bold uppercase tracking-tighter">{h}</th>
                                                 ))}
                                               </tr>
-                                            ))}
-                                          </tbody>
-                                        </table>
-                                      </div>
-                                    )}
+                                            </thead>
+                                            <tbody>
+                                              {(part.tableRows || []).map((row: string[], ri: number) => (
+                                                <tr key={ri}>
+                                                  {row.map((cell: any, ci: number) => (
+                                                    <td key={ci} className="border border-black p-2 text-center font-medium bg-white">
+                                                      {cell === '___' ? '____________' : cell}
+                                                    </td>
+                                                  ))}
+                                                </tr>
+                                              ))}
+                                            </tbody>
+                                          </table>
+                                        </div>
+                                      )}
+                                    </div>
+
+                                    <div className="text-right font-black text-[10px] uppercase tracking-widest mt-2 border-t border-black/5 pt-1">
+                                      {isEn ? `[Marks: ${part.marks}]` : `[নম্বর: ${toBengaliNumerals(part.marks)}]`}
+                                    </div>
                                   </div>
-                                  <div className="text-right font-bold text-xs mt-1">[{isEn ? part.marks : toBengaliNumerals(part.marks)} {isEn ? 'Marks' : 'নম্বর'}]</div>
-                                </div>
-                              ))}
+                                ))}
                               </div>
                             </div>
                           </div>

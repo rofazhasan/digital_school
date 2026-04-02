@@ -51,8 +51,8 @@ export const DescriptiveSection = ({
 
                         {/* Main Text Content */}
                         {(part.text || part.questionText) && (
-                            <div className="text-base font-medium text-amber-900 dark:text-amber-100 leading-relaxed bg-white/40 dark:bg-gray-800/20 p-4 rounded-xl border border-amber-200/20 shadow-sm">
-                                <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                            <div className="text-base font-medium text-amber-900 dark:text-amber-100 leading-relaxed bg-white/40 dark:bg-gray-800/20 p-4 rounded-xl border border-amber-200/20 shadow-sm whitespace-pre-wrap">
+                                <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                             </div>
                         )}
 
@@ -71,9 +71,9 @@ export const DescriptiveSection = ({
                         {part.subType === 'writing' && (
                             <div className="space-y-4">
                                 {part.sourceText && (
-                                    <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-base leading-relaxed text-blue-900 dark:text-blue-100 relative group text-left">
+                                    <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 border border-blue-100 dark:border-blue-900/30 rounded-2xl text-base leading-relaxed text-blue-900 dark:text-blue-100 relative group text-left whitespace-pre-wrap">
                                         <div className="absolute top-2 right-4 text-[10px] font-bold text-blue-300 dark:text-blue-700 uppercase tracking-widest pointer-events-none group-hover:text-blue-400 transition-colors">Source Material</div>
-                                        <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
+                                        <UniversalMathJax dynamic>{part.sourceText.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                     </div>
                                 )}
                                 <DebouncedTextarea
@@ -108,9 +108,9 @@ export const DescriptiveSection = ({
                                 )}
 
                                 {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (() => {
-                                    const segments = part.passage.split('___');
+                                    const segments = part.passage.replace(/\|\|/g, '\n').split('___');
                                     return (
-                                        <div className="text-base leading-relaxed p-5 bg-white/50 dark:bg-gray-900/50 rounded-2xl border border-border backdrop-blur-sm text-left">
+                                        <div className="text-base leading-relaxed p-5 bg-white/50 dark:bg-gray-900/50 rounded-2xl border border-border backdrop-blur-sm text-left whitespace-pre-wrap">
                                             {segments.map((seg: string, si: number) => (
                                                 <span key={si}>
                                                     <UniversalMathJax inline dynamic>{seg}</UniversalMathJax>
@@ -181,8 +181,8 @@ export const DescriptiveSection = ({
                         {part.subType === 'comprehension' && (
                             <div className="space-y-4">
                                 {(part.passage || part.stemPassage) && (
-                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 text-left">
-                                        <UniversalMathJax dynamic>{part.passage || part.stemPassage}</UniversalMathJax>
+                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 text-left whitespace-pre-wrap">
+                                        <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-1 gap-4">

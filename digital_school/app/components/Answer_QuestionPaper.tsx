@@ -171,7 +171,9 @@ const normalizeAnswer = (ans: string | undefined | number) => {
 
 // Helper to render text with MathJax
 const Text = ({ children }: { children: string }) => (
-  <UniversalMathJax dynamic inline>{cleanupMath(children)}</UniversalMathJax>
+  <span className="whitespace-pre-wrap">
+    <UniversalMathJax dynamic inline>{cleanupMath((children || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+  </span>
 );
 
 const Header = ({ examInfo, type, qrData, marks, time, banglaWord, showDate, lang = 'bn' }: {
@@ -394,7 +396,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
                                   <UniversalMathJax inline dynamic>
                                     {cleanupMath(renderDynamicExplanation(
-                                      q.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                      (q.explanation || "").replace(/\|\|/g, '\n').replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
                                       q.options,
                                       q.type
                                     ))}
@@ -427,13 +429,15 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             <div className="mt-2 ml-6 p-3 bg-blue-50 border border-blue-200 rounded">
                               <p className="font-bold text-blue-700 mb-1">ব্যাখ্যা:</p>
                               <div className="text-blue-900">
-                                <UniversalMathJax inline dynamic>
-                                  {cleanupMath(renderDynamicExplanation(
-                                    q.explanation,
-                                    null,
-                                    q.type
-                                  ))}
-                                </UniversalMathJax>
+                                <div className="whitespace-pre-wrap">
+                                  <UniversalMathJax inline dynamic>
+                                    {cleanupMath(renderDynamicExplanation(
+                                      (q.explanation || "").replace(/\|\|/g, '\n'),
+                                      null,
+                                      q.type
+                                    ))}
+                                  </UniversalMathJax>
+                                </div>
                               </div>
                             </div>
                           )}
@@ -560,7 +564,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               <span className="font-bold text-blue-700">ব্যাখ্যা:</span>{" "}
                               <UniversalMathJax inline dynamic>
                                 {cleanupMath(renderDynamicExplanation(
-                                  q.explanation,
+                                  (q.explanation || "").replace(/\|\|/g, '\n'),
                                   null,
                                   q.type,
                                   q.rightColumn
@@ -582,7 +586,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               {isEn ? `Read the following stem and answer questions ${rangeStr}:` : `নিচের উদ্দীপকটি পড়ো এবং ${rangeStr} নং প্রশ্নের উত্তর দাও:`}
                             </p>
                             <div className="not-italic font-normal">
-                              <UniversalMathJax dynamic>{q.q || q.questionText || q.stem || ''}</UniversalMathJax>
+                              <div className="whitespace-pre-wrap">
+                                <UniversalMathJax dynamic>{(q.q || q.questionText || q.stem || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                              </div>
                               {q.image && (
                                 <div className="mt-2 text-center">
                                   <img src={q.image} alt="stem image" className="max-h-48 mx-auto rounded border" />
@@ -639,7 +645,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <span className="font-bold text-gray-800">ব্যাখ্যা:</span>{" "}
                                           <UniversalMathJax inline dynamic>
                                             {cleanupMath(renderDynamicExplanation(
-                                              sub.explanation.replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
+                                              (sub.explanation || "").replace(/\|\|/g, '\n').replace(/^(\*\*Explanation:\*\*|Explanation:)\s*/i, ''),
                                               sub.options,
                                               'MCQ'
                                             ))}
@@ -731,16 +737,16 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                                 <UniversalMathJax inline>{sub.question || sub.questionText || sub.text || ''}</UniversalMathJax>
                                                 <span className="ml-1">[{isEn ? (sub.marks || '?') : toBengaliNumerals(sub.marks || '?')} {isEn ? 'Marks' : 'নম্বর'}]</span>
                                               </div>
-                                              <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                                <UniversalMathJax dynamic>{sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।'}</UniversalMathJax>
+                                              <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                                <UniversalMathJax dynamic>{(sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
                                               </div>
                                             </span>
                                           </li>
                                         ))}
                                       </ul>
                                     ) : (
-                                      <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                        <UniversalMathJax dynamic>{q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')}</UniversalMathJax>
+                                      <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                        <UniversalMathJax dynamic>{(q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                       </div>
                                     )}
                                   </div>
@@ -773,16 +779,16 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <UniversalMathJax inline>{sub.question || sub.questionText || sub.text || ''}</UniversalMathJax>
                                           <span className="ml-1">[{isEn ? (sub.marks || '?') : toBengaliNumerals(sub.marks || '?')} {isEn ? 'Marks' : 'নম্বর'}]</span>
                                         </div>
-                                        <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                          <UniversalMathJax dynamic>{sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।'}</UniversalMathJax>
+                                        <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                          <UniversalMathJax dynamic>{(sub.modelAnswer || sub.answer || sub.text || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
                                         </div>
                                       </span>
                                     </li>
                                   ))}
                                 </ul>
                               ) : (
-                                <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                                  <UniversalMathJax inline dynamic>{q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')}</UniversalMathJax>
+                                <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                                  <UniversalMathJax inline dynamic>{(q.modelAnswer || (isEn ? 'No answer provided.' : 'উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                 </div>
                               )}
                             </div>
@@ -812,7 +818,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
                               <div className="whitespace-pre-wrap mb-2">
-                                <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
+                                <UniversalMathJax dynamic>{(q.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                               </div>
                               <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer Sheet:' : 'উত্তরপত্র:'}</div>
                               <div className="space-y-4">
@@ -822,8 +828,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
                                   {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
                                   {(part.text || part.questionText) && (
-                                    <div className="font-medium mb-2 leading-relaxed">
-                                      <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                                    <div className="font-medium mb-2 leading-relaxed whitespace-pre-wrap">
+                                      <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                     </div>
                                   )}
 
@@ -831,8 +837,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     {part.subType === 'writing' && (
                                       <div className="space-y-2">
                                         {part.sourceText && (
-                                          <div className="p-2 bg-gray-50 border border-gray-200 rounded italic text-xs mb-2">
-                                            <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
+                                          <div className="p-2 bg-gray-50 border border-gray-200 rounded italic text-xs mb-2 whitespace-pre-wrap">
+                                            <UniversalMathJax dynamic>{(part.sourceText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                           </div>
                                         )}
                                       </div>
@@ -844,7 +850,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={qi} className="flex gap-2 items-start text-sm">
                                             <span className="font-bold flex-shrink-0">{isEn ? (qi + 1) : toBengaliNumerals(qi + 1)}.</span>
                                             <div className="flex-1 w-full">
-                                              <UniversalMathJax dynamic>{q}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{q.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           </div>
                                         ))}
@@ -857,7 +863,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={si} className="flex items-start gap-2 mb-3 max-w-2xl">
                                             <span className="font-bold flex-shrink-0 w-6">({isEn ? String.fromCharCode(97 + si) : BENGALI_SUB_LABELS[si]})</span>
                                             <div className="flex-1">
-                                              <UniversalMathJax dynamic>{s}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{s.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           </div>
                                         ))}
@@ -867,9 +873,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     {part.subType === 'fill_in' && (
                                       <div className="space-y-2">
                                         {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (
-                                          <div className="leading-relaxed">
+                                          <div className="leading-relaxed whitespace-pre-wrap">
                                             <UniversalMathJax dynamic>
-                                              {part.passage.split('___').map((segment: string, sIdx: number, array: any[]) => (
+                                              {part.passage.replace(/\|\|/g, '\n').split('___').map((segment: string, sIdx: number, array: any[]) => (
                                                 <React.Fragment key={sIdx}>
                                                   {segment}
                                                   {sIdx < array.length - 1 && (
@@ -887,7 +893,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       <div className="space-y-3">
                                         {part.stemPassage && (
                                           <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
-                                            <UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax>
+                                            <UniversalMathJax dynamic>{(part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                           </div>
                                         )}
                                         {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
@@ -897,7 +903,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                             {(part.questions || []).map((quest: string, qIdx: number) => (
                                               <div key={qIdx} className="flex items-start gap-2">
                                                 <span className="font-bold">{isEn ? String.fromCharCode(97 + qIdx) : BENGALI_SUB_LABELS[qIdx]}.</span>
-                                                <UniversalMathJax dynamic>{quest}</UniversalMathJax>
+                                                <UniversalMathJax dynamic>{quest.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                               </div>
                                             ))}
                                           </div>
@@ -907,7 +913,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div className="grid grid-cols-2 gap-x-8 gap-y-4 ml-4">
                                             {(part.stemQuestions || []).map((sq: any, sqIdx: number) => (
                                               <div key={sqIdx} className="break-inside-avoid">
-                                                <div className="font-bold mb-1">{isEn ? (sqIdx + 1) : toBengaliNumerals(sqIdx + 1)}. {sq.question}</div>
+                                                <div className="font-bold mb-1">{isEn ? (sqIdx + 1) : toBengaliNumerals(sqIdx + 1)}. <UniversalMathJax inline dynamic>{sq.question.replace(/\|\|/g, '\n')}</UniversalMathJax></div>
                                               </div>
                                             ))}
                                           </div>
@@ -921,7 +927,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={ai} className="flex gap-2">
                                             <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
                                             <div className="flex-1 font-bold">
-                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           </div>
                                         ))}
@@ -934,7 +940,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={ai} className="flex gap-2">
                                             <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
                                             <div className="flex-1 font-bold">
-                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           </div>
                                         ))}
@@ -956,11 +962,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                                 <React.Fragment key={i}>
                                                   <div className="border-r border-b border-black p-2 flex items-start gap-2">
                                                     <span className="font-bold w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
-                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{left[i]?.text || ""}</UniversalMathJax></span>
+                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{(left[i]?.text || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
                                                   </div>
                                                   <div className="border-b border-black p-2 flex items-start gap-2">
                                                     <span className="font-bold w-6">({isEn ? String.fromCharCode(105 + i) : toBengaliNumerals(i + 1)})</span>
-                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{right[i]?.text || ""}</UniversalMathJax></span>
+                                                    <span className="flex-1"><UniversalMathJax inline dynamic>{(right[i]?.text || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
                                                   </div>
                                                 </React.Fragment>
                                               );
@@ -979,7 +985,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                               <div className="w-8 h-8 rounded bg-white border border-gray-200 flex items-center justify-center font-bold shadow-sm shrink-0">
                                                 {isEn ? String.fromCharCode(97 + iIdx) : BENGALI_SUB_LABELS[iIdx]}
                                               </div>
-                                              <div className="pt-1 flex-1 leading-relaxed"><UniversalMathJax dynamic>{item}</UniversalMathJax></div>
+                                              <div className="pt-1 flex-1 leading-relaxed"><UniversalMathJax dynamic>{item.replace(/\|\|/g, '\n')}</UniversalMathJax></div>
                                             </div>
                                           ))}
                                         </div>
@@ -992,7 +998,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <thead>
                                             <tr>
                                               {(part.tableHeaders || []).map((h: string, hi: number) => (
-                                                <th key={hi} className="border border-black p-1 bg-gray-50">{h}</th>
+                                                <th key={hi} className="border border-black p-1 bg-gray-50"><UniversalMathJax inline dynamic>{h.replace(/\|\|/g, '\n')}</UniversalMathJax></th>
                                               ))}
                                             </tr>
                                           </thead>
@@ -1001,7 +1007,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                               <tr key={ri}>
                                                 {row.map((cell: any, ci: number) => (
                                                   <td key={ci} className="border border-black p-1 text-center">
-                                                    {cell === '___' ? '____________' : cell}
+                                                    {cell === '___' ? '____________' : <UniversalMathJax inline dynamic>{cell.replace(/\|\|/g, '\n')}</UniversalMathJax>}
                                                   </td>
                                                 ))}
                                               </tr>
@@ -1016,7 +1022,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                         {(part.statements || []).map((stmt: string, sIdx: number) => (
                                           <div key={sIdx} className="flex gap-2 items-start text-sm">
                                             <span className="font-bold shrink-0">{isEn ? (sIdx + 1) : toBengaliNumerals(sIdx + 1)}.</span>
-                                            <div className="flex-1 whitespace-pre-wrap"><UniversalMathJax dynamic>{stmt}</UniversalMathJax></div>
+                                            <div className="flex-1 whitespace-pre-wrap"><UniversalMathJax dynamic>{stmt.replace(/\|\|/g, '\n')}</UniversalMathJax></div>
                                             <span className="w-16 h-6 border border-gray-400 shrink-0 inline-block bg-white"></span>
                                           </div>
                                         ))}
@@ -1028,7 +1034,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                         {(part.items || []).map((item: string, iIdx: number) => (
                                           <div key={iIdx} className="flex items-center gap-3">
                                             <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap">
-                                              {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
+                                              {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item.replace(/\|\|/g, '\n')}</UniversalMathJax>}
                                               <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
                                             </div>
                                             {iIdx < (part.items?.length || 0) - 1 && (
@@ -1063,11 +1069,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     )}
                                   </div>
 
-                                  <div className="bg-gray-50 p-3 rounded border border-gray-200 shadow-sm leading-relaxed text-sm">
+                                  <div className="bg-gray-50 p-3 rounded border border-gray-200 shadow-sm leading-relaxed text-sm whitespace-pre-wrap">
                                     <div className="font-bold text-xs text-red-700 mb-1">{isEn ? 'Solution:' : 'সমাধান:'}</div>
                                     {part.subType === 'writing' && (
                                       <div>
-                                        <UniversalMathJax dynamic>{part.modelAnswer || (isEn ? 'No sample answer provided.' : 'নমুনা উত্তর প্রদান করা হয়নি।')}</UniversalMathJax>
+                                        <UniversalMathJax dynamic>{(part.modelAnswer || (isEn ? 'No sample answer provided.' : 'নমুনা উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                       </div>
                                     )}
 
@@ -1077,7 +1083,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={aIdx} className="flex gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
                                             <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
                                             <span className="flex-1 text-red-700 font-medium">
-                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </span>
                                           </div>
                                         ))}
@@ -1093,7 +1099,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div key={aIdx} className="flex gap-2 text-sm bg-white p-2 rounded border border-green-100 shadow-sm">
                                             <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
                                             <span className="flex-1 text-emerald-700 font-bold">
-                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </span>
                                           </div>
                                         ))}
@@ -1262,7 +1268,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       <div className="mt-3 bg-white p-2 rounded border border-gray-200">
                                         <div className="font-bold text-[11px] text-gray-600 border-b border-gray-100 pb-1 mb-1">{isEn ? 'Explanation:' : 'ব্যাখ্যা:'}</div>
                                         <div className="text-sm text-gray-800 leading-relaxed whitespace-pre-wrap">
-                                          <UniversalMathJax dynamic>{part.explanation}</UniversalMathJax>
+                                          <UniversalMathJax dynamic>{(part.explanation || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                         </div>
                                       </div>
                                     )}
@@ -1298,10 +1304,12 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                         <div className="flex items-start">
                           <span className="font-bold mr-2">{isEn ? (idx + 1) : toBengaliNumerals(idx + 1)}.</span>
                           <div className="flex-1">
-                            <UniversalMathJax dynamic>{`${q.questionText} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
+                            <div className="whitespace-pre-wrap">
+                              <UniversalMathJax dynamic>{`${(q.questionText || "").replace(/\|\|/g, '\n')} [${toBengaliNumerals(q.marks || 1)}]`}</UniversalMathJax>
+                            </div>
                             <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer:' : 'উত্তর:'}</div>
-                            <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed">
-                              <UniversalMathJax dynamic>{q.modelAnswer || 'উত্তর প্রদান করা হয়নি।'}</UniversalMathJax>
+                            <div className="bg-gray-50 p-2 rounded border border-gray-200 shadow-sm leading-relaxed whitespace-pre-wrap">
+                              <UniversalMathJax dynamic>{(q.modelAnswer || 'উত্তর প্রদান করা হয়নি।').replace(/\|\|/g, '\n')}</UniversalMathJax>
                             </div>
                           </div>
                         </div>

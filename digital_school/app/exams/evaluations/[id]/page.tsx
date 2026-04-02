@@ -3033,7 +3033,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
                                                                 
                                                                 // 1. Collect potential image sources (Handle both objects and direct strings)
-                                                                const partAnswerObj = currentStudent?.answers?.[marksKey];
+                                                                const mainPartAns = currentStudent?.answers?.[`${currentQuestion.id}_desc_${pIdx}`];
+                                                                const detailPartAns = getAns('ans');
+                                                                
                                                                 const allImages = [
                                                                   part.attachments,
                                                                   part.studentImages,
@@ -3043,14 +3045,25 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   currentStudent?.answers?.[`${subKeyBase}_image`],
                                                                   currentStudent?.answers?.[`${keyBase}_images`],
                                                                   currentStudent?.answers?.[`${subKeyBase}_images`],
-                                                                  // Check if marksKey value itself is an object with images
-                                                                  ...(typeof partAnswerObj === 'object' && partAnswerObj !== null ? [
-                                                                    partAnswerObj.responsePic,
-                                                                    partAnswerObj.studentUploadedImage,
-                                                                    partAnswerObj.imageUrl,
-                                                                    ...(Array.isArray(partAnswerObj.images) ? partAnswerObj.images : []),
-                                                                    ...(Array.isArray(partAnswerObj.responsePics) ? partAnswerObj.responsePics : [])
-                                                                  ] : [])
+                                                                  // Check main answer objects
+                                                                  ...(typeof mainPartAns === 'object' && mainPartAns !== null ? [
+                                                                    (mainPartAns as any).responsePic,
+                                                                    (mainPartAns as any).studentUploadedImage,
+                                                                    (mainPartAns as any).imageUrl,
+                                                                    ...(Array.isArray((mainPartAns as any).images) ? (mainPartAns as any).images : []),
+                                                                    ...(Array.isArray((mainPartAns as any).responsePics) ? (mainPartAns as any).responsePics : [])
+                                                                  ] : []),
+                                                                  // Check detailed answer objects
+                                                                  ...(typeof detailPartAns === 'object' && detailPartAns !== null ? [
+                                                                    (detailPartAns as any).responsePic,
+                                                                    (detailPartAns as any).studentUploadedImage,
+                                                                    (detailPartAns as any).imageUrl,
+                                                                    ...(Array.isArray((detailPartAns as any).images) ? (detailPartAns as any).images : []),
+                                                                    ...(Array.isArray((detailPartAns as any).responsePics) ? (detailPartAns as any).responsePics : [])
+                                                                  ] : []),
+                                                                  // Also check if it's a direct URL string
+                                                                  (typeof mainPartAns === 'string' && mainPartAns.startsWith('http')) ? mainPartAns : null,
+                                                                  (typeof detailPartAns === 'string' && detailPartAns.startsWith('http')) ? detailPartAns : null
                                                                 ].flat().filter(img => typeof img === 'string' && img.startsWith('http')).filter(Boolean);
                                                                 
                                                                 const uniqueImages = Array.from(new Set(allImages));
@@ -3125,7 +3138,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                                                 return hasTextKey ? (
                                                                   <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap mb-4">
-                                                                    <UniversalMathJax dynamic>{cleanupMath(part.modelAnswer || part.answer || part.correctAnswer || "")}</UniversalMathJax>
+                                                                    <UniversalMathJax dynamic>{cleanupMath((part.modelAnswer || part.answer || part.correctAnswer || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                                   </div>
                                                                 ) : null;
                                                               })()}
@@ -3155,7 +3168,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 <div className="mt-4 p-4 border-t border-emerald-200/50">
                                                                   <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Explanation</div>
                                                                   <div className="text-sm font-medium text-emerald-800 leading-relaxed whitespace-pre-wrap">
-                                                                    <UniversalMathJax dynamic>{cleanupMath(part.explanation)}</UniversalMathJax>
+                                                                    <UniversalMathJax dynamic>{cleanupMath((part.explanation || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                                   </div>
                                                                 </div>
                                                               )}
