@@ -39,6 +39,10 @@ interface CQ {
         matches?: Record<string, string>;
         statements?: string[];
         labels?: any[];
+        clueType?: string;
+        wordBox?: string[];
+        passage?: string;
+        answers?: string[];
     }[];
 }
 interface SQ {
@@ -58,6 +62,10 @@ interface SQ {
     matches?: Record<string, string>;
     correctAnswer?: any;
     explanation?: string;
+    clueType?: string;
+    wordBox?: string[];
+    passage?: string;
+    answers?: string[];
 }
 
 interface AR {
@@ -345,23 +353,38 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                     );
 
                 case 'fill_in':
+                    const isBoxType = subQ.clueType === 'box';
+                    const clues = subQ.wordBox || subQ.clues || [];
+                    
                     return (
-                        <div className="mt-2 p-2 border border-slate-200 rounded bg-slate-50 text-xs text-left">
-                            {(subQ.wordBox || subQ.clues) && (subQ.wordBox?.length > 0 || subQ.clues?.length > 0) && (
-                                <div className="mb-2 flex flex-wrap gap-1">
-                                    <span className="font-bold text-slate-400 mr-1 uppercase text-[8px]">Available Clues:</span>
-                                    {(subQ.wordBox || subQ.clues || []).map((c: string, ci: number) => <span key={ci} className="px-1 border rounded bg-white">{c}</span>)}
+                        <div className="mt-2 p-3 border border-slate-300 rounded bg-slate-50/30 text-[10px] text-left">
+                            {clues.length > 0 && (
+                                <div className={`mb-3 p-2 ${isBoxType ? 'border-2 border-slate-800 bg-white' : 'border border-dashed border-slate-300'} rounded`}>
+                                    <div className="text-[7px] font-black text-slate-500 uppercase mb-1 tracking-widest text-center border-b border-slate-100 pb-1">
+                                        {isBoxType ? 'Suitable Word Box' : 'Available Clues'}
+                                    </div>
+                                    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+                                        {clues.map((c: string, ci: number) => (
+                                            <span key={ci} className="font-bold text-slate-800 px-1 italic">
+                                                <UniversalMathJax inline dynamic>{cleanupMath(c)}</UniversalMathJax>
+                                            </span>
+                                        ))}
+                                    </div>
                                 </div>
                             )}
-                            <div className="leading-relaxed">
+                            <div className="leading-relaxed text-slate-900">
                                 {(subQ.passage || subQ.questionText || "").split('___').map((part: string, pi: number, arr: any[]) => {
                                     const val = getVal(pi.toString()) || (typeof studentAnswer === 'string' ? null : studentAnswer?.[pi]);
+                                    const correct = subQ.answers?.[pi];
+                                    const isCorrect = normalize(val) === normalize(correct);
+                                    
                                     return (
                                         <span key={pi}>
-                                            <Text>{part}</Text>
+                                            <UniversalMathJax inline dynamic>{cleanupMath(part.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                             {pi < arr.length - 1 && (
-                                                <span className="mx-1 px-1 border-b border-indigo-400 font-bold text-indigo-600 bg-indigo-50">
-                                                    {val || '___'}
+                                                <span className={`mx-1 px-2 border-b-2 font-black ${val ? (isCorrect ? 'border-green-600 text-green-700 bg-green-50/50' : 'border-red-600 text-red-700 bg-red-50/50') : 'border-indigo-500 text-indigo-700 bg-indigo-50/50'} rounded-t-sm`}>
+                                                    {val || '__________'}
+                                                    {!isCorrect && correct && <span className="ml-1 text-[7px] text-green-700 opacity-70">[{correct}]</span>}
                                                 </span>
                                             )}
                                         </span>
