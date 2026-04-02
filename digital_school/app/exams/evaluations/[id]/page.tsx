@@ -3014,7 +3014,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               {part.subType === 'short_answer' && (
                                                                 <div className="grid grid-cols-1 gap-2">
                                                                   {(part.questions || []).map((q: string, qi: number) => {
-                                                                    const ans = getAns(qi);
+                                                                    const ansArr = getAns('ans') || getAns('answers');
+                                                                    const ans = getAns(qi) || (Array.isArray(ansArr) ? ansArr[qi] : (qi === 0 && !Array.isArray(ansArr) ? ansArr : null));
                                                                     return (
                                                                       <div key={qi} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors">
                                                                         <div className="flex gap-2 items-start opacity-70 mb-1 group-hover:opacity-100">
@@ -3033,7 +3034,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               {part.subType === 'error_correction' && (
                                                                 <div className="grid grid-cols-1 gap-2">
                                                                   {(part.sentences || []).map((s: string, si: number) => {
-                                                                    const ans = getAns(si);
+                                                                    const ansArr = getAns('ans') || getAns('answers');
+                                                                    const ans = getAns(si) || (Array.isArray(ansArr) ? ansArr[si] : (si === 0 && !Array.isArray(ansArr) ? ansArr : null));
                                                                     return (
                                                                       <div key={si} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors flex items-center justify-between">
                                                                         <div className="flex gap-2 items-center">
@@ -3053,21 +3055,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
                                                                 const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
                                                                 
-                                                                // 1. Collect potential image sources from multiple possible storage patterns
-                                                                const mainPartData = currentStudent?.answers?.[keyBase];
-                                                                const subPartData = currentStudent?.answers?.[subKeyBase];
-                                                                const legacyImageData = currentStudent?.answers?.[`${keyBase}_images`] || currentStudent?.answers?.[`${keyBase}_image`];
-                                                                const legacySubImageData = currentStudent?.answers?.[`${subKeyBase}_images`] || currentStudent?.answers?.[`${subKeyBase}_image`];
+                                                                // 1. Robustly collect ALL data related to this descriptive part/sub-question
+                                                                // This handles flat keys like "ID_desc_0_ans", "ID_desc_0_image", etc.
+                                                                const relevantData = Object.keys(currentStudent?.answers || {})
+                                                                  .filter(k => k.startsWith(keyBase) || k.startsWith(subKeyBase))
+                                                                  .map(k => currentStudent?.answers?.[k]);
 
                                                                 const allImages = collectAllImages([
                                                                   part.attachments,
                                                                   part.studentImages,
                                                                   part.answer?.attachments,
                                                                   part.answer?.studentImages,
-                                                                  mainPartData,
-                                                                  subPartData,
-                                                                  legacyImageData,
-                                                                  legacySubImageData,
+                                                                  ...relevantData
                                                                 ]);
                                                                 
                                                                 const uniqueImages = Array.from(new Set(allImages));
@@ -3076,10 +3075,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 return (
                                                                   <div className="space-y-4">
                                                                     {/* Text response if not already rendered by specific sub-type */}
-                                                                    {responseText && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'writing', 'short_answer', 'error_correction'].includes(part.subType || '') && (
+                                                                    {(responseText || uniqueImages.length === 0) && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'writing', 'short_answer', 'error_correction'].includes(part.subType || '') && (
                                                                       <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
-                                                                        <UniversalMathJax dynamic>{responseText}</UniversalMathJax>
-                                                                        {!(responseText) && <span className="text-muted-foreground/30">No text provided…</span>}
+                                                                        {responseText ? <UniversalMathJax dynamic>{responseText}</UniversalMathJax> : <span className="text-muted-foreground/30">No response provided…</span>}
                                                                       </div>
                                                                     )}
                                                                     
@@ -3129,7 +3127,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-sm">Standard Key</div>
                                                               {(() => {
                                                                 const hasSubKey = part.subType === 'matching' || part.subType === 'flowchart' || part.subType === 'fill_in' || part.subType === 'true_false' || part.subType === 'short_answer' || part.subType === 'error_correction' || part.correctOrder;
-                                                                const hasTextKey = part.modelAnswer || part.answer || part.correctAnswer;
+                                                                const hasTextKey = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || (Array.isArray(part.answers) && part.answers.length > 0 && typeof part.answers[0] === 'string' ? part.answers : null) || (part.modelAnswers && (Array.isArray(part.modelAnswers) || typeof part.modelAnswers === 'string'));
                                                                 
                                                                 if (!hasSubKey && !hasTextKey) {
                                                                   return (
@@ -3140,11 +3138,28 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   );
                                                                 }
 
-                                                                return hasTextKey ? (
-                                                                  <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap mb-4">
-                                                                    <UniversalMathJax dynamic>{cleanupMath((part.modelAnswer || part.answer || part.correctAnswer || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : null));
+
+                                                                return (
+                                                                  <div className="space-y-3">
+                                                                    {(part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null)) && (
+                                                                      <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
+                                                                        <UniversalMathJax dynamic>{cleanupMath(String(part.modelAnswer || part.answer || part.correctAnswer || part.answers || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                      </div>
+                                                                    )}
+
+                                                                    {pluralAnswers && pluralAnswers.length > 0 && (
+                                                                      <div className="grid grid-cols-1 gap-1.5">
+                                                                        {pluralAnswers.map((ans: any, ai: number) => (
+                                                                          <div key={ai} className="flex gap-2 items-start bg-emerald-100/30 p-2 rounded-lg border border-emerald-200/50">
+                                                                            <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
+                                                                            <div className="text-sm font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
+                                                                          </div>
+                                                                        ))}
+                                                                      </div>
+                                                                    )}
                                                                   </div>
-                                                                ) : null;
+                                                                );
                                                               })()}
 
                                                               {part.subType === 'true_false' && (

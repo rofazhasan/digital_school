@@ -3518,8 +3518,46 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           </div>
                         )}
 
+                        {part.subType === 'short_answer' && (
+                          <div className="grid grid-cols-1 gap-1">
+                            {(part.questions || []).slice(0, 3).map((q: string, qi: number) => (
+                              <div key={qi} className="text-[10px] text-gray-500 flex gap-2 italic">
+                                <span className="font-bold opacity-30 italic">{qi + 1}.</span>
+                                <UniversalMathJax inline dynamic>{q}</UniversalMathJax>
+                              </div>
+                            ))}
+                            {(part.questions || []).length > 3 && <p className="text-[8px] text-gray-400 pl-4">+ {(part.questions || []).length - 3} more questions</p>}
+                          </div>
+                        )}
+
+                        {part.subType === 'error_correction' && (
+                          <div className="grid grid-cols-1 gap-1">
+                            {(part.sentences || []).slice(0, 3).map((s: string, si: number) => (
+                              <div key={si} className="text-[10px] text-gray-500 flex gap-2 italic">
+                                <span className="font-bold opacity-30 italic">{String.fromCharCode(97 + si)}.</span>
+                                <UniversalMathJax inline dynamic>{s}</UniversalMathJax>
+                              </div>
+                            ))}
+                            {(part.sentences || []).length > 3 && <p className="text-[8px] text-gray-400 pl-4">+ {(part.sentences || []).length - 3} more sentences</p>}
+                          </div>
+                        )}
+
+                        {part.subType === 'flowchart' && (
+                          <div className="flex flex-wrap gap-2 items-center">
+                            {(part.items || []).slice(0, 4).map((it: string, ii: number) => (
+                              <React.Fragment key={ii}>
+                                <div className="px-2 py-1 bg-amber-100/50 rounded border border-amber-200 text-[9px] font-bold text-amber-800 truncate max-w-[80px]">
+                                  <UniversalMathJax inline dynamic>{it}</UniversalMathJax>
+                                </div>
+                                {ii < (part.items || []).length - 1 && ii < 3 && <ArrowRight className="w-2.5 h-2.5 text-amber-300" />}
+                              </React.Fragment>
+                            ))}
+                            {(part.items || []).length > 4 && <span className="text-[8px] text-gray-400">...</span>}
+                          </div>
+                        )}
+
                         {/* Fallback for other types or text content */}
-                        {(!['writing', 'fill_in', 'comprehension', 'matching', 'table', 'true_false'].includes(part.subType || '')) && (part.text || part.questionText) && (
+                        {(!['writing', 'fill_in', 'comprehension', 'matching', 'table', 'true_false', 'label_diagram', 'short_answer', 'error_correction', 'flowchart'].includes(part.subType || '')) && (part.text || part.questionText) && (
                           <div className="text-xs text-gray-600 dark:text-gray-300 line-clamp-3">
                             <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
                           </div>

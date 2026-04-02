@@ -683,14 +683,33 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
         {renderSubQuestionContent(subQ, subIdx, questionId)}
         
-        {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null)) && (
-          <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
-            <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
-              <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+        {(() => {
+          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null);
+          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+
+          if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
+
+          return (
+            <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
+              <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
+                <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+              </div>
+              {modelAns && (
+                <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              )}
+              {modelAnsArray && modelAnsArray.length > 0 && !['fill_in', 'matching', 'short_answer', 'error_correction', 'true_false', 'flowchart'].includes(subQ.subType) && (
+                <div className="flex flex-col gap-1 mt-1">
+                  {modelAnsArray.map((ans: any, ai: number) => (
+                    <div key={ai} className="flex gap-1 items-start bg-emerald-100/20 p-1 rounded">
+                      <span className="font-black text-emerald-600 shrink-0">({ai + 1})</span>
+                      <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-            <UniversalMathJax dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : '') || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-          </div>
-        )}
+          );
+        })()}
         
         {subQ.explanation && (
           <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 mt-2 text-[10px] text-blue-800 flex flex-col gap-1 whitespace-pre-wrap">
