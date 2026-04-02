@@ -407,9 +407,9 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             <table className="w-full text-[8px] border-collapse">
                                 <thead className="bg-slate-100 border-b border-slate-200">
                                     <tr>
-                                        {cols.map((c, ci) => <th key={ci} className="p-1 text-left border-r border-slate-200">{c.label}</th>)}
-                                        <th className="p-1 text-left bg-indigo-50/30">Student Match</th>
-                                        <th className="p-1 text-left bg-green-50/30">Correct Key</th>
+                                        {cols.map((c, ci) => <th key={ci} className="p-0.5 text-left border-r border-slate-200">{c.label}</th>)}
+                                        <th className="p-0.5 text-left bg-indigo-50/30">Student Match</th>
+                                        <th className="p-0.5 text-left bg-green-50/30">Correct Key</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -435,15 +435,15 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         return (
                                             <tr key={i} className={`border-b border-slate-100 ${isCorrect ? 'bg-green-50/10' : 'bg-red-50/10'}`}>
                                                 {cols.map((c, ci) => (
-                                                    <td key={ci} className="p-1 border-r border-slate-200">
-                                                        <span className="font-bold text-slate-400 mr-1">{c.data[i]?.id}.</span>
-                                                        <Text>{c.data[i]?.text || '-'}</Text>
+                                                    <td key={ci} className="p-0.5 border-r border-slate-200">
+                                                        <span className="font-bold text-slate-400 mr-0.5 leading-none">{c.data[i]?.id}.</span>
+                                                        <span className="leading-tight"><Text>{c.data[i]?.text || '-'}</Text></span>
                                                     </td>
                                                 ))}
-                                                <td className={`p-1 border-r border-slate-200 font-black ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
+                                                <td className={`p-0.5 border-r border-slate-200 font-black leading-tight ${isCorrect ? 'text-green-700' : 'text-red-700'}`}>
                                                     {ansIdStr ? getItemText(ansIdStr) : 'None'}
                                                 </td>
-                                                <td className="p-1 text-green-700 font-black">
+                                                <td className="p-0.5 text-green-700 font-black leading-tight">
                                                     {correctIdStr ? getItemText(correctIdStr) : '-'}
                                                 </td>
                                             </tr>
