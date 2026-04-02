@@ -427,7 +427,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             return parts.map((pid, idx) => {
                                                 const colKey = ['leftColumn', 'rightColumn', 'columnC', 'columnD'][idx];
                                                 const item = subQ[colKey]?.find((r: any) => r.id === pid);
-                                                return item ? (idx > 0 ? `→${pid}` : pid) : pid;
+                                                const itemId = item?.id || pid;
+                                                return item ? (idx > 0 ? `→${itemId}` : itemId) : itemId;
                                             }).join('');
                                         };
 
@@ -891,15 +892,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                                         if (isSelected && isOptionCorrect) bgClass = "bg-green-100 border-green-600 ring-2 ring-green-600";
 
                                                                         return (
-                                                                            <div key={i} className={`p-2 rounded border flex items-center gap-2 text-xs ${bgClass}`}>
-                                                                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border ${isSelected || isOptionCorrect ? 'bg-white border-gray-300' : 'bg-gray-100 text-gray-500'}`}>
-                                                                                    {optionId}
-                                                                                </div>
-                                                                                <div className={`flex-1 ${isOptionCorrect ? 'font-bold text-green-800' : isSelected ? 'text-red-800' : 'text-gray-700'}`}>
+                                                                            <div key={i} className={`flex items-center gap-2 px-1 rounded text-xs ${isOptionCorrect ? 'text-green-700 font-bold bg-green-50' : (isSelected ? 'text-red-700 bg-red-50' : 'text-gray-600')}`}>
+                                                                                <span className="font-bold shrink-0">{optionId}.</span>
+                                                                                <div className="flex-1">
                                                                                     {optText}
                                                                                 </div>
-                                                                                {isOptionCorrect && <CheckCircle className="w-4 h-4 text-green-600" />}
-                                                                                {isSelected && !isOptionCorrect && <XCircle className="w-4 h-4 text-red-600" />}
+                                                                                {isSelected && (isOptionCorrect ? <CheckCircle className="w-3 h-3 text-green-600" /> : <XCircle className="w-3 h-3 text-red-600" />)}
                                                                             </div>
                                                                         );
                                                                     })}
@@ -943,22 +941,22 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         {/* MTF Content: Columns + Table */}
                                                         <div className="space-y-6">
                                                             {/* Columns Display */}
-                                                            <div className="grid grid-cols-2 gap-6 bg-gray-50 p-2 rounded border border-dashed border-gray-200">
-                                                                <div className="space-y-2">
-                                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b pb-1 mb-2">Column A</div>
+                                                            <div className="grid grid-cols-2 gap-2 bg-gray-50/50 p-1 rounded border border-dashed border-gray-200">
+                                                                <div className="space-y-1">
+                                                                    <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b pb-0.5 mb-1 px-1">Column A</div>
                                                                     {(q.leftColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[36px] flex items-center shadow-sm">
-                                                                            <span className="font-bold mr-2 w-5 h-5 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-600">{i + 1}</span>
-                                                                            <Text>{item.text}</Text>
+                                                                        <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
+                                                                            <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{i + 1}</span>
+                                                                            <div className="flex-1"><Text>{item.text}</Text></div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
-                                                                <div className="space-y-2">
-                                                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b pb-1 mb-2">Column B</div>
+                                                                <div className="space-y-1">
+                                                                    <div className="text-[8px] font-black text-gray-400 uppercase tracking-widest border-b pb-0.5 mb-1 px-1">Column B</div>
                                                                     {(q.rightColumn || []).map((item: any, i: number) => (
-                                                                        <div key={i} className="p-2 bg-white border rounded text-xs min-h-[36px] flex items-center shadow-sm">
-                                                                            <span className="font-bold mr-2 w-5 h-5 flex items-center justify-center bg-gray-100 rounded-full text-[10px] text-gray-600">{String.fromCharCode(65 + i)}</span>
-                                                                            <Text>{item.text}</Text>
+                                                                        <div key={i} className="p-1 px-2 bg-white border rounded text-[10px] flex items-center shadow-sm">
+                                                                            <span className="font-bold mr-2 w-4 h-4 flex items-center justify-center bg-gray-100 rounded-full text-[8px] text-gray-600 shrink-0">{String.fromCharCode(65 + i)}</span>
+                                                                            <div className="flex-1"><Text>{item.text}</Text></div>
                                                                         </div>
                                                                     ))}
                                                                 </div>
