@@ -18,6 +18,7 @@ import {
   CheckCircle,
   XCircle,
   PenTool,
+  ImagePlus,
   Save,
   ArrowLeft,
   Star,
@@ -2800,7 +2801,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 {(currentQuestion?.subQuestions || []).map((part: any, pIdx: number) => {
                                                   const ansKey = (sub: string | number) => `${currentQuestion.id}_desc_${pIdx}_${sub}`;
                                                   const getAns = (sub: string | number) => currentStudent?.answers?.[ansKey(sub)] ?? '';
-                                                  const currentSubMarks = currentStudent?.answers?.[`${currentQuestion.id}_desc_${pIdx}_marks`] || 0;
+                                                  const marksKey = `${currentQuestion.id}_desc_${pIdx}_marks`;
+                                                  const currentSubMarks = currentStudent?.answers?.[marksKey] || 0;
                                                   const normalize = (s: any) => String(s || "").trim().toLowerCase();
 
                                                   return (
@@ -3025,48 +3027,76 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 </div>
                                                               )}
 
-                                                              {(!part.subType || part.subType === 'desc' || part.subType === 'descriptive') && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'writing', 'short_answer', 'error_correction'].includes(part.subType) && (
-                                                                <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
-                                                                  <UniversalMathJax dynamic>{cleanupMath((getAns('ans') || getAns(0) || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                  {!(getAns('ans') || getAns(0)) && <span className="text-muted-foreground/30">No text provided…</span>}
-                                                                </div>
-                                                              )}
+                                                              {/* Student Response Text & Uploaded Images */}
                                                               {(() => {
                                                                 const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
                                                                 const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
-                                                                const singleImage = currentStudent?.answers?.[`${keyBase}_image`] || currentStudent?.answers?.[`${subKeyBase}_image`];
-                                                                const multipleImages = currentStudent?.answers?.[`${keyBase}_images`] || currentStudent?.answers?.[`${subKeyBase}_images`];
-                                                                const modernAttachments = part.attachments || part.studentImages || part.answer?.attachments || part.answer?.studentImages || [];
+                                                                
+                                                                // 1. Collect potential image sources (Handle both objects and direct strings)
+                                                                const partAnswerObj = currentStudent?.answers?.[marksKey];
                                                                 const allImages = [
-                                                                  ...(singleImage ? [singleImage] : []),
-                                                                  ...(Array.isArray(multipleImages) ? multipleImages : []),
-                                                                  ...(Array.isArray(modernAttachments) ? modernAttachments : [])
-                                                                ].filter(Boolean);
+                                                                  part.attachments,
+                                                                  part.studentImages,
+                                                                  part.answer?.attachments,
+                                                                  part.answer?.studentImages,
+                                                                  currentStudent?.answers?.[`${keyBase}_image`],
+                                                                  currentStudent?.answers?.[`${subKeyBase}_image`],
+                                                                  currentStudent?.answers?.[`${keyBase}_images`],
+                                                                  currentStudent?.answers?.[`${subKeyBase}_images`],
+                                                                  // Check if marksKey value itself is an object with images
+                                                                  ...(typeof partAnswerObj === 'object' && partAnswerObj !== null ? [
+                                                                    partAnswerObj.responsePic,
+                                                                    partAnswerObj.studentUploadedImage,
+                                                                    partAnswerObj.imageUrl,
+                                                                    ...(Array.isArray(partAnswerObj.images) ? partAnswerObj.images : []),
+                                                                    ...(Array.isArray(partAnswerObj.responsePics) ? partAnswerObj.responsePics : [])
+                                                                  ] : [])
+                                                                ].flat().filter(img => typeof img === 'string' && img.startsWith('http')).filter(Boolean);
+                                                                
                                                                 const uniqueImages = Array.from(new Set(allImages));
-                                                                if (uniqueImages.length === 0) return null;
+                                                                const responseText = cleanupMath((getAns('ans') || getAns(0) || '').replace(/\|\|/g, '\n'));
+                                                                
                                                                 return (
-                                                                  <div className="mt-6 pt-4 border-t border-dashed border-amber-200/50">
-                                                                    <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3">Answer Evidence / Uploads ({uniqueImages.length})</div>
-                                                                    <div className="flex flex-wrap gap-3">
-                                                                      {uniqueImages.map((img: string, i: number) => (
-                                                                        <div key={i} className="relative group">
-                                                                          <img
-                                                                            src={annotations[`${currentQuestion.id}_${pIdx * 10 + i}`] || img}
-                                                                            alt="Student Answer"
-                                                                            className="w-28 h-28 object-cover rounded-xl border-2 border-amber-100 cursor-pointer"
-                                                                            onClick={() => openAnnotation(img, currentQuestion.id, pIdx * 10 + i, currentStudent.student.id)}
-                                                                          />
-                                                                          <Button
-                                                                            size="icon"
-                                                                            variant="secondary"
-                                                                            className="absolute -top-1 -right-1 w-7 h-7 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity bg-white"
-                                                                            onClick={() => openAnnotation(img, currentQuestion.id, pIdx * 10 + i, currentStudent.student.id)}
-                                                                          >
-                                                                            <PenTool className="w-3.5 h-3.5 text-amber-600" />
-                                                                          </Button>
+                                                                  <div className="space-y-4">
+                                                                    {/* Text response if not already rendered by specific sub-type */}
+                                                                    {responseText && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'writing', 'short_answer', 'error_correction'].includes(part.subType || '') && (
+                                                                      <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
+                                                                        <UniversalMathJax dynamic>{responseText}</UniversalMathJax>
+                                                                        {!(responseText) && <span className="text-muted-foreground/30">No text provided…</span>}
+                                                                      </div>
+                                                                    )}
+                                                                    
+                                                                    {/* Evidence Images */}
+                                                                    {uniqueImages.length > 0 && (
+                                                                      <div className="mt-4 pt-4 border-t border-dashed border-amber-200/50">
+                                                                        <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                                          <ImagePlus className="w-3 h-3" /> Answer Evidence / Uploads ({uniqueImages.length})
                                                                         </div>
-                                                                      ))}
-                                                                    </div>
+                                                                        <div className="flex flex-wrap gap-3">
+                                                                          {uniqueImages.map((imgUrl: string, imgIdx: number) => (
+                                                                            <div key={imgIdx} className="relative group/img aspect-[4/3] w-[140px] rounded-lg border border-amber-100/50 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+                                                                              <img 
+                                                                                src={imgUrl} 
+                                                                                alt={`evidence-${imgIdx}`}
+                                                                                className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500 cursor-zoom-in"
+                                                                                onClick={() => window.open(imgUrl, '_blank')}
+                                                                              />
+                                                                              <Button
+                                                                                size="icon"
+                                                                                variant="secondary"
+                                                                                className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
+                                                                                onClick={(e) => {
+                                                                                  e.stopPropagation();
+                                                                                  openAnnotation(imgUrl, currentQuestion.id, pIdx, currentStudent?.student?.id);
+                                                                                }}
+                                                                              >
+                                                                                <PenTool className="w-3.5 h-3.5 text-amber-600" />
+                                                                              </Button>
+                                                                            </div>
+                                                                          ))}
+                                                                        </div>
+                                                                      </div>
+                                                                    )}
                                                                   </div>
                                                                 );
                                                               })()}

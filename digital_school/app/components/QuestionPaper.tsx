@@ -708,7 +708,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                           </div>
                                         )}
                                         <div className="font-medium text-[10px] text-gray-400 italic">
-                                          (Write your response below)
+                                          ({isEn ? 'Write your response below' : 'নিচে আপনার উত্তর লিখুন'})
                                         </div>
                                       </div>
                                     )}
@@ -743,7 +743,21 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     )}
 
                                     {part.subType === 'fill_in' && (
-                                      <div className="space-y-2">
+                                      <div className="space-y-2 mt-2">
+                                        {/* Word Box for fill_in questions */}
+                                        {part.wordBox && (
+                                          <div className="mb-4 p-3 border-2 border-black rounded-sm bg-gray-50/50 print:bg-transparent">
+                                            <div className="text-[10px] font-bold uppercase mb-1 text-center border-b border-gray-300 pb-1">
+                                              {isEn ? 'Words for Fill in the Blanks' : 'নিচের বক্স থেকে সঠিক শব্দ নিয়ে শূন্যস্থান পূরণ করো'}
+                                            </div>
+                                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-sm font-bold italic">
+                                              {part.wordBox.split('|').map((word: string, wIdx: number) => (
+                                                <span key={wIdx} className="px-2 py-0.5 border border-gray-200 rounded">{word}</span>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+                                        
                                         {(part.fillType === 'gap_passage' || !part.fillType) && part.passage && (
                                           <div className="leading-relaxed">
                                             <UniversalMathJax dynamic>
