@@ -4190,7 +4190,8 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
   };
 
   return (
-    <Card className="p-6">
+    <>
+      <Card className="p-6">
       <div className="flex flex-col items-center justify-center space-y-6">
 
         {!isPreviewMode ? (
