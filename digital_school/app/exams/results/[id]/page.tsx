@@ -690,35 +690,38 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
 
           return (
-            <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
-              <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
-                <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+            <div className="space-y-2">
+              <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
+                <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
+                  <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
+                </div>
+                {modelAns && (
+                  <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                )}
+                {modelAnsArray && modelAnsArray.length > 0 && !['fill_in', 'matching', 'short_answer', 'error_correction', 'true_false', 'flowchart'].includes(subQ.subType) && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    {modelAnsArray.map((ans: any, ai: number) => (
+                      <div key={ai} className="flex gap-1 items-start bg-emerald-100/20 p-1 rounded">
+                        <span className="font-black text-emerald-600 shrink-0">({ai + 1})</span>
+                        <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-              {modelAns && (
-                <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-              )}
-              {modelAnsArray && modelAnsArray.length > 0 && !['fill_in', 'matching', 'short_answer', 'error_correction', 'true_false', 'flowchart'].includes(subQ.subType) && (
-                <div className="flex flex-col gap-1 mt-1">
-                  {modelAnsArray.map((ans: any, ai: number) => (
-                    <div key={ai} className="flex gap-1 items-start bg-emerald-100/20 p-1 rounded">
-                      <span className="font-black text-emerald-600 shrink-0">({ai + 1})</span>
-                      <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
-                    </div>
-                  ))}
+
+              {subQ.explanation && (
+                <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 text-[10px] text-blue-800 flex flex-col gap-1 whitespace-pre-wrap">
+                  <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
+                    <Info className="w-2.5 h-2.5" /> Explanation
+                  </div>
+                  <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                 </div>
               )}
             </div>
           );
         })()}
         
-        {subQ.explanation && (
-          <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 mt-2 text-[10px] text-blue-800 flex flex-col gap-1 whitespace-pre-wrap">
-            <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
-              <Info className="w-2.5 h-2.5" /> Explanation
-            </div>
-            <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-          </div>
-        )}
       </div>
     );
   };
@@ -2801,23 +2804,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No response provided.</div>
                                             )}
 
-                                            {/* Sub-question Model Answer (Correct Answer) */}
-                                            {(subQ.answer || subQ.modelAnswer || subQ.explanation) && (
-                                              <div className="mt-2 p-3 rounded-xl bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 shadow-sm text-sm">
-                                                <div className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                                  <CheckCircle className="h-3 w-3" /> Model Answer / Explanation
-                                                </div>
-                                                <div className="text-foreground italic font-medium whitespace-pre-wrap">
-                                                  <UniversalMathJax inline dynamic>{cleanupMath(subQ.answer || subQ.modelAnswer || "")}</UniversalMathJax>
-                                                </div>
-                                                {subQ.explanation && (
-                                                  <div className="mt-2 pt-2 border-t border-emerald-500/20 text-foreground italic font-medium whitespace-pre-wrap">
-                                                    <span className="font-bold mr-1 text-emerald-700/80 uppercase text-[10px]">Explanation:</span>
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation)}</UniversalMathJax>
-                                                  </div>
-                                                )}
-                                              </div>
-                                            )}
 
                                             {/* Sub-question Uploaded Images */}
                                             {subQ.studentImages && subQ.studentImages.length > 0 && (
@@ -2838,12 +2824,17 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                           handleImageZoom(imageUrl, `Question ${index + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, annotation);
                                                         }}
                                                       >
-                                                        <img src={imageUrl} alt={`Sub-Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+                                                        <img 
+                                                          src={annotation?.imageData || imageUrl} 
+                                                          alt={`Sub-Img ${imgIdx + 1}`} 
+                                                          className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ${annotation ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`} 
+                                                        />
                                                         {annotation && (
-                                                          <div className="absolute top-2 right-2">
+                                                          <div className="absolute top-2 right-2 flex flex-col gap-1 items-end">
                                                             <div className="bg-emerald-500 rounded-full p-1 shadow-lg ring-2 ring-white animate-pulse">
                                                               <Zap className="h-3 w-3 text-white fill-white" />
                                                             </div>
+                                                            <div className="bg-emerald-100 text-emerald-700 text-[8px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm border border-emerald-200">Annotated</div>
                                                           </div>
                                                         )}
                                                       </div>

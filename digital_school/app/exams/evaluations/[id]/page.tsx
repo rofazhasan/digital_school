@@ -456,6 +456,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     return () => clearInterval(interval);
   }, [id]);
 
+  // NEW: Fetch annotations automatically whenever the current student changes
+  useEffect(() => {
+    const currentStudent = exam?.submissions[currentStudentIndex];
+    if (currentStudent?.student?.id) {
+      fetchAnnotations(currentStudent.student.id);
+    }
+  }, [currentStudentIndex, exam]);
+
 
   // Live Monitor Polling
   const fetchLiveStats = async () => {
@@ -3088,27 +3096,36 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                           <ImagePlus className="w-3 h-3" /> Answer Evidence / Uploads ({uniqueImages.length})
                                                                         </div>
                                                                         <div className="flex flex-wrap gap-3">
-                                                                          {uniqueImages.map((imgUrl: string, imgIdx: number) => (
-                                                                            <div key={imgIdx} className="relative group/img aspect-[4/3] w-[140px] rounded-lg border border-amber-100/50 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-                                                                              <img 
-                                                                                src={imgUrl} 
-                                                                                alt={`evidence-${imgIdx}`}
-                                                                                className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500 cursor-zoom-in"
-                                                                                onClick={() => window.open(imgUrl, '_blank')}
-                                                                              />
-                                                                              <Button
-                                                                                size="icon"
-                                                                                variant="secondary"
-                                                                                className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
-                                                                                onClick={(e) => {
-                                                                                  e.stopPropagation();
-                                                                                  openAnnotation(imgUrl, currentQuestion.id, pIdx, currentStudent?.student?.id);
-                                                                                }}
-                                                                              >
-                                                                                <PenTool className="w-3.5 h-3.5 text-amber-600" />
-                                                                              </Button>
-                                                                            </div>
-                                                                          ))}
+                                                                          {uniqueImages.map((imgUrl: string, imgIdx: number) => {
+                                                                            const annotationKey = `${currentQuestion.id}_${pIdx}`;
+                                                                            const displayUrl = annotations[annotationKey] || imgUrl;
+                                                                            const isAnnotated = !!annotations[annotationKey];
+                                                                            
+                                                                            return (
+                                                                              <div key={imgIdx} className="relative group/img aspect-[4/3] w-[140px] rounded-lg border border-amber-100/50 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
+                                                                                <img 
+                                                                                  src={displayUrl} 
+                                                                                  alt={`evidence-${imgIdx}`}
+                                                                                  className={`w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500 cursor-zoom-in ${isAnnotated ? 'ring-2 ring-emerald-500 inset-0' : ''}`}
+                                                                                  onClick={() => window.open(displayUrl, '_blank')}
+                                                                                />
+                                                                                {isAnnotated && (
+                                                                                  <div className="absolute top-1 left-1 bg-emerald-500 text-white text-[7px] font-black uppercase px-1 rounded shadow-sm animate-pulse">Annotated</div>
+                                                                                )}
+                                                                                <Button
+                                                                                  size="icon"
+                                                                                  variant="secondary"
+                                                                                  className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
+                                                                                  onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    openAnnotation(imgUrl, currentQuestion.id, pIdx, currentStudent?.student?.id);
+                                                                                  }}
+                                                                                >
+                                                                                  <PenTool className="w-3.5 h-3.5 text-amber-600" />
+                                                                                </Button>
+                                                                              </div>
+                                                                            );
+                                                                          })}
                                                                         </div>
                                                                       </div>
                                                                     )}

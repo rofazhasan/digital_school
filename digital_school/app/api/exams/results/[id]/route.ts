@@ -151,7 +151,7 @@ export async function GET(
         },
         submission: {
           id: submission.id,
-          submittedAt: submission.submittedAt,
+          submittedAt: (submission as any).submittedAt,
           status: submission.status
         },
         result: (result) ? { isPublished: false } : null,
@@ -221,17 +221,24 @@ export async function GET(
             subAns = aggregated;
           }
 
-          // MAP SUB-QUESTION IMAGES
+          // MAP SUB-QUESTION IMAGES (Robust prefix-based collection)
           const subImages: string[] = [];
-          if ((studentAnswers as any)[`${subId}_image` || `${descPrefix}image` || `${subId}_images` || `${descPrefix}images` ]) {
-             // For advanced ones, we prefer images linked to the descriptive ID but fallback
-          }
           
-          // Original mapping logic remains similar but more inclusive
-          if ((studentAnswers as any)[`${subId}_image` ]) subImages.push((studentAnswers as any)[`${subId}_image` ]);
-          if ((studentAnswers as any)[`${descPrefix}image` ]) subImages.push((studentAnswers as any)[`${descPrefix}image` ]);
-          if (Array.isArray((studentAnswers as any)[`${subId}_images` ])) subImages.push(...(studentAnswers as any)[`${subId}_images` ]);
-          if (Array.isArray((studentAnswers as any)[`${descPrefix}images` ])) subImages.push(...(studentAnswers as any)[`${descPrefix}images` ]);
+          // Scan for all images associated with this specific sub-question/part
+          Object.keys(studentAnswers).forEach(key => {
+            if (key.startsWith(subId) || key.startsWith(descPrefix)) {
+              const val = (studentAnswers as any)[key];
+              if (typeof val === 'string' && (val.startsWith('http') || val.includes('/uploads/'))) {
+                subImages.push(val);
+              } else if (Array.isArray(val)) {
+                val.forEach(v => {
+                  if (typeof v === 'string' && (v.startsWith('http') || v.includes('/uploads/'))) {
+                    subImages.push(v);
+                  }
+                });
+              }
+            }
+          });
 
           // Ensure unique images
           const uniqueSubImages = Array.from(new Set(subImages));
