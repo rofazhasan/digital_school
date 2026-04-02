@@ -81,11 +81,12 @@ function collectAllImages(obj: any): string[] {
 
   if (typeof obj === 'string') {
     // Basic check for URLs. Including common extensions and the upload API path.
-    if (obj.startsWith('http') && (
+    if ((obj.startsWith('http') || obj.startsWith('https') || obj.startsWith('data:image/')) && (
       obj.match(/\.(jpeg|jpg|gif|png|webp|svg|bmp)/i) || 
       obj.includes('api/upload') || 
       obj.includes('googleusercontent.com') ||
-      obj.includes('blob.core.windows.net')
+      obj.includes('blob.core.windows.net') ||
+      obj.startsWith('data:image/')
     )) {
       images.push(obj);
     }
@@ -3074,6 +3075,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   part.studentImages,
                                                                   part.answer?.attachments,
                                                                   part.answer?.studentImages,
+                                                                  part.images,
                                                                   ...relevantData
                                                                 ]);
                                                                 
@@ -3097,7 +3099,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                         </div>
                                                                         <div className="flex flex-wrap gap-3">
                                                                           {uniqueImages.map((imgUrl: string, imgIdx: number) => {
-                                                                            const annotationKey = `${currentQuestion.id}_${pIdx}`;
+                                                                            const imgIndex = pIdx * 100 + imgIdx;
+                                                                            const annotationKey = `${currentQuestion.id}_${imgIndex}`;
                                                                             const displayUrl = annotations[annotationKey] || imgUrl;
                                                                             const isAnnotated = !!annotations[annotationKey];
                                                                             
@@ -3118,7 +3121,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                                   className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
                                                                                   onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    openAnnotation(imgUrl, currentQuestion.id, pIdx, currentStudent?.student?.id);
+                                                                                    openAnnotation(imgUrl, currentQuestion.id, imgIndex, currentStudent?.student?.id);
                                                                                   }}
                                                                                 >
                                                                                   <PenTool className="w-3.5 h-3.5 text-amber-600" />
@@ -3144,7 +3147,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-sm">Standard Key</div>
                                                               {(() => {
                                                                 const hasSubKey = part.subType === 'matching' || part.subType === 'flowchart' || part.subType === 'fill_in' || part.subType === 'true_false' || part.subType === 'short_answer' || part.subType === 'error_correction' || part.correctOrder;
-                                                                const hasTextKey = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || (Array.isArray(part.answers) && part.answers.length > 0 && typeof part.answers[0] === 'string' ? part.answers : null) || (part.modelAnswers && (Array.isArray(part.modelAnswers) || typeof part.modelAnswers === 'string'));
+                                                                const hasTextKey = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || (Array.isArray(part.answers) && part.answers.length > 0 && typeof part.answers[0] === 'string' ? part.answers : null) || (part.modelAnswers && (Array.isArray(part.modelAnswers) || typeof part.modelAnswers === 'string')) || part.q_ans || part.ans;
                                                                 
                                                                 if (!hasSubKey && !hasTextKey) {
                                                                   return (
@@ -3159,9 +3162,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
                                                                 return (
                                                                   <div className="space-y-3">
-                                                                    {(part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null)) && (
+                                                                    {(part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans) && (
                                                                       <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
-                                                                        <UniversalMathJax dynamic>{cleanupMath(String(part.modelAnswer || part.answer || part.correctAnswer || part.answers || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                        <UniversalMathJax dynamic>{cleanupMath(String(part.modelAnswer || part.answer || part.correctAnswer || part.answers || part.q_ans || part.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                                       </div>
                                                                     )}
 

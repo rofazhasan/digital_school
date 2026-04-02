@@ -106,7 +106,8 @@ type Question = {
   id: string; type: QuestionType; subject: string; topic?: string | null; marks: number; difficulty: Difficulty;
   questionText: string; hasMath: boolean;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
-  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
+  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
+  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
   modelAnswer?: string | null;
   assertion?: string | null; reason?: string | null; correctOption?: number | null;
   leftColumn?: Array<{ id: string; text: string }>;
@@ -1321,7 +1322,7 @@ const QuestionCard: React.FC<{
           {/* DESCRIPTIVE Display */}
           {question.type === 'DESCRIPTIVE' && (
             <div className="space-y-4 mt-3">
-              {(question.subQuestions || []).map((part: any, i: number) => (
+              {(question.subQuestions || question.sub_questions || []).map((part: any, i: number) => (
                 <div key={i} className="p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

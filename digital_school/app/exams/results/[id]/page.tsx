@@ -684,8 +684,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         {renderSubQuestionContent(subQ, subIdx, questionId)}
         
         {(() => {
-          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null);
-          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans;
+          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : (Array.isArray(subQ.correctOrder) ? subQ.correctOrder : null)));
 
           if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
 
