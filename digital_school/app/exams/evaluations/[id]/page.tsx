@@ -59,6 +59,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
 import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
@@ -3001,6 +3002,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   })}
                                                                 </div>
                                                               )}
+                                                              {part.subType === 'interpreting_graph' && part.chartConfig && (
+                                                                <div className="space-y-4">
+                                                                  <div className="p-4 bg-white rounded-lg border shadow-sm">
+                                                                    <BeautifulChart 
+                                                                      type={part.chartConfig.type} 
+                                                                      data={part.chartConfig.data} 
+                                                                      xAxisLabel={part.chartConfig.xAxisLabel} 
+                                                                      yAxisLabel={part.chartConfig.yAxisLabel}
+                                                                    />
+                                                                  </div>
+                                                                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                                                                    <div className="text-[10px] font-black text-indigo-600/50 uppercase mb-2">Student Interpretation</div>
+                                                                    <div className="text-sm font-bold text-indigo-900 leading-relaxed italic">
+                                                                      {getAns('ans') ? <UniversalMathJax dynamic>{cleanupMath(String(getAns('ans')).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="text-gray-300">No response</span>}
+                                                                    </div>
+                                                                  </div>
+                                                                </div>
+                                                              )}
                                                               {part.subType === 'label_diagram' && (
                                                                 <div className="space-y-4">
                                                                   {part.imageUrl && <img src={part.imageUrl} alt="Diagram" className="max-h-48 rounded-lg border" />}
@@ -3065,29 +3084,29 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
                                                                 
                                                                 // 1. Robustly collect ALL data related to this descriptive part/sub-question
-                                                                // This handles flat keys like "ID_desc_0_ans", "ID_desc_0_image", etc.
-                                                                const relevantData = Object.keys(currentStudent?.answers || {})
+                                                                const studentAnswers = currentStudent?.answers || {};
+                                                                const relevantData = Object.keys(studentAnswers)
                                                                   .filter(k => k.startsWith(keyBase) || k.startsWith(subKeyBase))
-                                                                  .map(k => currentStudent?.answers?.[k]);
+                                                                  .map(k => studentAnswers[k]);
 
                                                                 const allImages = collectAllImages([
                                                                   part.attachments,
                                                                   part.studentImages,
+                                                                  part.images,
                                                                   part.answer?.attachments,
                                                                   part.answer?.studentImages,
-                                                                  part.images,
                                                                   ...relevantData
                                                                 ]);
                                                                 
                                                                 const uniqueImages = Array.from(new Set(allImages));
-                                                                const responseText = cleanupMath((getAns('ans') || getAns(0) || '').replace(/\|\|/g, '\n'));
+                                                                const responseText = cleanupMath(String(getAns('ans') || getAns(0) || getAns('answer') || '').replace(/\|\|/g, '\n'));
                                                                 
                                                                 return (
                                                                   <div className="space-y-4">
                                                                     {/* Text response if not already rendered by specific sub-type */}
-                                                                    {(responseText || uniqueImages.length === 0) && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'writing', 'short_answer', 'error_correction'].includes(part.subType || '') && (
-                                                                      <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
-                                                                        {responseText ? <UniversalMathJax dynamic>{responseText}</UniversalMathJax> : <span className="text-muted-foreground/30">No response provided…</span>}
+                                                                    {(responseText && responseText !== 'null') && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'short_answer', 'error_correction', 'interpreting_graph'].includes(part.subType || '') && (
+                                                                      <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium p-3 bg-white/50 rounded-xl border border-dashed border-gray-200">
+                                                                        <UniversalMathJax dynamic>{responseText}</UniversalMathJax>
                                                                       </div>
                                                                     )}
                                                                     
@@ -3095,12 +3114,13 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                     {uniqueImages.length > 0 && (
                                                                       <div className="mt-4 pt-4 border-t border-dashed border-amber-200/50">
                                                                         <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                                          <ImagePlus className="w-3 h-3" /> Answer Evidence / Uploads ({uniqueImages.length})
+                                                                          <ImagePlus className="w-3 h-3" /> Answer Evidence / Student Uploads ({uniqueImages.length})
                                                                         </div>
                                                                         <div className="flex flex-wrap gap-3">
                                                                           {uniqueImages.map((imgUrl: string, imgIdx: number) => {
-                                                                            const imgIndex = pIdx * 100 + imgIdx;
-                                                                            const annotationKey = `${currentQuestion.id}_${imgIndex}`;
+                                                                            // Stable numeric index for the annotation key
+                                                                            const stableIndex = pIdx * 100 + imgIdx;
+                                                                            const annotationKey = `${currentQuestion.id}_${stableIndex}`;
                                                                             const displayUrl = annotations[annotationKey] || imgUrl;
                                                                             const isAnnotated = !!annotations[annotationKey];
                                                                             
@@ -3121,7 +3141,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                                   className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
                                                                                   onClick={(e) => {
                                                                                     e.stopPropagation();
-                                                                                    openAnnotation(imgUrl, currentQuestion.id, imgIndex, currentStudent?.student?.id);
+                                                                                    openAnnotation(imgUrl, currentQuestion.id, stableIndex, currentStudent?.student?.id);
                                                                                   }}
                                                                                 >
                                                                                   <PenTool className="w-3.5 h-3.5 text-amber-600" />
@@ -3147,9 +3167,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                               <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-sm">Standard Key</div>
                                                               {(() => {
                                                                 const hasSubKey = part.subType === 'matching' || part.subType === 'flowchart' || part.subType === 'fill_in' || part.subType === 'true_false' || part.subType === 'short_answer' || part.subType === 'error_correction' || part.correctOrder;
-                                                                const hasTextKey = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || (Array.isArray(part.answers) && part.answers.length > 0 && typeof part.answers[0] === 'string' ? part.answers : null) || (part.modelAnswers && (Array.isArray(part.modelAnswers) || typeof part.modelAnswers === 'string')) || part.q_ans || part.ans;
-                                                                
-                                                                if (!hasSubKey && !hasTextKey) {
+                                                                const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
+                                                                const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
+
+                                                                if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasSubKey) {
                                                                   return (
                                                                     <div className="flex flex-col items-center justify-center py-6 text-emerald-600/40">
                                                                       <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
@@ -3158,17 +3179,15 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                   );
                                                                 }
 
-                                                                const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : null));
-
                                                                 return (
                                                                   <div className="space-y-3">
-                                                                    {(part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans) && (
+                                                                    {modelAns && (
                                                                       <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
-                                                                        <UniversalMathJax dynamic>{cleanupMath(String(part.modelAnswer || part.answer || part.correctAnswer || part.answers || part.q_ans || part.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                        <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                                       </div>
                                                                     )}
 
-                                                                    {pluralAnswers && pluralAnswers.length > 0 && (
+                                                                    {pluralAnswers && pluralAnswers.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(part.subType) && (
                                                                       <div className="grid grid-cols-1 gap-1.5">
                                                                         {pluralAnswers.map((ans: any, ai: number) => (
                                                                           <div key={ai} className="flex gap-2 items-start bg-emerald-100/30 p-2 rounded-lg border border-emerald-200/50">

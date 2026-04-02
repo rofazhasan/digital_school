@@ -5,6 +5,7 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { DebouncedTextarea } from "./SubjectiveSection";
 import { toBengaliAlphabets } from '@/utils/numeralConverter';
 import { ZoomableImage, QuestionImageGallery } from "./shared";
+import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { ChevronRight, ArrowDown } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -453,6 +454,31 @@ export const DescriptiveSection = ({
                                             />
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── INTERPRETING_GRAPH ── */}
+                        {part.subType === 'interpreting_graph' && part.chartConfig && (
+                            <div className="space-y-4">
+                                <div className="p-4 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-2xl shadow-sm">
+                                    <BeautifulChart 
+                                        type={part.chartConfig.type} 
+                                        data={part.chartConfig.data} 
+                                        xAxisLabel={part.chartConfig.xAxisLabel} 
+                                        yAxisLabel={part.chartConfig.yAxisLabel}
+                                    />
+                                </div>
+                                <div className="p-4 bg-amber-50/50 dark:bg-amber-900/10 rounded-xl border border-amber-100 dark:border-amber-800/30">
+                                    <p className="text-sm font-bold text-amber-800 dark:text-amber-300 mb-2">Write your interpretation / answer here:</p>
+                                    <DebouncedTextarea
+                                        value={getAns('ans') as string}
+                                        onChange={(val) => setAns('ans', val)}
+                                        disabled={disabled || submitted}
+                                        rows={4}
+                                        placeholder="Based on the graph, provide your answer..."
+                                        className="w-full p-4 rounded-xl border-2 border-amber-100 bg-background focus:border-amber-400 transition-all text-sm shadow-inner"
+                                    />
                                 </div>
                             </div>
                         )}

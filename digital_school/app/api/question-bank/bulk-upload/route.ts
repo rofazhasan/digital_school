@@ -328,6 +328,22 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                             return { text, x: n(x), y: n(y) };
                         });
                     }
+                } else if (subType === 'interpreting_graph') {
+                    const chartType = s(getValue(row, [`${prefix} Chart Type`, `s${i}ChartType`])) || 'bar';
+                    const chartLabels = s(getValue(row, [`${prefix} Chart Labels`, `s${i}ChartLabels`]));
+                    const chartData = s(getValue(row, [`${prefix} Chart Data`, `s${i}ChartData`]));
+                    const xAxisLabel = s(getValue(row, [`${prefix} X-Axis Label`, `s${i}XLabel`]));
+                    const yAxisLabel = s(getValue(row, [`${prefix} Y-Axis Label`, `s${i}YLabel`]));
+                    
+                    if (chartLabels && chartData) {
+                        subQ.chartConfig = {
+                            type: chartType,
+                            labels: chartLabels.split('|').map((x: string) => x.trim()),
+                            data: chartData.split('|').map((x: string) => n(x.trim())),
+                            xAxisLabel,
+                            yAxisLabel
+                        };
+                    }
                 } else if (subType === 'short_answer' || subType === 'error_correction') {
                     const ansStr = s(getValue(row, [`${prefix} Model Answers`, `${prefix} Correct Answers`]));
                     if (ansStr) subQ.modelAnswers = ansStr.split('|').map(x => x.trim());

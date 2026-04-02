@@ -39,6 +39,7 @@ export async function GET() {
             ["  - Labels", "Use 'Sub X Labels' with 'Text|Text' or 'Text:x:y|Text:x:y' format."],
             ["POETRY / PASSAGE", "For Poem/Passage, use '||' for forced line breaks or type with Newlines (Alt+Enter). The system will preserve the poetic format."],
             ["EXPLANATIONS", "Fill 'Teacher Note / Explanation' for the main question or 'Sub X Explanation' for each part. These show in Results/Evaluations."],
+            ["INTERPRETING GRAPH", "Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe separated), 'Sub X Chart Data' (pipe separated), and Axis labels."],
             [""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
             ["Marks", "Number only."]
@@ -132,7 +133,13 @@ export async function GET() {
                 { header: `${prefix} Option B`, key: `${keyPrefix}B`, width: 15 },
                 { header: `${prefix} Option C`, key: `${keyPrefix}C`, width: 15 },
                 { header: `${prefix} Option D`, key: `${keyPrefix}D`, width: 15 },
-                { header: `${prefix} Correct Option`, key: `${keyPrefix}Correct`, width: 15 }
+                { header: `${prefix} Correct Option`, key: `${keyPrefix}Correct`, width: 15 },
+                // Chart specific fields
+                { header: `${prefix} Chart Type`, key: `${keyPrefix}ChartType`, width: 12 },
+                { header: `${prefix} Chart Labels`, key: `${keyPrefix}ChartLabels`, width: 25 },
+                { header: `${prefix} Chart Data`, key: `${keyPrefix}ChartData`, width: 20 },
+                { header: `${prefix} X-Axis Label`, key: `${keyPrefix}XLabel`, width: 15 },
+                { header: `${prefix} Y-Axis Label`, key: `${keyPrefix}YLabel`, width: 15 }
             );
         }
         templateSheet.columns = columns;
@@ -287,6 +294,26 @@ export async function GET() {
             D1_Instructions: "Put the numbers in correct order.",
             D1_Questions: "Once there was a king.|He had a beautiful daughter.|Her name was Lily.",
             D1_Answers: "1,2,3"
+        });
+
+        // 6. Interpreting Graph
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Graph Analysis",
+            marks: 5,
+            text: "Analyze the following sales data and answer.",
+            explanation: "Model analysis of the sales trends.",
+            D1_SubType: "interpreting_graph",
+            D1_Label: "F",
+            D1_Marks: 5,
+            D1_Instructions: "What does the graph show about Q3?",
+            D1_ChartType: "bar",
+            D1_ChartLabels: "Q1|Q2|Q3|Q4",
+            D1_ChartData: "400|600|800|500",
+            D1_XLabel: "Quarter",
+            D1_YLabel: "Sales (USD)",
+            D1_Answers: "The graph shows a peak in sales during Q3, reaching 800 USD."
         });
 
         // Freeze top row

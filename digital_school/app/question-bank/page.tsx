@@ -26,6 +26,7 @@ import { MCQuestionForm } from "@/app/components/MCQuestionForm";
 import { INTQuestionForm } from "@/app/components/INTQuestionForm";
 import { ARQuestionForm } from "@/app/components/ARQuestionForm";
 import { MTFQuestionForm } from "@/app/components/MTFQuestionForm";
+import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { useToast } from "@/components/ui/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
@@ -47,7 +48,7 @@ import { Capacitor } from "@capacitor/core";
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 
 // DESCRIPTIVE sub-type definitions
-type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart';
+type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
 type WritingType = 'paragraph' | 'letter' | 'essay' | 'summary' | 'expansion' | 'translation' | 'story' | 'dialogue' | 'composition' | 'report' | 'application' | 'email';
 type FillType = 'gap_passage' | 'right_form' | 'suffix_prefix' | 'connector' | 'punctuation' | 'sentence_change' | 'substitution' | 'tag_question' | 'prepositions' | 'articles';
 type ClueType = 'none' | 'word_box' | 'in_text';
@@ -99,6 +100,13 @@ interface DescPart {
   // short_answer & error_correction
   answers?: string[];
   sentences?: string[];
+  // interpreting_graph
+  chartConfig?: {
+    type: 'bar' | 'line' | 'pie' | 'doughnut' | 'polarArea';
+    xAxisLabel?: string;
+    yAxisLabel?: string;
+    data: { label: string; value: number }[];
+  }
 }
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 type QuestionBank = { id: string; name: string; subject: string };
@@ -1409,6 +1417,17 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
+                    {part.subType === 'interpreting_graph' && part.chartConfig && (
+                      <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                        <BeautifulChart 
+                          type={part.chartConfig.type} 
+                          data={part.chartConfig.data} 
+                          xAxisLabel={part.chartConfig.xAxisLabel} 
+                          yAxisLabel={part.chartConfig.yAxisLabel}
+                        />
+                      </div>
+                    )}
+
 
                     {/* Specialized Model Answer Rendering */}
                     {part.subType === 'matching' && part.matches && (
@@ -1529,26 +1548,46 @@ const QuestionCard: React.FC<{
                     )}
 
                     {/* Model Answer / Explanation */}
-                    {(part.modelAnswer || part.answer || part.correctAnswer || part.explanation) && (
-                      <div className="mt-3 space-y-2">
-                        {(part.modelAnswer || part.answer || part.correctAnswer) && (
-                          <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
-                             <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Model Answer</p>
-                             <div className="text-xs text-emerald-800 dark:text-emerald-300 whitespace-pre-wrap">
-                               <UniversalMathJax>{part.modelAnswer || part.answer || part.correctAnswer}</UniversalMathJax>
-                             </div>
-                          </div>
-                        )}
-                        {part.explanation && (
-                          <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-                             <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 mb-1">Explanation</p>
-                             <div className="text-xs text-blue-800 dark:text-blue-300 whitespace-pre-wrap">
-                               <UniversalMathJax>{part.explanation}</UniversalMathJax>
-                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
+                    {(() => {
+                      const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
+                      const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
+
+                      if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !part.explanation) return null;
+
+                      return (
+                        <div className="mt-3 space-y-2">
+                          {modelAns && (
+                            <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
+                               <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Model Answer</p>
+                               <div className="text-xs text-emerald-800 dark:text-emerald-300 whitespace-pre-wrap">
+                                 <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                               </div>
+                            </div>
+                          )}
+                          {pluralAnswers && pluralAnswers.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(part.subType) && (
+                            <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 dark:border-emerald-800/30">
+                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2">Model Answer Keys</p>
+                              <div className="grid grid-cols-1 gap-1.5">
+                                {pluralAnswers.map((ans: any, ai: number) => (
+                                  <div key={ai} className="flex gap-2 items-start bg-white/50 p-2 rounded-lg border border-emerald-50">
+                                    <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
+                                    <div className="text-xs font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {part.explanation && (
+                            <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                               <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 mb-1">Explanation</p>
+                               <div className="text-xs text-blue-800 dark:text-blue-300 whitespace-pre-wrap">
+                                 <UniversalMathJax dynamic>{cleanupMath(String(part.explanation).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                               </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               ))}
@@ -1634,6 +1673,14 @@ const CLUE_TYPE_LABELS: Record<string, string> = {
   none: 'No Clues',
   word_box: 'Words in a Box (before text)',
   in_text: 'Dropdown / Inline Clues (within text)',
+};
+
+const GRAPH_TYPE_LABELS: Record<string, string> = {
+  bar: 'Bar Chart (স্তম্ভচিত্র)',
+  line: 'Line Graph (রেখাচিত্র)',
+  pie: 'Pie Chart (পাই চিত্র / বৃত্তলেখ)',
+  doughnut: 'Doughnut Chart',
+  polarArea: 'Polar Area Chart',
 };
 
 const FLOWCHART_STYLE_LABELS: Record<string, string> = {
@@ -1724,6 +1771,7 @@ function DescriptiveQuestionForm({
                 <SelectItem value="flowchart">🗺️ Flowchart</SelectItem>
                 <SelectItem value="short_answer">📝 Short Answer</SelectItem>
                 <SelectItem value="error_correction">❌ Error Correction</SelectItem>
+                <SelectItem value="interpreting_graph">📊 Interpreting Graph/Chart</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-[10px] text-amber-700/60 mt-1 italic leading-tight">
@@ -1738,6 +1786,7 @@ function DescriptiveQuestionForm({
               {part.subType === 'flowchart' && "Sequential steps or process diagrams where students fill in missing parts."}
               {part.subType === 'short_answer' && "Direct short answer questions."}
               {part.subType === 'error_correction' && "Provide incorrect sentences and have students rewrite them correctly."}
+              {part.subType === 'interpreting_graph' && "Create visual data representations (Bar, Pie, etc.) for students to analyze."}
             </p>
           </div>
 
@@ -2387,6 +2436,128 @@ function DescriptiveQuestionForm({
                 />
                 <p className="text-[10px] text-gray-500 italic">Coordinates x,y are percentages from 0-100.</p>
               </div>
+            </div>
+          )}
+
+          {/* ── INTERPRETING_GRAPH ── */}
+          {part.subType === 'interpreting_graph' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">Graph Type</Label>
+                  <Select
+                    value={part.chartConfig?.type || 'bar'}
+                    onValueChange={(v: any) => updatePart(idx, { 
+                      chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), type: v } 
+                    })}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(GRAPH_TYPE_LABELS).map(([v, label]) => (
+                        <SelectItem key={v} value={v}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Instructions / Question</Label>
+                  <Input
+                    value={part.instructions || ''}
+                    onChange={e => updatePart(idx, { instructions: e.target.value })}
+                    placeholder="e.g. Look at the graph and answer the questions..."
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs">X-Axis Label (e.g. Years/Months)</Label>
+                  <Input
+                    value={part.chartConfig?.xAxisLabel || ''}
+                    onChange={e => updatePart(idx, { 
+                      chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), xAxisLabel: e.target.value } 
+                    })}
+                    placeholder="X Axis Label"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">Y-Axis Label (e.g. Temperature/Sales)</Label>
+                  <Input
+                    value={part.chartConfig?.yAxisLabel || ''}
+                    onChange={e => updatePart(idx, { 
+                      chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), yAxisLabel: e.target.value } 
+                    })}
+                    placeholder="Y Axis Label"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-amber-700">Graph Data Points</Label>
+                <div className="space-y-2 max-h-60 overflow-y-auto p-1">
+                  {(part.chartConfig?.data || [{ label: '', value: 0 }]).map((d, di) => (
+                    <div key={di} className="flex gap-2 items-center">
+                      <Input
+                        value={d.label}
+                        onChange={e => {
+                          const data = [...(part.chartConfig?.data || [])];
+                          data[di] = { ...d, label: e.target.value };
+                          updatePart(idx, { chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), data } });
+                        }}
+                        placeholder="Label (e.g. 2021)"
+                        className="h-8 text-xs flex-1"
+                      />
+                      <Input
+                        type="number"
+                        value={d.value}
+                        onChange={e => {
+                          const data = [...(part.chartConfig?.data || [])];
+                          data[di] = { ...d, value: Number(e.target.value) };
+                          updatePart(idx, { chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), data } });
+                        }}
+                        placeholder="Value (e.g. 50)"
+                        className="h-8 text-xs w-24"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          const data = (part.chartConfig?.data || []).filter((_, i) => i !== di);
+                          updatePart(idx, { chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), data } });
+                        }}
+                      >
+                        <X className="h-3 w-3 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-1 border-dashed h-8 text-[10px]"
+                  onClick={() => {
+                    const data = [...(part.chartConfig?.data || []), { label: '', value: 0 }];
+                    updatePart(idx, { chartConfig: { ...(part.chartConfig || { type: 'bar', data: [] }), data } });
+                  }}
+                >
+                  <PlusCircle className="mr-1 h-3 w-3" /> Add Data Point
+                </Button>
+              </div>
+
+              {/* Preview Area */}
+              {part.chartConfig?.data && part.chartConfig.data.length > 0 && (
+                <div className="mt-4 p-4 border rounded-lg bg-white dark:bg-gray-950 shadow-inner">
+                  <Label className="text-[10px] uppercase font-bold text-gray-400 mb-2 block">Live Chart Preview</Label>
+                  <BeautifulChart 
+                    type={part.chartConfig.type} 
+                    data={part.chartConfig.data} 
+                    xAxisLabel={part.chartConfig.xAxisLabel} 
+                    yAxisLabel={part.chartConfig.yAxisLabel}
+                  />
+                </div>
+              )}
             </div>
           )}
 
@@ -4042,6 +4213,30 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         }
       ],
       "explanation": "এই প্রশ্নপত্রটি বাংলা ২য় পত্রের মান বন্টন এবং বোর্ড পরীক্ষার প্যাটার্ন অনুযায়ী তৈরি করা হয়েছে।"
+    },
+    {
+      "type": "DESCRIPTIVE",
+      "questionText": "Analyze the following population growth chart.",
+      "marks": 5,
+      "difficulty": "MEDIUM",
+      "subject": "Social Studies",
+      "className": "Class 10",
+      "subQuestions": [
+        {
+          "subType": "interpreting_graph",
+          "label": "A",
+          "marks": 5,
+          "instructions": "Discuss the growth rate observed between 2010 and 2020.",
+          "chartConfig": {
+            "type": "line",
+            "labels": ["2000", "2005", "2010", "2015", "2020"],
+            "data": [120, 150, 180, 220, 280],
+            "xAxisLabel": "Year",
+            "yAxisLabel": "Population (Millions)"
+          },
+          "modelAnswer": "The population shows a steady increase, with an accelerated growth rate between 2010 and 2020."
+        }
+      ]
     },
     {
       "type": "DESCRIPTIVE",

@@ -45,7 +45,8 @@ import {
   Zap,
   Calendar,
   Image as ImageIcon,
-  Info
+  Info,
+  Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { nativeShare } from '@/lib/native/interaction';
@@ -53,6 +54,7 @@ import { Capacitor } from "@capacitor/core";
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MathJaxContext } from "better-react-mathjax";
+import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
 import { hasStudentAnswered, isAnswerCorrect } from "@/lib/exam-result-utils";
@@ -468,6 +470,30 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         );
 
+      case 'interpreting_graph':
+        return (
+          <div className="mt-3 space-y-4">
+            {subQ.chartConfig && (
+              <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                <BeautifulChart 
+                  type={subQ.chartConfig.type} 
+                  data={subQ.chartConfig.data} 
+                  xAxisLabel={subQ.chartConfig.xAxisLabel} 
+                  yAxisLabel={subQ.chartConfig.yAxisLabel}
+                />
+              </div>
+            )}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Your Interpretation
+              </div>
+              <div className="text-foreground whitespace-pre-wrap italic font-medium">
+                {studentAnswer || <span className="text-muted-foreground/30">No response provided</span>}
+              </div>
+            </div>
+          </div>
+        );
+
       case 'label_diagram':
         return (
           <div className="mt-3 space-y-4">
@@ -564,6 +590,17 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     return (
       <div className="mt-4 px-2 space-y-4">
         {/* Specialized Sub-Key Rendering (matching the evaluation standard) */}
+        {subQ.subType === 'interpreting_graph' && (
+          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+              <Activity className="w-2.5 h-2.5" /> Graph Interpretation Key
+            </p>
+            <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed">
+               <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+            </div>
+          </div>
+        )}
+
         {subQ.subType === 'matching' && (
           <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
             <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
@@ -698,7 +735,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 {modelAns && (
                   <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
                 )}
-                {modelAnsArray && modelAnsArray.length > 0 && !['fill_in', 'matching', 'short_answer', 'error_correction', 'true_false', 'flowchart'].includes(subQ.subType) && (
+                {modelAnsArray && modelAnsArray.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(subQ.subType) && (
                   <div className="flex flex-col gap-1 mt-1">
                     {modelAnsArray.map((ans: any, ai: number) => (
                       <div key={ai} className="flex gap-1 items-start bg-emerald-100/20 p-1 rounded">

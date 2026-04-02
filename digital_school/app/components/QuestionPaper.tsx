@@ -5,6 +5,7 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { cleanupMath } from '@/lib/utils';
 import { toBengaliNumerals, formatBengaliDuration } from '@/utils/numeralConverter';
+import { BeautifulChart } from "@/app/components/BeautifulChart";
 
 
 // --- TYPES ---
@@ -955,6 +956,30 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                               ))}
                                             </tbody>
                                           </table>
+                                        </div>
+                                      )}
+
+                                      {part.subType === 'interpreting_graph' && (
+                                        <div className="mt-4 mb-4">
+                                          {part.chartConfig && (
+                                            <div className="max-w-2xl mx-auto border border-black/10 p-4 rounded-xl bg-white shadow-sm">
+                                              <BeautifulChart
+                                                type={part.chartConfig.type}
+                                                data={(part.chartConfig.labels || []).map((l: string, i: number) => ({
+                                                  label: l,
+                                                  value: part.chartConfig.data?.[i] || 0
+                                                }))}
+                                                xAxisLabel={part.chartConfig.xAxisLabel}
+                                                yAxisLabel={part.chartConfig.yAxisLabel}
+                                                isPrint={true}
+                                              />
+                                            </div>
+                                          )}
+                                          <div className="mt-6 space-y-4">
+                                            {[1, 2, 3].map(li => (
+                                              <div key={li} className="border-b border-dotted border-gray-400 h-1 w-full"></div>
+                                            ))}
+                                          </div>
                                         </div>
                                       )}
                                     </div>
