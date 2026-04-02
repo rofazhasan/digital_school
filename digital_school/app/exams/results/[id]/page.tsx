@@ -175,6 +175,7 @@ interface Question {
   explanation?: string;
   subQuestions?: SubQuestion[];
   sub_questions?: SubQuestion[];
+  parts?: SubQuestion[];
   feedback?: string;
   images?: string[];
   assertion?: string;

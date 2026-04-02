@@ -158,22 +158,28 @@ interface StudentSubmission {
 
 interface Question {
   id: string;
-  type: 'mcq' | 'smcq' | 'cq' | 'sq' | 'mc' | 'ar' | 'mtf' | 'int' | 'numeric' | 'descriptive';
-  text: string;
+  type: string;
+  text?: string;
+  question?: string;
+  questionText?: string;
   marks: number;
-  correct?: any;
-  options?: any[];
+  mark?: number;
+  modelAnswer?: string;
+  correct?: string;
+  answer?: string;
   explanation?: string;
   subQuestions?: any[];
   sub_questions?: any[];
-  modelAnswer?: string;
+  parts?: any[];
+  options?: any[];
   assertion?: string;
   reason?: string;
-  questionText?: string;
-  correctOption?: number;
-  pairs?: any[];
+  correctOption?: string;
+  correctAnswers?: any[];
+  correctMatches?: any;
   leftColumn?: any[];
   rightColumn?: any[];
+  pairs?: any[];
 }
 
 interface Exam {
@@ -2831,511 +2837,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               </div>
                                             )}
 
-                                            {currentQuestion?.type?.toLowerCase() === 'descriptive' && (
-                                              <div className="space-y-8">
-                                                {(currentQuestion?.subQuestions || []).map((part: any, pIdx: number) => {
-                                                  const ansKey = (sub: string | number) => `${currentQuestion.id}_desc_${pIdx}_${sub}`;
-                                                  const getAns = (sub: string | number) => currentStudent?.answers?.[ansKey(sub)] ?? '';
-                                                  const marksKey = `${currentQuestion.id}_desc_${pIdx}_marks`;
-                                                  const currentSubMarks = currentStudent?.answers?.[marksKey] || 0;
-                                                  const normalize = (s: any) => String(s || "").trim().toLowerCase();
-
-                                                  return (
-                                                    <div key={pIdx} className="relative group">
-                                                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200/50 shadow-sm">
-                                                        <div className="flex items-center gap-3">
-                                                          <div className="w-10 h-10 rounded-full bg-amber-500 flex items-center justify-center text-white font-black shadow-md shadow-amber-200">
-                                                            {toBengaliNumerals(pIdx + 1)}
-                                                          </div>
-                                                          <div>
-                                                            <div className="flex items-center gap-2 mb-1">
-                                                              <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white shadow-sm border-amber-200 text-amber-700">
-                                                                {String(part.subType || part.sub_type || '').replace('_', ' ')}
-                                                              </Badge>
-                                                              <span className="text-[10px] font-bold text-amber-600/60 font-mono">#{part.id?.slice(-4) || pIdx}</span>
-                                                            </div>
-                                                            <div className="text-sm font-black text-amber-900 flex items-center gap-2">
-                                                              <UniversalMathJax inline dynamic>{part.label || part.title || part.question || ''}</UniversalMathJax>
-                                                              <span className="text-xs font-bold text-amber-500/50 px-2 py-0.5 rounded-full bg-amber-100/50 border border-amber-200/50">{toBengaliNumerals(part.marks || 0)} marks</span>
-                                                            </div>
-                                                          </div>
-                                                        </div>
-                                                        <div className="flex flex-wrap items-center gap-2">
-                                                          <div className="text-[10px] font-black text-amber-600/70 uppercase tracking-wider mr-2">Award Marks:</div>
-                                                          <div className="flex gap-1.5 p-1 bg-white/60 rounded-lg border border-amber-100 shadow-inner">
-                                                            {Array.from({ length: (part.marks || 0) + 1 }, (_, i) => i).map((mark) => (
-                                                              <button
-                                                                key={mark}
-                                                                onClick={() => updateMarks(currentQuestion.id, mark, pIdx)}
-                                                                disabled={!canEditMarks()}
-                                                                className={`w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold transition-all ${currentSubMarks === mark
-                                                                  ? 'bg-amber-600 text-white shadow-lg shadow-amber-200 scale-110'
-                                                                  : 'bg-white text-amber-600 hover:bg-amber-50 border border-amber-100'
-                                                                  } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:-translate-y-0.5'}`}
-                                                              >
-                                                                {mark}
-                                                              </button>
-                                                            ))}
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 pl-4 border-l-4 border-amber-200/30">
-                                                        <div className="space-y-4">
-                                                          <div className="space-y-2">
-                                                            <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                                                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Quest:
-                                                            </div>
-                                                            <div className="text-sm font-semibold text-gray-800 leading-relaxed bg-blue-50/30 p-3 rounded-lg border border-blue-100/50 whitespace-pre-wrap">
-                                                              <UniversalMathJax dynamic>{cleanupMath((part.text || part.questionText || "Reference text/question missing in metadata").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                            </div>
-                                                          </div>
-                                                          <div className="space-y-2">
-                                                            <div className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-2">
-                                                              <div className="w-1.5 h-1.5 bg-amber-600 rounded-full"></div> Student response:
-                                                            </div>
-                                                            <div className="bg-white p-4 rounded-xl border-2 border-amber-100 shadow-sm min-h-[100px] relative overflow-hidden">
-                                                              {Capacitor.isNativePlatform() && (
-                                                                <Button
-                                                                  size="sm"
-                                                                  variant="ghost"
-                                                                  className="absolute top-2 right-2 h-7 px-2 text-[10px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200"
-                                                                  onClick={() => handleScan(currentQuestion.id, pIdx)}
-                                                                >
-                                                                  <Scan className="w-3 h-3 mr-1" />
-                                                                  Smart Scan
-                                                                </Button>
-                                                              )}
-                                                              {part.subType === 'writing' && (
-                                                                <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium">
-                                                                  <UniversalMathJax dynamic>{cleanupMath((getAns('ans') || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                  {!getAns('ans') && <span className="text-muted-foreground/40">No text provided…</span>}
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'fill_in' && (
-                                                                <div className="space-y-3">
-                                                                  {(part.fillType === 'gap_passage' || !part.fillType) && (
-                                                                    <div className="flex flex-wrap gap-4">
-                                                                      {(part.passage?.match(/___/g) || []).map((_: any, si: number) => (
-                                                                        <div key={si} className="flex items-center bg-amber-50/50 px-3 py-1.5 rounded-lg border border-amber-100">
-                                                                          <span className="text-[10px] font-black text-amber-500 mr-2">{toBengaliNumerals(si + 1)}</span>
-                                                                          <span className="text-sm font-bold text-gray-700">{getAns(si) || '___'}</span>
-                                                                        </div>
-                                                                      ))}
-                                                                    </div>
-                                                                  )}
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'comprehension' && (
-                                                                <div className="space-y-4">
-                                                                  {(part.questions || []).map((q: string, qi: number) => (
-                                                                    <div key={qi} className="space-y-1">
-                                                                      <div className="text-[10px] font-bold text-amber-800/60">Q{qi + 1}: {q}</div>
-                                                                      <div className="text-sm border-l-2 border-amber-400 pl-3 py-1 bg-amber-50/20 italic">{getAns(qi) || 'No response'}</div>
-                                                                    </div>
-                                                                  ))}
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'table' && (
-                                                                <div className="overflow-x-auto rounded-lg border border-amber-200">
-                                                                  <table className="w-full text-[10px]">
-                                                                    <thead className="bg-amber-100/50">
-                                                                      <tr>
-                                                                        {(part.tableHeaders || []).map((h: string, hi: number) => <th key={hi} className="border-b border-amber-200 p-2 text-left text-amber-800 whitespace-pre-wrap"><UniversalMathJax inline>{h.replace(/\|\|/g, '\n')}</UniversalMathJax></th>)}
-                                                                      </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                      {(part.tableRows || []).map((row: string[], ri: number) => (
-                                                                        <tr key={ri} className="hover:bg-amber-50/30">
-                                                                          {(part.tableHeaders || []).map((_: string, ci: number) => {
-                                                                            const isBlank = !row[ci] || row[ci] === '___';
-                                                                            return (
-                                                                              <td key={ci} className="border-b border-amber-100 p-2 whitespace-pre-wrap">
-                                                                                {isBlank ? <span className="font-black text-amber-600"><UniversalMathJax inline>{(getAns(`${ri}_${ci}`) || '___').replace(/\|\|/g, '\n')}</UniversalMathJax></span> : <span className="text-gray-500"><UniversalMathJax inline>{row[ci].replace(/\|\|/g, '\n')}</UniversalMathJax></span>}
-                                                                              </td>
-                                                                            );
-                                                                          })}
-                                                                        </tr>
-                                                                      ))}
-                                                                    </tbody>
-                                                                  </table>
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'matching' && (
-                                                                <div className="space-y-4">
-                                                                  <div className="rounded-xl border border-indigo-100 overflow-hidden shadow-sm bg-white">
-                                                                    <div className="p-2 bg-indigo-50/50 border-b border-indigo-100 text-[9px] font-black text-indigo-600 uppercase tracking-wider">Detailed Matching Correspondence</div>
-                                                                    <div className="overflow-x-auto">
-                                                                      <table className="w-full text-[10px] border-collapse">
-                                                                        <thead>
-                                                                          <tr className="bg-slate-50 divide-x divide-slate-100">
-                                                                            <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Reference Item</th>
-                                                                            <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Student Match</th>
-                                                                            <th className="p-2 text-left font-black text-slate-500 uppercase text-[8px] w-1/3">Master Key</th>
-                                                                          </tr>
-                                                                        </thead>
-                                                                        <tbody className="divide-y divide-slate-100">
-                                                                          {part.leftColumn?.map((l: any, i: number) => {
-                                                                            const studentMatchStr = getAns('match') as string;
-                                                                            const pairs = studentMatchStr?.split(/[,;]/).map(p => p.trim());
-                                                                            const ans = pairs?.find(p => p.startsWith(`${l.id}-`));
-                                                                            const correct = part.matches?.[l.id];
-                                                                            const isCorrect = normalize(ans) === normalize(correct);
-                                                                            return (
-                                                                              <tr key={i} className={`divide-x divide-slate-100 transition-colors ${isCorrect ? "bg-green-50/30" : "bg-red-50/30"}`}>
-                                                                                <td className="p-2 font-bold text-slate-700">{l.id}. {l.text}</td>
-                                                                                <td className={`p-2 font-black ${isCorrect ? "text-green-600" : "text-red-500"}`}>{ans || 'No match'}</td>
-                                                                                <td className="p-2 text-green-600 font-black">{correct || '—'}</td>
-                                                                              </tr>
-                                                                            );
-                                                                          })}
-                                                                        </tbody>
-                                                                      </table>
-                                                                    </div>
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'true_false' && (
-                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                                  {(part.statements || []).map((stmt: string, sIdx: number) => {
-                                                                    const studentAns = getAns(sIdx);
-                                                                    const correctAns = part.correct?.[sIdx];
-                                                                    const isCorrect = studentAns === correctAns;
-                                                                    return (
-                                                                      <div key={sIdx} className={`p-3 rounded-lg border-2 flex flex-col gap-1 ${isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                                                                        <div className="text-[10px] font-black text-gray-400 uppercase">Statement {sIdx + 1}</div>
-                                                                        <div className="text-sm font-medium">{stmt}</div>
-                                                                        <Badge variant={isCorrect ? "default" : "destructive"} className={isCorrect ? "bg-green-500" : "bg-red-500"}>{studentAns || 'No response'}</Badge>
-                                                                      </div>
-                                                                    );
-                                                                  })}
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'interpreting_graph' && part.chartConfig && (
-                                                                <div className="space-y-4">
-                                                                  <div className="p-4 bg-white rounded-lg border shadow-sm">
-                                                                    <BeautifulChart 
-                                                                      type={part.chartConfig.type} 
-                                                                      data={part.chartConfig.data} 
-                                                                      xAxisLabel={part.chartConfig.xAxisLabel} 
-                                                                      yAxisLabel={part.chartConfig.yAxisLabel}
-                                                                    />
-                                                                  </div>
-                                                                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
-                                                                    <div className="text-[10px] font-black text-indigo-600/50 uppercase mb-2">Student Interpretation</div>
-                                                                    <div className="text-sm font-bold text-indigo-900 leading-relaxed italic">
-                                                                      {getAns('ans') ? <UniversalMathJax dynamic>{cleanupMath(String(getAns('ans')).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="text-gray-300">No response</span>}
-                                                                    </div>
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'label_diagram' && (
-                                                                <div className="space-y-4">
-                                                                  {part.imageUrl && <img src={part.imageUrl} alt="Diagram" className="max-h-48 rounded-lg border" />}
-                                                                  <div className="grid grid-cols-2 gap-2">
-                                                                    {(part.labels || []).map((_: any, i: number) => {
-                                                                      const ans = getAns(i);
-                                                                      const correct = part.correctLabels?.[i];
-                                                                      const isCorrect = normalize(ans) === normalize(correct);
-                                                                      return (
-                                                                        <div key={i} className={`p-2 rounded border flex flex-col gap-0.5 ${isCorrect ? 'bg-green-50 border-green-100' : 'bg-red-50 border-red-100'}`}>
-                                                                          <div className="text-[9px] font-black text-amber-600/50 uppercase">Label {i + 1}</div>
-                                                                          <div className="text-xs font-bold">{ans || '___'}</div>
-                                                                          {!isCorrect && <div className="text-[8px] text-green-600 font-bold">Key: {correct}</div>}
-                                                                        </div>
-                                                                      );
-                                                                    })}
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'short_answer' && (
-                                                                <div className="grid grid-cols-1 gap-2">
-                                                                  {(part.questions || []).map((q: string, qi: number) => {
-                                                                    const ansArr = getAns('ans') || getAns('answers');
-                                                                    const ans = getAns(qi) || (Array.isArray(ansArr) ? ansArr[qi] : (qi === 0 && !Array.isArray(ansArr) ? ansArr : null));
-                                                                    return (
-                                                                      <div key={qi} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors">
-                                                                        <div className="flex gap-2 items-start opacity-70 mb-1 group-hover:opacity-100">
-                                                                          <span className="text-[10px] font-bold text-gray-400">Q{qi+1}.</span>
-                                                                          <span className="text-[11px] font-medium italic"><UniversalMathJax inline dynamic>{q}</UniversalMathJax></span>
-                                                                        </div>
-                                                                        <div className="text-sm font-bold pl-5 text-indigo-900 leading-relaxed">
-                                                                          {ans ? <UniversalMathJax dynamic>{ans}</UniversalMathJax> : <span className="text-gray-300 italic font-medium">No input</span>}
-                                                                        </div>
-                                                                      </div>
-                                                                    );
-                                                                  })}
-                                                                </div>
-                                                              )}
-
-                                                              {part.subType === 'error_correction' && (
-                                                                <div className="grid grid-cols-1 gap-2">
-                                                                  {(part.sentences || []).map((s: string, si: number) => {
-                                                                    const ansArr = getAns('ans') || getAns('answers');
-                                                                    const ans = getAns(si) || (Array.isArray(ansArr) ? ansArr[si] : (si === 0 && !Array.isArray(ansArr) ? ansArr : null));
-                                                                    return (
-                                                                      <div key={si} className="group border rounded-lg p-2 bg-white/50 hover:bg-white transition-colors flex items-center justify-between">
-                                                                        <div className="flex gap-2 items-center">
-                                                                          <span className="text-[10px] font-bold text-gray-400">{String.fromCharCode(97 + si)}.</span>
-                                                                          <span className="text-[11px] font-medium italic text-gray-600 line-through"><UniversalMathJax inline dynamic>{s}</UniversalMathJax></span>
-                                                                          <ArrowRight className="w-3 h-3 text-amber-500" />
-                                                                          <span className="text-sm font-bold text-indigo-900">{ans || <span className="text-gray-300 italic font-medium">No input</span>}</span>
-                                                                        </div>
-                                                                      </div>
-                                                                    );
-                                                                  })}
-                                                                </div>
-                                                              )}
-
-                                                              {/* Student Response Text & Uploaded Images */}
-                                                              {(() => {
-                                                                const keyBase = `${currentQuestion.id}_desc_${pIdx}`;
-                                                                const subKeyBase = `${currentQuestion.id}_sub_${pIdx}`;
-                                                                
-                                                                // 1. Robustly collect ALL data related to this descriptive part/sub-question
-                                                                const studentAnswers = currentStudent?.answers || {};
-                                                                const relevantData = Object.keys(studentAnswers)
-                                                                  .filter(k => k.startsWith(keyBase) || k.startsWith(subKeyBase))
-                                                                  .map(k => studentAnswers[k]);
-
-                                                                const allImages = collectAllImages([
-                                                                  part.attachments,
-                                                                  part.studentImages,
-                                                                  part.images,
-                                                                  part.answer?.attachments,
-                                                                  part.answer?.studentImages,
-                                                                  ...relevantData
-                                                                ]);
-                                                                
-                                                                const uniqueImages = Array.from(new Set(allImages));
-                                                                const responseText = cleanupMath(String(getAns('ans') || getAns(0) || getAns('answer') || '').replace(/\|\|/g, '\n'));
-                                                                
-                                                                return (
-                                                                  <div className="space-y-4">
-                                                                    {/* Text response if not already rendered by specific sub-type */}
-                                                                    {(responseText && responseText !== 'null') && !['fill_in', 'matching', 'true_false', 'label_diagram', 'comprehension', 'flowchart', 'rearranging', 'table', 'short_answer', 'error_correction', 'interpreting_graph'].includes(part.subType || '') && (
-                                                                      <div className="whitespace-pre-wrap text-sm text-gray-700 italic font-medium p-3 bg-white/50 rounded-xl border border-dashed border-gray-200">
-                                                                        <UniversalMathJax dynamic>{responseText}</UniversalMathJax>
-                                                                      </div>
-                                                                    )}
-                                                                    
-                                                                    {/* Evidence Images */}
-                                                                    {uniqueImages.length > 0 && (
-                                                                      <div className="mt-4 pt-4 border-t border-dashed border-amber-200/50">
-                                                                        <div className="text-[10px] font-black text-amber-800/40 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                                          <ImagePlus className="w-3 h-3" /> Answer Evidence / Student Uploads ({uniqueImages.length})
-                                                                        </div>
-                                                                        <div className="flex flex-wrap gap-3">
-                                                                          {uniqueImages.map((imgUrl: string, imgIdx: number) => {
-                                                                            // Stable numeric index for the annotation key
-                                                                            const stableIndex = pIdx * 100 + imgIdx;
-                                                                            const annotationKey = `${currentQuestion.id}_${stableIndex}`;
-                                                                            const displayUrl = annotations[annotationKey] || imgUrl;
-                                                                            const isAnnotated = !!annotations[annotationKey];
-                                                                            
-                                                                            return (
-                                                                              <div key={imgIdx} className="relative group/img aspect-[4/3] w-[140px] rounded-lg border border-amber-100/50 overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
-                                                                                <img 
-                                                                                  src={displayUrl} 
-                                                                                  alt={`evidence-${imgIdx}`}
-                                                                                  className={`w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-500 cursor-zoom-in ${isAnnotated ? 'ring-2 ring-emerald-500 inset-0' : ''}`}
-                                                                                  onClick={() => window.open(displayUrl, '_blank')}
-                                                                                />
-                                                                                {isAnnotated && (
-                                                                                  <div className="absolute top-1 left-1 bg-emerald-500 text-white text-[7px] font-black uppercase px-1 rounded shadow-sm animate-pulse">Annotated</div>
-                                                                                )}
-                                                                                <Button
-                                                                                  size="icon"
-                                                                                  variant="secondary"
-                                                                                  className="absolute top-2 right-2 w-7 h-7 rounded-full opacity-0 group-hover/img:opacity-100 transition-all font-bold shadow-lg bg-white/90"
-                                                                                  onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    openAnnotation(imgUrl, currentQuestion.id, stableIndex, currentStudent?.student?.id);
-                                                                                  }}
-                                                                                >
-                                                                                  <PenTool className="w-3.5 h-3.5 text-amber-600" />
-                                                                                </Button>
-                                                                              </div>
-                                                                            );
-                                                                          })}
-                                                                        </div>
-                                                                      </div>
-                                                                    )}
-                                                                  </div>
-                                                                );
-                                                              })()}
-                                                            </div>
-                                                          </div>
-                                                        </div>
-                                                        <div className="space-y-4">
-                                                          <div className="space-y-2">
-                                                            <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
-                                                              <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full"></div> Model Verification Key:
-                                                            </div>
-                                                            <div className="bg-emerald-50/30 p-5 rounded-2xl border-2 border-emerald-100/50 shadow-sm relative overflow-hidden group-hover:border-emerald-200 transition-colors">
-                                                              <div className="absolute top-0 right-0 px-3 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-widest rounded-bl-xl shadow-sm">Standard Key</div>
-                                                              {(() => {
-                                                                const hasSubKey = part.subType === 'matching' || part.subType === 'flowchart' || part.subType === 'fill_in' || part.subType === 'true_false' || part.subType === 'short_answer' || part.subType === 'error_correction' || part.correctOrder;
-                                                                const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
-                                                                const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
-
-                                                                if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasSubKey) {
-                                                                  return (
-                                                                    <div className="flex flex-col items-center justify-center py-6 text-emerald-600/40">
-                                                                      <AlertCircle className="w-8 h-8 mb-2 opacity-20" />
-                                                                      <span className="text-[10px] font-black uppercase tracking-tighter">No model answer provided</span>
-                                                                    </div>
-                                                                  );
-                                                                }
-
-                                                                return (
-                                                                  <div className="space-y-3">
-                                                                    {modelAns && (
-                                                                      <div className="text-sm font-medium text-emerald-900 leading-relaxed whitespace-pre-wrap">
-                                                                        <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                      </div>
-                                                                    )}
-
-                                                                    {pluralAnswers && pluralAnswers.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(part.subType) && (
-                                                                      <div className="grid grid-cols-1 gap-1.5">
-                                                                        {pluralAnswers.map((ans: any, ai: number) => (
-                                                                          <div key={ai} className="flex gap-2 items-start bg-emerald-100/30 p-2 rounded-lg border border-emerald-200/50">
-                                                                            <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
-                                                                            <div className="text-sm font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
-                                                                          </div>
-                                                                        ))}
-                                                                      </div>
-                                                                    )}
-                                                                  </div>
-                                                                );
-                                                              })()}
-
-                                                              {part.subType === 'true_false' && (
-                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
-                                                                    <CheckSquare className="w-2.5 h-2.5" /> True/False Answer Key
-                                                                  </div>
-                                                                  <div className="grid grid-cols-1 gap-2">
-                                                                    {(part.statements || []).map((stmt: string, si: number) => {
-                                                                      const ans = part.correctAnswers?.[si];
-                                                                      return (
-                                                                        <div key={si} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center justify-between gap-4">
-                                                                          <div className="flex items-center gap-2 max-w-[70%]">
-                                                                            <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[9px]">({si+1})</span>
-                                                                            <span className="truncate opacity-75">{stmt}</span>
-                                                                          </div>
-                                                                          <Badge className="bg-emerald-600 text-white border-0 text-[10px] uppercase font-black px-2">{String(ans ?? "—")}</Badge>
-                                                                        </div>
-                                                                      );
-                                                                    })}
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              {part.explanation && (
-                                                                <div className="mt-4 p-4 border-t border-emerald-200/50">
-                                                                  <div className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-2">Explanation</div>
-                                                                  <div className="text-sm font-medium text-emerald-800 leading-relaxed whitespace-pre-wrap">
-                                                                    <UniversalMathJax dynamic>{cleanupMath((part.explanation || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              {part.correctOrder && (
-                                                                <div className="flex gap-2 mt-4">
-                                                                  {(part.correctOrder || []).map((label: string, i: number) => (
-                                                                    <span key={i} className="w-6 h-6 rounded bg-emerald-600 text-white flex items-center justify-center font-bold shadow-sm">{label}</span>
-                                                                  ))}
-                                                                </div>
-                                                              )}
-                                                              {part.subType === 'matching' && (
-                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
-                                                                    <ArrowRight className="w-2.5 h-2.5" /> Correct Pairing Matrix
-                                                                  </div>
-                                                                  <div className="grid grid-cols-1 gap-2">
-                                                                    {Object.entries((part.matches as Record<string, any>) || {}).map(([l, r], mIdx) => (
-                                                                      <div key={mIdx} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center justify-between gap-4 group/match">
-                                                                        <div className="flex items-center gap-2">
-                                                                          <span className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[10px] shadow-sm transform group-hover/match:scale-110 transition-transform">{l}</span>
-                                                                          <ArrowRight className="w-3 h-3 text-emerald-400" />
-                                                                          <span className="font-bold text-emerald-900"><UniversalMathJax inline>{Array.isArray(r) ? r.join(' → ') : r}</UniversalMathJax></span>
-                                                                        </div>
-                                                                      </div>
-                                                                    ))}
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                              
-                                                              {part.subType === 'flowchart' && (
-                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
-                                                                    <ArrowRight className="w-2.5 h-2.5" /> Flowchart Sequence Key
-                                                                  </div>
-                                                                  <div className="grid grid-cols-1 gap-2">
-                                                                    {(part.items || []).map((item: string, ii: number) => {
-                                                                      const modelAnsRaw = part.modelAnswers?.[ii] || part.correctOrder?.[ii] || "";
-                                                                      const modelAns = Array.isArray(modelAnsRaw) ? modelAnsRaw : modelAnsRaw.split('|');
-                                                                      return (
-                                                                        <div key={ii} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center gap-3">
-                                                                           <Badge variant="outline" className="h-4 px-1 text-[8px] border-emerald-300 text-emerald-600">Step {ii+1}</Badge>
-                                                                           <div className="flex flex-wrap gap-2">
-                                                                             {modelAns.map((val: string, vi: number) => (
-                                                                               <span key={vi} className="font-black text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-100 shadow-sm">
-                                                                                 <UniversalMathJax inline>{val || "—"}</UniversalMathJax>
-                                                                               </span>
-                                                                             ))}
-                                                                           </div>
-                                                                        </div>
-                                                                      );
-                                                                    })}
-                                                                  </div>
-                                                                </div>
-                                                              )}
-
-                                                              {part.subType === 'fill_in' && (
-                                                                <div className="mt-4 p-3 bg-white/60 rounded-xl border border-emerald-100 text-xs text-emerald-800 shadow-sm transition-all hover:bg-white hover:border-emerald-200">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-emerald-500 tracking-widest flex items-center gap-2">
-                                                                    <ArrowRight className="w-2.5 h-2.5" /> Gap-Fill Master Key
-                                                                  </div>
-                                                                  <div className="grid grid-cols-1 gap-2">
-                                                                    {(part.answers || part.correctAnswers || []).map((ans: string, ai: number) => (
-                                                                      <div key={ai} className="bg-emerald-100/30 p-1.5 rounded border border-emerald-200/50 flex items-center gap-3">
-                                                                         <span className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[9px]">({ai+1})</span>
-                                                                         <span className="font-black text-emerald-800"><UniversalMathJax inline>{ans}</UniversalMathJax></span>
-                                                                      </div>
-                                                                    ))}
-                                                                  </div>
-                                                                </div>
-                                                              )}
-
-                                                              {(part.modelAnswer || part.answer || part.correctAnswer) && (
-                                                                <div className="mt-4 p-4 bg-green-50/50 rounded-xl border border-green-200/50 text-xs text-green-800 shadow-sm">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-green-600 tracking-widest flex items-center gap-2">
-                                                                    <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
-                                                                  </div>
-                                                                  <div className="whitespace-pre-wrap leading-relaxed">
-                                                                    <UniversalMathJax dynamic>{cleanupMath((part.modelAnswer || part.answer || part.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                  </div>
-                                                                </div>
-                                                              )}
-
-                                                              {part.explanation && (
-                                                                <div className="mt-4 p-4 bg-blue-50/50 rounded-xl border border-blue-200/50 text-xs text-blue-800 shadow-sm">
-                                                                  <div className="font-black uppercase text-[8px] mb-2 text-blue-600 tracking-widest flex items-center gap-2">
-                                                                    <Info className="w-2.5 h-2.5" /> Explanation
-                                                                  </div>
-                                                                  <div className="whitespace-pre-wrap leading-relaxed">
-                                                                    <UniversalMathJax dynamic>{cleanupMath(part.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                  </div>
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          </div>
-                                                        </div>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-                                            )}
                                           </div>
                                         ) : (
                                           <span className="text-gray-500 italic">No answer provided by the student</span>
@@ -3400,60 +2901,108 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                         })()}
 
                                         {/* CQ Sub-question Answers */}
-                                        {(currentQuestion?.type?.toLowerCase() === 'cq' || currentQuestion?.type?.toLowerCase() === 'sq') && (currentQuestion?.subQuestions || currentQuestion?.sub_questions) && (
+                                        {(currentQuestion?.type?.toLowerCase() === 'cq' || currentQuestion?.type?.toLowerCase() === 'sq' || currentQuestion?.type?.toLowerCase() === 'descriptive') && (currentQuestion?.subQuestions || currentQuestion?.sub_questions || currentQuestion?.parts) && (
                                           <div className="space-y-4 border-t pt-4 mt-2">
                                             <h5 className="font-medium text-gray-700">Sub-question Answers:</h5>
-                                            {(currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).map((subQ: any, idx: number) => {
-                                              const subKey = `${currentQuestion?.id}_sub_${idx}`;
-                                              const subText = currentStudent?.answers?.[subKey];
-                                              const subImg = currentStudent?.answers?.[`${subKey}_image`];
-                                              const subImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
+                                            {(currentQuestion?.subQuestions || currentQuestion?.sub_questions || currentQuestion?.parts || []).map((subQ: any, idx: number) => {
+                                              const subIdx = idx;
+                                              const qId = currentQuestion.id;
+                                              const studentAnswers = currentStudent?.answers || {};
 
-                                              if (!subText && !subImg && (!subImgs || subImgs.length === 0)) return (
+                                              // Dual-key support for answers
+                                              const subText = studentAnswers[`${qId}_sub_${subIdx}`] || studentAnswers[`${qId}_desc_${subIdx}`] || "";
+                                              
+                                              // Collect images from both prefixes
+                                              const subImgArr = studentAnswers[`${qId}_sub_${subIdx}_images`] || studentAnswers[`${qId}_desc_${subIdx}_images`] || [];
+                                              const subImgSingle = studentAnswers[`${qId}_sub_${subIdx}_image`] || studentAnswers[`${qId}_desc_${subIdx}_image`];
+                                              const allSubImages = subImgSingle ? [subImgSingle, ...subImgArr] : subImgArr;
+
+                                              if (!subText && (!allSubImages || allSubImages.length === 0)) return (
                                                 <div key={idx} className="text-sm text-gray-400 italic pl-2 border-l-2 border-transparent">
-                                                  (Sub-question {idx + 1} not answered)
+                                                  (Part {toBengaliNumerals(idx + 1)} not answered)
                                                 </div>
                                               );
 
                                               return (
                                                 <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-3">
+                                                  {/* Metadata rendering (Passages, Source, etc.) */}
+                                                  {subQ.passage && (
+                                                    <div className="p-3 bg-slate-50 border-l-4 border-slate-300 rounded-r text-sm text-slate-700 italic mb-2">
+                                                      <UniversalMathJax dynamic>{cleanupMath(subQ.passage)}</UniversalMathJax>
+                                                    </div>
+                                                  )}
+                                                  {subQ.sourceText && (
+                                                    <div className="p-2 bg-amber-50/50 border border-amber-100 rounded text-xs text-amber-800 mb-2">
+                                                      <span className="font-bold uppercase text-[9px] block mb-1">Source Text:</span>
+                                                      <UniversalMathJax dynamic>{subQ.sourceText}</UniversalMathJax>
+                                                    </div>
+                                                  )}
+                                                  {subQ.instruction && (
+                                                    <div className="text-[10px] text-blue-600 font-bold uppercase mb-1 flex items-center gap-1">
+                                                      <Info className="w-3 h-3" /> {subQ.instruction}
+                                                    </div>
+                                                  )}
+                                                  
                                                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                                     <div className="flex-1">
                                                       <div className="text-sm font-semibold text-indigo-700 mb-1 flex items-center gap-2">
                                                         <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div> Part {toBengaliNumerals(idx + 1)}
-                                                        <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">[{subQ.marks || 0} Marks]</span>
+                                                        <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">[{subQ.marks || subQ.mark || 0} Marks]</span>
                                                       </div>
-                                                      {subQ?.text || subQ?.question || subQ?.questionText ? (
-                                                        <div className="text-gray-800 text-sm font-medium leading-relaxed mb-1 whitespace-pre-wrap">
-                                                          <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                          {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer) && (
-                                                            <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
-                                                              <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ.modelAnswer || subQ.answer || subQ.correctAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                            </div>
-                                                          )}
-                                                          {subQ.explanation && (
-                                                            <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
-                                                              <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                            </div>
-                                                          )}
+                                                      
+                                                      {/* Question Text */}
+                                                      <div className="text-gray-800 text-sm font-medium leading-relaxed mb-2 whitespace-pre-wrap">
+                                                        <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                      </div>
+
+                                                      {/* Chart/Visuals */}
+                                                      {subQ.chartConfig && (
+                                                        <div className="mb-3 p-3 bg-white border rounded shadow-sm max-w-md">
+                                                          <BeautifulChart 
+                                                            type={subQ.chartConfig.type} 
+                                                            data={subQ.chartConfig.data} 
+                                                            xAxisLabel={subQ.chartConfig.xAxisLabel} 
+                                                            yAxisLabel={subQ.chartConfig.yAxisLabel}
+                                                          />
                                                         </div>
-                                                      ) : null}
-                                                      <div className="mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-2 rounded border border-indigo-50/50 whitespace-pre-wrap">
-                                                        <UniversalMathJax dynamic>{cleanupMath((subText || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                      </div>
+                                                      )}
+                                                      
+                                                      {/* Model Answer & Explanation */}
+                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers) && (
+                                                        <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
+                                                          <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      )}
+                                                      {subQ.explanation && (
+                                                        <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
+                                                          <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      )}
+
+                                                      {/* Student Text Response */}
+                                                      {subText && (
+                                                        <div className="mt-3 mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-3 rounded border border-indigo-50/50 whitespace-pre-wrap italic ring-1 ring-indigo-50/30 shadow-sm">
+                                                          <UniversalMathJax dynamic>{cleanupMath((subText || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      )}
                                                     </div>
 
-                                                    {/* Inline Marking for CQ Sub-question */}
+                                                    {/* Inline Marking for Sub-question */}
                                                     <div className="flex flex-wrap items-center gap-2 bg-indigo-50/30 p-2 rounded-lg border border-indigo-100/50 self-start">
                                                       <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mr-1">Grade:</div>
                                                       <div className="flex gap-1">
-                                                        {Array.from({ length: (subQ?.marks || 0) + 1 }, (_, i) => i).map((mark) => {
-                                                          const marksKey = `${currentQuestion?.id}_sub_${idx}_marks`;
-                                                          const isSelected = (currentStudent?.answers?.[marksKey] || 0) === mark;
+                                                        {Array.from({ length: (subQ?.marks || subQ?.mark || 0) + 1 }, (_, i) => i).map((mark) => {
+                                                          // Check both desc and sub prefixes for marks
+                                                          const marksKey = `${qId}_sub_${subIdx}_marks`;
+                                                          const descMarksKey = `${qId}_desc_${subIdx}_marks`;
+                                                          const isSelectedSub = (studentAnswers[marksKey]) === mark;
+                                                          const isSelectedDesc = (studentAnswers[descMarksKey]) === mark;
+                                                          const isSelected = isSelectedSub || isSelectedDesc;
+                                                          
                                                           return (
                                                             <button
                                                               key={mark}
-                                                              onClick={() => updateMarks(currentQuestion?.id, mark, idx)}
+                                                              onClick={() => updateMarks(qId, mark, idx)}
                                                               disabled={!canEditMarks()}
                                                               className={`w-7 h-7 rounded flex items-center justify-center text-[10px] font-black transition-all ${isSelected
                                                                 ? 'bg-indigo-600 text-white shadow-md'
@@ -3468,44 +3017,40 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                     </div>
                                                   </div>
 
-                                                  {(() => {
-                                                    const singleImg = currentStudent?.answers?.[`${subKey}_image`];
-                                                    const multipleImgs = currentStudent?.answers?.[`${subKey}_images`] || [];
-                                                    const allSubImages = singleImg ? [singleImg, ...(multipleImgs || [])] : (multipleImgs || []);
+                                                  {/* Student Image Evidence (Annotations Supported) */}
+                                                  {allSubImages && allSubImages.length > 0 && (
+                                                    <div className="flex flex-wrap gap-2 mt-2 ml-4">
+                                                      {allSubImages.map((imgUrl: string, imgIdx: number) => {
+                                                        // Stable numeric index for matching with annotation keys
+                                                        const questionIndex = idx * 100 + imgIdx;
+                                                        const displayUrl = getImageUrl(imgUrl, qId, questionIndex);
+                                                        const hasAnnotation = displayUrl !== imgUrl;
 
-                                                    return allSubImages.length > 0 ? (
-                                                      <div className="flex flex-wrap gap-2 mt-2 ml-4">
-                                                        {(allSubImages || [])?.map((imgUrl: string, imgIdx: number) => {
-                                                          const questionIndex = idx * 100 + imgIdx;
-                                                          const displayUrl = getImageUrl(imgUrl, currentQuestion?.id, questionIndex);
-                                                          const hasAnnotation = displayUrl !== imgUrl;
-
-                                                          return (
-                                                            <div key={imgIdx} className="relative inline-block group">
-                                                              <img
-                                                                src={displayUrl}
-                                                                alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
-                                                                crossOrigin="anonymous"
-                                                                className="h-20 w-20 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
-                                                                onClick={() => openAnnotation(imgUrl, currentQuestion?.id, questionIndex, currentStudent?.student?.id)}
-                                                              />
-                                                              <button
-                                                                onClick={() => openAnnotation(imgUrl, currentQuestion?.id, questionIndex, currentStudent?.student?.id)}
-                                                                className="absolute top-1 right-1 bg-background/90 p-1 rounded-full shadow-sm hover:bg-muted text-primary opacity-0 group-hover:opacity-100 transition-opacity"
-                                                              >
-                                                                <PenTool className="w-2.5 h-2.5" />
-                                                              </button>
-                                                              {hasAnnotation && (
-                                                                <div className="absolute top-0 left-0 bg-green-500 text-white text-[8px] px-1 py-0.5 rounded-br font-semibold shadow-sm z-10">
-                                                                  ✓
-                                                                </div>
-                                                              )}
-                                                            </div>
-                                                          );
-                                                        })}
-                                                      </div>
-                                                    ) : null;
-                                                  })()}
+                                                        return (
+                                                          <div key={imgIdx} className="relative inline-block group">
+                                                            <img
+                                                              src={displayUrl}
+                                                              alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
+                                                              crossOrigin="anonymous"
+                                                              className="h-24 w-24 rounded border border-border bg-muted/50 object-cover cursor-pointer hover:scale-105 transition-transform"
+                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id)}
+                                                            />
+                                                            <button
+                                                              onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id)}
+                                                              className="absolute top-1 right-1 bg-background/90 p-1.5 rounded-full shadow-sm hover:bg-muted text-primary opacity-0 group-hover:opacity-100 transition-opacity"
+                                                            >
+                                                              <PenTool className="w-3.5 h-3.5" />
+                                                            </button>
+                                                            {hasAnnotation && (
+                                                              <div className="absolute top-0 left-0 bg-green-500 text-white text-[8px] px-1.5 py-0.5 rounded-br font-semibold shadow-sm z-10 pointer-events-none">
+                                                                ✓
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                        );
+                                                      })}
+                                                    </div>
+                                                  )}
                                                 </div>
                                               );
                                             })}

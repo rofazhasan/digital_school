@@ -37,7 +37,7 @@ import {
   PlusCircle, Wand2, Eye, EyeOff, CheckSquare,
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
-  Download, Save, AlertTriangle, LayoutDashboard
+  Download, Save, AlertTriangle, LayoutDashboard, Info
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
@@ -116,6 +116,7 @@ type Question = {
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
   sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
+  parts?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
   modelAnswer?: string | null;
   assertion?: string | null; reason?: string | null; correctOption?: number | null;
   leftColumn?: Array<{ id: string; text: string }>;
@@ -135,6 +136,8 @@ type GeneratedQuestion = {
   questionText: string;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
   subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
+  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
+  parts?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
   modelAnswer?: string;
   marks: number;
   difficulty: Difficulty;
@@ -1330,8 +1333,26 @@ const QuestionCard: React.FC<{
           {/* DESCRIPTIVE Display */}
           {question.type === 'DESCRIPTIVE' && (
             <div className="space-y-4 mt-3">
-              {(question.subQuestions || question.sub_questions || []).map((part: any, i: number) => (
+              {(question.subQuestions || question.sub_questions || question.parts || []).map((part: any, i: number) => (
                 <div key={i} className="p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 space-y-3">
+                  {/* Metadata Rendering */}
+                  {part.passage && (
+                    <div className="p-2.5 bg-slate-100/50 dark:bg-slate-800/50 border-l-4 border-slate-300 rounded text-[11px] text-slate-700 dark:text-slate-300 italic mb-2">
+                       <UniversalMathJax dynamic>{cleanupMath(part.passage)}</UniversalMathJax>
+                    </div>
+                  )}
+                  {part.sourceText && (
+                    <div className="p-2 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 rounded text-[10px] text-amber-800 dark:text-amber-400 mb-2">
+                      <span className="font-bold uppercase text-[8px] block mb-1">Source Text:</span>
+                      <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
+                    </div>
+                  )}
+                  {part.instruction && (
+                    <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase mb-1 flex items-center gap-1">
+                      <Info className="w-3 h-3" /> {part.instruction}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white dark:bg-gray-800">
@@ -1339,7 +1360,7 @@ const QuestionCard: React.FC<{
                       </Badge>
                       <span className="text-xs font-bold text-gray-400">{getLetter(i).toLowerCase()}.</span>
                     </div>
-                    <Badge variant="secondary" className="text-[9px] font-black h-5">{part.marks}M</Badge>
+                    <Badge variant="secondary" className="text-[9px] font-black h-5">{part.marks || part.mark}M</Badge>
                   </div>
 
                   <div className="space-y-2">
