@@ -417,12 +417,19 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             </div>
                             <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
-                          <div className="ml-6 grid grid-cols-1 gap-1 border-l-2 border-gray-200 pl-3">
-                            <div>{isEn ? 'a Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'কAssertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।'}</div>
-                            <div>{isEn ? 'b Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'খAssertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।'}</div>
-                            <div>{isEn ? 'c Assertion is true but Reason is false.' : 'গAssertion সত্য কিন্তু Reason মিথ্যা।'}</div>
-                            <div>{isEn ? 'd Assertion is false but Reason is true.' : 'ঘAssertion মিথ্যা কিন্তু Reason সত্য।'}</div>
-                            <div>{isEn ? 'e Both Assertion and Reason are false.' : 'ঙAssertion ও Reason উভয়ই মিথ্যা।'}</div>
+                          <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-2">
+                            {[
+                              { label: isEn ? 'a' : 'ক', text: isEn ? 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' },
+                              { label: isEn ? 'b' : 'খ', text: isEn ? 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' },
+                              { label: isEn ? 'c' : 'গ', text: isEn ? 'Assertion is true but Reason is false.' : 'Assertion সত্য কিন্তু Reason মিথ্যা।' },
+                              { label: isEn ? 'd' : 'ঘ', text: isEn ? 'Assertion is false but Reason is true.' : 'Assertion মিথ্যা কিন্তু Reason সত্য।' },
+                              { label: isEn ? 'e' : 'ঙ', text: isEn ? 'Both Assertion and Reason are false.' : 'Assertion ও Reason উভয়ই মিথ্যা।' }
+                            ].map((opt, oidx) => (
+                              <div key={oidx} className="option-item flex items-start gap-1">
+                                <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{opt.label}</span>
+                                <span className="flex-1 text-[11px] leading-tight"><Text>{opt.text}</Text></span>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       );
@@ -431,9 +438,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     if (q.type?.toUpperCase() === 'MTF') {
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-bold">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
-                            <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          <div className="flex justify-between items-end mb-1 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
                             <div className="border-r border-black pr-2">
@@ -677,14 +684,20 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
-                              <div className="whitespace-pre-wrap">
+                              <div className="whitespace-pre-wrap mb-2">
                                 <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
                               </div>
                               {/* Render each sub-part of the descriptive question */}
-                              {(q.subQuestions || []).map((part: any, pIdx: number) => (
-                                <div key={pIdx} className="mb-3">
-                                  {part.label && <div className="font-bold text-sm mb-1 underline">{part.label}:</div>}
-                                  {part.instructions && <div className="text-xs italic mb-2">{part.instructions}</div>}
+                              <div className="space-y-4">
+                                {(q.subQuestions || []).map((part: any, pIdx: number) => (
+                                  <div key={pIdx} className="border border-black/20 rounded-md p-3 bg-gray-50/20 break-inside-avoid shadow-sm">
+                                    {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
+                                    {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
+                                    {(part.text || part.questionText) && (
+                                      <div className="font-medium mb-2 leading-relaxed">
+                                        <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                                      </div>
+                                    )}
 
                                   <div className="text-sm">
                                     {part.subType === 'writing' && (
@@ -756,6 +769,34 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'short_answer' && (
+                                      <div className="space-y-4 mt-2">
+                                        {(part.questions || []).map((q: string, qi: number) => (
+                                          <div key={qi} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + qi)})</span>
+                                            <div className="flex-1">
+                                              <UniversalMathJax dynamic>{q}</UniversalMathJax>
+                                              <div className="border-b border-dotted border-gray-400 w-full mt-6 h-1"></div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'error_correction' && (
+                                      <div className="space-y-2 mt-2">
+                                        {(part.sentences || []).map((s: string, si: number) => (
+                                          <div key={si} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + si)})</span>
+                                            <div className="flex-1">
+                                              <UniversalMathJax dynamic>{s}</UniversalMathJax>
+                                              <div className="border-b border-dotted border-gray-400 w-full mt-4 h-1"></div>
+                                            </div>
+                                          </div>
+                                        ))}
                                       </div>
                                     )}
 
@@ -926,6 +967,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                   <div className="text-right font-bold text-xs mt-1">[{isEn ? part.marks : toBengaliNumerals(part.marks)} {isEn ? 'Marks' : 'নম্বর'}]</div>
                                 </div>
                               ))}
+                              </div>
                             </div>
                           </div>
                         </div>

@@ -49,9 +49,22 @@ export const DescriptiveSection = ({
                             <span className="text-xs text-muted-foreground">[{part.marks} marks]</span>
                         </div>
 
+                        {/* Main Text Content */}
+                        {(part.text || part.questionText) && (
+                            <div className="text-base font-medium text-amber-900 dark:text-amber-100 leading-relaxed bg-white/40 dark:bg-gray-800/20 p-4 rounded-xl border border-amber-200/20 shadow-sm">
+                                <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                            </div>
+                        )}
+
                         {/* Instructions */}
                         {part.instructions && (
-                            <UniversalMathJax dynamic className="text-sm text-gray-700 dark:text-gray-300 italic text-left">{part.instructions}</UniversalMathJax>
+                            <div className="flex items-center gap-2 px-1">
+                                <div className="h-px flex-1 bg-amber-200/50"></div>
+                                <div className="text-[10px] font-black uppercase tracking-tighter text-amber-600/60 dark:text-amber-400/40 italic">
+                                    <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                                </div>
+                                <div className="h-px flex-1 bg-amber-200/50"></div>
+                            </div>
                         )}
 
                         {/* ── WRITING ── */}
@@ -190,6 +203,53 @@ export const DescriptiveSection = ({
                                         </div>
                                     ))}
                                 </div>
+                            </div>
+                        )}
+
+                        {/* ── SHORT_ANSWER ── */}
+                        {part.subType === 'short_answer' && (
+                            <div className="space-y-6">
+                                {(part.questions || []).map((q: string, qi: number) => (
+                                    <div key={qi} className="space-y-3 p-4 bg-white/50 dark:bg-gray-800/50 rounded-2xl border border-border/50 group transition-all hover:border-amber-200">
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-xs font-black text-amber-600 dark:text-amber-400 border border-amber-200/50 shrink-0 mt-0.5">{qi + 1}</div>
+                                            <div className="text-base font-semibold text-slate-800 dark:text-slate-200 leading-snug"><UniversalMathJax dynamic>{q}</UniversalMathJax></div>
+                                        </div>
+                                        <DebouncedTextarea
+                                            value={getAns(qi) as string}
+                                            onChange={(val) => setAns(qi, val)}
+                                            disabled={disabled || submitted}
+                                            rows={2}
+                                            placeholder="Write your answer here…"
+                                            className="w-full p-4 rounded-xl border border-border bg-background/50 focus:border-amber-400 transition-all text-sm"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* ── ERROR_CORRECTION ── */}
+                        {part.subType === 'error_correction' && (
+                            <div className="space-y-4">
+                                {(part.sentences || []).map((s: string, si: number) => (
+                                    <div key={si} className="p-4 bg-white/50 dark:bg-gray-800/50 rounded-2xl border border-border/50 group transition-all hover:border-amber-200 space-y-3">
+                                        <div className="flex gap-3 items-start">
+                                            <div className="w-6 h-6 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-500 uppercase shrink-0 mt-0.5">{String.fromCharCode(97 + si)}</div>
+                                            <div className="text-base font-medium text-slate-700 dark:text-slate-300 leading-relaxed"><UniversalMathJax dynamic>{s}</UniversalMathJax></div>
+                                        </div>
+                                        <div className="flex gap-2 items-center bg-amber-50/30 dark:bg-amber-900/10 p-2 rounded-xl">
+                                            <ChevronRight className="w-4 h-4 text-amber-500 shrink-0" />
+                                            <input
+                                                type="text"
+                                                value={getAns(si) as string}
+                                                onChange={(e) => setAns(si, e.target.value)}
+                                                disabled={disabled || submitted}
+                                                className="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-amber-700 dark:text-amber-400 placeholder-amber-200"
+                                                placeholder="Enter the corrected sentence here…"
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         )}
 

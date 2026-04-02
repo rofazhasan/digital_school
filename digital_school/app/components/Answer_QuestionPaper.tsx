@@ -453,29 +453,23 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             </div>
                             <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
-                          <div className="ml-6 grid grid-cols-1 gap-1 border-l-2 border-gray-200 pl-3 mb-3">
-                            {(() => {
+                          <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-2 mb-3">
+                            {[
+                              { label: isEn ? 'a' : 'ক', text: isEn ? 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' },
+                              { label: isEn ? 'b' : 'খ', text: isEn ? 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' },
+                              { label: isEn ? 'c' : 'গ', text: isEn ? 'Assertion is true but Reason is false.' : 'Assertion সত্য কিন্তু Reason মিথ্যা।' },
+                              { label: isEn ? 'd' : 'ঘ', text: isEn ? 'Assertion is false but Reason is true.' : 'Assertion মিথ্যা কিন্তু Reason সত্য।' },
+                              { label: isEn ? 'e' : 'ঙ', text: isEn ? 'Both Assertion and Reason are false.' : 'Assertion ও Reason উভয়ই মিথ্যা।' }
+                            ].map((opt, oidx) => {
                               const cOpt = Number(q.correct || q.correctOption || 0);
+                              const isCorrect = (oidx + 1) === cOpt;
                               return (
-                                <>
-                                  <div className={cOpt === 1 ? 'bg-green-100 font-bold p-1 rounded' : ''}>
-                                    {isEn ? 'a Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'ক. Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।'}
-                                  </div>
-                                  <div className={cOpt === 2 ? 'bg-green-100 font-bold p-1 rounded' : ''}>
-                                    {isEn ? 'b Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'খ. Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।'}
-                                  </div>
-                                  <div className={cOpt === 3 ? 'bg-green-100 font-bold p-1 rounded' : ''}>
-                                    {isEn ? 'c Assertion is true but Reason is false.' : 'গ. Assertion সত্য কিন্তু Reason মিথ্যা।'}
-                                  </div>
-                                  <div className={cOpt === 4 ? 'bg-green-100 font-bold p-1 rounded' : ''}>
-                                    {isEn ? 'd Assertion is false but Reason is true.' : 'ঘ. Assertion মিথ্যা কিন্তু Reason সত্য।'}
-                                  </div>
-                                  <div className={cOpt === 5 ? 'bg-green-100 font-bold p-1 rounded' : ''}>
-                                    {isEn ? 'e Both Assertion and Reason are false.' : 'ঙ. Assertion ও Reason উভয়ই মিথ্যা।'}
-                                  </div>
-                                </>
+                                <div key={oidx} className={`option-item flex items-start gap-1 ${isCorrect ? 'bg-green-100 rounded px-1 -ml-1' : ''}`}>
+                                  <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''} ${isCorrect ? 'bg-green-600 text-white border-green-600' : ''}`}>{opt.label}</span>
+                                  <span className={`flex-1 text-[11px] leading-tight ${isCorrect ? 'font-bold text-green-900' : ''}`}><Text>{opt.text}</Text></span>
+                                </div>
                               );
-                            })()}
+                            })}
                           </div>
                           <div className="mt-2 ml-6 border-2 border-green-600 bg-green-50 rounded p-3">
                             <div className="flex items-center gap-2">
@@ -511,9 +505,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                     if (q.type === 'MTF') {
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
-                          <div className="flex justify-between items-start mb-2">
-                            <span className="font-bold">{qNum}. {isEn ? 'Match the Columns:' : 'স্তম্ভদ্বয় মিল করো:'}</span>
-                            <span className="font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          <div className="flex justify-between items-end mb-1 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Match the Columns (Solution):' : 'স্তম্ভদ্বয় মিল করো (সমাধান):'}</span>
+                            <span className="font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
 
                           {/* Original Table Layout for Synchronization */}
@@ -817,13 +811,21 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
-                              <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
-                              <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer:' : 'উত্তর:'}</div>
+                              <div className="whitespace-pre-wrap mb-2">
+                                <UniversalMathJax dynamic>{q.questionText || ""}</UniversalMathJax>
+                              </div>
+                              <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer Sheet:' : 'উত্তরপত্র:'}</div>
+                              <div className="space-y-4">
 
                               {(q.subQuestions || []).map((part: any, pIdx: number) => (
-                                <div key={pIdx} className="mb-3">
-                                  {part.label && <div className="font-bold text-sm mb-1 underline">{part.label}:</div>}
-                                  {part.instructions && <div className="text-xs italic mb-2">{part.instructions}</div>}
+                                <div key={pIdx} className="border border-black/20 rounded-md p-3 bg-gray-50/20 break-inside-avoid shadow-sm">
+                                  {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
+                                  {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
+                                  {(part.text || part.questionText) && (
+                                    <div className="font-medium mb-2 leading-relaxed">
+                                      <UniversalMathJax dynamic>{part.text || part.questionText}</UniversalMathJax>
+                                    </div>
+                                  )}
 
                                   <div className="text-sm mb-3">
                                     {part.subType === 'writing' && (
@@ -910,6 +912,32 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                             ))}
                                           </div>
                                         )}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'short_answer' && (
+                                      <div className="space-y-1 mt-2 ml-4">
+                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                          <div key={ai} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
+                                            <div className="flex-1 font-bold">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'error_correction' && (
+                                      <div className="space-y-1 mt-2 ml-4">
+                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                          <div key={ai} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
+                                            <div className="flex-1 font-bold">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        ))}
                                       </div>
                                     )}
 
@@ -1123,6 +1151,32 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       </div>
                                     )}
 
+                                    {part.subType === 'short_answer' && (
+                                      <div className="space-y-1 mt-2 ml-4">
+                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                          <div key={ai} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
+                                            <div className="flex-1 font-bold">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'error_correction' && (
+                                      <div className="space-y-1 mt-2 ml-4">
+                                        {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                                          <div key={ai} className="flex gap-2">
+                                            <span className="font-bold min-w-[20px]">{String.fromCharCode(97 + ai)})</span>
+                                            <div className="flex-1 font-bold">
+                                              <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
                                     {(part.subType === 'matching' || part.subType === 'mtf') && (
                                       <div className="grid grid-cols-1 gap-2 ml-4">
                                         {Object.entries((part.matches as Record<string, string>) || {}).map(([l, r], mIdx) => (
@@ -1216,6 +1270,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                   <div className="text-right font-bold text-xs mt-1">[{isEn ? part.marks : toBengaliNumerals(part.marks)} {isEn ? 'Marks' : 'নম্বর'}]</div>
                                 </div>
                               ))}
+                              </div>
                             </div>
                           </div>
                         </div>

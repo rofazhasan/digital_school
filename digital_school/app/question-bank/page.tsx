@@ -1406,14 +1406,133 @@ const QuestionCard: React.FC<{
                       </div>
                     )}
 
+
+                    {/* Specialized Model Answer Rendering */}
+                    {part.subType === 'matching' && part.matches && (
+                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                          <ArrowRight className="w-2.5 h-2.5" /> Pairing Matrix
+                        </p>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {Object.entries((part.matches as Record<string, any>) || {}).map(([l, r], mIdx) => (
+                            <div key={mIdx} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
+                              <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[9px]">{l}</span>
+                              <ArrowRight className="w-2.5 h-2.5 text-emerald-300" />
+                              <UniversalMathJax inline>{Array.isArray(r) ? r.join(' → ') : r}</UniversalMathJax>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {part.subType === 'flowchart' && part.items && (
+                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                          <ArrowRight className="w-2.5 h-2.5" /> Flowchart Key
+                        </p>
+                        <div className="space-y-1.5">
+                          {part.items.map((item: string, ii: number) => {
+                            const modelAnsRaw = part.modelAnswers?.[ii] || part.correctOrder?.[ii] || "";
+                            const modelAns = Array.isArray(modelAnsRaw) ? modelAnsRaw : modelAnsRaw.split('|');
+                            return (
+                              <div key={ii} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
+                                <Badge variant="outline" className="h-3.5 px-1 text-[7px] border-emerald-200 text-emerald-600 uppercase">Step {ii+1}</Badge>
+                                <div className="flex flex-wrap gap-1">
+                                  {modelAns.map((val: string, vi: number) => (
+                                    <span key={vi} className="bg-emerald-100/50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1 font-black">
+                                      <UniversalMathJax inline>{val || "—"}</UniversalMathJax>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {part.subType === 'fill_in' && (part.answers || part.correctAnswers) && (
+                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                          <ArrowRight className="w-2.5 h-2.5" /> Gap-Fill Key
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(part.answers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                            <div key={ai} className="flex items-center gap-1.5 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-black">
+                              <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{ai+1}</span>
+                              <UniversalMathJax inline>{ans}</UniversalMathJax>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {part.subType === 'true_false' && part.statements && (
+                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                                <CheckSquare className="w-2.5 h-2.5" /> True/False Key
+                            </p>
+                            <div className="grid grid-cols-1 gap-1.5">
+                                {(part.statements || []).map((stmt: string, si: number) => {
+                                    const ans = part.correctAnswers?.[si];
+                                    return (
+                                        <div key={si} className="flex items-center justify-between gap-4 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
+                                            <div className="flex items-center gap-2 max-w-[70%]">
+                                                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{si+1}</span>
+                                                <span className="truncate opacity-75">{stmt}</span>
+                                            </div>
+                                            <Badge className="bg-emerald-600 text-white border-0 text-[8px] uppercase font-black px-1.5 h-3.5 leading-none">{String(ans ?? "—")}</Badge>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {part.subType === 'short_answer' && (
+                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                          <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                            <ArrowRight className="w-2.5 h-2.5" /> Short-Answer Keys
+                          </p>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                              <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
+                                <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
+                                <div className="text-[10px] font-black text-emerald-900 leading-tight">
+                                  <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                    )}
+
+                    {part.subType === 'error_correction' && (
+                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                          <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                            <ArrowRight className="w-2.5 h-2.5" /> Error-Correction Keys
+                          </p>
+                          <div className="grid grid-cols-1 gap-1.5">
+                            {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
+                              <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
+                                <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 uppercase font-black">{String.fromCharCode(97+ai)}</span>
+                                <div className="text-[10px] font-black text-emerald-900 leading-tight">
+                                  <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                    )}
+
                     {/* Model Answer / Explanation */}
-                    {(part.modelAnswer || part.explanation) && (
+                    {(part.modelAnswer || part.answer || part.correctAnswer || part.explanation) && (
                       <div className="mt-3 space-y-2">
-                        {part.modelAnswer && (
+                        {(part.modelAnswer || part.answer || part.correctAnswer) && (
                           <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Model Answer</p>
                              <div className="text-xs text-emerald-800 dark:text-emerald-300 whitespace-pre-wrap">
-                               <UniversalMathJax>{part.modelAnswer}</UniversalMathJax>
+                               <UniversalMathJax>{part.modelAnswer || part.answer || part.correctAnswer}</UniversalMathJax>
                              </div>
                           </div>
                         )}
@@ -4297,8 +4416,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                   <ul className="list-disc pl-5 space-y-1 text-xs text-red-600 dark:text-red-400">
                     {results.errors.map((err, i) => (
                       <li key={i}>{err}</li>
-                    ))}
-                  </ul>
+                      ))}</ul>
                 </CardContent>
               </Card>
             )}
@@ -4306,5 +4424,115 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         )}
       </div>
     </Card>
+
+    {!isPreviewMode && (
+      <Card className="p-6 border-dashed bg-gray-50/30 dark:bg-gray-900/10 mt-6 overflow-hidden">
+        <div className="flex items-center gap-2 mb-4 text-indigo-600 dark:text-indigo-400">
+          <BookCopy className="w-5 h-5" />
+          <h3 className="font-bold text-lg">XLSX Formatting Guide</h3>
+        </div>
+
+        <Tabs defaultValue="standard" className="w-full">
+          <TabsList className="mb-4 bg-gray-100/50 dark:bg-gray-800/50 p-1 rounded-xl">
+            <TabsTrigger value="standard" className="rounded-lg">Standard Types</TabsTrigger>
+            <TabsTrigger value="descriptive" className="rounded-lg">Descriptive Sub-types</TabsTrigger>
+            <TabsTrigger value="tips" className="rounded-lg">Pro Tips</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="standard" className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm">
+                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">SMCQ (Single MCQ)</h4>
+                <p className="text-xs text-gray-500 mb-2">Basic multiple choice questions.</p>
+                <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
+                  <li><b>Type:</b> <code>SMCQ</code></li>
+                  <li><b>Options:</b> Enter in columns <code>Option A</code>, <code>Option B</code>, etc.</li>
+                  <li><b>Correct:</b> Use <code>A</code>, <code>B</code>, <code>C</code>, or <code>D</code>.</li>
+                </ul>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm">
+                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">CQ (Creative Question)</h4>
+                <p className="text-xs text-gray-500 mb-2">Stem-based question with multi-part MCQs.</p>
+                <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
+                  <li><b>Type:</b> <code>CQ</code></li>
+                  <li><b>Stem:</b> Use the <code>Stem</code> column for the passage.</li>
+                  <li><b>Parts:</b> Map sub-questions in the <code>D1_</code>, <code>D2_</code> columns.</li>
+                </ul>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="descriptive" className="space-y-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-pink-500">
+                <h4 className="font-bold text-sm mb-1 text-pink-600">Matching</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Separator: | and :</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800 font-mono">
+                  Apple:Red|Banana:Yellow|Grape:Green
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-blue-500">
+                <h4 className="font-bold text-sm mb-1 text-blue-600">Short Answer</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Separator: |</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800 font-mono">
+                  Q1 Text|Q2 Text
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-emerald-500">
+                <h4 className="font-bold text-sm mb-1 text-emerald-600">Fill in the Gaps</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Gap: ___</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800">
+                  Use 3 underscores <code>___</code> for blanks and <code>|</code> in Answers cell.
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-orange-500">
+                <h4 className="font-bold text-sm mb-1 text-orange-600">Rearranging</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Order: 1,2,3</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800">
+                  List sentences in <code>D1_Questions</code> with <code>|</code>. Order in <code>D1_Order</code>.
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-purple-500">
+                <h4 className="font-bold text-sm mb-1 text-purple-600">Error Correction</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Mapping: 1-to-1</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800 font-mono">
+                  Sentence 1|Sentence 2|...
+                </p>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-cyan-500">
+                <h4 className="font-bold text-sm mb-1 text-cyan-600">Flowchart</h4>
+                <p className="text-[10px] text-gray-400 mb-2 uppercase font-bold tracking-wider">Vertical/Horizontal</p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 p-2 rounded border border-gray-100 dark:border-gray-800">
+                  List sequence in <code>D1_Questions</code> using <code>|</code>.
+                </p>
+              </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="tips" className="space-y-3 pt-2">
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+              <h4 className="font-bold text-sm mb-2 text-amber-700 dark:text-amber-500 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" /> Essential Technical Tips
+              </h4>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-amber-900 dark:text-amber-300">The Pipe Character <code>|</code></p>
+                  <p className="text-[10px] text-amber-800 dark:text-amber-400">Used as the primary separator for multiple values. If you have 10 sub-questions, put them all in one cell separated by pipes.</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-amber-900 dark:text-amber-300">HTML & MathJax</p>
+                  <p className="text-[10px] text-amber-800 dark:text-amber-400">You can use <code>&lt;br/&gt;</code> for new lines and <code>\( formula \)</code> for math within any text cell.</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-[11px] font-bold text-amber-900 dark:text-amber-300">Case Sensitivity</p>
+                  <p className="text-[10px] text-amber-800 dark:text-amber-400">Type codes like <code>SMCQ</code> and <code>DESCRIPTIVE</code> MUST be Uppercase.</p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </Card>
+    )}
+  </>
   );
 };

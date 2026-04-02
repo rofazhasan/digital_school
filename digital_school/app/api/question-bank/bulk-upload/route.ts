@@ -236,7 +236,7 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                 const label = s(getValue(row, [`${prefix} Label`]));
                 const instructions = s(getValue(row, [`${prefix} Instructions`]));
 
-                const subQ: any = { subType, text, marks, modelAnswer, explanation, label, instructions };
+                const subQ: any = { subType, text, questionText: text, marks, modelAnswer, explanation, label, instructions };
                 subQ.imageUrl = s(getValue(row, [`${prefix} Image URL`, `${prefix} Diagram URL`, `${prefix} Image`]));
 
                 // Handle Sub-type specific data from delimited strings
@@ -248,6 +248,12 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                     if (wordBoxStr) subQ.wordBox = wordBoxStr.split('|').map(x => x.trim());
                     const answersStr = s(getValue(row, [`${prefix} Answers`]));
                     if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
+                } else if (subType === 'short_answer') {
+                    const itemsStr = s(getValue(row, [`${prefix} Questions`, `${prefix} Items`]));
+                    if (itemsStr) subQ.questions = itemsStr.split('|').map(x => x.trim());
+                } else if (subType === 'error_correction') {
+                    const itemsStr = s(getValue(row, [`${prefix} Sentences`, `${prefix} Items`]));
+                    if (itemsStr) subQ.sentences = itemsStr.split('|').map(x => x.trim());
                 } else if (subType === 'table') {
                     const headersStr = s(getValue(row, [`${prefix} Table Headers`]));
                     if (headersStr) subQ.tableHeaders = headersStr.split('|').map(x => x.trim());
@@ -322,6 +328,9 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                             return { text, x: n(x), y: n(y) };
                         });
                     }
+                } else if (subType === 'short_answer' || subType === 'error_correction') {
+                    const ansStr = s(getValue(row, [`${prefix} Model Answers`, `${prefix} Correct Answers`]));
+                    if (ansStr) subQ.modelAnswers = ansStr.split('|').map(x => x.trim());
                 }
 
                 data.subQuestions.push(subQ);
@@ -352,7 +361,7 @@ export async function POST(req: NextRequest) {
         // Helper
         const findClassId = (className: string) => {
             const norm = className.toLowerCase().trim();
-            const found = classes.find(c =>
+            const found = classes.find((c: any) =>
                 c.name.toLowerCase() === norm ||
                 `${c.name} - ${c.section}`.toLowerCase() === norm
             );

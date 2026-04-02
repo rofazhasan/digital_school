@@ -200,10 +200,94 @@ export async function GET() {
         templateSheet.addRow(["AR", sampleClass, "History", "Events", "MEDIUM", 1, "", "", "", "", "", "", "1", "", "S1 is true", "S2 is reason"]);
         templateSheet.addRow(["MTF", sampleClass, "GK", "Capitals", "MEDIUM", 5, "Match capitals:", "", "", "", "", "", "", "", "", "", "India", "USA", "France", "", "", "Delhi", "Washington", "Paris", "", "", "1-A, 2-B, 3-C"]);
         templateSheet.addRow(["SMCQ", sampleClass, "Physics", "Thermodynamics", "HARD", 5, "Consider a heat engine...", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Explanation for stem", "", "What is efficiency?", 1, "0.5", "0.5", "0.3", "0.2", "A", "", "Efficiency formula..."]);
-        templateSheet.addRow(["DESCRIPTIVE", sampleClass, "Bangla 2nd", "Grammar", "MEDIUM", 10, "Writing & Grammar Part", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Various sub-parts..."]);
+        // Detailed Descriptive Examples
+        const descriptiveCommon = {
+            class: sampleClass,
+            subject: "English 2nd",
+            difficulty: "MEDIUM",
+            status: "PUBLISHED",
+            complexity: "CONCEPTUAL"
+        };
 
-        // Detailed Descriptive samples are usually easier via JSON, but we can add more specific columns if we expand the template.
-        // For now, these rows demonstrate the type exists.
+        // 1. Matching
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Matching",
+            marks: 5,
+            text: "Match the parts of sentences from Column A and Column B.",
+            explanation: "Model matching answer demonstrating Left:Right syntax.",
+            D1_SubType: "matching",
+            D1_Label: "A",
+            D1_Marks: 5,
+            D1_Instructions: "Match the following items.",
+            D1_Questions: "Row 1:Val 1|Row 2:Val 2|Row 3:Val 3",
+            D1_Answers: "Row 1:Val 1|Row 2:Val 2|Row 3:Val 3"
+        });
+
+        // 2. Fill in the gaps (Cloze Test)
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Fill in the gaps",
+            marks: 5,
+            text: "Read the following passage and fill in the blanks with suitable words.",
+            explanation: "Model gap-fill answer demonstrating triple underscore syntax.",
+            D1_SubType: "fill_in",
+            D1_Label: "B",
+            D1_Marks: 5,
+            D1_Instructions: "Use words from the box if necessary.",
+            D1_WordBox: "honest|hardworking|sincere|truth",
+            D1_Passage: "A man is known by the ___ he keeps. One should be ___ in life.",
+            D1_Answers: "company|honest"
+        });
+
+        // 3. Short Answer (New)
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Short Questions",
+            marks: 10,
+            text: "Answer the following questions in one or two sentences.",
+            explanation: "Model short answer demonstrating piped questions and model answers.",
+            D1_SubType: "short_answer",
+            D1_Label: "C",
+            D1_Marks: 10,
+            D1_Instructions: "Write concise answers.",
+            D1_Questions: "What is the capital of Bangladesh?|Name the national fruit.",
+            D1_Answers: "Dhaka|Jackfruit"
+        });
+
+        // 4. Error Correction (New)
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Error Correction",
+            marks: 10,
+            text: "The following sentences contain grammatical errors. Correct them.",
+            explanation: "Model error correction demonstrating piped sentences and corrections.",
+            D1_SubType: "error_correction",
+            D1_Label: "D",
+            D1_Marks: 10,
+            D1_Instructions: "Underline the change.",
+            D1_Questions: "She don't like apples.|He are a good boy.",
+            D1_Answers: "She doesn't like apples.|He is a good boy."
+        });
+
+        // 5. Rearranging
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Rearranging",
+            marks: 10,
+            text: "The following sentences are in jumbled order. Rearrange them.",
+            D1_SubType: "rearranging",
+            D1_Label: "E",
+            D1_Marks: 10,
+            D1_Instructions: "Put the numbers in correct order.",
+            D1_Questions: "Once there was a king.|He had a beautiful daughter.|Her name was Lily.",
+            D1_Answers: "1,2,3"
+        });
 
         // Freeze top row
         templateSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
