@@ -382,18 +382,25 @@ export default function CreateExamPage() {
       const str = String(timeStr).trim();
       if (!str || str.includes("--")) return "";
 
-      const simpleMatch = str.match(/^(\d{1,2}):(\d{2})/);
-      if (simpleMatch) {
-        hours = parseInt(simpleMatch[1]);
-        minutes = parseInt(simpleMatch[2]);
+      // Check if it's a full Date/Time string first (important for multi-day exams)
+      const fullDateParse = Date.parse(str);
+      if (!isNaN(fullDateParse)) {
+        const d = new Date(fullDateParse);
+        // If the date part of this string is valid, return the full ISO string
+        // instead of forcing it to dateStr's date.
+        // We only overwrite the date if it's a very small dummy date (like 1970 or 1899 from Excel)
+        if (d.getFullYear() > 1900) {
+            return d.toISOString();
+        }
+        hours = d.getHours();
+        minutes = d.getMinutes();
         isValid = true;
       } else {
-        const parsed = Date.parse(str);
-        if (!isNaN(parsed)) {
-          const d = new Date(parsed);
-          hours = d.getHours();
-          minutes = d.getMinutes();
-          isValid = true;
+        const simpleMatch = str.match(/^(\d{1,2}):(\d{2})/);
+        if (simpleMatch) {
+            hours = parseInt(simpleMatch[1]);
+            minutes = parseInt(simpleMatch[2]);
+            isValid = true;
         }
       }
     }
@@ -458,8 +465,8 @@ export default function CreateExamPage() {
           if (keywords.some(kw => lowerK === kw.toLowerCase() || lowerK.startsWith(kw.toLowerCase()))) {
             const val = row[k];
             // Treat empty string or undefined as null to trigger defaults later if needed, 
-            // BUT preserve 0.
-            if (val === undefined || val === null || val === "") return null;
+            // BUT preserve 0. Allow 0 to be a valid value.
+            if (val === undefined || val === null || (typeof val === 'string' && val.trim() === "")) return null;
             return val;
           }
         }
@@ -500,25 +507,25 @@ export default function CreateExamPage() {
         }
 
         const exam: any = {
-          name: getValue(row, ["Exam Name"]) || `Exam ${index + 1}`,
-          description: getValue(row, ["Description"]) || "",
+          name: getValue(row, ["Exam Name", "Name"]) || `Exam ${index + 1}`,
+          description: getValue(row, ["Description", "Desc"]) || "",
           date: dateStr,
           startTime: startTimeStr,
           endTime: endTimeStr,
-          duration: Number(getValue(row, ["Duration"]) || 60),
-          type: (getValue(row, ["Type"]) || "OFFLINE").toUpperCase(), // Normalized
-          totalMarks: Number(getValue(row, ["Total Marks"]) || 100),
-          passMarks: Number(getValue(row, ["Pass Marks"]) || 33),
+          duration: Number(getValue(row, ["Duration"]) ?? 0) || 0,
+          type: (String(getValue(row, ["Type"]) || "OFFLINE")).toUpperCase(), // Normalized
+          totalMarks: Number(getValue(row, ["Total Marks", "Marks"]) ?? 0) || 0,
+          passMarks: Number(getValue(row, ["Pass Marks"]) ?? 0) || 0,
           classId: "", // Will be resolved in validation
-          allowRetake: false,
+          allowRetake: !!getValue(row, ["Allow Retake", "Retake"]),
           instructions: getValue(row, ["Instructions"]) || "",
           mcqNegativeMarking: parseFloat(getValue(row, ["MCQ Negative Marking", "Negative Marking"]) ?? 0) || 0,
           cqTotalQuestions: parseInt(getValue(row, ["CQ Total Questions", "Total CQ"]) ?? 0) || 0,
           cqRequiredQuestions: parseInt(getValue(row, ["CQ Required Questions", "Required CQ"]) ?? 0) || 0,
           sqTotalQuestions: parseInt(getValue(row, ["SQ Total Questions", "Total SQ"]) ?? 0) || 0,
           sqRequiredQuestions: parseInt(getValue(row, ["SQ Required Questions", "Required SQ"]) ?? 0) || 0,
-          objectiveTime: parseInt(getValue(row, ["Objective Time"]) ?? 20) || 20,
-          cqSqTime: parseInt(getValue(row, ["CQ/SQ Time", "CQ SQ Time"]) ?? 40) || 40,
+          objectiveTime: parseInt(getValue(row, ["Objective Time"]) ?? 0) || 0,
+          cqSqTime: parseInt(getValue(row, ["CQ/SQ Time", "CQ SQ Time"]) ?? 0) || 0,
           cqSubsections: subsections
         };
 
@@ -792,8 +799,10 @@ export default function CreateExamPage() {
                             <TableHead className="w-[180px]">Exam Name</TableHead>
                             <TableHead className="w-[150px]">Class</TableHead>
                             <TableHead className="w-[140px]">Date</TableHead>
-                            <TableHead className="w-[100px]">Dur.(m)</TableHead>
-                            <TableHead className="w-[120px]">Type</TableHead>
+                            <TableHead className="w-[140px]">Start Time</TableHead>
+                            <TableHead className="w-[140px]">End Time</TableHead>
+                            <TableHead className="w-[80px]">Dur.(m)</TableHead>
+                            <TableHead className="w-[100px]">Type</TableHead>
                             <TableHead className="min-w-[200px]">Status</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -816,11 +825,19 @@ export default function CreateExamPage() {
                                 <Input className="h-8" type="date" value={exam.date} onChange={(e) => handleCellChange(i, 'date', e.target.value)} />
                               </TableCell>
                               <TableCell>
-                                <Input className="h-8 w-16" type="number" value={exam.duration} onChange={(e) => handleCellChange(i, 'duration', parseInt(e.target.value) || 0)} />
+                                <Input className="h-8" type="datetime-local" value={exam.startTime.slice(0, 16)} 
+                                  onChange={(e) => handleCellChange(i, 'startTime', e.target.value)} />
+                              </TableCell>
+                              <TableCell>
+                                <Input className="h-8" type="datetime-local" value={exam.endTime.slice(0, 16)} 
+                                  onChange={(e) => handleCellChange(i, 'endTime', e.target.value)} />
+                              </TableCell>
+                              <TableCell>
+                                <Input className="h-8 w-16 px-1" type="number" value={exam.duration} onChange={(e) => handleCellChange(i, 'duration', parseInt(e.target.value) || 0)} />
                               </TableCell>
                               <TableCell>
                                 <Select value={exam.type} onValueChange={(val) => handleCellChange(i, 'type', val as any)}>
-                                  <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                                  <SelectTrigger className="h-8 w-full"><SelectValue /></SelectTrigger>
                                   <SelectContent>{examTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
                                 </Select>
                               </TableCell>
