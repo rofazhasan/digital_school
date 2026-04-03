@@ -20,11 +20,13 @@ interface ProcessedQuestion {
   drawingData: {
     imageData: string;
     originalImagePath: string;
+    drawingData?: any;
   } | null;
   allDrawings: {
     imageIndex: number;
     imageData: string;
     originalImagePath: string;
+    drawingData?: any;
   }[];
   options: any[];
   modelAnswer: string;

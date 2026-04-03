@@ -97,6 +97,9 @@ export default function DrawingCanvas({
     const [activeTextInput, setActiveTextInput] = useState<{ x: number, y: number } | null>(null);
     const [currentText, setCurrentText] = useState("");
     const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+    const imgRef = useRef<HTMLImageElement | null>(null);
+    const canvasSizeRef = useRef({ width: 0, height: 0 });
+    const renderReqRef = useRef<number | null>(null);
 
     // Initialize Canvas & Image
     useEffect(() => {
@@ -117,22 +120,34 @@ export default function DrawingCanvas({
             w = w * ratio;
             h = h * ratio;
 
+            imgRef.current = img;
+            canvasSizeRef.current = { width: w, height: h };
             setImageDimensions({ width: w, height: h });
             setImgLoaded(true);
             resetZoom();
         };
     }, [backgroundImage]);
 
-    // Redraw effect
+    // Redraw loop using requestAnimationFrame for butter-smooth performance
     useEffect(() => {
         if (!imgLoaded) return;
-        drawEverything();
+        
+        const requestRender = () => {
+            if (renderReqRef.current) cancelAnimationFrame(renderReqRef.current);
+            renderReqRef.current = requestAnimationFrame(drawEverything);
+        };
+
+        requestRender();
+        return () => {
+            if (renderReqRef.current) cancelAnimationFrame(renderReqRef.current);
+        };
     }, [imgLoaded, strokes, texts, showAnnotations, scale, offset]);
 
     const drawEverything = useCallback(() => {
         const canvas = canvasRef.current;
         const annoCanvas = annotationCanvasRef.current;
-        if (!canvas || !annoCanvas) return;
+        const img = imgRef.current;
+        if (!canvas || !annoCanvas || !img) return;
 
         const ctx = canvas.getContext('2d');
         const qCtx = annoCanvas.getContext('2d');
@@ -142,17 +157,15 @@ export default function DrawingCanvas({
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         qCtx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
 
-        // Draw Background Image
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.src = backgroundImage;
-        // Optimization: Image is already cached/loaded by the effect above
+        // Draw Background Image (Using persistent reference)
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         if (!showAnnotations) return;
 
-        // Draw Strokes
+        // Draw Strokes with Professional Smoothing
         strokes.forEach(stroke => {
+            if (stroke.points.length === 0) return;
+
             qCtx.beginPath();
             qCtx.strokeStyle = stroke.color;
             qCtx.lineWidth = stroke.width;
@@ -165,25 +178,43 @@ export default function DrawingCanvas({
                 qCtx.globalCompositeOperation = 'source-over';
             }
 
-            if (stroke.points.length > 0) {
-                qCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
-                for (let i = 1; i < stroke.points.length; i++) {
-                    const p = stroke.points[i];
-                    // Smoothing logic can be added here (Bezier)
-                    qCtx.lineTo(p.x, p.y);
+            qCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            
+            if (stroke.points.length < 3) {
+                stroke.points.forEach(p => qCtx.lineTo(p.x, p.y));
+            } else {
+                // Bezier Curve Smoothing for professional feel
+                for (let i = 1; i < stroke.points.length - 2; i++) {
+                    const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
+                    const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
+                    qCtx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, xc, yc);
                 }
-                qCtx.stroke();
+                // For the last 2 points
+                const n = stroke.points.length;
+                qCtx.quadraticCurveTo(
+                    stroke.points[n - 2].x, 
+                    stroke.points[n - 2].y, 
+                    stroke.points[n - 1].x, 
+                    stroke.points[n - 1].y
+                );
             }
+            qCtx.stroke();
         });
 
-        // Draw Texts
+        // Draw Texts with Visibility Halo
         qCtx.globalCompositeOperation = 'source-over';
         texts.forEach(t => {
-            qCtx.fillStyle = t.color;
             qCtx.font = `bold ${t.size}px Arial, "Nikosh", sans-serif`;
+            
+            // Text shadow/halo for visibility on any background
+            qCtx.strokeStyle = 'white';
+            qCtx.lineWidth = Math.max(1, t.size / 10);
+            qCtx.strokeText(t.text, t.x, t.y);
+            
+            qCtx.fillStyle = t.color;
             qCtx.fillText(t.text, t.x, t.y);
         });
-    }, [backgroundImage, imgLoaded, strokes, texts, showAnnotations]);
+    }, [backgroundImage, strokes, texts, showAnnotations]);
 
     const saveToHistory = (newStrokes: Stroke[], newTexts: TextAnnotation[]) => {
         const newHistory = history.slice(0, historyStep + 1);
@@ -324,17 +355,54 @@ export default function DrawingCanvas({
         }, 'image/jpeg', 0.85);
     };
 
-    // Panning logic (Spacebar or Middle Click)
+    // Zoom & Pan Event Listeners (Professional Feel)
     useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === ' ' && !isPanning && !activeTextInput) setIsPanning(true);
+        const container = containerRef.current;
+        if (!container) return;
+
+        const handleWheel = (e: WheelEvent) => {
+            if (activeTextInput) return;
+            e.preventDefault();
+            
+            const delta = -e.deltaY * 0.001; // Slower, smoother zoom
+            const newScale = Math.min(Math.max(0.5, scale + delta), 5);
+            
+            if (newScale !== scale) {
+                // Zoom-at-point logic
+                const rect = container.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+
+                // Position relative to scaled image
+                const imageX = (mouseX - offset.x) / scale;
+                const imageY = (mouseY - offset.y) / scale;
+
+                // New offset to keep the same point under the cursor
+                const newOffsetX = mouseX - imageX * newScale;
+                const newOffsetY = mouseY - imageY * newScale;
+
+                setOffset({ x: newOffsetX, y: newOffsetY });
+                setScale(newScale);
+            }
         };
+
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === ' ' && !isPanning && !activeTextInput) {
+                e.preventDefault();
+                setIsPanning(true);
+            }
+        };
+
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.key === ' ') setIsPanning(false);
         };
+
+        container.addEventListener('wheel', handleWheel, { passive: false });
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
+        
         return () => {
+            container.removeEventListener('wheel', handleWheel);
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };

@@ -170,6 +170,7 @@ interface Question {
     imageIndex: number;
     imageData: string;
     originalImagePath: string;
+    drawingData?: any;
   }[];
   options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
   modelAnswer?: string;
@@ -561,7 +562,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     const displayUrl = annotation?.imageData || imgUrl;
                     
                     return (
-                      <div key={imgIdx} className="relative group cursor-pointer" onClick={() => handleImageZoom(displayUrl, `Sub-question ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, { id: questionId } as Question)}>
+                      <div key={imgIdx} className="relative group cursor-pointer" onClick={() => handleImageZoom(displayUrl, `Sub-question ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}>
                         <img 
                           src={displayUrl} 
                           alt={`Submission ${imgIdx + 1}`} 
@@ -2434,7 +2435,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                                         <div
                                                           key={imgIdx}
                                                           className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm hover:shadow-xl transition-all"
-                                                          onClick={() => handleImageZoom(imageUrl, `Question ${globalIndex + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, question)}
+                                                          onClick={() => handleImageZoom(imageUrl, `Question ${globalIndex + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
                                                         >
                                                           <img src={imageUrl} alt={`Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                                                           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -3270,54 +3271,34 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
                 </DialogHeader>
 
-                <div className="flex-1 relative overflow-auto p-4 sm:p-8 flex items-center justify-center bg-transparent group/image">
+                <div className="flex-1 relative p-0 overflow-hidden bg-slate-950 flex flex-col items-stretch">
                   {isApplyingDrawing ? (
-                    <div className="flex flex-col items-center gap-4 text-white/60">
+                    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-white/60">
                       <div className="w-12 h-12 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin"></div>
                       <span className="text-xs font-bold uppercase tracking-widest animate-pulse">Processing Feedback...</span>
                     </div>
                   ) : (
-                    <div className="relative max-w-full max-h-full">
-                      {/* Floating Hint */}
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="absolute -bottom-12 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-white/10 text-[10px] text-white/60 font-medium z-20"
-                      >
-                        Pinch or scroll to zoom • Click and drag to pan
-                      </motion.div>
-
-                      <img
-                        src={annotatedImageFailed ? originalImageFallback : zoomedImage}
-                        alt={annotatedImageFailed ? "Original Response" : "Teacher Annotated Response"}
-                        className="max-w-full max-h-[70vh] object-contain rounded-3xl bg-slate-900 shadow-2xl ring-1 ring-white/20 transition-all duration-500"
-                        onError={() => {
-                          if (!annotatedImageFailed && originalImageFallback) {
-                            setAnnotatedImageFailed(true);
-                          }
-                        }}
-                      />
-
-                      {/* Badge Overlay */}
-                      <div className="absolute top-6 left-6 pointer-events-none">
-                        <div className={cn(
-                          "px-4 py-2 rounded-2xl backdrop-blur-xl border flex items-center gap-3 shadow-2xl transition-all duration-500",
-                          annotatedImageFailed ? "bg-slate-800/80 border-slate-700/50" : "bg-indigo-500/80 border-indigo-400/50"
-                        )}>
-                          {annotatedImageFailed ? (
-                            <>
-                              <div className="w-2 h-2 rounded-full bg-slate-400 animate-pulse"></div>
-                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Original Scan</span>
-                            </>
-                          ) : (
-                            <>
-                              <div className="w-2 h-2 rounded-full bg-indigo-200 animate-pulse"></div>
-                              <span className="text-[10px] font-black text-white uppercase tracking-widest">Teacher Feedback Applied</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                    <DrawingCanvas
+                      backgroundImage={(annotatedImageFailed ? originalImageFallback : zoomedImage) || ''}
+                      readOnly={true}
+                      onCancel={() => setShowZoomModal(false)}
+                      onNext={() => {
+                        if (activeZoomImages && activeZoomIndex < activeZoomImages.length - 1) {
+                          const nextIdx = activeZoomIndex + 1;
+                          handleImageZoom(activeZoomImages[nextIdx], zoomedImageTitle, nextIdx, activeZoomImages, activeZoomQuestion!);
+                        }
+                      }}
+                      onPrev={() => {
+                        if (activeZoomImages && activeZoomIndex > 0) {
+                          const prevIdx = activeZoomIndex - 1;
+                          handleImageZoom(activeZoomImages[prevIdx], zoomedImageTitle, prevIdx, activeZoomImages, activeZoomQuestion!);
+                        }
+                      }}
+                      currentIndex={activeZoomIndex}
+                      totalImages={activeZoomImages?.length || 1}
+                      initialStrokes={activeZoomQuestion?.allDrawings?.find(d => d.imageIndex === activeZoomIndex || d.originalImagePath === zoomedImage)?.drawingData?.strokes || []}
+                      initialTexts={activeZoomQuestion?.allDrawings?.find(d => d.imageIndex === activeZoomIndex || d.originalImagePath === zoomedImage)?.drawingData?.texts || []}
+                    />
                   )}
                 </div>
 
