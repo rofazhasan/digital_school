@@ -65,14 +65,13 @@ export default function DrawingCanvas({
     readOnly = false,
     onNext,
     onPrev,
-    currentIndex,
-    totalImages,
+    currentIndex = 0,
+    totalImages = 0,
     initialStrokes = [],
     initialTexts = []
 }: DrawingCanvasProps) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#EF4444');
     const [lineWidth, setLineWidth] = useState(3);
@@ -101,11 +100,25 @@ export default function DrawingCanvas({
     const canvasSizeRef = useRef({ width: 0, height: 0 });
     const renderReqRef = useRef<number | null>(null);
 
+    // Refs for real-time listener values (to avoid stale closures in handleWheel)
+    const scaleRef = useRef(scale);
+    const offsetRef = useRef(offset);
+    
+    useEffect(() => { scaleRef.current = scale; }, [scale]);
+    useEffect(() => { offsetRef.current = offset; }, [offset]);
+
     // Initialize Canvas & Image
     useEffect(() => {
+        if (!backgroundImage) {
+            setImgLoaded(false);
+            return;
+        }
+
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = backgroundImage;
+        setImgLoaded(false); // Reset loading state when source changes
+        
         img.onload = () => {
             const container = containerRef.current;
             if (!container) return;
@@ -126,6 +139,11 @@ export default function DrawingCanvas({
             setImgLoaded(true);
             resetZoom();
         };
+
+        img.onerror = () => {
+            console.error("Failed to load image:", backgroundImage);
+            setImgLoaded(false);
+        };
     }, [backgroundImage]);
 
     // Redraw loop using requestAnimationFrame for butter-smooth performance
@@ -145,20 +163,13 @@ export default function DrawingCanvas({
 
     const drawEverything = useCallback(() => {
         const canvas = canvasRef.current;
-        const annoCanvas = annotationCanvasRef.current;
-        const img = imgRef.current;
-        if (!canvas || !annoCanvas || !img || !imgLoaded) return;
+        if (!canvas || !imgLoaded) return;
 
-        const ctx = canvas.getContext('2d');
-        const qCtx = annoCanvas.getContext('2d');
-        if (!ctx || !qCtx) return;
+        const qCtx = canvas.getContext('2d');
+        if (!qCtx) return;
 
-        // Clear
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        qCtx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
-
-        // Draw Background Image (Using persistent reference)
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        // Clear Current Annotation Layer
+        qCtx.clearRect(0, 0, canvas.width, canvas.height);
 
         if (!showAnnotations) return;
 
@@ -183,13 +194,11 @@ export default function DrawingCanvas({
             if (stroke.points.length < 3) {
                 stroke.points.forEach(p => qCtx.lineTo(p.x, p.y));
             } else {
-                // Bezier Curve Smoothing for professional feel
                 for (let i = 1; i < stroke.points.length - 2; i++) {
                     const xc = (stroke.points[i].x + stroke.points[i + 1].x) / 2;
                     const yc = (stroke.points[i].y + stroke.points[i + 1].y) / 2;
                     qCtx.quadraticCurveTo(stroke.points[i].x, stroke.points[i].y, xc, yc);
                 }
-                // For the last 2 points
                 const n = stroke.points.length;
                 qCtx.quadraticCurveTo(
                     stroke.points[n - 2].x, 
@@ -214,7 +223,7 @@ export default function DrawingCanvas({
             qCtx.fillStyle = t.color;
             qCtx.fillText(t.text, t.x, t.y);
         });
-    }, [backgroundImage, strokes, texts, showAnnotations]);
+    }, [strokes, texts, showAnnotations, imgLoaded]);
 
     const saveToHistory = (newStrokes: Stroke[], newTexts: TextAnnotation[]) => {
         const newHistory = history.slice(0, historyStep + 1);
@@ -246,7 +255,7 @@ export default function DrawingCanvas({
     };
 
     const getMousePos = (e: React.MouseEvent | React.TouchEvent): Point => {
-        const canvas = annotationCanvasRef.current;
+        const canvas = canvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
         
@@ -301,12 +310,6 @@ export default function DrawingCanvas({
         if (isDrawing) {
             setIsDrawing(false);
             saveToHistory(strokes, texts);
-            
-            // Auto-save logic (debounced)
-            if (onSave) {
-                // We'll trigger a real save in handleSave function for now, 
-                // but we could automate it here with a timer.
-            }
         }
     };
 
@@ -330,8 +333,7 @@ export default function DrawingCanvas({
 
     const handleSaveFlattened = () => {
         const canvas = canvasRef.current;
-        const annoCanvas = annotationCanvasRef.current;
-        if (!canvas || !annoCanvas || !onSave) return;
+        if (!canvas || !onSave) return;
 
         setIsSaving(true);
         
@@ -342,9 +344,14 @@ export default function DrawingCanvas({
         const fCtx = finalCanvas.getContext('2d');
         if (!fCtx) return;
 
-        fCtx.drawImage(canvas, 0, 0);
+        // Draw background image
+        if (imgRef.current) {
+            fCtx.drawImage(imgRef.current, 0, 0, canvas.width, canvas.height);
+        }
+        
+        // Draw annotations
         if (showAnnotations) {
-            fCtx.drawImage(annoCanvas, 0, 0);
+            fCtx.drawImage(canvas, 0, 0);
         }
 
         finalCanvas.toBlob((blob) => {
@@ -364,11 +371,13 @@ export default function DrawingCanvas({
             if (activeTextInput) return;
             e.preventDefault();
             
-            const delta = -e.deltaY * 0.001; // Slower, smoother zoom
-            const newScale = Math.min(Math.max(0.5, scale + delta), 5);
+            const currentScale = scaleRef.current;
+            const currentOffset = offsetRef.current;
             
-            if (newScale !== scale) {
-                // Zoom-at-point logic
+            const delta = -e.deltaY * 0.001; 
+            const newScale = Math.min(Math.max(0.5, currentScale + delta), 5);
+            
+            if (newScale !== currentScale) {
                 const rect = container.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
@@ -554,9 +563,11 @@ export default function DrawingCanvas({
                 <div 
                     style={{ 
                         transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                        transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+                        transition: isPanning ? 'none' : 'transform 0.1s ease-out',
+                        visibility: imgLoaded ? 'visible' : 'hidden',
+                        opacity: imgLoaded ? 1 : 0
                     }}
-                    className="relative shadow-2xl ring-1 ring-white/10 rounded-sm overflow-hidden"
+                    className="relative shadow-2xl ring-1 ring-white/10 rounded-sm overflow-hidden bg-white"
                 >
                     {/* Tooltip for Panning */}
                     {!readOnly && scale > 1 && (
@@ -565,15 +576,21 @@ export default function DrawingCanvas({
                         </div>
                     )}
 
-                    {/* Canvas Layers */}
+                    {/* Native Background Layer */}
+                    <img 
+                        src={backgroundImage}
+                        alt="Question"
+                        style={{ 
+                            width: imageDimensions.width, 
+                            height: imageDimensions.height,
+                            display: 'block'
+                        }}
+                        className="bg-white pointer-events-none"
+                    />
+
+                    {/* Annotation Canvas Layers */}
                     <canvas
                         ref={canvasRef}
-                        width={imageDimensions.width}
-                        height={imageDimensions.height}
-                        className="bg-white"
-                    />
-                    <canvas
-                        ref={annotationCanvasRef}
                         width={imageDimensions.width}
                         height={imageDimensions.height}
                         onMouseDown={startAction}

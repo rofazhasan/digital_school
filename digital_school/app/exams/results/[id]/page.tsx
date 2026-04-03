@@ -244,6 +244,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [activeZoomImages, setActiveZoomImages] = useState<string[]>([]);
   const [activeZoomIndex, setActiveZoomIndex] = useState(0);
   const [activeZoomQuestion, setActiveZoomQuestion] = useState<Question | null>(null);
+  const [activeZoomStrokes, setActiveZoomStrokes] = useState<any[]>([]);
+  const [activeZoomTexts, setActiveZoomTexts] = useState<any[]>([]);
   const [annotatedImageFailed, setAnnotatedImageFailed] = useState(false);
   const [originalImageFallback, setOriginalImageFallback] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
@@ -1117,10 +1119,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     setActiveZoomQuestion(question);
     setZoomedImageTitle(title);
     
-    // Find if this specific image has an annotation
-    const annotation = question.allDrawings?.find(d => d.imageIndex === index || d.originalImagePath === imageUrl);
+    // Robust lookup: Match by index OR by path suffix
+    const annotation = question.allDrawings?.find(d => 
+      d.imageIndex === index || 
+      (imageUrl && d.originalImagePath && (imageUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imageUrl)))
+    );
     setZoomedImage(annotation?.imageData || imageUrl);
-    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null); // Preserve the truly original image
+    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null); 
+    
+    // PRE-CALCULATE ANNOTATIONS FOR OPTIMIZED RENDERING
+    setActiveZoomStrokes(annotation?.drawingData?.strokes || []);
+    setActiveZoomTexts(annotation?.drawingData?.texts || []);
+    
     setShowZoomModal(true);
   };
 
@@ -3284,22 +3294,12 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       backgroundImage={(activeZoomOriginal || zoomedImage) || ''}
                       readOnly={true}
                       onCancel={() => setShowZoomModal(false)}
-                      onNext={() => {
-                        if (activeZoomImages && activeZoomIndex < activeZoomImages.length - 1) {
-                          const nextIdx = activeZoomIndex + 1;
-                          handleImageZoom(activeZoomImages[nextIdx], zoomedImageTitle, nextIdx, activeZoomImages, activeZoomQuestion!);
-                        }
-                      }}
-                      onPrev={() => {
-                        if (activeZoomImages && activeZoomIndex > 0) {
-                          const prevIdx = activeZoomIndex - 1;
-                          handleImageZoom(activeZoomImages[prevIdx], zoomedImageTitle, prevIdx, activeZoomImages, activeZoomQuestion!);
-                        }
-                      }}
+                      onNext={handleNextZoomImage}
+                      onPrev={handlePrevZoomImage}
                       currentIndex={activeZoomIndex}
                       totalImages={activeZoomImages?.length || 1}
-                      initialStrokes={activeZoomQuestion?.allDrawings?.find(d => d.imageIndex === activeZoomIndex || d.originalImagePath === zoomedImage)?.drawingData?.strokes || []}
-                      initialTexts={activeZoomQuestion?.allDrawings?.find(d => d.imageIndex === activeZoomIndex || d.originalImagePath === zoomedImage)?.drawingData?.texts || []}
+                      initialStrokes={activeZoomStrokes}
+                      initialTexts={activeZoomTexts}
                     />
                   )}
                 </div>
