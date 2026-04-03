@@ -79,7 +79,10 @@ export default function DrawingCanvas({
     
     // Zoom & Pan State
     const [scale, setScale] = useState(1);
+    const [baseFitScale, setBaseFitScale] = useState(1); // Scale to fit into container
     const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 }); // Current displayed size
+    const [naturalDimensions, setNaturalDimensions] = useState({ width: 0, height: 0 }); // Original image size
     const [isPanning, setIsPanning] = useState(false);
     const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 });
     
@@ -95,7 +98,6 @@ export default function DrawingCanvas({
     const [showAnnotations, setShowAnnotations] = useState(true);
     const [activeTextInput, setActiveTextInput] = useState<{ x: number, y: number } | null>(null);
     const [currentText, setCurrentText] = useState("");
-    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
     const imgRef = useRef<HTMLImageElement | null>(null);
     const canvasSizeRef = useRef({ width: 0, height: 0 });
     const renderReqRef = useRef<number | null>(null);
@@ -126,16 +128,16 @@ export default function DrawingCanvas({
             const maxWidth = container.clientWidth - 40;
             const maxHeight = container.clientHeight - 40;
             
-            let w = img.width;
-            let h = img.height;
-            const ratio = Math.min(maxWidth / w, maxHeight / h);
+            const nw = img.width;
+            const nh = img.height;
+            const ratio = Math.min(maxWidth / nw, maxHeight / nh);
             
-            w = w * ratio;
-            h = h * ratio;
-
+            setNaturalDimensions({ width: nw, height: nh });
+            setImageDimensions({ width: nw * ratio, height: nh * ratio });
+            setBaseFitScale(ratio); // Keep record of how we fitted it
+            
             imgRef.current = img;
-            canvasSizeRef.current = { width: w, height: h };
-            setImageDimensions({ width: w, height: h });
+            canvasSizeRef.current = { width: nw, height: nh };
             setImgLoaded(true);
             resetZoom();
         };
@@ -268,10 +270,11 @@ export default function DrawingCanvas({
             clientY = e.clientY;
         }
 
-        // Adjust for scale and offset
+        // Map screen coordinates to original image pixel coordinates
+        // (clientX - rect.left) / (baseFitScale * scale)
         return {
-            x: (clientX - rect.left) * (canvas.width / rect.width),
-            y: (clientY - rect.top) * (canvas.height / rect.height)
+            x: (clientX - rect.left) / (baseFitScale * scale),
+            y: (clientY - rect.top) / (baseFitScale * scale)
         };
     };
 
@@ -339,14 +342,14 @@ export default function DrawingCanvas({
         
         // Create a temporary canvas to combine them
         const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = canvas.width;
-        finalCanvas.height = canvas.height;
+        finalCanvas.width = naturalDimensions.width;
+        finalCanvas.height = naturalDimensions.height;
         const fCtx = finalCanvas.getContext('2d');
         if (!fCtx) return;
 
         // Draw background image
         if (imgRef.current) {
-            fCtx.drawImage(imgRef.current, 0, 0, canvas.width, canvas.height);
+            fCtx.drawImage(imgRef.current, 0, 0, naturalDimensions.width, naturalDimensions.height);
         }
         
         // Draw annotations
@@ -383,12 +386,12 @@ export default function DrawingCanvas({
                 const mouseY = e.clientY - rect.top;
 
                 // Position relative to scaled image
-                const imageX = (mouseX - offset.x) / scale;
-                const imageY = (mouseY - offset.y) / scale;
+                const imageX = (mouseX - offset.x) / (baseFitScale * scale);
+                const imageY = (mouseY - offset.y) / (baseFitScale * scale);
 
                 // New offset to keep the same point under the cursor
-                const newOffsetX = mouseX - imageX * newScale;
-                const newOffsetY = mouseY - imageY * newScale;
+                const newOffsetX = mouseX - imageX * (baseFitScale * newScale);
+                const newOffsetY = mouseY - imageY * (baseFitScale * newScale);
 
                 setOffset({ x: newOffsetX, y: newOffsetY });
                 setScale(newScale);
@@ -415,7 +418,7 @@ export default function DrawingCanvas({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isPanning, activeTextInput]);
+    }, [isPanning, activeTextInput, baseFitScale]);
 
     return (
         <div className="flex flex-col h-full bg-slate-950 text-white rounded-xl overflow-hidden shadow-2xl border border-slate-800">
@@ -562,7 +565,7 @@ export default function DrawingCanvas({
 
                 <div 
                     style={{ 
-                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${baseFitScale * scale})`,
                         transition: isPanning ? 'none' : 'transform 0.1s ease-out',
                         visibility: imgLoaded ? 'visible' : 'hidden',
                         opacity: imgLoaded ? 1 : 0
@@ -581,8 +584,8 @@ export default function DrawingCanvas({
                         src={backgroundImage}
                         alt="Question"
                         style={{ 
-                            width: imageDimensions.width, 
-                            height: imageDimensions.height,
+                            width: naturalDimensions.width, 
+                            height: naturalDimensions.height,
                             display: 'block'
                         }}
                         className="bg-white pointer-events-none"
@@ -591,8 +594,8 @@ export default function DrawingCanvas({
                     {/* Annotation Canvas Layers */}
                     <canvas
                         ref={canvasRef}
-                        width={imageDimensions.width}
-                        height={imageDimensions.height}
+                        width={naturalDimensions.width}
+                        height={naturalDimensions.height}
                         onMouseDown={startAction}
                         onMouseMove={performAction}
                         onMouseUp={endAction}
