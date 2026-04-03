@@ -17,9 +17,9 @@ export async function POST(
 
         const { id: examId } = await params;
         const body = await request.json();
-        const { studentId, questionId, originalImagePath, imageData, imageIndex } = body;
-
-        console.log('[Drawing API] Received data:', { studentId, questionId, imageIndex, hasImageData: !!imageData });
+        const { studentId, questionId, originalImagePath, imageData, imageIndex, drawingData } = body;
+        
+        console.log('[Drawing API] Received data:', { studentId, questionId, imageIndex, hasImageData: !!imageData, hasDrawingData: !!drawingData });
 
         if (!studentId || !questionId || !imageData) {
             console.error('[Drawing API] Missing required fields');
@@ -37,7 +37,8 @@ export async function POST(
             },
             update: {
                 imageData,
-                originalImagePath, // Update original if it changed for some reason, or keep it
+                drawingData,
+                originalImagePath, 
                 evaluatorId: token.user.id,
             },
             create: {
@@ -46,6 +47,7 @@ export async function POST(
                 examId,
                 imageIndex: imageIndex || 0,
                 imageData,
+                drawingData,
                 originalImagePath: originalImagePath || '',
                 evaluatorId: token.user.id,
             }

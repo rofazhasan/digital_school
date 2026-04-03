@@ -682,6 +682,7 @@ model ExamSubmissionDrawing {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   imageIndex        Int            @default(0)
+  drawingData       Json?
   evaluator         User           @relation(fields: [evaluatorId], references: [id])
   exam              Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
   submission        ExamSubmission @relation(fields: [studentId, examId], references: [studentId, examId], onDelete: Cascade)

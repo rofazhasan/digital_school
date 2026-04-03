@@ -1,239 +1,599 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
-import { Undo, Redo, Save, Eraser, PenTool, X, Trash2, Download } from "lucide-react";
+import { 
+  Undo, 
+  Save, 
+  Eraser, 
+  PenTool, 
+  X, 
+  Type, 
+  ZoomIn, 
+  ZoomOut, 
+  Maximize, 
+  ChevronLeft, 
+  ChevronRight,
+  Loader2,
+  Trash2,
+  Check,
+  Eye,
+  EyeOff
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+
+interface Point {
+    x: number;
+    y: number;
+}
+
+interface Stroke {
+    points: Point[];
+    color: string;
+    width: number;
+    tool: 'pen' | 'eraser';
+}
+
+interface TextAnnotation {
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    size: number;
+    id: string;
+}
 
 interface DrawingCanvasProps {
     backgroundImage: string;
-    onSave: (blob: Blob) => void;
+    onSave?: (blob: Blob, drawingData: { strokes: Stroke[], texts: TextAnnotation[] }) => void;
     onCancel: () => void;
-    initialData?: string; // For future edit support
+    readOnly?: boolean;
+    onNext?: () => void;
+    onPrev?: () => void;
+    currentIndex?: number;
+    totalImages?: number;
+    initialStrokes?: Stroke[];
+    initialTexts?: TextAnnotation[];
 }
 
-export default function DrawingCanvas({ backgroundImage, onSave, onCancel }: DrawingCanvasProps) {
+export default function DrawingCanvas({ 
+    backgroundImage, 
+    onSave, 
+    onCancel, 
+    readOnly = false,
+    onNext,
+    onPrev,
+    currentIndex,
+    totalImages,
+    initialStrokes = [],
+    initialTexts = []
+}: DrawingCanvasProps) {
+    const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
     const [isDrawing, setIsDrawing] = useState(false);
-    const [color, setColor] = useState('#EF4444'); // Default red for grading
+    const [color, setColor] = useState('#EF4444');
     const [lineWidth, setLineWidth] = useState(3);
-    const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
-    const [history, setHistory] = useState<ImageData[]>([]);
+    const [tool, setTool] = useState<'pen' | 'eraser' | 'text'>('pen');
+    
+    // Zoom & Pan State
+    const [scale, setScale] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [isPanning, setIsPanning] = useState(false);
+    const [lastPanPos, setLastPanPos] = useState({ x: 0, y: 0 });
+    
+    // Data State
+    const [strokes, setStrokes] = useState<Stroke[]>(initialStrokes);
+    const [texts, setTexts] = useState<TextAnnotation[]>(initialTexts);
+    const [history, setHistory] = useState<{ strokes: Stroke[], texts: TextAnnotation[] }[]>([]);
     const [historyStep, setHistoryStep] = useState(-1);
-    const [imageSize, setImageSize] = useState({ width: 800, height: 600 });
-    const [isTrafficSaving, setIsTrafficSaving] = useState(false);
+    
+    // UI State
+    const [imgLoaded, setImgLoaded] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showAnnotations, setShowAnnotations] = useState(true);
+    const [activeTextInput, setActiveTextInput] = useState<{ x: number, y: number } | null>(null);
+    const [currentText, setCurrentText] = useState("");
+    const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
 
-    // Initialize Canvas
+    // Initialize Canvas & Image
     useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
         const img = new Image();
         img.crossOrigin = "anonymous";
         img.src = backgroundImage;
         img.onload = () => {
-            // Fit to screen but keep aspect ratio, and enforce max storage dimensions
-            const screenMaxWidth = window.innerWidth * 0.8;
-            const screenMaxHeight = window.innerHeight * 0.7;
-            const MAX_STORAGE_DIM = 1280; // Limit processing/storage size
+            const container = containerRef.current;
+            if (!container) return;
 
+            const maxWidth = container.clientWidth - 40;
+            const maxHeight = container.clientHeight - 40;
+            
             let w = img.width;
             let h = img.height;
-
-            const ratio = Math.min(screenMaxWidth / w, screenMaxHeight / h, MAX_STORAGE_DIM / w, MAX_STORAGE_DIM / h);
+            const ratio = Math.min(maxWidth / w, maxHeight / h);
+            
             w = w * ratio;
             h = h * ratio;
 
-            canvas.width = w;
-            canvas.height = h;
-            setImageSize({ width: w, height: h });
-
-            ctx.drawImage(img, 0, 0, w, h);
-            saveHistory(); // Save initial state
-        };
-
-        img.onerror = (error) => {
-            console.error('Failed to load image for annotation:', backgroundImage, error);
-            alert('Failed to load image. Please check if the image URL is accessible.');
+            setImageDimensions({ width: w, height: h });
+            setImgLoaded(true);
+            resetZoom();
         };
     }, [backgroundImage]);
 
-    const saveHistory = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+    // Redraw effect
+    useEffect(() => {
+        if (!imgLoaded) return;
+        drawEverything();
+    }, [imgLoaded, strokes, texts, showAnnotations, scale, offset]);
 
-        const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const drawEverything = useCallback(() => {
+        const canvas = canvasRef.current;
+        const annoCanvas = annotationCanvasRef.current;
+        if (!canvas || !annoCanvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const qCtx = annoCanvas.getContext('2d');
+        if (!ctx || !qCtx) return;
+
+        // Clear
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        qCtx.clearRect(0, 0, annoCanvas.width, annoCanvas.height);
+
+        // Draw Background Image
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.src = backgroundImage;
+        // Optimization: Image is already cached/loaded by the effect above
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        if (!showAnnotations) return;
+
+        // Draw Strokes
+        strokes.forEach(stroke => {
+            qCtx.beginPath();
+            qCtx.strokeStyle = stroke.color;
+            qCtx.lineWidth = stroke.width;
+            qCtx.lineCap = 'round';
+            qCtx.lineJoin = 'round';
+            
+            if (stroke.tool === 'eraser') {
+                qCtx.globalCompositeOperation = 'destination-out';
+            } else {
+                qCtx.globalCompositeOperation = 'source-over';
+            }
+
+            if (stroke.points.length > 0) {
+                qCtx.moveTo(stroke.points[0].x, stroke.points[0].y);
+                for (let i = 1; i < stroke.points.length; i++) {
+                    const p = stroke.points[i];
+                    // Smoothing logic can be added here (Bezier)
+                    qCtx.lineTo(p.x, p.y);
+                }
+                qCtx.stroke();
+            }
+        });
+
+        // Draw Texts
+        qCtx.globalCompositeOperation = 'source-over';
+        texts.forEach(t => {
+            qCtx.fillStyle = t.color;
+            qCtx.font = `bold ${t.size}px Arial, "Nikosh", sans-serif`;
+            qCtx.fillText(t.text, t.x, t.y);
+        });
+    }, [backgroundImage, imgLoaded, strokes, texts, showAnnotations]);
+
+    const saveToHistory = (newStrokes: Stroke[], newTexts: TextAnnotation[]) => {
         const newHistory = history.slice(0, historyStep + 1);
-        newHistory.push(data);
+        newHistory.push({ strokes: [...newStrokes], texts: [...newTexts] });
         setHistory(newHistory);
         setHistoryStep(newHistory.length - 1);
     };
 
-    const getPos = (e: React.MouseEvent | React.TouchEvent) => {
-        const canvas = canvasRef.current;
+    const handleUndo = () => {
+        if (historyStep > 0) {
+            const prev = history[historyStep - 1];
+            setStrokes(prev.strokes);
+            setTexts(prev.texts);
+            setHistoryStep(historyStep - 1);
+        } else if (historyStep === 0) {
+            setStrokes([]);
+            setTexts([]);
+            setHistoryStep(-1);
+        }
+    };
+
+    const resetZoom = () => {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+    };
+
+    const handleZoom = (delta: number) => {
+        setScale(prev => Math.min(Math.max(0.5, prev + delta), 5));
+    };
+
+    const getMousePos = (e: React.MouseEvent | React.TouchEvent): Point => {
+        const canvas = annotationCanvasRef.current;
         if (!canvas) return { x: 0, y: 0 };
         const rect = canvas.getBoundingClientRect();
-
+        
         let clientX, clientY;
         if ('touches' in e) {
             clientX = e.touches[0].clientX;
             clientY = e.touches[0].clientY;
         } else {
-            clientX = (e as React.MouseEvent).clientX;
-            clientY = (e as React.MouseEvent).clientY;
+            clientX = e.clientX;
+            clientY = e.clientY;
         }
 
+        // Adjust for scale and offset
         return {
-            x: clientX - rect.left,
-            y: clientY - rect.top
+            x: (clientX - rect.left) * (canvas.width / rect.width),
+            y: (clientY - rect.top) * (canvas.height / rect.height)
         };
     };
 
-    const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-        e.preventDefault(); // Prevent scrolling on touch
+    const startAction = (e: React.MouseEvent | React.TouchEvent) => {
+        if (readOnly) return;
+        
+        if (tool === 'text') {
+            const pos = getMousePos(e);
+            setActiveTextInput({ x: pos.x, y: pos.y });
+            return;
+        }
+
         setIsDrawing(true);
-        const { x, y } = getPos(e);
-        const ctx = canvasRef.current?.getContext('2d');
-        if (ctx) {
-            ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
-            // Eraser acts as white paint for simple implementation over image
-            // But over an image, "erasing" usually means restoring the image?
-            // A true layer system is complex. Simple approach: Eraser paints white (assuming white paper) 
-            // OR we just use it as white paint which covers the text.
-            // Usually for grading, "erasing" implies removing the *annotation* not the paper.
-            // But single canvas combines them.
-            // Let's stick to "white paint" for eraser for now, as splitting layers is harder.
-            // Actually, standard grading behavior is often just painting white to cover mistakes or red for marks.
-            ctx.lineWidth = lineWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            if (tool === 'eraser') {
-                // hack for erasing over image: we can't easily restore underneath without layers.
-                // Maybe just don't support eraser or make it clear it paints white.
-            }
-        }
+        const pos = getMousePos(e);
+        const newStroke: Stroke = {
+            points: [pos],
+            color: color,
+            width: lineWidth,
+            tool: tool as 'pen' | 'eraser'
+        };
+        setStrokes(prev => [...prev, newStroke]);
     };
 
-    const draw = (e: React.MouseEvent | React.TouchEvent) => {
-        if (!isDrawing) return;
-        e.preventDefault();
-        const { x, y } = getPos(e);
-        const ctx = canvasRef.current?.getContext('2d');
-        if (ctx) {
-            ctx.lineTo(x, y);
-            ctx.stroke();
-        }
+    const performAction = (e: React.MouseEvent | React.TouchEvent) => {
+        if (!isDrawing || tool === 'text') return;
+        const pos = getMousePos(e);
+        setStrokes(prev => {
+            const last = [...prev];
+            const current = last[last.length - 1];
+            current.points.push(pos);
+            return last;
+        });
     };
 
-    const stopDrawing = () => {
+    const endAction = () => {
         if (isDrawing) {
             setIsDrawing(false);
-            const ctx = canvasRef.current?.getContext('2d');
-            ctx?.closePath();
-            saveHistory();
-        }
-    };
-
-    const handleUndo = () => {
-        if (historyStep > 0) {
-            const step = historyStep - 1;
-            setHistoryStep(step);
-            const canvas = canvasRef.current;
-            const ctx = canvas?.getContext('2d');
-            if (canvas && ctx && history[step]) {
-                ctx.putImageData(history[step], 0, 0);
+            saveToHistory(strokes, texts);
+            
+            // Auto-save logic (debounced)
+            if (onSave) {
+                // We'll trigger a real save in handleSave function for now, 
+                // but we could automate it here with a timer.
             }
         }
     };
 
-    const handleSave = () => {
+    const handleTextSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (currentText.trim() && activeTextInput) {
+            const newText: TextAnnotation = {
+                ...activeTextInput,
+                text: currentText,
+                color: color,
+                size: lineWidth * 5, // Scaling font size with line width
+                id: Date.now().toString()
+            };
+            const updatedTexts = [...texts, newText];
+            setTexts(updatedTexts);
+            saveToHistory(strokes, updatedTexts);
+            setCurrentText("");
+            setActiveTextInput(null);
+        }
+    };
+
+    const handleSaveFlattened = () => {
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        setIsTrafficSaving(true);
-        canvas.toBlob((blob) => {
+        const annoCanvas = annotationCanvasRef.current;
+        if (!canvas || !annoCanvas || !onSave) return;
+
+        setIsSaving(true);
+        
+        // Create a temporary canvas to combine them
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = canvas.width;
+        finalCanvas.height = canvas.height;
+        const fCtx = finalCanvas.getContext('2d');
+        if (!fCtx) return;
+
+        fCtx.drawImage(canvas, 0, 0);
+        if (showAnnotations) {
+            fCtx.drawImage(annoCanvas, 0, 0);
+        }
+
+        finalCanvas.toBlob((blob) => {
             if (blob) {
-                onSave(blob);
+                onSave(blob, { strokes, texts });
             }
-            setIsTrafficSaving(false);
-        }, 'image/jpeg', 0.6); // Reduced quality for storage optimization
+            setIsSaving(false);
+        }, 'image/jpeg', 0.85);
     };
+
+    // Panning logic (Spacebar or Middle Click)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === ' ' && !isPanning && !activeTextInput) setIsPanning(true);
+        };
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.key === ' ') setIsPanning(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        window.addEventListener('keyup', handleKeyUp);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+            window.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [isPanning, activeTextInput]);
 
     return (
-        <div className="flex flex-col h-full bg-gray-900 text-white rounded-lg overflow-hidden">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between p-4 bg-gray-800 border-b border-gray-700">
-                <div className="flex items-center gap-4">
-                    <div className="flex bg-gray-700 rounded-md p-1">
-                        <button
-                            onClick={() => { setTool('pen'); setColor('#EF4444'); }}
-                            className={cn("p-2 rounded transition-colors", tool === 'pen' && color === '#EF4444' ? "bg-red-500 text-white" : "hover:bg-gray-600")}
-                            title="Red Pen"
+        <div className="flex flex-col h-full bg-slate-950 text-white rounded-xl overflow-hidden shadow-2xl border border-slate-800">
+            {/* Header / Toolbar */}
+            <div className="flex flex-wrap items-center justify-between p-3 bg-slate-900 border-b border-slate-800 gap-3 z-20">
+                <div className="flex items-center gap-3">
+                    <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={onPrev} 
+                            disabled={!onPrev || currentIndex === 0}
+                            className="h-8 w-8 hover:bg-slate-700"
                         >
-                            <div className="w-4 h-4 rounded-full bg-red-500 border border-white/20"></div>
-                        </button>
-                        <button
-                            onClick={() => { setTool('pen'); setColor('#10B981'); }}
-                            className={cn("p-2 rounded transition-colors", tool === 'pen' && color === '#10B981' ? "bg-green-500 text-white" : "hover:bg-gray-600")}
-                            title="Green Pen"
+                            <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex items-center px-2 text-[10px] font-bold uppercase tracking-widest text-slate-400 border-x border-slate-700">
+                            {currentIndex !== undefined ? `${currentIndex + 1} / ${totalImages}` : 'Image'}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={onNext} 
+                            disabled={!onNext || (currentIndex !== undefined && totalImages !== undefined && currentIndex === totalImages - 1)}
+                            className="h-8 w-8 hover:bg-slate-700"
                         >
-                            <div className="w-4 h-4 rounded-full bg-green-500 border border-white/20"></div>
-                        </button>
-                        <button
-                            onClick={() => { setTool('pen'); setColor('#3B82F6'); }}
-                            className={cn("p-2 rounded transition-colors", tool === 'pen' && color === '#3B82F6' ? "bg-blue-500 text-white" : "hover:bg-gray-600")}
-                            title="Blue Pen"
-                        >
-                            <div className="w-4 h-4 rounded-full bg-blue-500 border border-white/20"></div>
-                        </button>
+                            <ChevronRight className="h-4 w-4" />
+                        </Button>
                     </div>
 
-                    <div className="w-32 px-2">
-                        <Slider
-                            value={[lineWidth]}
-                            onValueChange={(v) => setLineWidth(v[0])}
-                            min={1}
-                            max={10}
-                            step={1}
-                            className="cursor-pointer"
-                        />
-                    </div>
+                    <div className="h-6 w-px bg-slate-800 mx-1 hidden sm:block"></div>
 
-                    <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyStep <= 0} className="text-white hover:bg-gray-700">
-                        <Undo className="w-5 h-5" />
-                    </Button>
+                    <div className="flex gap-1 items-center bg-slate-800/50 p-1 rounded-lg">
+                        <Button variant="ghost" size="icon" onClick={() => handleZoom(0.2)} className="h-8 w-8 text-slate-300">
+                            <ZoomIn className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => handleZoom(-0.2)} className="h-8 w-8 text-slate-300">
+                            <ZoomOut className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={resetZoom} className="h-8 w-8 text-slate-300">
+                            <Maximize className="h-4 w-4" />
+                        </Button>
+                    </div>
                 </div>
 
+                {!readOnly && (
+                    <div className="flex items-center gap-3">
+                        <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                            <button
+                                onClick={() => setTool('pen')}
+                                className={cn("p-2 rounded-md transition-all", tool === 'pen' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                            >
+                                <PenTool className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => setTool('eraser')}
+                                className={cn("p-2 rounded-md transition-all", tool === 'eraser' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                            >
+                                <Eraser className="h-4 w-4" />
+                            </button>
+                            <button
+                                onClick={() => setTool('text')}
+                                className={cn("p-2 rounded-md transition-all", tool === 'text' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                            >
+                                <Type className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="hidden lg:flex items-center gap-2 px-2 bg-slate-800/50 rounded-lg h-10 border border-slate-700/50">
+                            {['#EF4444', '#10B981', '#3B82F6', '#F59E0B'].map(c => (
+                                <button
+                                    key={c}
+                                    onClick={() => setColor(c)}
+                                    className={cn(
+                                        "w-5 h-5 rounded-full border-2 transition-transform", 
+                                        color === c ? "scale-125 border-white shadow-md" : "border-transparent opacity-60 hover:opacity-100"
+                                    )}
+                                    style={{ backgroundColor: c }}
+                                />
+                            ))}
+                        </div>
+
+                        <div className="w-24 px-2 hidden md:block">
+                            <Slider value={[lineWidth]} onValueChange={(v) => setLineWidth(v[0])} min={1} max={10} step={1} />
+                        </div>
+
+                        <Button variant="ghost" size="icon" onClick={handleUndo} disabled={historyStep < 0} className="text-slate-400 hover:text-white hover:bg-slate-800">
+                            <Undo className="h-4 w-4" />
+                        </Button>
+                    </div>
+                )}
+
                 <div className="flex items-center gap-2">
-                    <Button variant="ghost" onClick={onCancel} className="text-gray-400 hover:text-white hover:bg-gray-700">
-                        Cancel
+                    <Button variant="ghost" size="icon" onClick={() => setShowAnnotations(!showAnnotations)} className="text-slate-400 hover:bg-slate-800">
+                        {showAnnotations ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                     </Button>
-                    <Button onClick={handleSave} disabled={isTrafficSaving} className="bg-indigo-600 hover:bg-indigo-700">
-                        {isTrafficSaving ? "Saving..." : <><Save className="w-4 h-4 mr-2" /> Save Annotation</>}
+                    <Button variant="ghost" onClick={onCancel} className="hidden sm:inline-flex text-slate-400 hover:text-white">
+                        Close
                     </Button>
+                    {!readOnly && (
+                        <Button 
+                            onClick={handleSaveFlattened} 
+                            disabled={isSaving}
+                            className="bg-indigo-600 hover:bg-indigo-700 shadow-indigo-500/20 shadow-lg px-6"
+                        >
+                            {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : "Save"}
+                        </Button>
+                    )}
                 </div>
             </div>
 
-            {/* Canvas Area */}
-            <div className="flex-1 bg-gray-900 overflow-auto flex items-center justify-center p-4 relative touch-none">
-                <canvas
-                    ref={canvasRef}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                    className="border border-gray-700 rounded bg-white shadow-xl max-w-full max-h-full cursor-crosshair"
-                />
+            {/* Canvas Viewport */}
+            <div 
+                ref={containerRef}
+                className={cn(
+                    "flex-1 relative overflow-hidden flex items-center justify-center p-8 transition-colors duration-300",
+                    isPanning ? "cursor-grabbing bg-slate-900" : "bg-slate-950"
+                )}
+                onMouseDown={(e) => {
+                    if (e.button === 1 || isPanning) {
+                        setIsPanning(true);
+                        setLastPanPos({ x: e.clientX, y: e.clientY });
+                    }
+                }}
+                onMouseMove={(e) => {
+                    if (isPanning) {
+                        const dx = e.clientX - lastPanPos.x;
+                        const dy = e.clientY - lastPanPos.y;
+                        setOffset(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                        setLastPanPos({ x: e.clientX, y: e.clientY });
+                    }
+                }}
+                onMouseUp={() => {
+                    if (!isPanning) return;
+                    setIsPanning(false);
+                }}
+            >
+                {!imgLoaded && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center space-y-4">
+                        <Loader2 className="h-10 w-10 text-indigo-500 animate-spin" />
+                        <span className="text-sm font-medium text-slate-500 uppercase tracking-widest">Loading Document...</span>
+                    </div>
+                )}
+
+                <div 
+                    style={{ 
+                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                        transition: isPanning ? 'none' : 'transform 0.1s ease-out'
+                    }}
+                    className="relative shadow-2xl ring-1 ring-white/10 rounded-sm overflow-hidden"
+                >
+                    {/* Tooltip for Panning */}
+                    {!readOnly && scale > 1 && (
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-white z-30 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+                            Hold SPACE to Pan
+                        </div>
+                    )}
+
+                    {/* Canvas Layers */}
+                    <canvas
+                        ref={canvasRef}
+                        width={imageDimensions.width}
+                        height={imageDimensions.height}
+                        className="bg-white"
+                    />
+                    <canvas
+                        ref={annotationCanvasRef}
+                        width={imageDimensions.width}
+                        height={imageDimensions.height}
+                        onMouseDown={startAction}
+                        onMouseMove={performAction}
+                        onMouseUp={endAction}
+                        onMouseLeave={endAction}
+                        onTouchStart={startAction}
+                        onTouchMove={performAction}
+                        onTouchEnd={endAction}
+                        className={cn(
+                            "absolute inset-0 z-10 touch-none",
+                            readOnly ? "cursor-default" : isPanning ? "cursor-grabbing" : tool === 'text' ? "cursor-text" : "cursor-crosshair"
+                        )}
+                    />
+
+                    {/* Active Text Input Overlay */}
+                    {activeTextInput && (
+                        <div 
+                            className="absolute z-20 pointer-events-auto"
+                            style={{ 
+                                left: `${activeTextInput.x}px`, 
+                                top: `${activeTextInput.y}px`,
+                                transform: 'translateY(-100%)'
+                            }}
+                        >
+                            <form onSubmit={handleTextSubmit} className="flex flex-col bg-slate-900 border border-indigo-500 rounded-lg p-2 shadow-2xl min-w-[200px]">
+                                <input 
+                                    autoFocus
+                                    className="bg-transparent text-white border-none outline-none p-1 text-sm mb-2"
+                                    placeholder="Type feedback here..."
+                                    value={currentText}
+                                    onChange={(e) => setCurrentText(e.target.value)}
+                                    // Language support notes: Bengali works natively in HTML inputs
+                                />
+                                <div className="flex justify-end gap-1">
+                                    <Button type="button" size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setActiveTextInput(null)}>Cancel</Button>
+                                    <Button type="submit" size="sm" className="h-6 px-2 text-[10px] bg-indigo-600">Add Text</Button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+                </div>
+                
+                {/* Navigation Floating UI for Results Page */}
+                {readOnly && totalImages && totalImages > 1 && (
+                   <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-center bg-black/60 backdrop-blur-xl border border-white/10 rounded-full p-2 gap-4 shadow-2xl z-30">
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={onPrev} 
+                            disabled={currentIndex === 0}
+                            className="text-white hover:bg-white/20 rounded-full"
+                        >
+                            <ChevronLeft className="h-5 w-5" />
+                        </Button>
+                        <div className="flex gap-1 overflow-x-auto max-w-[200px] py-1">
+                            {Array.from({ length: totalImages }).map((_, i) => (
+                                <div 
+                                    key={i} 
+                                    className={cn(
+                                        "w-2 h-2 rounded-full transition-all",
+                                        i === currentIndex ? "bg-indigo-500 scale-125 w-4" : "bg-white/30"
+                                    )}
+                                />
+                            ))}
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={onNext} 
+                            disabled={currentIndex === totalImages - 1}
+                            className="text-white hover:bg-white/20 rounded-full"
+                        >
+                            <ChevronRight className="h-5 w-5" />
+                        </Button>
+                   </div>
+                )}
+            </div>
+            
+            {/* Footer Attribution / Controls */}
+            <div className="p-2 bg-slate-900/50 border-t border-slate-800 text-[10px] text-slate-500 flex justify-between items-center px-4">
+                <div className="flex items-center gap-2">
+                    <span className="bg-indigo-500/10 text-indigo-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-tighter">HD Rendering</span>
+                    <span>Supports Bengali & Math Typing</span>
+                </div>
+                <div className="hidden sm:block italic">
+                    Press Spacebar to Pan • Scroll to Zoom
+                </div>
             </div>
         </div>
     );
