@@ -240,6 +240,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [showZoomModal, setShowZoomModal] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const [zoomedImageTitle, setZoomedImageTitle] = useState('');
+  const [activeZoomOriginal, setActiveZoomOriginal] = useState<string | null>(null);
   const [activeZoomImages, setActiveZoomImages] = useState<string[]>([]);
   const [activeZoomIndex, setActiveZoomIndex] = useState(0);
   const [activeZoomQuestion, setActiveZoomQuestion] = useState<Question | null>(null);
@@ -1119,6 +1120,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     // Find if this specific image has an annotation
     const annotation = question.allDrawings?.find(d => d.imageIndex === index || d.originalImagePath === imageUrl);
     setZoomedImage(annotation?.imageData || imageUrl);
+    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null); // Preserve the truly original image
     setShowZoomModal(true);
   };
 
@@ -3279,7 +3281,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   ) : (
                     <DrawingCanvas
-                      backgroundImage={(annotatedImageFailed ? originalImageFallback : zoomedImage) || ''}
+                      backgroundImage={(activeZoomOriginal || zoomedImage) || ''}
                       readOnly={true}
                       onCancel={() => setShowZoomModal(false)}
                       onNext={() => {

@@ -147,7 +147,7 @@ export default function DrawingCanvas({
         const canvas = canvasRef.current;
         const annoCanvas = annotationCanvasRef.current;
         const img = imgRef.current;
-        if (!canvas || !annoCanvas || !img) return;
+        if (!canvas || !annoCanvas || !img || !imgLoaded) return;
 
         const ctx = canvas.getContext('2d');
         const qCtx = annoCanvas.getContext('2d');
