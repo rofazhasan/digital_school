@@ -19,7 +19,9 @@ import {
   Trash2,
   Check,
   Eye,
-  EyeOff
+  EyeOff,
+  Hand,
+  Pencil
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -44,6 +46,8 @@ interface TextAnnotation {
     size: number;
     id: string;
 }
+
+type Tool = 'pen' | 'eraser' | 'text' | 'hand';
 
 interface DrawingCanvasProps {
     backgroundImage: string;
