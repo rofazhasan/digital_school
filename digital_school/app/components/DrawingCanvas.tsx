@@ -75,7 +75,7 @@ export default function DrawingCanvas({
     const [isDrawing, setIsDrawing] = useState(false);
     const [color, setColor] = useState('#EF4444');
     const [lineWidth, setLineWidth] = useState(3);
-    const [tool, setTool] = useState<'pen' | 'eraser' | 'text'>('pen');
+    const [tool, setTool] = useState<Tool>('pen');
     
     // Zoom & Pan State
     const [scale, setScale] = useState(1);
@@ -271,7 +271,6 @@ export default function DrawingCanvas({
         }
 
         // Map screen coordinates to original image pixel coordinates
-        // (clientX - rect.left) / (baseFitScale * scale)
         return {
             x: (clientX - rect.left) / (baseFitScale * scale),
             y: (clientY - rect.top) / (baseFitScale * scale)
@@ -279,7 +278,7 @@ export default function DrawingCanvas({
     };
 
     const startAction = (e: React.MouseEvent | React.TouchEvent) => {
-        if (readOnly) return;
+        if (readOnly || tool === 'hand') return;
         
         if (tool === 'text') {
             const pos = getMousePos(e);
@@ -375,8 +374,6 @@ export default function DrawingCanvas({
             e.preventDefault();
             
             const currentScale = scaleRef.current;
-            const currentOffset = offsetRef.current;
-            
             const delta = -e.deltaY * 0.001; 
             const newScale = Math.min(Math.max(0.5, currentScale + delta), 5);
             
@@ -385,11 +382,9 @@ export default function DrawingCanvas({
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
 
-                // Position relative to scaled image
-                const imageX = (mouseX - offset.x) / (baseFitScale * scale);
-                const imageY = (mouseY - offset.y) / (baseFitScale * scale);
+                const imageX = (mouseX - offset.x) / (baseFitScale * currentScale);
+                const imageY = (mouseY - offset.y) / (baseFitScale * currentScale);
 
-                // New offset to keep the same point under the cursor
                 const newOffsetX = mouseX - imageX * (baseFitScale * newScale);
                 const newOffsetY = mouseY - imageY * (baseFitScale * newScale);
 
@@ -418,7 +413,7 @@ export default function DrawingCanvas({
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keyup', handleKeyUp);
         };
-    }, [isPanning, activeTextInput, baseFitScale]);
+    }, [isPanning, activeTextInput, baseFitScale, offset]);
 
     return (
         <div className="flex flex-col h-full bg-slate-950 text-white rounded-xl overflow-hidden shadow-2xl border border-slate-800">
@@ -466,25 +461,39 @@ export default function DrawingCanvas({
 
                 {!readOnly && (
                     <div className="flex items-center gap-3">
-                        <div className="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
-                            <button
-                                onClick={() => setTool('pen')}
-                                className={cn("p-2 rounded-md transition-all", tool === 'pen' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                        <div className="flex gap-1 p-1 bg-slate-900/50 backdrop-blur-md rounded-lg border border-white/10 ring-1 ring-black/20">
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setTool('hand')} 
+                                className={cn("px-2 h-8", tool === 'hand' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white")}
                             >
-                                <PenTool className="h-4 w-4" />
-                            </button>
-                            <button
-                                onClick={() => setTool('eraser')}
-                                className={cn("p-2 rounded-md transition-all", tool === 'eraser' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                                <Hand className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setTool('pen')} 
+                                className={cn("px-2 h-8", tool === 'pen' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white")}
+                            >
+                                <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setTool('eraser')} 
+                                className={cn("px-2 h-8", tool === 'eraser' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white")}
                             >
                                 <Eraser className="h-4 w-4" />
-                            </button>
-                            <button
-                                onClick={() => setTool('text')}
-                                className={cn("p-2 rounded-md transition-all", tool === 'text' ? "bg-indigo-600 text-white shadow-lg" : "hover:bg-slate-700 text-slate-400")}
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => setTool('text')} 
+                                className={cn("px-2 h-8", tool === 'text' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white")}
                             >
                                 <Type className="h-4 w-4" />
-                            </button>
+                            </Button>
                         </div>
 
                         <div className="hidden lg:flex items-center gap-2 px-2 bg-slate-800/50 rounded-lg h-10 border border-slate-700/50">
@@ -565,10 +574,14 @@ export default function DrawingCanvas({
 
                 <div 
                     style={{ 
+                        width: naturalDimensions.width,
+                        height: naturalDimensions.height,
                         transform: `translate(${offset.x}px, ${offset.y}px) scale(${baseFitScale * scale})`,
+                        transformOrigin: '0 0',
                         transition: isPanning ? 'none' : 'transform 0.1s ease-out',
                         visibility: imgLoaded ? 'visible' : 'hidden',
-                        opacity: imgLoaded ? 1 : 0
+                        opacity: imgLoaded ? 1 : 0,
+                        flex: 'none' // CRITICAL: Stop flexbox from squashing the image
                     }}
                     className="relative shadow-2xl ring-1 ring-white/10 rounded-sm overflow-hidden bg-white"
                 >
@@ -605,7 +618,7 @@ export default function DrawingCanvas({
                         onTouchEnd={endAction}
                         className={cn(
                             "absolute inset-0 z-10 touch-none",
-                            readOnly ? "cursor-default" : isPanning ? "cursor-grabbing" : tool === 'text' ? "cursor-text" : "cursor-crosshair"
+                            tool === 'hand' || isPanning ? "cursor-grabbing" : readOnly ? "cursor-default" : tool === 'text' ? "cursor-text" : "cursor-crosshair"
                         )}
                     />
 
