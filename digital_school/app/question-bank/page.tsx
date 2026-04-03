@@ -1331,287 +1331,185 @@ const QuestionCard: React.FC<{
           )}
 
           {/* DESCRIPTIVE Display */}
+          {/* DESCRIPTIVE Display */}
           {question.type === 'DESCRIPTIVE' && (
             <div className="space-y-4 mt-3">
-              {(question.subQuestions || question.sub_questions || question.parts || []).map((part: any, i: number) => (
-                <div key={i} className="p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 space-y-3">
-                  {/* Metadata Rendering */}
-                  {part.passage && (
-                    <div className="p-2.5 bg-slate-100/50 dark:bg-slate-800/50 border-l-4 border-slate-300 rounded text-[11px] text-slate-700 dark:text-slate-300 italic mb-2">
-                       <UniversalMathJax dynamic>{cleanupMath(part.passage)}</UniversalMathJax>
-                    </div>
-                  )}
-                  {part.sourceText && (
-                    <div className="p-2 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 rounded text-[10px] text-amber-800 dark:text-amber-400 mb-2">
-                      <span className="font-bold uppercase text-[8px] block mb-1">Source Text:</span>
-                      <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
-                    </div>
-                  )}
-                  {part.instruction && (
-                    <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase mb-1 flex items-center gap-1">
-                      <Info className="w-3 h-3" /> {part.instruction}
-                    </div>
-                  )}
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white dark:bg-gray-800">
-                        {String(part.subType || part.sub_type || '').replace('_', ' ')}
-                      </Badge>
-                      <span className="text-xs font-bold text-gray-400">{getLetter(i).toLowerCase()}.</span>
-                    </div>
-                    <Badge variant="secondary" className="text-[9px] font-black h-5">{part.marks || part.mark}M</Badge>
+              {(() => {
+                // Deduplication logic: prioritize parts, then subQuestions, then sub_questions
+                const p = question.parts && question.parts.length > 0 ? question.parts :
+                          question.subQuestions && question.subQuestions.length > 0 ? question.subQuestions :
+                          question.sub_questions && question.sub_questions.length > 0 ? question.sub_questions : [];
+                
+                if (p.length === 0) return (
+                  <div className="p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 text-xs text-gray-400 italic">
+                    (No sub-questions available)
                   </div>
+                );
 
-                  <div className="space-y-2">
-                    {(part.label || part.title || part.question) && (
-                      <div className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-pre-wrap">
-                        <UniversalMathJax>{part.label || part.title || part.question}</UniversalMathJax>
-                      </div>
-                    )}
-                    {(part.instructions || part.instruction) && (
-                      <div className="text-xs italic text-gray-500 dark:text-gray-400 whitespace-pre-wrap">
-                        <UniversalMathJax>{part.instructions || part.instruction}</UniversalMathJax>
-                      </div>
-                    )}
-                    
-                    {/* Specialized Rendering for Descriptive Types */}
-                    {(part.subType === 'writing' || part.sub_type === 'writing') && (part.sourceText || part.source_text) && (
-                      <div className="p-3 rounded-xl bg-blue-50/30 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-800/50 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap italic">
-                         <UniversalMathJax>{part.sourceText || part.source_text}</UniversalMathJax>
-                      </div>
-                    )}
+                return p.map((part: any, i: number) => (
+                  <div key={i} className="p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/40 border border-gray-100 dark:border-gray-800 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-5 h-5 rounded bg-slate-900 text-white dark:bg-white dark:text-slate-900 flex items-center justify-center text-[10px] font-black mt-0.5">
+                        {getLetter(i).toLowerCase()}
+                      </span>
+                      <div className="flex-1 space-y-3">
+                        {/* Part Info Bar */}
+                        <div className="flex items-center justify-between gap-2">
+                          <Badge variant="outline" className="text-[9px] font-black uppercase tracking-tighter bg-white dark:bg-gray-800">
+                            {String(part.subType || part.sub_type || 'Descriptive Part').replace('_', ' ')}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[9px] font-black h-5">{part.marks || part.mark}M</Badge>
+                        </div>
 
-                    {(part.subType === 'fill_in' || part.sub_type === 'fill_in') && part.passage && (
-                      <div className="p-3 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/50 text-sm leading-relaxed whitespace-pre-wrap">
-                        <UniversalMathJax>{part.passage}</UniversalMathJax>
-                        {(part.wordBox || part.word_box) && (part.wordBox || part.word_box).length > 0 && (
-                          <div className="mt-3 pt-3 border-t border-indigo-100/50 flex flex-wrap gap-2">
-                            {(part.wordBox || part.word_box).map((w: string, wi: number) => (
-                              <span key={wi} className="px-2 py-1 bg-white dark:bg-gray-800 border rounded text-[10px] font-medium">{w}</span>
-                            ))}
+                        {/* Metadata Rendering */}
+                        {part.passage && (
+                          <div className="p-2.5 bg-slate-100/50 dark:bg-slate-800/50 border-l-4 border-slate-300 rounded text-[11px] text-slate-700 dark:text-slate-300 italic">
+                             <UniversalMathJax dynamic>{cleanupMath(part.passage)}</UniversalMathJax>
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
-                      <div className="flex flex-wrap items-center gap-2 py-2">
-                        {part.items.map((item: string, ii: number) => (
-                          <React.Fragment key={ii}>
-                            <div className="px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
-                              <UniversalMathJax>{item}</UniversalMathJax>
-                            </div>
-                            {ii < part.items.length - 1 && <ArrowRight className="w-3 h-3 text-gray-400" />}
-                          </React.Fragment>
-                        ))}
-                      </div>
-                    )}
-
-                    {(part.subType === 'matching' || part.sub_type === 'matching') && (part.leftColumn || part.left_column) && (
-                      <div className="grid grid-cols-2 gap-2 mt-2">
-                        <div className="space-y-1">
-                          {(part.leftColumn || part.left_column).map((item: any, ii: number) => (
-                            <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
-                              <span className="font-bold mr-1">{ii+1}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="space-y-1">
-                          {(part.rightColumn || part.right_column)?.map((item: any, ii: number) => (
-                            <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
-                              <span className="font-bold mr-1">{String.fromCharCode(65+ii)}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(part.subType === 'label_diagram' || part.sub_type === 'label_diagram') && (part.imageUrl || part.image_url || part.image) && (
-                      <div className="relative rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 bg-white p-2">
-                        <img src={part.imageUrl || part.image_url || part.image} alt="Diagram" className="w-full h-auto max-h-48 object-contain" />
-                        <div className="mt-2 flex flex-wrap gap-2 px-1">
-                           {part.labels?.map((label: any, li: number) => (
-                             <Badge key={li} variant="outline" className="text-[9px]">{label.text}</Badge>
-                           ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {(part.subType === 'interpreting_graph' || part.sub_type === 'interpreting_graph') && (part.chartConfig || part.chart_config) && (
-                      <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
-                        <BeautifulChart 
-                          type={(part.chartConfig || part.chart_config).type} 
-                          data={(part.chartConfig || part.chart_config).data} 
-                          xAxisLabel={(part.chartConfig || part.chart_config).xAxisLabel || (part.chartConfig || part.chart_config).xAxis_label} 
-                          yAxisLabel={(part.chartConfig || part.chart_config).yAxisLabel || (part.chartConfig || part.chart_config).yAxis_label}
-                        />
-                      </div>
-                    )}
-
-
-                    {/* Specialized Model Answer Rendering */}
-                    {(part.subType === 'matching' || part.sub_type === 'matching') && part.matches && (
-                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                          <ArrowRight className="w-2.5 h-2.5" /> Pairing Matrix
-                        </p>
-                        <div className="grid grid-cols-1 gap-1.5">
-                          {Object.entries((part.matches as Record<string, any>) || {}).map(([l, r], mIdx) => (
-                            <div key={mIdx} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
-                              <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[9px]">{l}</span>
-                              <ArrowRight className="w-2.5 h-2.5 text-emerald-300" />
-                              <UniversalMathJax inline>{Array.isArray(r) ? r.join(' → ') : r}</UniversalMathJax>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {part.subType === 'flowchart' && part.items && (
-                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                          <ArrowRight className="w-2.5 h-2.5" /> Flowchart Key
-                        </p>
-                        <div className="space-y-1.5">
-                          {part.items.map((item: string, ii: number) => {
-                            const modelAnsRaw = part.modelAnswers?.[ii] || part.correctOrder?.[ii] || "";
-                            const modelAns = Array.isArray(modelAnsRaw) ? modelAnsRaw : modelAnsRaw.split('|');
-                            return (
-                              <div key={ii} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
-                                <Badge variant="outline" className="h-3.5 px-1 text-[7px] border-emerald-200 text-emerald-600 uppercase">Step {ii+1}</Badge>
-                                <div className="flex flex-wrap gap-1">
-                                  {modelAns.map((val: string, vi: number) => (
-                                    <span key={vi} className="bg-emerald-100/50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1 font-black">
-                                      <UniversalMathJax inline>{val || "—"}</UniversalMathJax>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    {part.subType === 'fill_in' && (part.answers || part.correctAnswers) && (
-                      <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                        <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                          <ArrowRight className="w-2.5 h-2.5" /> Gap-Fill Key
-                        </p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {(part.answers || part.correctAnswers || []).map((ans: string, ai: number) => (
-                            <div key={ai} className="flex items-center gap-1.5 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-black">
-                              <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{ai+1}</span>
-                              <UniversalMathJax inline>{ans}</UniversalMathJax>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {part.subType === 'true_false' && part.statements && (
-                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                                <CheckSquare className="w-2.5 h-2.5" /> True/False Key
-                            </p>
-                            <div className="grid grid-cols-1 gap-1.5">
-                                {(part.statements || []).map((stmt: string, si: number) => {
-                                    const ans = part.correctAnswers?.[si];
-                                    return (
-                                        <div key={si} className="flex items-center justify-between gap-4 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
-                                            <div className="flex items-center gap-2 max-w-[70%]">
-                                                <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{si+1}</span>
-                                                <span className="truncate opacity-75">{stmt}</span>
-                                            </div>
-                                            <Badge className="bg-emerald-600 text-white border-0 text-[8px] uppercase font-black px-1.5 h-3.5 leading-none">{String(ans ?? "—")}</Badge>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {part.subType === 'short_answer' && (
-                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                          <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                            <ArrowRight className="w-2.5 h-2.5" /> Short-Answer Keys
-                          </p>
-                          <div className="grid grid-cols-1 gap-1.5">
-                            {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
-                              <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
-                                <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
-                                <div className="text-[10px] font-black text-emerald-900 leading-tight">
-                                  <UniversalMathJax dynamic>{ans}</UniversalMathJax>
-                                </div>
-                              </div>
-                            ))}
+                        {part.sourceText && (
+                          <div className="p-2 bg-amber-50/50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-800/50 rounded text-[10px] text-amber-800 dark:text-amber-400">
+                            <span className="font-bold uppercase text-[8px] block mb-1">Source Text:</span>
+                            <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
                           </div>
-                        </div>
-                    )}
-
-                    {part.subType === 'error_correction' && (
-                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-                          <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-                            <ArrowRight className="w-2.5 h-2.5" /> Error-Correction Keys
-                          </p>
-                          <div className="grid grid-cols-1 gap-1.5">
-                            {(part.modelAnswers || part.correctAnswers || []).map((ans: string, ai: number) => (
-                              <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
-                                <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 uppercase font-black">{String.fromCharCode(97+ai)}</span>
-                                <div className="text-[10px] font-black text-emerald-900 leading-tight">
-                                  <UniversalMathJax dynamic>{ans}</UniversalMathJax>
-                                </div>
-                              </div>
-                            ))}
+                        )}
+                        {part.instruction && (
+                          <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase flex items-center gap-1">
+                            <Info className="w-3 h-3" /> {part.instruction}
                           </div>
-                        </div>
-                    )}
+                        )}
 
-                    {/* Model Answer / Explanation */}
-                    {(() => {
-                      const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
-                      const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
-
-                      if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !part.explanation) return null;
-
-                      return (
-                        <div className="mt-3 space-y-2">
-                          {modelAns && (
-                            <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
-                               <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-1">Model Answer</p>
-                               <div className="text-xs text-emerald-800 dark:text-emerald-300 whitespace-pre-wrap">
-                                 <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                               </div>
+                        <div className="space-y-2">
+                          {(part.label || part.title || part.question || part.questionText || part.text) && (
+                            <div className="text-sm font-bold text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                              <UniversalMathJax>{cleanupMath(part.label || part.title || part.question || part.questionText || part.text)}</UniversalMathJax>
                             </div>
                           )}
-                          {pluralAnswers && pluralAnswers.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(part.subType) && (
-                            <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 dark:border-emerald-800/30">
-                              <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2">Model Answer Keys</p>
-                              <div className="grid grid-cols-1 gap-1.5">
-                                {pluralAnswers.map((ans: any, ai: number) => (
-                                  <div key={ai} className="flex gap-2 items-start bg-white/50 p-2 rounded-lg border border-emerald-50">
-                                    <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
-                                    <div className="text-xs font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
+                          
+                          {/* Specialized Rendering Content */}
+                          {(part.subType === 'fill_in' || part.sub_type === 'fill_in') && part.passage && (
+                            <div className="p-2 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/50 text-sm leading-relaxed whitespace-pre-wrap mt-2">
+                              <UniversalMathJax>{part.passage}</UniversalMathJax>
+                              {(part.wordBox || part.word_box) && (part.wordBox || part.word_box).length > 0 && (
+                                <div className="mt-2 pt-2 border-t border-indigo-100/50 flex flex-wrap gap-1.5">
+                                  {(part.wordBox || part.word_box).map((w: string, wi: number) => (
+                                    <span key={wi} className="px-2 py-0.5 bg-white dark:bg-gray-800 border rounded text-[9px] font-medium">{w}</span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {(part.subType === 'matching' || part.sub_type === 'matching') && (part.leftColumn || part.left_column) && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              <div className="space-y-1">
+                                {(part.leftColumn || part.left_column).map((item: any, ii: number) => (
+                                  <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
+                                    <span className="font-bold mr-1">{ii+1}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="space-y-1">
+                                {(part.rightColumn || part.right_column)?.map((item: any, ii: number) => (
+                                  <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
+                                    <span className="font-bold mr-1">{String.fromCharCode(65+ii)}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
                                   </div>
                                 ))}
                               </div>
                             </div>
                           )}
-                          {part.explanation && (
-                            <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
-                               <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 mb-1">Explanation</p>
-                               <div className="text-xs text-blue-800 dark:text-blue-300 whitespace-pre-wrap">
-                                 <UniversalMathJax dynamic>{cleanupMath(String(part.explanation).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                               </div>
+
+                          {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
+                            <div className="flex flex-wrap items-center gap-2 py-1 mt-2">
+                              {part.items.map((item: string, ii: number) => (
+                                <React.Fragment key={ii}>
+                                  <div className="px-3 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
+                                    <UniversalMathJax>{item}</UniversalMathJax>
+                                  </div>
+                                  {ii < part.items.length - 1 && <ArrowRight className="w-3 h-3 text-gray-400" />}
+                                </React.Fragment>
+                              ))}
                             </div>
                           )}
+
+                          {/* Final Consolidated Answer & Explanation Section */}
+                          {(() => {
+                            const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
+                            const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
+                            const hasExplanation = !!part.explanation;
+                            const hasPairing = (part.subType === 'matching' || part.sub_type === 'matching') && part.matches;
+
+                            if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing) return null;
+
+                            return (
+                              <div className="mt-3 space-y-2">
+                                {/* Pairing Matrix for Matching */}
+                                {hasPairing && (
+                                  <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                                    <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                                      <ArrowRight className="w-2.5 h-2.5" /> Pairing Matrix
+                                    </p>
+                                    <div className="grid grid-cols-1 gap-1.5">
+                                      {Object.entries((part.matches as Record<string, any>) || {}).map(([l, r], mIdx) => (
+                                        <div key={mIdx} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
+                                          <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[9px]">{l}</span>
+                                          <ArrowRight className="w-2.5 h-2.5 text-emerald-300" />
+                                          <UniversalMathJax inline>{Array.isArray(r) ? r.join(' → ') : r}</UniversalMathJax>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Main Model Answer (Emerald Style) */}
+                                {modelAns && (
+                                  <div className="p-3 rounded-xl bg-emerald-50/50 dark:bg-emerald-900/20 border border-emerald-100 dark:border-emerald-800">
+                                    <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1">
+                                      <ArrowRight className="w-2.5 h-2.5" /> Model Answer
+                                    </p>
+                                    <div className="text-xs text-emerald-800 dark:text-emerald-300 font-bold leading-relaxed whitespace-pre-wrap">
+                                      <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Answer Keys for specialized types (Short Answer, True/False, etc.) */}
+                                {pluralAnswers && pluralAnswers.length > 0 && !hasPairing && (
+                                  <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 dark:border-emerald-800/30">
+                                    <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1">
+                                      <ArrowRight className="w-2.5 h-2.5" /> Answer Keys
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {pluralAnswers.map((ans: any, ai: number) => (
+                                        <div key={ai} className="flex gap-2 items-center bg-white/50 p-1.5 rounded-lg border border-emerald-50">
+                                          <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
+                                          <div className="text-[10px] font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Explanation */}
+                                {hasExplanation && (
+                                  <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800">
+                                    <p className="text-[10px] font-black uppercase text-blue-700 dark:text-blue-400 mb-1 flex items-center gap-1">
+                                      <Info className="w-2.5 h-2.5" /> Explanation
+                                    </p>
+                                    <div className="text-xs text-blue-800 dark:text-blue-300 whitespace-pre-wrap italic">
+                                      <UniversalMathJax dynamic>{cleanupMath(String(part.explanation).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </div>
-                      );
-                    })()}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ));
+              })()}
             </div>
           )}
         </CardContent>
