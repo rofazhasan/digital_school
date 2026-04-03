@@ -849,7 +849,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                           {(part.items || []).map((item: string, iIdx: number) => (
                                             <div key={iIdx} className="flex items-center gap-3">
                                               <div className="w-40 h-24 border-2 border-slate-400 rounded flex items-center justify-center p-2 text-center shadow-sm relative text-xs whitespace-pre-wrap bg-white">
-                                                {item === '___' || item?.includes('___') ? '                                ' : <UniversalMathJax dynamic>{item}</UniversalMathJax>}
+                                                {iIdx === 0 ? (
+                                                  <UniversalMathJax dynamic>{item}</UniversalMathJax>
+                                                ) : (
+                                                  <div className="h-full w-full"></div> // Empty box for student
+                                                )}
                                                 <div className="absolute top-1 left-2 text-[8px] font-bold text-slate-500">{iIdx + 1}</div>
                                               </div>
                                               {iIdx < (part.items?.length || 0) - 1 && (

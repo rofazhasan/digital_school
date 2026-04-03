@@ -2965,22 +2965,48 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                         <div className="mb-3 p-3 bg-white border rounded shadow-sm max-w-md">
                                                           <BeautifulChart 
                                                             type={subQ.chartConfig.type} 
-                                                            data={subQ.chartConfig.data} 
+                                                            data={(() => {
+                                                              const cc = subQ.chartConfig;
+                                                              const labels = cc.labels || cc.chartLabels || cc.chart_labels;
+                                                              const data = cc.data || cc.chartData || cc.chart_data;
+                                                              if (Array.isArray(labels) && Array.isArray(data)) {
+                                                                return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
+                                                              }
+                                                              return Array.isArray(data) ? data : [];
+                                                            })()} 
                                                             xAxisLabel={subQ.chartConfig.xAxisLabel} 
                                                             yAxisLabel={subQ.chartConfig.yAxisLabel}
+                                                            isPrint={true}
                                                           />
                                                         </div>
                                                       )}
                                                       
                                                       {/* Model Answer & Explanation (Consolidated Emerald Style) */}
-                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans) && (
+                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans || (subQ.subType === 'flowchart' && subQ.items)) && (
                                                         <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
                                                           <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
                                                             <ArrowRight className="w-2.5 h-2.5" /> Model Answer
                                                           </p>
-                                                          <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
-                                                            <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                          </div>
+                                                          
+                                                          {/* Special Flowchart Visualization */}
+                                                          {subQ.subType === 'flowchart' && subQ.items && (
+                                                            <div className="flex flex-wrap items-center gap-2 py-1 mb-2">
+                                                              {subQ.items.map((item: string, ii: number) => (
+                                                                <React.Fragment key={ii}>
+                                                                  <div className="px-2.5 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap text-emerald-900 border-emerald-100">
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
+                                                                  </div>
+                                                                  {ii < subQ.items.length - 1 && <ArrowRight className="w-3 h-3 text-emerald-300" />}
+                                                                </React.Fragment>
+                                                              ))}
+                                                            </div>
+                                                          )}
+
+                                                          {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans) && (
+                                                            <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
+                                                              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                            </div>
+                                                          )}
                                                         </div>
                                                       )}
                                                       {subQ.explanation && (

@@ -296,27 +296,30 @@ export const DescriptiveSection = ({
                             <div className="space-y-6 flex flex-col items-center">
                                 {(part.items || []).map((item: string, ii: number) => {
                                     const isVertical = part.flowchartStyle !== 'horizontal';
-                                    const segments = item.split('___');
+                                    const isPrompt = ii === 0;
+
                                     return (
                                         <React.Fragment key={ii}>
                                             <div className="p-4 md:p-6 bg-white dark:bg-gray-900 border-2 border-amber-200 dark:border-amber-800 rounded-2xl shadow-md min-w-[200px] max-w-lg text-center relative group">
                                                 <div className="absolute -top-3 -left-3 w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold text-xs ring-4 ring-white dark:ring-gray-950">{ii + 1}</div>
                                                 <div className="text-base font-semibold leading-relaxed">
-                                                    {segments.map((seg, si) => (
-                                                        <React.Fragment key={si}>
-                                                            <UniversalMathJax inline dynamic>{seg}</UniversalMathJax>
-                                                            {si < segments.length - 1 && (
-                                                                <input
-                                                                    type="text"
-                                                                    value={getAns(`flow_${ii}_${si}`) as string}
-                                                                    onChange={(e) => setAns(`flow_${ii}_${si}`, e.target.value)}
-                                                                    disabled={disabled || submitted}
-                                                                    className="mx-2 w-24 border-b-2 border-amber-400 bg-transparent text-center focus:outline-none focus:border-amber-600 font-bold"
-                                                                    placeholder="..."
-                                                                />
-                                                            )}
-                                                        </React.Fragment>
-                                                    ))}
+                                                    {isPrompt ? (
+                                                        <UniversalMathJax dynamic>{item}</UniversalMathJax>
+                                                    ) : (
+                                                        <textarea
+                                                            value={getAns(`flow_${ii}_0`) as string}
+                                                            onChange={(e) => setAns(`flow_${ii}_0`, e.target.value)}
+                                                            disabled={disabled || submitted}
+                                                            className="w-full bg-transparent text-center focus:outline-none placeholder:text-amber-200 dark:placeholder:text-amber-900/50 resize-none overflow-hidden min-h-[40px] border-b-2 border-dashed border-amber-300 h-auto"
+                                                            placeholder={`Complete Step ${ii + 1}...`}
+                                                            rows={1}
+                                                            onInput={(e) => {
+                                                                const target = e.target as HTMLTextAreaElement;
+                                                                target.style.height = 'auto';
+                                                                target.style.height = (target.scrollHeight) + 'px';
+                                                            }}
+                                                        />
+                                                    )}
                                                 </div>
                                             </div>
                                             {ii < (part.items || []).length - 1 && (
@@ -464,7 +467,10 @@ export const DescriptiveSection = ({
                                 <div className="p-4 bg-white dark:bg-gray-900 border border-amber-200 dark:border-amber-800 rounded-2xl shadow-sm">
                                     <BeautifulChart 
                                         type={part.chartConfig.type} 
-                                        data={part.chartConfig.data} 
+                                        data={(part.chartConfig.labels || []).map((l: string, i: number) => ({
+                                          label: l,
+                                          value: part.chartConfig.data?.[i] || 0
+                                        }))}
                                         xAxisLabel={part.chartConfig.xAxisLabel} 
                                         yAxisLabel={part.chartConfig.yAxisLabel}
                                     />

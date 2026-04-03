@@ -3,7 +3,40 @@ import QRCode from "react-qr-code";
 import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
-import { CheckCircle, XCircle, MinusCircle, Check, X, BookOpen, Info } from "lucide-react";
+import { BeautifulChart } from "@/app/components/BeautifulChart";
+import {
+    Trophy,
+    Award,
+    TrendingUp,
+    Users,
+    Target,
+    BarChart3,
+    Medal,
+    Crown,
+    CheckCircle,
+    XCircle,
+    Minus,
+    Download,
+    Share2,
+    Eye,
+    Clock,
+    BookOpen,
+    User,
+    ChevronRight,
+    ArrowRight,
+    ArrowDown,
+    Pin,
+    PenTool,
+    Info,
+    Calendar,
+    GraduationCap,
+    School,
+    FileText,
+    Calculator,
+    Zap,
+    Check,
+    X
+} from 'lucide-react';
 import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from "@/utils/numeralConverter";
 
@@ -327,28 +360,44 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
             switch (subType) {
                 case 'flowchart':
+                    const isHorizontal = subQ.flowchartStyle === 'horizontal';
                     return (
-                        <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
-                            {(subQ.items || []).map((item: string, ii: number) => (
-                                <div key={ii} className="p-1 border border-slate-200 rounded">
-                                    <div className="font-bold text-slate-400 mb-1">Step {ii + 1}</div>
-                                    <div className="flex flex-col gap-1">
-                                        {item.split('___').map((seg, si, arr) => {
-                                            const val = getVal(`flow_${ii}_${si}`) || (typeof studentAnswer === 'string' ? null : studentAnswer?.[`flow_${ii}_${si}`]);
-                                            return (
-                                                <div key={si}>
-                                                    <div className="italic text-slate-500"><Text>{seg}</Text></div>
-                                                    {si < arr.length - 1 && (
-                                                        <div className="mt-0.5 p-1 border border-indigo-200 rounded font-bold bg-slate-50">
-                                                            {val || <span className="text-slate-300">Missing</span>}
+                        <div className={`mt-2 flex ${isHorizontal ? 'flex-row flex-wrap items-center' : 'flex-col'} gap-2 text-[10px]`}>
+                            {(subQ.items || []).map((item: string, ii: number) => {
+                                const isPrompt = ii === 0;
+                                const val = getVal(`flow_${ii}_0`) || (typeof studentAnswer === 'object' && studentAnswer !== null ? studentAnswer[`flow_${ii}_0`] : null);
+                                const isCorrect = normalize(val) === normalize(item);
+
+                                return (
+                                    <React.Fragment key={ii}>
+                                        <div className={`p-2 border rounded shadow-sm min-w-[120px] max-w-[200px] text-center ${isPrompt ? 'bg-slate-100 border-slate-300' : (val ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-slate-50 border-dashed border-slate-200')}`}>
+                                            <div className="font-black text-[7px] text-slate-400 uppercase mb-1">Step {ii + 1}</div>
+                                            <div className="font-bold text-slate-800">
+                                                {isPrompt ? (
+                                                    <Text>{item}</Text>
+                                                ) : (
+                                                    <div className="flex flex-col gap-1">
+                                                        <div className={val ? (isCorrect ? 'text-green-700' : 'text-red-700') : 'text-slate-400'}>
+                                                            {val || '__________'}
                                                         </div>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))}
+                                                        {!isCorrect && val && (
+                                                            <div className="text-[7px] text-green-700 opacity-60 border-t border-green-100 pt-1 mt-1">
+                                                                Key: <Text>{item}</Text>
+                                                                {val ? <XCircle className="w-2 h-2 ml-1 inline" /> : null}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                        {ii < (subQ.items || []).length - 1 && (
+                                            <div className="flex items-center justify-center text-slate-300">
+                                                {isHorizontal ? <ArrowRight className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
+                                            </div>
+                                        )}
+                                    </React.Fragment>
+                                );
+                            })}
                         </div>
                     );
 
@@ -557,6 +606,37 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             </div>
                         </div>
                     );
+                
+                case 'interpreting_graph':
+                    const cc = subQ.chartConfig || subQ.chart_config;
+                    return (
+                        <div className="mt-2 space-y-2">
+                             {cc && (
+                                <div className="p-2 border border-slate-200 rounded bg-white flex flex-col items-center">
+                                    <BeautifulChart 
+                                        type={cc.type} 
+                                        data={(() => {
+                                            const labels = cc.labels || cc.chartLabels || cc.chart_labels;
+                                            const data = cc.data || cc.chartData || cc.chart_data;
+                                            if (Array.isArray(labels) && Array.isArray(data)) {
+                                                return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
+                                            }
+                                            return Array.isArray(data) ? data : [];
+                                        })()} 
+                                        xAxisLabel={cc.xAxisLabel || cc.xAxis_label} 
+                                        yAxisLabel={cc.yAxisLabel || cc.yAxis_label}
+                                        isPrint={true}
+                                    />
+                                </div>
+                             )}
+                             {studentAnswer && (
+                                <div className="p-2 border border-slate-200 rounded bg-slate-50 text-[9px]">
+                                    <div className="text-[7px] font-bold text-slate-400 uppercase mb-1">Student Interpretation:</div>
+                                    <Text>{typeof studentAnswer === 'string' ? studentAnswer : (getVal('ans') || JSON.stringify(studentAnswer))}</Text>
+                                </div>
+                             )}
+                        </div>
+                    );
 
                 default:
                     return (
@@ -600,19 +680,32 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 <span className="ml-1 text-[8px] text-slate-400 uppercase tracking-tighter">[{subQ.marks || 0}]</span>
                             </div>
                             
-                            {renderSubQuestionCore(subQ, subIdx, questionId)}
-
                             {(() => {
                                 const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null);
                                 const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+                                const isFlowchart = (subQ.subType === 'flowchart' || subQ.sub_type === 'flowchart') && subQ.items;
 
-                                if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
+                                if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0) && !isFlowchart) return null;
 
                                 return (
                                     <div className="mt-2 p-2 bg-green-50 border border-green-100 rounded text-[8px] text-green-800">
                                         <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
                                             <BookOpen className="w-2 h-2" /> Model Answer / Key
                                         </div>
+
+                                        {isFlowchart && (
+                                            <div className="flex flex-wrap items-center gap-1.5 py-1 mb-1">
+                                                {(subQ.items || []).map((item: string, ii: number) => (
+                                                    <React.Fragment key={ii}>
+                                                        <div className="px-1.5 py-1 rounded border border-green-200 bg-white font-bold text-green-700">
+                                                            <UniversalMathJax inline>{item}</UniversalMathJax>
+                                                        </div>
+                                                        {ii < (subQ.items || []).length - 1 && <ArrowRight className="w-2 h-2 text-green-300" />}
+                                                    </React.Fragment>
+                                                ))}
+                                            </div>
+                                        )}
+
                                         {modelAns && (
                                             <UniversalMathJax dynamic inline>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                         )}

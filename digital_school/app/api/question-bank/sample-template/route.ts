@@ -34,12 +34,12 @@ export async function GET() {
             ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-10 including 'Option A-D' and 'Correct Option'. Provides automated marking."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'. Supports 'Sub X Type' for specialized layout."],
             ["DESCRIPTIVE", "Flexible format. Use 'Sub X Type' (writing, fill_in, matching, rearranging, flowchart, comprehension, label_diagram, etc.)."],
-            ["  - Flowchart", "Use 'Sub X Items' for nodes (pipe separated '|') and 'Sub X Correct Order' for sequence."],
+            ["  - Flowchart", "Use 'Sub X Items' for all nodes (pipe separated '|'). The FIRST node is the starting prompt shown to students. Use 'Sub X Correct Order' for the full sequence."],
             ["  - Fill-in", "Use 'Sub X Clue Type' (word_box, in_text, none) and 'Sub X Word Box' (pipe separated). Use 'Sub X Passage' with '___' for gaps."],
             ["  - Labels", "Use 'Sub X Labels' with 'Text|Text' or 'Text:x:y|Text:x:y' format."],
             ["POETRY / PASSAGE", "For Poem/Passage, use '||' for forced line breaks or type with Newlines (Alt+Enter). The system will preserve the poetic format."],
             ["EXPLANATIONS", "Fill 'Teacher Note / Explanation' for the main question or 'Sub X Explanation' for each part. These show in Results/Evaluations."],
-            ["INTERPRETING GRAPH", "Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe separated), 'Sub X Chart Data' (pipe separated), and Axis labels."],
+            ["  - Graphs", "Use 'Sub X Type' = 'interpreting_graph'. Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe separated '|'), 'Sub X Chart Data' (pipe separated '|'), and Axis labels."],
             [""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
             ["Marks", "Number only."]
@@ -314,6 +314,40 @@ export async function GET() {
             D1_XLabel: "Quarter",
             D1_YLabel: "Sales (USD)",
             D1_Answers: "The graph shows a peak in sales during Q3, reaching 800 USD."
+        });
+        
+        // 7. Flowchart (Standardized)
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Process Flow",
+            marks: 5,
+            text: "Complete the following flowchart representing the photosynthesis process.",
+            explanation: "Model flowchart answer showing the sequential steps.",
+            D1_SubType: "flowchart",
+            D1_Label: "G",
+            D1_Marks: 5,
+            D1_Instructions: "Identify the missing steps in the sequence.",
+            D1_Items: "Sunlight & CO2|Chlorophyll Absorption|Glucose Production|Oxygen Release",
+            D1_Order: "Sunlight & CO2|Chlorophyll Absorption|Glucose Production|Oxygen Release"
+        });
+
+        // 8. Interpreting Graph (Pie Chart)
+        templateSheet.addRow({
+            type: "DESCRIPTIVE",
+            ...descriptiveCommon,
+            topic: "Distribution of Gases",
+            marks: 5,
+            text: "Analyze the following pie chart showing the composition of Earth's atmosphere.",
+            explanation: "Model analysis of atmospheric gases.",
+            D1_SubType: "interpreting_graph",
+            D1_Label: "H",
+            D1_Marks: 5,
+            D1_Instructions: "Which gas is most abundant?",
+            D1_ChartType: "pie",
+            D1_ChartLabels: "Nitrogen|Oxygen|Argon|CO2 & Others",
+            D1_ChartData: "78|21|0.9|0.1",
+            D1_Answers: "Nitrogen is the most abundant gas at 78%."
         });
 
         // Freeze top row

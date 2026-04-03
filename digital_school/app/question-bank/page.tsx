@@ -1421,14 +1421,13 @@ const QuestionCard: React.FC<{
 
                           {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
                             <div className="flex flex-wrap items-center gap-2 py-1 mt-2">
-                              {part.items.map((item: string, ii: number) => (
-                                <React.Fragment key={ii}>
-                                  <div className="px-3 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
-                                    <UniversalMathJax>{item}</UniversalMathJax>
-                                  </div>
-                                  {ii < part.items.length - 1 && <ArrowRight className="w-3 h-3 text-gray-400" />}
-                                </React.Fragment>
-                              ))}
+                              <div className="px-3 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
+                                <UniversalMathJax>{part.items[0]}</UniversalMathJax>
+                              </div>
+                              <ArrowRight className="w-3 h-3 text-gray-400" />
+                              <div className="px-4 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-[9px] font-bold text-gray-400 italic">
+                                Continue flowchart...
+                              </div>
                             </div>
                           )}
 
@@ -1437,12 +1436,32 @@ const QuestionCard: React.FC<{
                             const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
                             const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
                             const hasExplanation = !!part.explanation;
+                            const isFlowchart = part.subType === 'flowchart' || part.sub_type === 'flowchart';
                             const hasPairing = (part.subType === 'matching' || part.sub_type === 'matching') && part.matches;
 
-                            if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing) return null;
+                            if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing && (!isFlowchart || !part.items)) return null;
 
                             return (
                               <div className="mt-3 space-y-2">
+                                {/* Complete Flowchart for Flowchart types */}
+                                {isFlowchart && part.items && (
+                                  <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                                    <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                                      <ArrowRight className="w-2.5 h-2.5" /> Complete Flowchart
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-2 py-1">
+                                      {part.items.map((item: string, ii: number) => (
+                                        <React.Fragment key={ii}>
+                                          <div className="px-2.5 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap text-emerald-900 border-emerald-100">
+                                            <UniversalMathJax inline>{item}</UniversalMathJax>
+                                          </div>
+                                          {ii < part.items.length - 1 && <ArrowRight className="w-3 h-3 text-emerald-300" />}
+                                        </React.Fragment>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
                                 {/* Pairing Matrix for Matching */}
                                 {hasPairing && (
                                   <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
@@ -1474,7 +1493,7 @@ const QuestionCard: React.FC<{
                                 )}
 
                                 {/* Answer Keys for specialized types (Short Answer, True/False, etc.) */}
-                                {pluralAnswers && pluralAnswers.length > 0 && !hasPairing && (
+                                {pluralAnswers && pluralAnswers.length > 0 && !hasPairing && !isFlowchart && (
                                   <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 dark:border-emerald-800/30">
                                     <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1">
                                       <ArrowRight className="w-2.5 h-2.5" /> Answer Keys
@@ -2471,7 +2490,10 @@ function DescriptiveQuestionForm({
                   <Label className="text-[10px] uppercase font-bold text-gray-400 mb-2 block">Live Chart Preview</Label>
                   <BeautifulChart 
                     type={part.chartConfig.type} 
-                    data={part.chartConfig.data} 
+                    data={Array.isArray((part.chartConfig as any).labels) ? (part.chartConfig as any).labels.map((l: string, i: number) => ({
+                      label: l,
+                      value: (part.chartConfig as any).data?.[i] || 0
+                    })) : (part.chartConfig.data as any) || []}
                     xAxisLabel={part.chartConfig.xAxisLabel} 
                     yAxisLabel={part.chartConfig.yAxisLabel}
                   />

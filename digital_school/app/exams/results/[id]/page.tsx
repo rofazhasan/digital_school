@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { use } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -651,9 +651,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
               <BeautifulChart 
                 type={(subQ.chartConfig || subQ.chart_config).type} 
-                data={(subQ.chartConfig || subQ.chart_config).data} 
+                data={(() => {
+                  const cc = subQ.chartConfig || subQ.chart_config;
+                  const labels = cc.labels || cc.chartLabels || cc.chart_labels;
+                  const data = cc.data || cc.chartData || cc.chart_data;
+                  if (Array.isArray(labels) && Array.isArray(data)) {
+                    return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
+                  }
+                  return Array.isArray(data) ? data : [];
+                })()} 
                 xAxisLabel={(subQ.chartConfig || subQ.chart_config).xAxisLabel || (subQ.chartConfig || subQ.chart_config).xAxis_label} 
                 yAxisLabel={(subQ.chartConfig || subQ.chart_config).yAxisLabel || (subQ.chartConfig || subQ.chart_config).yAxis_label}
+                isPrint={true}
               />
             </div>
           )}
@@ -687,28 +696,20 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        {subQ.subType === 'flowchart' && (
+        {subQ.subType === 'flowchart' && subQ.items && (
           <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
             <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-              <ArrowRight className="w-2.5 h-2.5" /> Flowchart Key
+              <ArrowRight className="w-2.5 h-2.5" /> Complete Flowchart
             </p>
-            <div className="space-y-1.5">
-              {(subQ.items || []).map((item: string, ii: number) => {
-                const modelAnsRaw = subQ.modelAnswers?.[ii] || subQ.correctOrder?.[ii] || "";
-                const modelAns = Array.isArray(modelAnsRaw) ? modelAnsRaw : modelAnsRaw.split('|');
-                return (
-                  <div key={ii} className="flex items-center gap-2 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium font-black">
-                    <Badge variant="outline" className="h-4 px-1.5 text-[8px] bg-emerald-100 border-emerald-200 text-emerald-600 uppercase font-black">Step {ii+1}</Badge>
-                    <div className="flex flex-wrap gap-1">
-                      {modelAns.map((val: string, vi: number) => (
-                        <span key={vi} className="bg-emerald-100/50 px-1.5 py-0.5 rounded border border-emerald-100 flex items-center gap-1">
-                          <UniversalMathJax inline dynamic>{val || "—"}</UniversalMathJax>
-                        </span>
-                      ))}
-                    </div>
+            <div className="flex flex-wrap items-center gap-2 py-1">
+              {subQ.items.map((item: string, ii: number) => (
+                <React.Fragment key={ii}>
+                  <div className="px-2.5 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap text-emerald-900 border-emerald-100">
+                    <UniversalMathJax inline dynamic>{item}</UniversalMathJax>
                   </div>
-                );
-              })}
+                  {ii < subQ.items.length - 1 && <ArrowRight className="w-3 h-3 text-emerald-300" />}
+                </React.Fragment>
+              ))}
             </div>
           </div>
         )}

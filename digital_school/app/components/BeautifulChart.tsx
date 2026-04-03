@@ -85,28 +85,32 @@ export const BeautifulChart: React.FC<ChartProps> = ({
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    animation: isPrint ? false : true,
+    animation: isPrint ? false : (typeof window !== 'undefined' ? true : false),
     plugins: {
       legend: {
-        display: ['pie', 'doughnut', 'polarArea'].includes(type),
+        display: isPrint ? (['pie', 'doughnut', 'polarArea'].includes(type)) : true,
         position: 'bottom' as const,
         labels: {
           font: { 
-            size: isPrint ? 10 : 12,
-            weight: isPrint ? 'bold' : 'normal'
+            size: isPrint ? 9 : 12,
+            weight: isPrint ? 'bold' : 'normal',
+            family: isPrint ? "'Inter', 'system-ui', 'Helvetica', 'Arial', sans-serif" : undefined
           },
           color: isPrint ? '#000' : undefined,
-          boxWidth: 10,
+          boxWidth: 8,
+          padding: isPrint ? 4 : 10
         }
       },
       title: {
         display: !!title,
         text: title,
         font: {
-          size: isPrint ? 14 : 16,
-          weight: 'bold'
+          size: isPrint ? 12 : 16,
+          weight: 'bold',
+          family: isPrint ? "'Inter', 'system-ui', 'Helvetica', 'Arial', sans-serif" : undefined
         },
-        color: isPrint ? '#000' : undefined
+        color: isPrint ? '#000' : undefined,
+        padding: isPrint ? 4 : 10
       },
       tooltip: {
         enabled: !isPrint
@@ -116,15 +120,26 @@ export const BeautifulChart: React.FC<ChartProps> = ({
       y: {
         beginAtZero: true,
         grid: {
-          color: isPrint ? 'rgba(0,0,0,0.1)' : undefined
+          color: isPrint ? 'rgba(0,0,0,0.05)' : undefined,
+          drawBorder: false
         },
         title: {
           display: !!yAxisLabel,
           text: yAxisLabel,
-          font: { weight: 'bold', size: isPrint ? 10 : 12 },
+          font: { 
+            weight: 'bold', 
+            size: isPrint ? 9 : 12,
+            family: isPrint ? "'Inter', 'system-ui', 'Helvetica', 'Arial', sans-serif" : undefined
+          },
           color: isPrint ? '#000' : undefined
         },
-        ticks: { color: isPrint ? '#000' : undefined, font: { size: isPrint ? 9 : 11 } }
+        ticks: { 
+          color: isPrint ? '#000' : undefined, 
+          font: { 
+            size: isPrint ? 8 : 11,
+            weight: isPrint ? 'bold' : 'normal'
+          } 
+        }
       },
       x: {
         grid: {
@@ -133,27 +148,38 @@ export const BeautifulChart: React.FC<ChartProps> = ({
         title: {
           display: !!xAxisLabel,
           text: xAxisLabel,
-          font: { weight: 'bold', size: isPrint ? 10 : 12 },
+          font: { 
+            weight: 'bold', 
+            size: isPrint ? 9 : 12,
+            family: isPrint ? "'Inter', 'system-ui', 'Helvetica', 'Arial', sans-serif" : undefined
+          },
           color: isPrint ? '#000' : undefined
         },
-        ticks: { color: isPrint ? '#000' : undefined, font: { size: isPrint ? 9 : 11 } }
+        ticks: { 
+          color: isPrint ? '#000' : undefined, 
+          font: { 
+            size: isPrint ? 8 : 11,
+            weight: isPrint ? 'bold' : 'normal'
+          } 
+        }
       }
     } : (type === 'polarArea' ? {
       r: {
-        grid: { color: isPrint ? 'rgba(0,0,0,0.1)' : undefined },
+        grid: { color: isPrint ? 'rgba(0,0,0,0.05)' : undefined },
         ticks: { display: false }
       }
     } : undefined)
   };
 
   const containerStyle: React.CSSProperties = {
-    height: isPrint ? (['pie', 'doughnut'].includes(type) ? '200px' : '220px') : '300px',
+    height: isPrint ? (['pie', 'doughnut', 'polarArea'].includes(type) ? '180px' : '180px') : '300px',
     width: '100%',
-    maxWidth: isPrint ? (['pie', 'doughnut'].includes(type) ? '300px' : '500px') : '100%',
-    margin: '0 auto',
-    padding: '8px',
+    maxWidth: isPrint ? (['pie', 'doughnut', 'polarArea'].includes(type) ? '250px' : '100%') : '100%',
+    margin: isPrint ? '0' : '0 auto',
+    padding: isPrint ? '4px' : '8px',
     backgroundColor: isPrint ? '#fff' : 'transparent',
-    borderRadius: '8px',
+    border: isPrint ? '1px solid #e2e8f0' : 'none',
+    borderRadius: isPrint ? '4px' : '8px',
   };
 
   return (
