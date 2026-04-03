@@ -2599,13 +2599,18 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                       <div className="text-sm text-muted-foreground">
                                         {currentQuestion?.marks} mark{currentQuestion?.marks > 1 ? 's' : ''}
                                       </div>
-                                      {['cq', 'sq'].includes(currentQuestion?.type?.toLowerCase() || '') && (
+                                      {['cq', 'sq', 'descriptive'].includes(currentQuestion?.type?.toLowerCase() || '') && (
                                         <Badge variant="outline" className="text-[10px] font-black bg-indigo-50 text-indigo-700 border-indigo-200">
                                           Awarded: {(() => {
                                             const qId = currentQuestion?.id;
                                             let total = 0;
-                                            (currentQuestion?.subQuestions || currentQuestion?.sub_questions || []).forEach((_: any, i: number) => {
-                                              total += Number(currentStudent?.answers?.[`${qId}_sub_${i}_marks`] || 0);
+                                            const subQs = currentQuestion?.subQuestions || currentQuestion?.sub_questions || currentQuestion?.parts || [];
+                                            subQs.forEach((_: any, i: number) => {
+                                              total += Number(
+                                                currentStudent?.answers?.[`${qId}_sub_${i}_marks`] || 
+                                                currentStudent?.answers?.[`${qId}_desc_${i}_marks`] || 
+                                                0
+                                              );
                                             });
                                             return total;
                                           })()} / {currentQuestion?.marks}
@@ -2967,15 +2972,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                         </div>
                                                       )}
                                                       
-                                                      {/* Model Answer & Explanation */}
-                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers) && (
-                                                        <div className="mt-2 text-xs text-green-700 bg-green-50 p-2 rounded border border-green-100 whitespace-pre-wrap">
-                                                          <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                      {/* Model Answer & Explanation (Consolidated Emerald Style) */}
+                                                      {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans) && (
+                                                        <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                                                          <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                                                            <ArrowRight className="w-2.5 h-2.5" /> Model Answer
+                                                          </p>
+                                                          <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
+                                                            <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                          </div>
                                                         </div>
                                                       )}
                                                       {subQ.explanation && (
-                                                        <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-100 whitespace-pre-wrap">
-                                                          <span className="font-bold">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        <div className="mt-2 p-2 rounded-lg bg-blue-50/50 border border-blue-100 text-[10px] text-blue-800 flex items-start gap-2">
+                                                          <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                                                          <div>
+                                                            <span className="font-bold uppercase block mb-0.5 text-[8px]">Explanation:</span>
+                                                            <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                          </div>
                                                         </div>
                                                       )}
 

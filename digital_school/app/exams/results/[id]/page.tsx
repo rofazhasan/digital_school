@@ -581,6 +581,28 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
             )}
+
+            {/* General Model Answer Box (Standard CQ Style) */}
+            {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans) && (
+              <div className="mt-3 p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+                <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+                  <ArrowRight className="w-2.5 h-2.5" /> Model Answer
+                </p>
+                <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
+                  <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                </div>
+              </div>
+            )}
+            
+            {subQ.explanation && (
+              <div className="mt-2 p-2 rounded-lg bg-blue-50/50 border border-blue-100 text-[10px] text-blue-800 flex items-start gap-2">
+                <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                <div>
+                  <span className="font-bold uppercase block mb-0.5 text-[8px]">Explanation:</span>
+                  <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                </div>
+              </div>
+            )}
           </div>
         );
     }
@@ -725,6 +747,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
                 );
               })}
+            </div>
+          </div>
+        )}
+
+        {/* Fallback Generalized Model Answer block for Descriptive (Writing, etc.) */}
+        {!['interpreting_graph', 'matching', 'flowchart', 'fill_in', 'true_false'].includes(subQ.subType || subQ.sub_type) && (subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans) && (
+          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+              <ArrowRight className="w-2.5 h-2.5" /> Model Answer
+            </p>
+            <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
+              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
             </div>
           </div>
         )}
@@ -1446,6 +1480,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const sqQuestions = result.questions?.filter((q: Question) => q.type?.toUpperCase() === 'SQ') || [];
   const objectiveQuestions = [...mcqQuestions, ...mcQuestions, ...arQuestions, ...mtfQuestions, ...intQuestions, ...smcqQuestions];
 
+  // Re-calculate awarded marks on the fly to avoid "zero-score" errors for descriptive/creative parts
+  const recalculatedCqMarks = cqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
+  const recalculatedSqMarks = sqQuestions.reduce((sum, q) => sum + (q.awardedMarks || 0), 0);
+
+  // Use recalculated values if the provided result.result totals are zero but awarded marks exist
+  const effectiveCqMarks = (result.result?.cqMarks || 0) || recalculatedCqMarks;
+  const effectiveSqMarks = (result.result?.sqMarks || 0) || recalculatedSqMarks;
+  const effectiveTotalMarks = (result.result?.total || 0) || (recalculatedCqMarks + recalculatedSqMarks + (result.result?.mcqMarks || 0));
+
   /* Fix: Use required counts for marks breakdown if available */
   const cqMarkPerQuestion = cqQuestions[0]?.marks || 10;
   const sqMarkPerQuestion = sqQuestions[0]?.marks || 10;
@@ -1905,7 +1948,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <div className="space-y-1">
                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
                               <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
-                                {result.result?.cqMarks}
+                                {effectiveCqMarks}
                                 <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalCqMarks}</span>
                               </div>
                             </div>
@@ -1923,7 +1966,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <div className="space-y-1">
                               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Earned Marks</p>
                               <div className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white flex items-baseline flex-wrap">
-                                {result.result?.sqMarks}
+                                {effectiveSqMarks}
                                 <span className="text-sm sm:text-lg font-bold text-slate-400 ml-1">/{totalSqMarks}</span>
                               </div>
                             </div>
@@ -1934,7 +1977,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-200">Total Aggregate</p>
                           <div className="mt-2 text-center sm:text-left">
                             <div className="text-3xl sm:text-5xl font-black flex items-baseline justify-center sm:justify-start flex-wrap leading-none">
-                              {result.result?.total}
+                              {effectiveTotalMarks}
                               <span className="text-lg sm:text-xl text-indigo-300 ml-1 sm:ml-2">/{result.exam.totalMarks}</span>
                             </div>
                             {(() => {
