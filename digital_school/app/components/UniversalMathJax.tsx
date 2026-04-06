@@ -47,7 +47,11 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
         window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
     }, [content, contentWithDiagrams]);
 
-    if (content !== contentWithDiagrams) {
+    // Safely apply pedagogical formatting (|| -> <br />, **bold**) 
+    // This is now handled within cleanupMath, but we must detect if HTML is present
+    const hasHtml = contentWithDiagrams.includes('<') && contentWithDiagrams.includes('>');
+
+    if (hasHtml) {
         return (
             <MathJax inline={inline} dynamic={dynamic}>
                 <span ref={mathRef} dangerouslySetInnerHTML={{ __html: contentWithDiagrams }} />
@@ -55,5 +59,5 @@ export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, in
         );
     }
 
-    return <MathJax inline={inline} dynamic={dynamic}>{content}</MathJax>;
+    return <MathJax inline={inline} dynamic={dynamic}>{contentWithDiagrams}</MathJax>;
 };

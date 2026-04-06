@@ -113,35 +113,72 @@ export function calculatePercentage(earnedMarks: number, totalMarks: number): nu
 }
 
 /**
- * Ensures text uses inline math delimiters to prevent unwanted new lines and centering.
- * Replaces $$...$$ with $...$ and \[...\] with \(...\)
- * Also wraps Bangla/Unicode text in \text{} for proper rendering in LaTeX tables
- * @param text - The text containing math to clean up
- * @returns Cleaned text with inline math delimiters and Bangla support
+ * Processes custom formatting markers from the Excel template
+ * Handles:
+ * - || -> <br /> (Line break / Poetry)
+ * - **text** -> <strong>text</strong> (Bold)
+ * - ___ -> underlined gap (Fill in the blanks)
  */
-export function cleanupMath(text: string | null | undefined): string {
+export function applyFormatting(text: string | null | undefined): string {
   if (!text) return "";
 
   let processed = text;
 
-  // 1. Normalize LaTeX delimiters to inline ($) for consistent processing and print flow
-  processed = processed
-    .replace(/\$\$/g, '$')  // $$ -> $
-    .replace(/\\\[/g, '$').replace(/\\\]/g, '$') // \[ -> $, \] -> $
-    .replace(/\\\(/g, '$').replace(/\\\)/g, '$');   // \( -> $, \) -> $
+  // 1. Line Breaks (||)
+  processed = processed.replace(/\|\|/g, '<br />');
 
-  // 2. Wrap Bangla Unicode characters (U+0980 to U+09FF) in \text{} inside math delimiters
-  // This ensures conjuncts and ligatures render correctly instead of being treated as individual math symbols
-  processed = processed.replace(/\$([\s\S]*?)\$/g, (match, mathContent) => {
-    return '$' + mathContent.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
-      // Check if already wrapped in \text{} or similar command
+  // 2. Bold (**text**)
+  processed = processed.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  // 3. Fill in the blanks (___)
+  processed = processed.replace(/___/g, '<span class="inline-block border-b-2 border-current min-w-[60px] mx-1" style="vertical-align: baseline;">&nbsp;</span>');
+
+  return processed;
+}
+
+/**
+ * Ensures text uses inline math delimiters to prevent unwanted new lines and centering.
+ * Replaces $$...$$ with $...$ and \[...\] with \(...\)
+ * Also wraps Bangla/Unicode text in \text{} for proper rendering in LaTeX tables
+ * @param text - The text containing math to clean up
+ * @returns Cleaned text with inline math delimiters, formatting, and Bangla support
+ */
+export function cleanupMath(text: string | null | undefined): string {
+  if (!text) return "";
+
+  // 1. Normalize LaTeX delimiters to inline ($) for consistent processing
+  // This must be done FIRST so we have a single delimiter to split by
+  let normalized = text
+    .replace(/\$\$/g, '$')
+    .replace(/\\\[/g, '$').replace(/\\\]/g, '$')
+    .replace(/\\\(/g, '$').replace(/\\\)/g, '$');
+
+  // 2. Split by $ to isolate math from text
+  // Even indices are text, odd indices are math
+  const parts = normalized.split('$');
+  const processedParts = parts.map((part, index) => {
+    // Even index: It's regular text, apply formatting
+    if (index % 2 === 0) {
+      return applyFormatting(part);
+    }
+    // Odd index: It's math content, DO NOT apply bold/italic/poetry formatting
+    // But we still apply the internal cleanup logic like \text{} for Bangla
+    let mathContent = part;
+    
+    // Wrap Bangla Unicode characters (U+0980 to U+09FF) in \text{}
+    mathContent = mathContent.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
       const before = fullString.slice(0, offset);
       if (/\\text\s*\{$/.test(before)) return match;
       return `\\text{${match}}`;
-    }) + '$';
+    });
+    
+    return mathContent;
   });
 
-  // 3. Fallback for Bangla text in explicit tables that might not be caught by the above
+  // 3. Join back with $ delimiters
+  let processed = processedParts.join('$');
+
+  // 4. Fallback for Bangla text in explicit tables
   const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
   processed = processed.replace(tableRegex, (match) => {
     return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (m: string, banglaText: string, offset: number, fullString: string) => {
