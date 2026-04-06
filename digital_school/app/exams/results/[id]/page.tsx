@@ -628,31 +628,31 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         {/* Question Metadata: Label, Instructions, Source, Passage, Graph */}
         <div className="mb-4 space-y-3">
           {(subQ.label || subQ.title || subQ.question) && (
-            <div className="text-sm font-black text-gray-800 leading-tight">
+            <div className="text-sm font-black text-gray-800 dark:text-slate-200 leading-tight">
               <UniversalMathJax inline dynamic>{subQ.label || subQ.title || subQ.question}</UniversalMathJax>
             </div>
           )}
           
           {(subQ.instructions || subQ.instruction) && (
-            <div className="text-[10px] italic text-gray-400 bg-gray-50 p-1.5 rounded border border-gray-100 flex items-start gap-1.5">
+            <div className="text-[10px] italic text-gray-400 bg-gray-50 dark:bg-slate-900/50 p-1.5 rounded border border-gray-100 dark:border-slate-800 flex items-start gap-1.5">
               <Info className="w-2.5 h-2.5 mt-0.5 shrink-0" />
               <UniversalMathJax dynamic>{subQ.instructions || subQ.instruction}</UniversalMathJax>
             </div>
           )}
 
           {(subQ.subType === 'writing' || subQ.sub_type === 'writing') && (subQ.sourceText || subQ.source_text) && (
-            <div className="p-3 rounded-xl bg-blue-50/30 border border-blue-100/50 text-xs italic text-blue-900/60 leading-relaxed">
+            <div className="p-3 rounded-xl bg-blue-50/30 dark:bg-blue-900/10 border border-blue-100/50 dark:border-blue-900/30 text-xs italic text-blue-900/60 dark:text-blue-300 leading-relaxed">
               <UniversalMathJax dynamic>{subQ.sourceText || subQ.source_text}</UniversalMathJax>
             </div>
           )}
 
           {(subQ.subType === 'fill_in' || subQ.sub_type === 'fill_in') && subQ.passage && (
-            <div className="p-3 rounded-xl bg-indigo-50/30 border border-indigo-100/50 text-sm leading-relaxed text-indigo-900/80">
+            <div className="p-3 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-900/30 text-sm leading-relaxed text-indigo-900/80 dark:text-indigo-200">
               <UniversalMathJax dynamic>{subQ.passage}</UniversalMathJax>
               {(subQ.wordBox || subQ.word_box) && (subQ.wordBox || subQ.word_box).length > 0 && (
                 <div className="mt-3 pt-3 border-t border-indigo-100/30 flex flex-wrap gap-2">
                   {(subQ.wordBox || subQ.word_box).map((w: string, wi: number) => (
-                    <span key={wi} className="px-2 py-1 bg-white border border-indigo-100 rounded-md text-[10px] font-bold shadow-sm text-indigo-600">{w}</span>
+                    <span key={wi} className="px-2 py-1 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/50 rounded-md text-[10px] font-bold shadow-sm text-indigo-600 dark:text-indigo-400">{w}</span>
                   ))}
                 </div>
               )}
@@ -660,7 +660,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           )}
 
           {(subQ.subType === 'interpreting_graph' || subQ.sub_type === 'interpreting_graph') && (subQ.chartConfig || subQ.chart_config) && (
-            <div className="p-4 bg-white border border-slate-200 rounded-2xl shadow-sm">
+            <div className="p-4 bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
               <BeautifulChart 
                 type={(subQ.chartConfig || subQ.chart_config).type} 
                 data={(() => {
@@ -764,7 +764,46 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        {/* Restoration: Student Response Artifacts (Annotated Pics) */}
+        {subQ.subType === 'short_answer' && (
+          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+              <ArrowRight className="w-2.5 h-2.5" /> Short-Answer Keys
+            </p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
+                <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
+                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
+                  <div className="text-[11px] font-black text-emerald-900 leading-tight">
+                    <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {subQ.subType === 'error_correction' && (
+          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
+            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
+              <ArrowRight className="w-2.5 h-2.5" /> Error-Correction Keys
+            </p>
+            <div className="grid grid-cols-1 gap-1.5">
+              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
+                <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
+                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 uppercase font-black">{String.fromCharCode(97 + ai)}</span>
+                  <div className="text-[11px] font-black text-emerald-900 leading-tight">
+                    <UniversalMathJax dynamic>{ans}</UniversalMathJax>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 1. Specialized Student Response Rendering */}
+        {renderSubQuestionContent(subQ, subIdx, questionId)}
+
+        {/* 2. Visual Submission Artifacts (Annotated Pics) */}
         {(subQ.studentImages && subQ.studentImages.length > 0) && (
           <div className="my-6 p-5 rounded-[2rem] bg-slate-900 dark:bg-slate-950 text-white shadow-2xl relative overflow-hidden group/artifact">
             <div className="absolute top-0 right-0 p-8 opacity-5 group-hover/artifact:rotate-12 group-hover/artifact:scale-110 transition-transform">
@@ -778,7 +817,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
                   <div>
                     <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Submission Artifacts</h5>
-                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight">Part {subIdx + 1} • Student Response Screen</p>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight">Part {subIdx + 1} • Visual Evidence</p>
                   </div>
                 </div>
                 <Badge variant="outline" className="text-[9px] font-black border-white/20 text-emerald-400">Annotated Artifact</Badge>
@@ -789,11 +828,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   <div
                     key={imgIdx}
                     className="aspect-video relative rounded-2xl overflow-hidden border border-white/10 group/img cursor-zoom-in"
-                    onClick={() => handleImageZoom(imageUrl, `Question Review • Part ${subIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
+                    onClick={() => handleImageZoom(imageUrl, `Submission Review • Part ${subIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
                   >
                     <img src={imageUrl} alt="Artifact" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-700" loading="lazy" />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-3">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-white/80">View Full Annotation</span>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-white/80">View Interaction Fullscreen</span>
                     </div>
                   </div>
                 ))}
@@ -802,7 +841,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        {/* Unified Teacher Feedback Section (Model Answer + Explanation) */}
+        {/* 3. Official Teacher Feedback (Model Answer + Explanation) */}
         {(() => {
           const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans || subQ.sub_answer;
           const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : (Array.isArray(subQ.correctOrder) ? subQ.correctOrder : null)));
@@ -838,7 +877,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
                           </div>
                         )}
-                        {modelAnsArray && modelAnsArray.length > 0 && (
+                        {modelAnsArray && modelAnsArray.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(subQ.subType) && (
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                             {modelAnsArray.map((ans: any, ai: number) => (
                               <div key={ai} className="flex gap-2 items-center bg-white/60 dark:bg-slate-900/40 p-2 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
@@ -853,15 +892,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   )}
 
                   {/* Explanation Part */}
-                  {hasExplanation && (
+                  {explanation && (
                     <div className="space-y-2">
-                      <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-tight flex items-center gap-1.5">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
                         <Info className="w-3 h-3" /> Pedagogical Rationale
                       </p>
-                      <div className="pl-4 border-l-2 border-indigo-500/20">
-                        <div className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
-                          <UniversalMathJax dynamic>{cleanupMath(explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                        </div>
+                      <div className="pl-4 border-l-2 border-emerald-500/20 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
+                        <UniversalMathJax dynamic>{cleanupMath(explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                       </div>
                     </div>
                   )}
@@ -873,6 +910,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
       </div>
     );
   };
+
 
   // Print Handler
   // No lint error here anymore
@@ -2347,9 +2385,122 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       "bg-slate-50/50 border-slate-100 dark:bg-slate-900/20 dark:border-slate-800/40 opacity-60"
                                     )}
                                   >
-                                    {/* Result Rendering Logic */}
+                                    {/* Question Type & Index Header */}
+                                    <div className="flex items-center justify-between gap-4 mb-8">
+                                      <div className="flex items-center gap-3">
+                                        <Badge className="bg-indigo-600 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest shadow-lg shadow-indigo-500/20">#{gIdx + 1}</Badge>
+                                        <Badge variant="outline" className="text-[10px] font-black uppercase tracking-widest border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/40">
+                                          {type === 'INT' ? 'INT / NUMERIC' : type}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-[10px] font-black italic px-3 py-1 rounded-full shadow-sm">
+                                          {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
+                                        </Badge>
+                                      </div>
+                                    </div>
+
+                                    {/* Question Text (for non-SMCQ) */}
+                                    {type !== 'SMCQ' && (
+                                      <div className="text-xl md:text-2xl font-bold text-slate-800 dark:text-slate-100 leading-tight mb-8">
+                                        <UniversalMathJax dynamic>{cleanupMath(question.questionText || "")}</UniversalMathJax>
+                                      </div>
+                                    )}
+
+                                    {/* SMCQ Scenario Rendering */}
+                                    {type === 'SMCQ' && (
+                                      <div className="mb-10 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
+                                        <div className="p-8 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[3rem] border-2 border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
+                                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                            <Layers className="h-24 w-24 text-indigo-500" />
+                                          </div>
+                                          <div className="relative z-10">
+                                            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-4 border border-indigo-500/30">
+                                              <Sparkles className="h-3.5 w-3.5" /> Scenario Context
+                                            </div>
+                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
+                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div className="space-y-12 pl-4 md:pl-12 border-l-4 border-dashed border-indigo-500/20 dark:border-indigo-500/10">
+                                          {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                            <div key={subIdx} className="relative space-y-8 group">
+                                              <div className="absolute -left-[1.65rem] md:-left-[3.15rem] top-2 w-4 h-4 rounded-full bg-white dark:bg-slate-950 border-4 border-indigo-500 shadow-lg shadow-indigo-500/50 z-10" />
+
+                                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+                                                <div className="flex-1 space-y-4">
+                                                  <div className="flex items-center gap-3">
+                                                    <span className="text-2xl font-black text-indigo-600/30 dark:text-indigo-400/20 italic tabular-nums">
+                                                      PART {String(subIdx + 1).padStart(2, '0')}
+                                                    </span>
+                                                    <Badge variant="outline" className="rounded-full px-4 py-1 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[10px] uppercase font-black tracking-widest text-slate-500">
+                                                      {subQ.marks} MARK{subQ.marks !== 1 ? 'S' : ''}
+                                                    </Badge>
+                                                  </div>
+                                                  <div className="text-lg md:text-xl font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
+                                                  </div>
+                                                </div>
+
+                                                {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
+                                                  <div className={cn(
+                                                    "px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-sm border whitespace-nowrap",
+                                                    subQ.isCorrect
+                                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                                      : "bg-rose-500/10 text-rose-600 border-rose-500/30"
+                                                  )}>
+                                                    {subQ.isCorrect ? "Perfect Result" : "Corrected Response"}
+                                                  </div>
+                                                )}
+                                              </div>
+
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {(subQ.options || []).map((opt: any, oi: number) => {
+                                                  const optText = typeof opt === 'object' ? opt.text : opt;
+                                                  const isSel = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && String(subQ.studentAnswer).trim() === String(optText).trim();
+                                                  const isCorOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null && (String(subQ.correctAnswer).trim() === String(optText).trim() || Number(subQ.correctAnswer) === oi)));
+
+                                                  let optStyle = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
+                                                  let optIcon = null;
+
+                                                  if (isSel && isCorOpt) {
+                                                    optStyle = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-50 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 grayscale-0 scale-[1.02]";
+                                                    optIcon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
+                                                  } else if (isSel && !isCorOpt) {
+                                                    optStyle = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-50 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10 grayscale-0";
+                                                    optIcon = <XCircle className="h-4 w-4 text-rose-600" />;
+                                                  } else if (!isSel && isCorOpt) {
+                                                    optStyle = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed grayscale-0";
+                                                    optIcon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
+                                                  }
+
+                                                  return (
+                                                    <div key={oi} className={`relative p-5 rounded-[2rem] border-2 flex items-center gap-5 transition-all duration-300 ${optStyle}`}>
+                                                      <span className={cn(
+                                                        "w-10 h-10 flex items-center justify-center rounded-2xl text-[11px] font-black shadow-sm transition-colors",
+                                                        isSel ? "bg-indigo-600 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
+                                                      )}>
+                                                        {String.fromCharCode(0x0995 + oi)}
+                                                      </span>
+                                                      <span className="flex-1 text-sm font-bold tracking-tight">
+                                                        <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
+                                                      </span>
+                                                      <div className="flex-shrink-0">{optIcon}</div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    {/* Result Rendering Logic (MCQ/MC/AR) */}
                                     {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
-                                      <div className="space-y-2">
+                                      <div className="space-y-4">
                                         {(() => {
                                           let optionsToRender = question.options;
                                           // Handle options for AR specifically if missing
@@ -2707,41 +2858,48 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                    </div>
 
                                    <div className="pl-6 md:pl-12 border-l-4 border-dashed border-amber-200 dark:border-amber-900/40 space-y-12">
-                                      {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => {
-                                        const isObj = ['MCQ', 'MC'].includes((subQ.type || subQ.subType || "").toUpperCase()) || (subQ.options && subQ.options.length > 0);
-                                        return (
-                                          <div key={subIdx} className="space-y-6">
-                                            <div className="flex items-center gap-3">
-                                               <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-[10px] font-black text-amber-700">{subIdx + 1}</div>
-                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
-                                            </div>
-
-                                            {isObj ? (
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                {(subQ.options || []).map((opt: any, oi: number) => {
-                                                  const t = typeof opt === 'object' ? opt.text : opt;
-                                                  const isSel = String(subQ.studentAnswer || "").trim() === String(t).trim();
-                                                  const isCor = opt.isCorrect || String(subQ.correctAnswer || "").trim() === String(t).trim();
-                                                  return (
-                                                    <div key={oi} className={cn(
-                                                      "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
-                                                      isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
-                                                      isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
-                                                      !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
-                                                      "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
-                                                    )}>
-                                                      <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
-                                                      <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
-                                                    </div>
-                                                  );
-                                                })}
+                                      {(q.subQuestions || q.sub_questions || []).length > 0 ? (
+                                        (q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => {
+                                          const isObj = ['MCQ', 'MC', 'AR', 'SMCQ'].includes((subQ.type || subQ.subType || "").toUpperCase()) || (subQ.options && subQ.options.length > 0);
+                                          return (
+                                            <div key={subIdx} className="space-y-6">
+                                              <div className="flex items-center gap-3">
+                                                 <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-[10px] font-black text-amber-700">{subIdx + 1}</div>
+                                                 <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
                                               </div>
-                                            ) : (
-                                              renderDescriptiveSubQuestion(subQ, subIdx, q.id)
-                                            )}
-                                          </div>
-                                        );
-                                      })}
+
+                                              {isObj ? (
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                  {(subQ.options || []).map((opt: any, oi: number) => {
+                                                    const t = typeof opt === 'object' ? opt.text : opt;
+                                                    const isSel = String(subQ.studentAnswer || "").trim() === String(t).trim();
+                                                    const isCor = opt.isCorrect || String(subQ.correctAnswer || "").trim() === String(t).trim();
+                                                    return (
+                                                      <div key={oi} className={cn(
+                                                        "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
+                                                        isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
+                                                        isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
+                                                        !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
+                                                        "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
+                                                      )}>
+                                                        <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
+                                                        <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              ) : (
+                                                renderDescriptiveSubQuestion(subQ, subIdx, q.id)
+                                              )}
+                                            </div>
+                                          );
+                                        })
+                                      ) : (
+                                        <div className="space-y-6">
+                                           {/* Direct Response Rendering for SQ questions without sub-questions */}
+                                           {renderDescriptiveSubQuestion(q, 0, q.id)}
+                                        </div>
+                                      )}
                                    </div>
                                  </motion.div>
                                ))}
@@ -2850,17 +3008,45 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                          <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
                                       </div>
                                       <div className="text-xl font-bold leading-tight mb-6"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
-                                      <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
-                                         <p className="text-sm font-medium leading-[1.8] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{q.studentAnswer || "No text response"}</p>
-                                      </div>
+                                      
+                                      {q.studentAnswer && (
+                                        <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+                                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Primary Analysis Response
+                                           </div>
+                                           <p className="text-sm font-medium leading-[1.8] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{q.studentAnswer}</p>
+                                        </div>
+                                      )}
                                    </div>
-                                   {q.studentAnswerImages && q.studentAnswerImages.length > 0 && (
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                         {q.studentAnswerImages.map((img: string, iIdx: number) => (
-                                            <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Page ${iIdx+1}`, iIdx, q.studentAnswerImages || [], q)}>
-                                               <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+
+                                   {/* Iterate through Descriptive Sub-Questions */}
+                                   {(q.subQuestions || q.sub_questions || []).length > 0 && (
+                                     <div className="pl-6 md:pl-12 border-l-4 border-dashed border-slate-200 dark:border-slate-800 space-y-12">
+                                       {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                         <div key={subIdx} className="space-y-4">
+                                            <div className="flex items-center gap-3">
+                                               <div className="w-6 h-6 rounded-lg bg-slate-950 dark:bg-white flex items-center justify-center text-[10px] font-black text-white dark:text-slate-950">{subIdx + 1}</div>
+                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
                                             </div>
-                                         ))}
+                                            {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
+                                         </div>
+                                       ))}
+                                     </div>
+                                   )}
+
+                                   {q.studentAnswerImages && q.studentAnswerImages.length > 0 && (
+                                      <div className="mt-8 space-y-2">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2 px-1">
+                                           <Camera className="w-3 h-3" /> Root Artifacts ({q.studentAnswerImages.length})
+                                        </div>
+                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                           {q.studentAnswerImages.map((img: string, iIdx: number) => (
+                                              <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Evidence ${iIdx+1}`, iIdx, q.studentAnswerImages || [], q as unknown as Question)}>
+                                                 <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+                                                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
+                                              </div>
+                                           ))}
+                                        </div>
                                       </div>
                                    )}
                                  </motion.div>
