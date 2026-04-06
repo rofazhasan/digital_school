@@ -279,7 +279,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const [cqPage, setCqPage] = useState(1);
   const [sqPage, setSqPage] = useState(1);
   const [descriptivePage, setDescriptivePage] = useState(1);
-  
+
   // Section Constants
   const OBJECTIVE_PER_PAGE = 15;
   const COMPLEX_PER_PAGE = 10;
@@ -322,15 +322,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                   </div>
                   {segments.map((seg, si) => (
                     <div key={si} className="flex flex-col gap-1">
-                        <div className="text-xs text-muted-foreground font-medium italic whitespace-pre-wrap">
-                          <UniversalMathJax inline dynamic>{cleanupMath(seg.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                        </div>
+                      <div className="text-xs text-muted-foreground font-medium italic whitespace-pre-wrap">
+                        <UniversalMathJax inline dynamic>{cleanupMath(seg.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                      </div>
                       {si < segments.length - 1 && (
                         <div className="space-y-1">
                           <div className={cn(
                             "p-2 rounded border text-sm font-bold shadow-sm",
-                            normalize(getVal(`flow_${ii}_${si}`)) === normalize(modelAnswers[si]) 
-                              ? "bg-green-50 dark:bg-green-950/20 border-green-200 text-green-700" 
+                            normalize(getVal(`flow_${ii}_${si}`)) === normalize(modelAnswers[si])
+                              ? "bg-green-50 dark:bg-green-950/20 border-green-200 text-green-700"
                               : "bg-white dark:bg-slate-950 border-amber-200"
                           )}>
                             {getVal(`flow_${ii}_${si}`) || <span className="text-muted-foreground italic opacity-30">Missing</span>}
@@ -438,7 +438,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       const ans = getMatchAns(l.id);
                       const correct = subQ.matches?.[l.id];
                       const isCorrect = normalize(ans) === normalize(correct);
-                      
+
                       const getItemText = (id: string) => {
                         if (!id) return null;
                         const parts = id.split('-');
@@ -501,10 +501,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           <div className="mt-3 space-y-4">
             {subQ.chartConfig && (
               <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
-                <BeautifulChart 
-                  type={subQ.chartConfig.type} 
-                  data={subQ.chartConfig.data} 
-                  xAxisLabel={subQ.chartConfig.xAxisLabel} 
+                <BeautifulChart
+                  type={subQ.chartConfig.type}
+                  data={subQ.chartConfig.data}
+                  xAxisLabel={subQ.chartConfig.xAxisLabel}
                   yAxisLabel={subQ.chartConfig.yAxisLabel}
                 />
               </div>
@@ -540,7 +540,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 const isCorrect = normalize(ans) === normalize(correct);
                 return (
                   <div key={i} className={cn("p-2 rounded border flex flex-col", isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
-                    <div className="text-[9px] font-bold opacity-50">Label {i+1}</div>
+                    <div className="text-[9px] font-bold opacity-50">Label {i + 1}</div>
                     <div className="text-xs font-bold">{ans || '___'}</div>
                     {correct && <div className="text-[8px] text-green-600 font-bold">Key: {correct}</div>}
                   </div>
@@ -567,7 +567,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 <div className="text-foreground whitespace-pre-wrap">{studentAnswer}</div>
               </div>
             )}
-            
+
             {hasImages && (
               <div className="space-y-2">
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2 px-1">
@@ -576,22 +576,22 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 <div className="flex flex-wrap gap-2">
                   {subQ.studentImages.map((imgUrl: string, imgIdx: number) => {
                     // Check for annotation in allDrawings
-                    const annotation = (subQ.allDrawings || []).find((d: any) => 
+                    const annotation = (subQ.allDrawings || []).find((d: any) =>
                       d.originalImagePath === imgUrl || d.imageIndex === imgIdx
                     );
                     const displayUrl = annotation?.imageData || imgUrl;
-                    
+
                     return (
                       <div key={imgIdx} className="relative group cursor-pointer" onClick={() => handleImageZoom(displayUrl, `Sub-question ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}>
-                        <img 
-                          src={displayUrl} 
-                          alt={`Submission ${imgIdx + 1}`} 
+                        <img
+                          src={displayUrl}
+                          alt={`Submission ${imgIdx + 1}`}
                           className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-105"
                           loading="lazy"
                         />
                         {annotation && (
                           <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-bold shadow-sm">
-                             ✓
+                            ✓
                           </div>
                         )}
                         <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[8px] px-1 rounded">
@@ -615,7 +615,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 </div>
               </div>
             )}
-            
+
             {subQ.explanation && (
               <div className="mt-2 p-2 rounded-lg bg-blue-50/50 border border-blue-100 text-[10px] text-blue-800 flex items-start gap-2">
                 <Info className="w-3 h-3 mt-0.5 shrink-0" />
@@ -642,7 +642,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <UniversalMathJax inline dynamic>{subQ.label || subQ.title || subQ.question}</UniversalMathJax>
             </div>
           )}
-          
+
           {(subQ.instructions || subQ.instruction) && (
             <div className="text-[10px] italic text-gray-400 bg-gray-50 dark:bg-slate-900/50 p-1.5 rounded border border-gray-100 dark:border-slate-800 flex items-start gap-1.5">
               <Info className="w-2.5 h-2.5 mt-0.5 shrink-0" />
@@ -671,8 +671,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
           {(subQ.subType === 'interpreting_graph' || subQ.sub_type === 'interpreting_graph') && (subQ.chartConfig || subQ.chart_config) && (
             <div className="p-4 bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
-              <BeautifulChart 
-                type={(subQ.chartConfig || subQ.chart_config).type} 
+              <BeautifulChart
+                type={(subQ.chartConfig || subQ.chart_config).type}
                 data={(() => {
                   const cc = subQ.chartConfig || subQ.chart_config;
                   const labels = cc.labels || cc.chartLabels || cc.chart_labels;
@@ -681,8 +681,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
                   }
                   return Array.isArray(data) ? data : [];
-                })()} 
-                xAxisLabel={(subQ.chartConfig || subQ.chart_config).xAxisLabel || (subQ.chartConfig || subQ.chart_config).xAxis_label} 
+                })()}
+                xAxisLabel={(subQ.chartConfig || subQ.chart_config).xAxisLabel || (subQ.chartConfig || subQ.chart_config).xAxis_label}
                 yAxisLabel={(subQ.chartConfig || subQ.chart_config).yAxisLabel || (subQ.chartConfig || subQ.chart_config).yAxis_label}
                 isPrint={true}
               />
@@ -696,7 +696,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               <Activity className="w-2.5 h-2.5" /> Graph Interpretation Key
             </p>
             <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed">
-               <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
             </div>
           </div>
         )}
@@ -744,7 +744,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             <div className="flex flex-wrap gap-1.5">
               {(subQ.answers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
                 <div key={ai} className="flex items-center gap-1.5 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-black">
-                  <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{ai+1}</span>
+                  <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{ai + 1}</span>
                   <UniversalMathJax inline dynamic>{ans}</UniversalMathJax>
                 </div>
               ))}
@@ -782,7 +782,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             <div className="grid grid-cols-1 gap-1.5">
               {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
                 <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
-                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
+                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai + 1}</span>
                   <div className="text-[11px] font-black text-emerald-900 leading-tight">
                     <UniversalMathJax dynamic>{ans}</UniversalMathJax>
                   </div>
@@ -854,18 +854,18 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         {/* 3. Official Teacher Feedback (Model Answer + Explanation) */}
         {(() => {
           // Broadened extraction logic to catch various backend key variants for SQ, CQ, and Descriptive
-          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || 
-                           (typeof subQ.answers === 'string' ? subQ.answers : null) || 
-                           subQ.q_ans || subQ.ans || subQ.sub_answer || subQ.model_answer || 
-                           subQ.correct_answer || (subQ.correctOrder && Array.isArray(subQ.correctOrder) ? subQ.correctOrder.join(', ') : null);
-          
-          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : 
-                                (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : 
-                                (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
-          
-          const explanation = subQ.explanation || subQ.sub_explanation || subQ.rationale || 
-                              subQ.pedagogicalRationale || subQ.explanation_text || subQ.rationale_text;
-                              
+          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer ||
+            (typeof subQ.answers === 'string' ? subQ.answers : null) ||
+            subQ.q_ans || subQ.ans || subQ.sub_answer || subQ.model_answer ||
+            subQ.correct_answer || (subQ.correctOrder && Array.isArray(subQ.correctOrder) ? subQ.correctOrder.join(', ') : null);
+
+          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers :
+            (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers :
+              (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+
+          const explanation = subQ.explanation || subQ.sub_explanation || subQ.rationale ||
+            subQ.pedagogicalRationale || subQ.explanation_text || subQ.rationale_text;
+
           const hasExplanation = !!explanation;
 
           // If no content to show, return null
@@ -1204,19 +1204,19 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     setActiveZoomIndex(index);
     setActiveZoomQuestion(question);
     setZoomedImageTitle(title);
-    
+
     // Robust lookup: Match by index OR by path suffix
-    const annotation = question.allDrawings?.find(d => 
-      d.imageIndex === index || 
+    const annotation = question.allDrawings?.find(d =>
+      d.imageIndex === index ||
       (imageUrl && d.originalImagePath && (imageUrl.endsWith(d.originalImagePath) || d.originalImagePath.endsWith(imageUrl)))
     );
     setZoomedImage(annotation?.imageData || imageUrl);
-    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null); 
-    
+    setActiveZoomOriginal(imageUrl || annotation?.originalImagePath || null);
+
     // PRE-CALCULATE ANNOTATIONS FOR OPTIMIZED RENDERING
     setActiveZoomStrokes(annotation?.drawingData?.strokes || []);
     setActiveZoomTexts(annotation?.drawingData?.texts || []);
-    
+
     setShowZoomModal(true);
   };
 
@@ -2381,7 +2381,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           <div id="objective-questions-section" className="space-y-8 animate-in fade-in duration-700">
                             <div className="flex items-center gap-4 mb-8">
                               <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-inner">
-                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Objective Section (MCQ, MC, AR, INT, MTF, SMCQ)</h3>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items Found</p>
                               </div>
                             </div>
@@ -2403,9 +2402,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     className={cn(
                                       "relative border-2 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-8 transition-all duration-500",
                                       isCorrect ? "bg-emerald-50/30 border-emerald-100/50 dark:bg-emerald-950/10 dark:border-emerald-900/40" :
-                                      isPartial ? "bg-amber-50/30 border-amber-100/50 dark:bg-amber-950/10 dark:border-amber-900/40" :
-                                      hasAns ? "bg-rose-50/30 border-rose-100/50 dark:bg-rose-950/10 dark:border-rose-900/40" :
-                                      "bg-slate-50/50 border-slate-100 dark:bg-slate-900/20 dark:border-slate-800/40 opacity-60"
+                                        isPartial ? "bg-amber-50/30 border-amber-100/50 dark:bg-amber-950/10 dark:border-amber-900/40" :
+                                          hasAns ? "bg-rose-50/30 border-rose-100/50 dark:bg-rose-950/10 dark:border-rose-900/40" :
+                                            "bg-slate-50/50 border-slate-100 dark:bg-slate-900/20 dark:border-slate-800/40 opacity-60"
                                     )}
                                   >
                                     {/* Question Type & Index Header */}
@@ -2775,10 +2774,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             )}
                                             {(question as any).explanationImage && (
                                               <div className="mt-4 relative group/expimg cursor-zoom-in max-w-xl" onClick={() => handleImageZoom((question as any).explanationImage, "Explanation Diagram", 0, [(question as any).explanationImage], question as unknown as Question)}>
-                                                <img 
-                                                  src={(question as any).explanationImage} 
-                                                  alt="Explanation Graphic" 
-                                                  className="rounded-2xl border border-amber-200/50 shadow-md group-hover/expimg:scale-[1.01] transition-transform duration-500" 
+                                                <img
+                                                  src={(question as any).explanationImage}
+                                                  alt="Explanation Graphic"
+                                                  className="rounded-2xl border border-amber-200/50 shadow-md group-hover/expimg:scale-[1.01] transition-transform duration-500"
                                                   loading="lazy"
                                                 />
                                                 <div className="absolute inset-0 bg-black/0 group-hover/expimg:bg-black/5 transition-colors rounded-2xl" />
@@ -2850,92 +2849,92 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         return (
                           <div id="sq-section" className="space-y-8 animate-in fade-in duration-700">
-                             <div className="flex items-center gap-4 mb-8">
-                                <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-inner">
-                                   <Layers className="h-6 w-6 text-amber-600" />
+                            <div className="flex items-center gap-4 mb-8">
+                              <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-inner">
+                                <Layers className="h-6 w-6 text-amber-600" />
+                              </div>
+                              <div className="flex-1">
+                                <div className="flex items-center justify-between mb-1">
+                                  <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Short Questions</h3>
+                                  <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Evaluation Required</Badge>
                                 </div>
-                                <div className="flex-1">
-                                   <div className="flex items-center justify-between mb-1">
-                                      <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Short Questions</h3>
-                                      <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Evaluation Required</Badge>
-                                   </div>
-                                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                      <Info className="w-3 h-3" />
-                                      Section II • {filteredQuestions.length} Questions (Short Response)
-                                   </p>
-                                </div>
-                             </div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                  <Info className="w-3 h-3" />
+                                  Section II • {filteredQuestions.length} Questions (Short Response)
+                                </p>
+                              </div>
+                            </div>
 
-                             <div className="space-y-12">
-                               {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
-                                   <div className="flex items-center gap-4">
-                                      <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">SQ #{startIndex + idx + 1}</Badge>
-                                      <div className="h-px flex-1 bg-gradient-to-r from-amber-600/20 to-transparent" />
-                                      <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
-                                   </div>
-                                   
-                                   <div className="p-4 md:p-8 bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-100 dark:border-amber-900/40 rounded-[2rem] md:rounded-[3rem]">
-                                      <div className="text-xl font-bold leading-tight">
-                                        <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
-                                      </div>
-                                   </div>
+                            <div className="space-y-12">
+                              {paginatedQuestions.map((q, idx) => (
+                                <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
+                                  <div className="flex items-center gap-4">
+                                    <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">SQ #{startIndex + idx + 1}</Badge>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-amber-600/20 to-transparent" />
+                                    <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                                  </div>
 
-                                   <div className="pl-6 md:pl-12 border-l-4 border-dashed border-amber-200 dark:border-amber-900/40 space-y-12">
-                                      {(q.subQuestions || q.sub_questions || []).length > 0 ? (
-                                        (q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => {
-                                          const isObj = ['MCQ', 'MC', 'AR', 'SMCQ'].includes((subQ.type || subQ.subType || "").toUpperCase()) || (subQ.options && subQ.options.length > 0);
-                                          return (
-                                            <div key={subIdx} className="space-y-6">
-                                              <div className="flex items-center gap-3">
-                                                 <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-[10px] font-black text-amber-700">{subIdx + 1}</div>
-                                                 <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
-                                              </div>
+                                  <div className="p-4 md:p-8 bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-100 dark:border-amber-900/40 rounded-[2rem] md:rounded-[3rem]">
+                                    <div className="text-xl font-bold leading-tight">
+                                      <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
+                                    </div>
+                                  </div>
 
-                                              {isObj ? (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                  {(subQ.options || []).map((opt: any, oi: number) => {
-                                                    const t = typeof opt === 'object' ? opt.text : opt;
-                                                    const isSel = String(subQ.studentAnswer || "").trim() === String(t).trim();
-                                                    const isCor = opt.isCorrect || String(subQ.correctAnswer || "").trim() === String(t).trim();
-                                                    return (
-                                                      <div key={oi} className={cn(
-                                                        "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
-                                                        isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
-                                                        isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
-                                                        !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
-                                                        "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
-                                                      )}>
-                                                        <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
-                                                        <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
-                                                      </div>
-                                                    );
-                                                  })}
-                                                </div>
-                                              ) : (
-                                                renderDescriptiveSubQuestion(subQ, subIdx, q.id)
-                                              )}
+                                  <div className="pl-6 md:pl-12 border-l-4 border-dashed border-amber-200 dark:border-amber-900/40 space-y-12">
+                                    {(q.subQuestions || q.sub_questions || []).length > 0 ? (
+                                      (q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => {
+                                        const isObj = ['MCQ', 'MC', 'AR', 'SMCQ'].includes((subQ.type || subQ.subType || "").toUpperCase()) || (subQ.options && subQ.options.length > 0);
+                                        return (
+                                          <div key={subIdx} className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-[10px] font-black text-amber-700">{subIdx + 1}</div>
+                                              <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
                                             </div>
-                                          );
-                                        })
-                                      ) : (
-                                        <div className="space-y-6">
-                                           {/* Direct Response Rendering for SQ questions without sub-questions */}
-                                           {renderDescriptiveSubQuestion(q, 0, q.id)}
-                                        </div>
-                                      )}
-                                   </div>
-                                 </motion.div>
-                               ))}
-                             </div>
 
-                             {totalPages > 1 && (
-                               <div className="flex items-center justify-between p-6 bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/50 rounded-3xl mt-12">
-                                 <Button variant="outline" disabled={sqPage === 1} onClick={() => { setSqPage(p => p - 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
-                                 <span className="text-[10px] font-black uppercase text-amber-700 tracking-widest">Page {sqPage} of {totalPages}</span>
-                                 <Button variant="outline" disabled={sqPage === totalPages} onClick={() => { setSqPage(p => p + 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                               </div>
-                             )}
+                                            {isObj ? (
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {(subQ.options || []).map((opt: any, oi: number) => {
+                                                  const t = typeof opt === 'object' ? opt.text : opt;
+                                                  const isSel = String(subQ.studentAnswer || "").trim() === String(t).trim();
+                                                  const isCor = opt.isCorrect || String(subQ.correctAnswer || "").trim() === String(t).trim();
+                                                  return (
+                                                    <div key={oi} className={cn(
+                                                      "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
+                                                      isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
+                                                        isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
+                                                          !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
+                                                            "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
+                                                    )}>
+                                                      <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
+                                                      <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            ) : (
+                                              renderDescriptiveSubQuestion(subQ, subIdx, q.id)
+                                            )}
+                                          </div>
+                                        );
+                                      })
+                                    ) : (
+                                      <div className="space-y-6">
+                                        {/* Direct Response Rendering for SQ questions without sub-questions */}
+                                        {renderDescriptiveSubQuestion(q, 0, q.id)}
+                                      </div>
+                                    )}
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between p-6 bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/50 rounded-3xl mt-12">
+                                <Button variant="outline" disabled={sqPage === 1} onClick={() => { setSqPage(p => p - 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                <span className="text-[10px] font-black uppercase text-amber-700 tracking-widest">Page {sqPage} of {totalPages}</span>
+                                <Button variant="outline" disabled={sqPage === totalPages} onClick={() => { setSqPage(p => p + 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -2952,53 +2951,53 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         return (
                           <div id="cq-section" className="space-y-8 animate-in fade-in duration-700">
-                             <div className="flex items-center gap-4 mb-8">
-                                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20 shadow-inner">
-                                   <FileText className="h-6 w-6 text-emerald-600" />
-                                </div>
-                                <div>
-                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Creative Section (CQ)</h3>
-                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Questions</p>
-                                </div>
-                             </div>
+                            <div className="flex items-center gap-4 mb-8">
+                              <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20 shadow-inner">
+                                <FileText className="h-6 w-6 text-emerald-600" />
+                              </div>
+                              <div>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Creative Section (CQ)</h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Questions</p>
+                              </div>
+                            </div>
 
-                             <div className="space-y-16">
-                               {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-8">
-                                    <div className="flex items-center gap-4">
-                                       <Badge className="bg-emerald-600/10 text-emerald-600 border-emerald-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">CQ #{startIndex + idx + 1}</Badge>
-                                       <div className="h-px flex-1 bg-gradient-to-r from-emerald-600/20 to-transparent" />
-                                       <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
-                                    </div>
-                                    
-                                    <div className="p-6 md:p-10 bg-emerald-50/20 dark:bg-emerald-950/20 border-2 border-emerald-100 dark:border-emerald-900/40 rounded-[2.5rem] md:rounded-[3.5rem] shadow-xl shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
-                                       <div className="text-xl font-bold leading-tight max-w-full overflow-x-auto scrollbar-thin">
-                                         <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
-                                       </div>
-                                    </div>
+                            <div className="space-y-16">
+                              {paginatedQuestions.map((q, idx) => (
+                                <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-8">
+                                  <div className="flex items-center gap-4">
+                                    <Badge className="bg-emerald-600/10 text-emerald-600 border-emerald-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">CQ #{startIndex + idx + 1}</Badge>
+                                    <div className="h-px flex-1 bg-gradient-to-r from-emerald-600/20 to-transparent" />
+                                    <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                                  </div>
 
-                                    <div className="pl-6 md:pl-12 border-l-4 border-dashed border-emerald-200 dark:border-emerald-900/40 space-y-12">
-                                       {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
-                                         <div key={subIdx} className="space-y-6">
-                                            <div className="flex items-center gap-3">
-                                               <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-[10px] font-black text-emerald-700">{subIdx + 1}</div>
-                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
-                                            </div>
-                                            {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
-                                         </div>
-                                       ))}
+                                  <div className="p-6 md:p-10 bg-emerald-50/20 dark:bg-emerald-950/20 border-2 border-emerald-100 dark:border-emerald-900/40 rounded-[2.5rem] md:rounded-[3.5rem] shadow-xl shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
+                                    <div className="text-xl font-bold leading-tight max-w-full overflow-x-auto scrollbar-thin">
+                                      <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
                                     </div>
-                                 </motion.div>
-                               ))}
-                             </div>
+                                  </div>
 
-                             {totalPages > 1 && (
-                               <div className="flex items-center justify-between p-6 bg-emerald-50/50 dark:bg-slate-900/50 border border-emerald-200/50 rounded-3xl mt-12">
-                                 <Button variant="outline" disabled={cqPage === 1} onClick={() => { setCqPage(p => p - 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
-                                 <span className="text-[10px] font-black uppercase text-emerald-700 tracking-widest">Page {cqPage} of {totalPages}</span>
-                                 <Button variant="outline" disabled={cqPage === totalPages} onClick={() => { setCqPage(p => p + 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                               </div>
-                             )}
+                                  <div className="pl-6 md:pl-12 border-l-4 border-dashed border-emerald-200 dark:border-emerald-900/40 space-y-12">
+                                    {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                      <div key={subIdx} className="space-y-6">
+                                        <div className="flex items-center gap-3">
+                                          <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-[10px] font-black text-emerald-700">{subIdx + 1}</div>
+                                          <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
+                                        </div>
+                                        {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </motion.div>
+                              ))}
+                            </div>
+
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between p-6 bg-emerald-50/50 dark:bg-slate-900/50 border border-emerald-200/50 rounded-3xl mt-12">
+                                <Button variant="outline" disabled={cqPage === 1} onClick={() => { setCqPage(p => p - 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                <span className="text-[10px] font-black uppercase text-emerald-700 tracking-widest">Page {cqPage} of {totalPages}</span>
+                                <Button variant="outline" disabled={cqPage === totalPages} onClick={() => { setCqPage(p => p + 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -3015,77 +3014,77 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         return (
                           <div id="descriptive-section" className="space-y-8 animate-in fade-in duration-700">
-                             <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-12 bg-slate-950/10 dark:bg-white/10 rounded-2xl flex items-center justify-center border border-slate-950/20 dark:border-white/20 shadow-inner">
-                                   <AlignLeft className="h-6 w-6" />
-                                </div>
-                                <div>
-                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Analysis Section</h3>
-                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items</p>
-                                </div>
-                             </div>
+                            <div className="flex items-center gap-4 mb-4">
+                              <div className="w-12 h-12 bg-slate-950/10 dark:bg-white/10 rounded-2xl flex items-center justify-center border border-slate-950/20 dark:border-white/20 shadow-inner">
+                                <AlignLeft className="h-6 w-6" />
+                              </div>
+                              <div>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Analysis Section</h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items</p>
+                              </div>
+                            </div>
 
-                             <div className="space-y-12">
-                               {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
-                                   <div className="p-4 md:p-8 bg-slate-50/50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-800 rounded-[2rem] md:rounded-[3rem]">
-                                      <div className="flex items-center justify-between mb-6">
-                                         <Badge className="bg-slate-950 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest">Question #{startIndex + idx + 1}</Badge>
-                                         <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                            <div className="space-y-12">
+                              {paginatedQuestions.map((q, idx) => (
+                                <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
+                                  <div className="p-4 md:p-8 bg-slate-50/50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-800 rounded-[2rem] md:rounded-[3rem]">
+                                    <div className="flex items-center justify-between mb-6">
+                                      <Badge className="bg-slate-950 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest">Question #{startIndex + idx + 1}</Badge>
+                                      <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                                    </div>
+                                    <div className="text-xl font-bold leading-tight mb-6 max-w-full overflow-x-auto scrollbar-thin"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
+
+                                    {q.studentAnswer && (
+                                      <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                          <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Primary Analysis Response
+                                        </div>
+                                        <p className="text-sm font-medium leading-[1.8] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{q.studentAnswer}</p>
                                       </div>
-                                      <div className="text-xl font-bold leading-tight mb-6 max-w-full overflow-x-auto scrollbar-thin"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
-                                      
-                                      {q.studentAnswer && (
-                                        <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
-                                           <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
-                                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Primary Analysis Response
-                                           </div>
-                                           <p className="text-sm font-medium leading-[1.8] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{q.studentAnswer}</p>
-                                        </div>
-                                      )}
-                                   </div>
+                                    )}
+                                  </div>
 
-                                   {/* Iterate through Descriptive Sub-Questions */}
-                                   {(q.subQuestions || q.sub_questions || []).length > 0 && (
-                                     <div className="pl-6 md:pl-12 border-l-4 border-dashed border-slate-200 dark:border-slate-800 space-y-12">
-                                       {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
-                                         <div key={subIdx} className="space-y-4">
-                                            <div className="flex items-center gap-3">
-                                               <div className="w-6 h-6 rounded-lg bg-slate-950 dark:bg-white flex items-center justify-center text-[10px] font-black text-white dark:text-slate-950">{subIdx + 1}</div>
-                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
-                                            </div>
-                                            {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
-                                         </div>
-                                       ))}
-                                     </div>
-                                   )}
+                                  {/* Iterate through Descriptive Sub-Questions */}
+                                  {(q.subQuestions || q.sub_questions || []).length > 0 && (
+                                    <div className="pl-6 md:pl-12 border-l-4 border-dashed border-slate-200 dark:border-slate-800 space-y-12">
+                                      {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                        <div key={subIdx} className="space-y-4">
+                                          <div className="flex items-center gap-3">
+                                            <div className="w-6 h-6 rounded-lg bg-slate-950 dark:bg-white flex items-center justify-center text-[10px] font-black text-white dark:text-slate-950">{subIdx + 1}</div>
+                                            <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
+                                          </div>
+                                          {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
 
-                                   {q.studentAnswerImages && q.studentAnswerImages.length > 0 && (
-                                      <div className="mt-8 space-y-2">
-                                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2 px-1">
-                                           <Camera className="w-3 h-3" /> Root Artifacts ({q.studentAnswerImages.length})
-                                        </div>
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                           {q.studentAnswerImages.map((img: string, iIdx: number) => (
-                                              <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Evidence ${iIdx+1}`, iIdx, q.studentAnswerImages || [], q as unknown as Question)}>
-                                                 <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
-                                                 <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
-                                              </div>
-                                           ))}
-                                        </div>
+                                  {q.studentAnswerImages && q.studentAnswerImages.length > 0 && (
+                                    <div className="mt-8 space-y-2">
+                                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2 px-1">
+                                        <Camera className="w-3 h-3" /> Root Artifacts ({q.studentAnswerImages.length})
                                       </div>
-                                   )}
-                                 </motion.div>
-                               ))}
-                             </div>
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        {q.studentAnswerImages.map((img: string, iIdx: number) => (
+                                          <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Evidence ${iIdx + 1}`, iIdx, q.studentAnswerImages || [], q as unknown as Question)}>
+                                            <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+                                            <div className="absolute inset-0 bg-black/0 hover:bg-black/10 transition-colors" />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </motion.div>
+                              ))}
+                            </div>
 
-                             {totalPages > 1 && (
-                               <div className="flex items-center justify-between p-6 bg-slate-950/5 dark:bg-white/5 border border-slate-200 dark:border-slate-800 rounded-3xl mt-12">
-                                 <Button variant="outline" disabled={descriptivePage === 1} onClick={() => { setDescriptivePage(p => p - 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
-                                 <span className="text-[10px] font-black uppercase tracking-widest">Page {descriptivePage} of {totalPages}</span>
-                                 <Button variant="outline" disabled={descriptivePage === totalPages} onClick={() => { setDescriptivePage(p => p + 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
-                               </div>
-                             )}
+                            {totalPages > 1 && (
+                              <div className="flex items-center justify-between p-6 bg-slate-950/5 dark:bg-white/5 border border-slate-200 dark:border-slate-800 rounded-3xl mt-12">
+                                <Button variant="outline" disabled={descriptivePage === 1} onClick={() => { setDescriptivePage(p => p - 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                <span className="text-[10px] font-black uppercase tracking-widest">Page {descriptivePage} of {totalPages}</span>
+                                <Button variant="outline" disabled={descriptivePage === totalPages} onClick={() => { setDescriptivePage(p => p + 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
