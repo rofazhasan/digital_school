@@ -46,6 +46,7 @@ import {
   Calendar,
   Image as ImageIcon,
   Info,
+  AlignLeft,
   Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -264,8 +265,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
   const printRef = useRef<HTMLDivElement>(null);
 
   // Pagination State
-  const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 20;
+  const [objectivePage, setObjectivePage] = useState(1);
+  const [cqPage, setCqPage] = useState(1);
+  const [sqPage, setSqPage] = useState(1);
+  const [descriptivePage, setDescriptivePage] = useState(1);
+  
+  // Section Constants
+  const OBJECTIVE_PER_PAGE = 15;
+  const COMPLEX_PER_PAGE = 10;
 
   // Helper to render advanced descriptive sub-questions content
   const renderSubQuestionContent = (subQ: any, subIdx: number, questionId: string) => {
@@ -508,7 +515,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           <div className="mt-3 space-y-4">
             {subQ.imageUrl && (
               <div className="relative inline-block border rounded-xl overflow-hidden shadow-sm max-w-full">
-                <img src={subQ.imageUrl} alt="Diagram" className="max-h-64 object-contain" />
+                <img src={subQ.imageUrl} alt="Diagram" className="max-h-64 object-contain" loading="lazy" />
                 {(subQ.labels || []).map((l: any, i: number) => (
                   <div key={i} className="absolute w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
                     {i + 1}
@@ -570,6 +577,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           src={displayUrl} 
                           alt={`Submission ${imgIdx + 1}`} 
                           className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm transition-transform group-hover:scale-105"
+                          loading="lazy"
                         />
                         {annotation && (
                           <div className="absolute top-1 right-1 bg-green-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-[8px] font-bold shadow-sm">
@@ -756,91 +764,73 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
-        {/* Fallback Generalized Model Answer block for Descriptive (Writing, etc.) */}
-        {!['interpreting_graph', 'matching', 'flowchart', 'fill_in', 'true_false'].includes(subQ.subType || subQ.sub_type) && (subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans) && (
-          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-              <ArrowRight className="w-2.5 h-2.5" /> Model Answer
-            </p>
-            <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
-              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-            </div>
-          </div>
-        )}
-
-        {subQ.subType === 'short_answer' && (
-          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-              <ArrowRight className="w-2.5 h-2.5" /> Short-Answer Keys
-            </p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
-                <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
-                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 font-black">{ai+1}</span>
-                  <div className="text-[11px] font-black text-emerald-900 leading-tight">
-                    <UniversalMathJax dynamic>{ans}</UniversalMathJax>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {subQ.subType === 'error_correction' && (
-          <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
-            <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
-              <ArrowRight className="w-2.5 h-2.5" /> Error-Correction Keys
-            </p>
-            <div className="grid grid-cols-1 gap-1.5">
-              {(subQ.answers || subQ.modelAnswers || subQ.correctAnswers || []).map((ans: string, ai: number) => (
-                <div key={ai} className="bg-white/70 p-1.5 rounded border border-emerald-100 flex items-center gap-3 shadow-sm">
-                  <span className="w-4 h-4 rounded bg-emerald-600 text-white flex items-center justify-center font-black text-[8px] shrink-0 uppercase font-black">{String.fromCharCode(97+ai)}</span>
-                  <div className="text-[11px] font-black text-emerald-900 leading-tight">
-                    <UniversalMathJax dynamic>{ans}</UniversalMathJax>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {renderSubQuestionContent(subQ, subIdx, questionId)}
-        
+        {/* Unified Teacher Feedback Section (Model Answer + Explanation) */}
         {(() => {
           const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans;
           const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : (Array.isArray(subQ.correctOrder) ? subQ.correctOrder : null)));
+          const hasExplanation = !!subQ.explanation;
+          
+          const specializedTypes = ['interpreting_graph', 'matching', 'flowchart', 'fill_in', 'true_false', 'short_answer', 'error_correction'];
+          const isSpecialized = specializedTypes.includes(subQ.subType || subQ.sub_type);
 
-          if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)) return null;
+          // If no content to show, return null
+          if (!hasExplanation && (isSpecialized || (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)))) return null;
 
           return (
-            <div className="space-y-2">
-              <div className="p-3 bg-green-50/30 rounded-lg border border-green-100 mt-2 text-[10px] text-green-800 flex flex-col gap-1 whitespace-pre-wrap">
-                <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
-                  <BookOpen className="w-2.5 h-2.5" /> Model Answer / Key
-                </div>
-                {modelAns && (
-                  <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                )}
-                {modelAnsArray && modelAnsArray.length > 0 && !['matching', 'flowchart', 'interpreting_graph'].includes(subQ.subType) && (
-                  <div className="flex flex-col gap-1 mt-1">
-                    {modelAnsArray.map((ans: any, ai: number) => (
-                      <div key={ai} className="flex gap-1 items-start bg-emerald-100/20 p-1 rounded">
-                        <span className="font-black text-emerald-600 shrink-0">({ai + 1})</span>
-                        <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
-                      </div>
-                    ))}
+            <div className="mt-6 p-4 rounded-3xl bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05] border border-emerald-500/10 dark:border-emerald-500/20 shadow-sm relative overflow-hidden group">
+              {/* Background Accent */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-colors" />
+              
+              <div className="relative z-10 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="w-3.5 h-3.5" />
                   </div>
-                )}
-              </div>
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">Official Evaluation Copy</h5>
+                </div>
 
-              {subQ.explanation && (
-                <div className="p-3 bg-blue-50/30 rounded-lg border border-blue-100 text-[10px] text-blue-800 flex flex-col gap-1 whitespace-pre-wrap">
-                  <div className="font-black uppercase flex items-center gap-1.5 opacity-70">
-                    <Info className="w-2.5 h-2.5" /> Explanation
-                  </div>
-                  <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                <div className="grid grid-cols-1 gap-4 lg:gap-8">
+                  {/* Model Answer Part */}
+                  {!isSpecialized && (modelAns || (modelAnsArray && modelAnsArray.length > 0)) && (
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
+                        <CheckCircle className="w-3 h-3" /> Correct Key
+                      </p>
+                      <div className="pl-4 border-l-2 border-emerald-500/20">
+                        {modelAns && (
+                          <div className="text-sm text-emerald-950 dark:text-emerald-50 font-bold leading-relaxed whitespace-pre-wrap">
+                            <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                          </div>
+                        )}
+                        {modelAnsArray && modelAnsArray.length > 0 && (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+                            {modelAnsArray.map((ans: any, ai: number) => (
+                              <div key={ai} className="flex gap-2 items-center bg-white/60 dark:bg-slate-900/40 p-2 rounded-xl border border-emerald-100/50 dark:border-emerald-800/30">
+                                <span className="font-black text-[9px] bg-emerald-500 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
+                                <div className="text-[10px] font-bold text-emerald-900 dark:text-emerald-100"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Explanation Part */}
+                  {hasExplanation && (
+                    <div className="space-y-2">
+                      <p className="text-[9px] font-bold text-indigo-400 uppercase tracking-tight flex items-center gap-1.5">
+                        <Info className="w-3 h-3" /> Pedagogical Rationale
+                      </p>
+                      <div className="pl-4 border-l-2 border-indigo-500/20">
+                        <div className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
+                          <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              </div>
             </div>
           );
         })()}
@@ -1047,7 +1037,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
   // Reset pagination when filter changes
   useEffect(() => {
-    setCurrentPage(1);
+    setObjectivePage(1);
+    setSqPage(1);
+    setCqPage(1);
+    setDescriptivePage(1);
   }, [filterStatus]);
 
   // Function to combine original image with annotations
@@ -1610,15 +1603,17 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <span className="hidden sm:inline ml-2">Print Script</span>
                     </Button>
                   )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/60"
-                    onClick={handleShare}
-                  >
-                    <Share2 className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                    <span className="hidden sm:inline ml-2">Share</span>
-                  </Button>
+                  {result.result?.isPublished && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-xl hover:bg-white/60 dark:hover:bg-slate-800/60"
+                      onClick={handleShare}
+                    >
+                      <Share2 className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                      <span className="hidden sm:inline ml-2">Share</span>
+                    </Button>
+                  )}
 
                 </div>
               </div>
@@ -2092,37 +2087,35 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </CardContent>
             </Card>
           </motion.div>
-
-          {/* Statistics Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
-            {[
-              { label: "Average Score", value: (result.statistics.averageScore || 0).toFixed(1), icon: BarChart3, color: "blue" },
-              { label: "Highest Score", value: result.statistics.highestScore, icon: TrendingUp, color: "emerald" },
-              { label: "Lowest Score", value: result.statistics.lowestScore, icon: Target, color: "rose" },
-              { label: "Total Peers", value: result.statistics.totalStudents, icon: Users, color: "indigo" }
-            ].map((stat, idx) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.5 + idx * 0.1 }}
-              >
-                <Card className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md border border-slate-200/50 dark:border-slate-800/50 rounded-3xl overflow-hidden hover:scale-105 transition-all duration-300 shadow-xl shadow-slate-200/20 dark:shadow-none">
-                  <CardContent className="p-6">
-                    <div className="flex items-center gap-4">
-                      <div className={`p-3 rounded-2xl bg-${stat.color}-500/10 text-${stat.color}-600 dark:text-${stat.color}-400 shadow-inner`}>
-                        <stat.icon className="h-6 w-6" />
-                      </div>
-                      <div className="space-y-0.5">
-                        <p className="text-[10px] uppercase tracking-[0.2em] font-black text-slate-400">{stat.label}</p>
-                        <p className="text-2xl font-black text-slate-900 dark:text-white capitalize">{stat.value}</p>
-                      </div>
+          {/* Statistics Grid - STRICTLY ONLY visible if published */}
+          {result.result?.isPublished && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-12">
+              {[
+                { label: "Average Score", value: (result.statistics.averageScore || 0).toFixed(1), icon: BarChart3, color: "blue" },
+                { label: "Highest Score", value: result.statistics.highestScore, icon: TrendingUp, color: "emerald" },
+                { label: "Lowest Score", value: result.statistics.lowestScore, icon: Target, color: "rose" },
+                { label: "Total Peers", value: result.statistics.totalStudents, icon: Users, color: "indigo" }
+              ].map((stat, idx) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.1 * idx }}
+                  className="group relative"
+                >
+                  <div className={`p-6 rounded-[2rem] bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border border-${stat.color}-500/10 hover:border-${stat.color}-500/30 transition-all duration-500 shadow-xl shadow-${stat.color}-500/5`}>
+                    <div className={`absolute top-6 right-6 p-2 rounded-xl bg-${stat.color}-500/10 text-${stat.color}-500 group-hover:scale-110 transition-transform`}>
+                      <stat.icon className="w-4 h-4" />
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                    <div className="space-y-1">
+                      <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-slate-500 transition-colors">{stat.label}</p>
+                      <p className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tighter tabular-nums">{stat.value}</p>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
 
 
           {/* Review Request Section */}
@@ -2215,9 +2208,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             )
           }
 
-          {/* Question Review Section */}
+          {/* Question Review Section - STRICTLY hidden until published */}
           {
-            result.questions && result.questions.length > 0 && (
+            result.result?.isPublished && result.questions && result.questions.length > 0 && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -2236,57 +2229,47 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
                   </div>
                   <CardContent className="p-8 md:p-12">
-                    {/* Filter Controls */}
+                    {/* Filter Controls (Consolidated for Objective) */}
                     <div className="flex flex-wrap items-center gap-3 mb-12 p-6 bg-slate-50/50 dark:bg-slate-800/30 rounded-[2rem] border border-slate-200/50 dark:border-slate-700/30 backdrop-blur-sm shadow-inner">
-                      <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mr-2">Filter Results:</span>
-                      <Button
-                        variant={filterStatus === 'ALL' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilterStatus('ALL')}
-                        className={`rounded-xl px-6 ${filterStatus === 'ALL' ? 'bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-500/25' : 'border-slate-200 dark:border-slate-800'}`}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        variant={filterStatus === 'CORRECT' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilterStatus('CORRECT')}
-                        className={`rounded-xl px-6 ${filterStatus === 'CORRECT' ? 'bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-500/25' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50'}`}
-                      >
-                        <CheckCircle className="h-4 w-4 mr-2" /> Correct
-                      </Button>
-                      <Button
-                        variant={filterStatus === 'WRONG' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilterStatus('WRONG')}
-                        className={`rounded-xl px-6 ${filterStatus === 'WRONG' ? 'bg-rose-600 hover:bg-rose-700 shadow-lg shadow-rose-500/25' : 'text-rose-600 border-rose-200 hover:bg-rose-50'}`}
-                      >
-                        <XCircle className="h-4 w-4 mr-2" /> Wrong/Partial
-                      </Button>
-                      <Button
-                        variant={filterStatus === 'UNANSWERED' ? 'default' : 'outline'}
-                        size="sm"
-                        onClick={() => setFilterStatus('UNANSWERED')}
-                        className={`rounded-xl px-6 ${filterStatus === 'UNANSWERED' ? 'bg-slate-600 hover:bg-slate-700 shadow-lg shadow-slate-500/25' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                      >
-                        <Minus className="h-4 w-4 mr-2" /> Unanswered
-                      </Button>
+                      <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mr-2">Filter Objective:</span>
+                      {[
+                        { id: 'ALL', label: 'All', icon: Layers, color: 'bg-indigo-600 shadow-indigo-500/25' },
+                        { id: 'CORRECT', label: 'Correct', icon: CheckCircle, color: 'bg-emerald-600 shadow-emerald-500/25' },
+                        { id: 'WRONG', label: 'Wrong', icon: XCircle, color: 'bg-rose-600 shadow-rose-500/25' },
+                        { id: 'PARTIAL', label: 'Partial', icon: Activity, color: 'bg-amber-600 shadow-amber-500/25' },
+                        { id: 'UNANSWERED', label: 'Blank', icon: Minus, color: 'bg-slate-600 shadow-slate-500/25' }
+                      ].map(f => (
+                        <Button
+                          key={f.id}
+                          variant={filterStatus === f.id ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => { setFilterStatus(f.id as any); setObjectivePage(1); }}
+                          className={cn(
+                            "rounded-xl px-6 transition-all duration-300",
+                            filterStatus === f.id ? `${f.color} text-white shadow-lg` : "border-slate-200 dark:border-slate-800 text-slate-500 hover:bg-slate-50"
+                          )}
+                        >
+                          <f.icon className="h-4 w-4 mr-2" /> {f.label}
+                        </Button>
+                      ))}
                     </div>
 
                     <div className="space-y-12">
-                      {/* Unified Objective Section */}
+                      {/* 1. OBJECTIVE SECTION (Unified MCQ, MC, MTF, AR, INT) */}
                       {(() => {
-                        const objectiveTypes = ['MCQ', 'MC', 'AR', 'MTF', 'INT', 'NUMERIC', 'SMCQ'];
-                        const filteredQuestions = result.questions.filter(q => {
+                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC'];
+                        const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
 
                           const hasAnswer = hasStudentAnswered(type, q.studentAnswer, q.subQuestions || q.sub_questions);
                           const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
+                          const isPartial = hasAnswer && !isCorrect && Number(q.awardedMarks) > 0;
 
-                          switch (filterStatus) {
+                          switch (filterStatus as any) {
                             case 'CORRECT': return isCorrect;
-                            case 'WRONG': return hasAnswer && !isCorrect;
+                            case 'WRONG': return hasAnswer && !isCorrect && !isPartial;
+                            case 'PARTIAL': return isPartial;
                             case 'UNANSWERED': return !hasAnswer;
                             default: return true;
                           }
@@ -2294,216 +2277,44 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
-                        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+                        const totalPages = Math.ceil(filteredQuestions.length / 15);
+                        const startIndex = (objectivePage - 1) * 15;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 15);
 
                         return (
-                          <div id="objective-questions-section">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                                <CheckSquare className="h-4 w-4 text-primary" />
+                          <div id="objective-questions-section" className="space-y-8 animate-in fade-in duration-700">
+                            <div className="flex items-center gap-4 mb-8">
+                              <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-inner">
+                                <CheckSquare className="h-6 w-6 text-indigo-600" />
                               </div>
-                              <h3 className="text-2xl font-bold text-foreground">Objective Questions (অবজেক্টিভ প্রশ্ন)</h3>
-                              <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                                {filteredQuestions.length} Questions
-                              </Badge>
+                              <div>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Objective Section</h3>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items Found</p>
+                              </div>
                             </div>
-                            <div className="space-y-6">
+
+                            <div className="space-y-8">
                               {paginatedQuestions.map((question, index) => {
                                 const type = (question.type || "").toUpperCase();
-                                const globalIndex = startIndex + index;
+                                const gIdx = startIndex + index;
                                 const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
-                                const hasAnswer = hasStudentAnswered(type, question.studentAnswer, question.subQuestions || question.sub_questions);
+                                const hasAns = hasStudentAnswered(type, question.studentAnswer, question.subQuestions || question.sub_questions);
+                                const isPartial = hasAns && !isCorrect && Number(question.awardedMarks) > 0;
 
                                 return (
                                   <motion.div
                                     key={question.id}
                                     initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.1 * index }}
-                                    className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300 
-                                      ${isCorrect
-                                        ? 'bg-green-500/5 border-green-500/20 dark:bg-green-500/10'
-                                        : hasAnswer
-                                          ? 'bg-red-500/5 border-red-500/20 dark:bg-red-500/10'
-                                          : 'bg-muted/30 border-border opacity-90'}`}
-                                  >
-                                    {/* Question Header */}
-                                    <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center gap-3">
-                                        <Badge variant="secondary" className="bg-primary/10 text-primary border-none">
-                                          {type}
-                                        </Badge>
-                                        <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
-                                          {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
-                                        </Badge>
-                                      </div>
-                                    </div>
-
-                                    {/* SMCQ Specific Rendering */}
-                                    {type === 'SMCQ' && (
-                                      <div className="mb-8 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
-                                        <div className="p-6 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[2.5rem] border border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
-                                          <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                            <Layers className="h-20 w-20 text-indigo-500" />
-                                          </div>
-                                          <div className="relative z-10">
-                                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-4 border border-indigo-500/30">
-                                              <Sparkles className="h-3 w-3" /> Scenario Context
-                                            </div>
-                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
-                                              <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
-                                            </div>
-                                          </div>
-                                        </div>
-
-                                        <div className="space-y-10 pl-2 md:pl-10 border-l-4 border-dashed border-indigo-500/20">
-                                          {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
-                                            <div key={subIdx} className="relative space-y-6 group">
-                                              {/* connector dot */}
-                                              <div className="absolute -left-12 top-2 w-4 h-4 rounded-full bg-white dark:bg-slate-900 border-4 border-indigo-500 shadow-lg shadow-indigo-500/50 z-10" />
-
-                                              <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-                                                <div className="flex-1 space-y-3">
-                                                  <div className="flex items-center gap-3">
-                                                    <span className="text-2xl font-black text-indigo-600/30 dark:text-indigo-400/20 italic tabular-nums">
-                                                      PART {String(subIdx + 1).padStart(2, '0')}
-                                                    </span>
-                                                    <Badge variant="outline" className="rounded-full px-3 py-0.5 bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-[10px] uppercase font-black tracking-tighter text-slate-500">
-                                                      {subQ.marks} Point{subQ.marks !== 1 ? 's' : ''}
-                                                    </Badge>
-                                                  </div>
-                                                  <div className="text-lg font-bold text-slate-700 dark:text-slate-200 leading-snug">
-                                                    <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
-                                                  </div>
-                                                </div>
-
-                                                {(subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && subQ.studentAnswer !== '' && subQ.studentAnswer !== 'No answer provided') && (
-                                                  <div className={cn(
-                                                    "px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest shadow-sm border whitespace-nowrap",
-                                                    subQ.isCorrect
-                                                      ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
-                                                      : "bg-rose-500/10 text-rose-600 border-rose-500/30"
-                                                  )}>
-                                                    {subQ.isCorrect ? "Perfectly Correct" : "Incorrect Response"}
-                                                  </div>
-                                                )}
-                                              </div>
-
-                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {(subQ.options || []).map((opt: any, oi: number) => {
-                                                  const optText = typeof opt === 'object' ? opt.text : opt;
-                                                  const isSelected = subQ.studentAnswer !== undefined && subQ.studentAnswer !== null && String(subQ.studentAnswer).trim() === String(optText).trim();
-                                                  const isCorrectOpt = (opt.isCorrect || (subQ.correctAnswer !== undefined && subQ.correctAnswer !== null && (String(subQ.correctAnswer).trim() === String(optText).trim() || Number(subQ.correctAnswer) === oi)));
-
-                                                  let style = "border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 text-slate-400 opacity-60 grayscale-[0.5]";
-                                                  let icon = null;
-
-                                                  if (isSelected && isCorrectOpt) {
-                                                    style = "border-emerald-500 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/20 shadow-lg shadow-emerald-500/10 grayscale-0 scale-[1.02]";
-                                                    icon = <CheckCircle className="h-4 w-4 text-emerald-600" />;
-                                                  } else if (isSelected && !isCorrectOpt) {
-                                                    style = "border-rose-500 bg-rose-500/10 text-rose-900 dark:text-rose-100 ring-2 ring-rose-500/20 shadow-lg shadow-rose-500/10 grayscale-0";
-                                                    icon = <XCircle className="h-4 w-4 text-rose-600" />;
-                                                  } else if (!isSelected && isCorrectOpt) {
-                                                    style = "border-emerald-500/40 bg-emerald-500/5 text-emerald-700/80 border-dashed grayscale-0";
-                                                    icon = <CheckCircle className="h-4 w-4 text-emerald-400" />;
-                                                  }
-
-                                                  return (
-                                                    <div key={oi} className={`relative p-4 rounded-2xl border-2 flex items-center gap-4 transition-all duration-300 ${style}`}>
-                                                      <span className={cn(
-                                                        "w-9 h-9 flex items-center justify-center rounded-xl text-xs font-black shadow-sm transition-colors",
-                                                        isSelected ? "bg-primary text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-500"
-                                                      )}>
-                                                        {String.fromCharCode(0x0995 + oi)}
-                                                      </span>
-                                                      <span className="flex-1 text-sm font-bold tracking-tight">
-                                                        <UniversalMathJax inline dynamic>{cleanupMath(optText)}</UniversalMathJax>
-                                                      </span>
-                                                      <div className="flex-shrink-0">{icon}</div>
-                                                    </div>
-                                                  );
-                                                })}
-                                              </div>
-
-                                              {/* Sub-question Uploaded Images (Isolated) */}
-                                              {subQ.studentImages && subQ.studentImages.length > 0 && (
-                                                <div className="mt-4 p-4 rounded-3xl bg-emerald-500/5 border border-emerald-500/20 shadow-sm relative overflow-hidden group">
-                                                  <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none group-hover:rotate-12 transition-transform">
-                                                    <ImageIcon className="h-10 w-10 text-emerald-500" />
-                                                  </div>
-                                                  <div className="text-[10px] font-black text-emerald-600/60 dark:text-emerald-400/50 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
-                                                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                                                    Visual Evidence (Part {subIdx + 1})
-                                                  </div>
-                                                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                                    {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
-                                                      return (
-                                                        <div
-                                                          key={imgIdx}
-                                                          className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-sm hover:shadow-xl transition-all"
-                                                          onClick={() => handleImageZoom(imageUrl, `Question ${globalIndex + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
-                                                        >
-                                                          <img src={imageUrl} alt={`Img ${imgIdx + 1}`} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
-                                                          <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                                        </div>
-                                                      );
-                                                    })}
-                                                  </div>
-                                                </div>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
+                                    whileInView={{ opacity: 1, x: 0 }}
+                                    viewport={{ once: true }}
+                                    className={cn(
+                                      "relative border-2 rounded-[2.5rem] p-8 transition-all duration-500",
+                                      isCorrect ? "bg-emerald-50/30 border-emerald-100/50 dark:bg-emerald-950/10 dark:border-emerald-900/40" :
+                                      isPartial ? "bg-amber-50/30 border-amber-100/50 dark:bg-amber-950/10 dark:border-amber-900/40" :
+                                      hasAns ? "bg-rose-50/30 border-rose-100/50 dark:bg-rose-950/10 dark:border-rose-900/40" :
+                                      "bg-slate-50/50 border-slate-100 dark:bg-slate-900/20 dark:border-slate-800/40 opacity-60"
                                     )}
-
-                                    {/* AR Specific Rendering */}
-                                    {type === 'AR' ? (
-                                      <div className="mb-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                          <div className="p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
-                                            <div className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 uppercase mb-1">Assertion (A)</div>
-                                            <div className="text-sm text-foreground">
-                                              <UniversalMathJax dynamic>{(question as any).assertion || question.questionText}</UniversalMathJax>
-                                            </div>
-                                          </div>
-                                          <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                                            <div className="text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase mb-1">Reason (R)</div>
-                                            <div className="text-sm text-foreground">
-                                              <UniversalMathJax dynamic>{(question as any).reason || ""}</UniversalMathJax>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ) : type === 'MTF' ? (
-                                      <div className="mb-4">
-                                        <div className="text-foreground mb-4 font-medium">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
-                                        </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                                          {(question as any).pairs?.map((p: any, pidx: number) => (
-                                            <div key={pidx} className="flex items-center justify-between p-2 bg-card rounded text-xs border border-border shadow-sm">
-                                              <div className="font-medium"><UniversalMathJax dynamic>{p.left}</UniversalMathJax></div>
-                                              <div className="px-2">→</div>
-                                              <div className="font-medium text-blue-700"><UniversalMathJax dynamic>{p.right}</UniversalMathJax></div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    ) : type !== 'SMCQ' ? (
-                                      <div className="mb-4 overflow-x-auto max-w-full scrollbar-thin">
-                                        <div className="text-lg font-medium text-foreground">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
-                                        </div>
-                                      </div>
-                                    ) : null}
-
+                                  >
                                     {/* Result Rendering Logic */}
                                     {(type === 'MCQ' || type === 'MC' || type === 'AR') && (question.options || type === 'AR') ? (
                                       <div className="space-y-2">
@@ -2762,6 +2573,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               src={(question as any).explanationImage}
                                               alt="Explanation"
                                               className="mt-3 max-h-72 rounded-lg border border-border shadow-sm object-contain"
+                                              loading="lazy"
                                             />
                                           )}
                                         </div>
@@ -2776,38 +2588,30 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                             {/* Pagination Controls */}
                             {
                               totalPages > 1 && (
-                                <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm">
+                                <div className="flex items-center justify-center gap-2 mt-8 p-4 bg-card rounded-lg border border-border shadow-sm text-slate-500">
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      if (currentPage > 1) {
-                                        setCurrentPage(curr => curr - 1);
-                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                      }
+                                      setObjectivePage(curr => Math.max(1, curr - 1));
+                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
                                     }}
-                                    disabled={currentPage === 1}
+                                    disabled={objectivePage === 1}
                                     className="w-24"
                                   >
                                     <ChevronLeft className="h-4 w-4 mr-1" /> Previous
                                   </Button>
-
                                   <div className="flex items-center gap-1 mx-4">
-                                    <span className="text-sm font-medium text-gray-600">
-                                      Page <span className="font-bold text-gray-900">{currentPage}</span> of <span className="font-bold text-gray-900">{totalPages}</span>
-                                    </span>
+                                    <span className="text-sm font-medium">Page <span className="font-bold text-slate-800">{objectivePage}</span> of <span className="font-bold text-slate-800">{totalPages}</span></span>
                                   </div>
-
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => {
-                                      if (currentPage < totalPages) {
-                                        setCurrentPage(curr => curr + 1);
-                                        document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                      }
+                                      setObjectivePage(curr => Math.min(totalPages, curr + 1));
+                                      document.getElementById('objective-questions-section')?.scrollIntoView({ behavior: 'smooth' });
                                     }}
-                                    disabled={currentPage === totalPages}
+                                    disabled={objectivePage === totalPages}
                                     className="w-24"
                                   >
                                     Next <ChevronRight className="h-4 w-4 ml-1" />
@@ -2822,305 +2626,224 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
 
 
-                      {/* CQ Section */}
+
+
+                      {/* 2. SQ SECTION (SQ, SMCQ) - Scenario Questions */}
                       {(() => {
-                        const filteredQuestions = result.questions.filter(q => {
-                          const type = q.type?.toUpperCase();
-                          if (type !== 'CQ' && type !== 'DESCRIPTIVE') return false;
-                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
-                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
-
-                          switch (filterStatus) {
-                            case 'CORRECT': return isCorrect;
-                            case 'WRONG': return hasAnswer && !isCorrect;
-                            case 'UNANSWERED': return !hasAnswer;
-                            default: return true;
-                          }
-                        });
-
+                        const sqTypes = ['SQ', 'SMCQ'];
+                        const filteredQuestions = (result.questions || []).filter(q => sqTypes.includes((q.type || "").toUpperCase()));
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / ITEMS_PER_PAGE);
-                        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+                        const totalPages = Math.ceil(filteredQuestions.length / 10);
+                        const startIndex = (sqPage - 1) * 10;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
 
                         return (
-                          <div id="creative-questions-section">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="w-8 h-8 bg-green-500/10 dark:bg-green-500/20 rounded-full flex items-center justify-center">
-                                <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
-                              </div>
-                              <h3 className="text-xl sm:text-2xl font-bold text-foreground">Creative Questions (CQ)</h3>
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none text-[10px] sm:text-xs">
-                                {filteredQuestions.length} Questions
-                              </Badge>
-                            </div>
-                            <div className="space-y-6">
-                              {paginatedQuestions.map((question, index) => {
-                                const globalIndex = startIndex + index;
-                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
-                                const hasAnswer = hasStudentAnswered(question.type, question.studentAnswer);
+                          <div id="sq-section" className="space-y-8 animate-in fade-in duration-700">
+                             <div className="flex items-center gap-4 mb-8">
+                                <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-inner">
+                                   <Layers className="h-6 w-6 text-amber-600" />
+                                </div>
+                                <div>
+                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Scenario Section (SQ)</h3>
+                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Questions</p>
+                                </div>
+                             </div>
 
-                                return (
-                                  <motion.div
-                                    key={question.id}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.1 * index }}
-                                    className={`border rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-300
-                                          ${isCorrect
-                                        ? 'bg-green-500/5 border-green-500/20 dark:bg-green-500/10'
-                                        : hasAnswer
-                                          ? 'bg-red-500/5 border-red-500/20 dark:bg-red-500/10'
-                                          : 'bg-muted/30 border-border opacity-90'}`}
-                                  >
-                                    <div className="flex items-center justify-between mb-4">
-                                      <div className="flex items-center gap-3">
-                                        <Badge variant="secondary" className="bg-green-500/10 text-green-600 dark:text-green-400 border-none">{question.type?.toUpperCase() === 'DESCRIPTIVE' ? 'DESCRIPTIVE' : 'CQ'}</Badge>
-                                        <span className="text-sm text-muted-foreground font-bold italic">Question {globalIndex + 1}</span>
+                             <div className="space-y-12">
+                               {paginatedQuestions.map((q, idx) => (
+                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-6">
+                                   <div className="flex items-center gap-4">
+                                      <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">SQ #{startIndex + idx + 1}</Badge>
+                                      <div className="h-px flex-1 bg-gradient-to-r from-amber-600/20 to-transparent" />
+                                      <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                                   </div>
+                                   
+                                   <div className="p-8 bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-100 dark:border-amber-900/40 rounded-[3rem]">
+                                      <div className="text-xl font-bold leading-tight">
+                                        <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
                                       </div>
-                                      <div className="flex items-center gap-2">
-                                        <Badge variant={isCorrect ? 'default' : 'destructive'} className="text-sm px-2 py-0.5">
-                                          {Number(question.awardedMarks).toFixed(2).replace(/\.00$/, '').replace(/(\.\d)0$/, '$1')}/{question.marks}
-                                        </Badge>
-                                      </div>
-                                    </div>
+                                   </div>
 
-                                    <div className="mb-4">
-                                      <div className="text-lg font-medium text-foreground">
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                      </div>
-                                    </div>
-
-                                    <div className="mb-4">
-                                      <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-2">Your Answer:</h4>
-                                      {hasAnswer ? (
-                                        <div className="p-3 rounded-lg border-2 border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-900/10">
-                                          <p className="text-gray-700 dark:text-gray-300">{question.studentAnswer}</p>
-                                        </div>
-                                      ) : (
-                                        <div className="p-3 rounded-lg border-2 border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/10">
-                                          <p className="text-gray-500 dark:text-gray-400 italic">No answer provided</p>
-                                        </div>
-                                      )}
-                                    </div>
-
-                                    {/* Student Answer Images - Only show if not CQ/SQ with sub-questions */}
-                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && !(
-                                      (question.type === 'CQ' || question.type === 'SQ') &&
-                                      (question.subQuestions || question.sub_questions || []).length > 0
-                                    ) && (
-                                        <div className="mb-4">
-                                          <h4 className="font-medium text-foreground mb-2">Your Uploaded Images:</h4>
-                                          <div className="p-3 rounded-lg border-2 border-emerald-500/20 bg-emerald-500/5">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                              {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => (
-                                                <div
-                                                  key={imgIdx}
-                                                  className="relative group cursor-pointer"
-                                                  onClick={() => {
-                                                    handleImageZoom(imageUrl, `Question ${index + 1} Image ${imgIdx + 1}`, imgIdx, question.studentAnswerImages || [], question);
-                                                  }}
-                                                >
-                                                  <img src={imageUrl} alt={`Img ${imgIdx + 1}`} crossOrigin="anonymous" className="w-full h-32 object-contain rounded-lg border-2 border-green-500/30 bg-muted/50" />
-                                                </div>
-                                              ))}
+                                   <div className="pl-6 md:pl-12 border-l-4 border-dashed border-amber-200 dark:border-amber-900/40 space-y-12">
+                                      {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => {
+                                        const isObj = ['MCQ', 'MC'].includes((subQ.type || subQ.subType || "").toUpperCase()) || (subQ.options && subQ.options.length > 0);
+                                        return (
+                                          <div key={subIdx} className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                               <div className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900 flex items-center justify-center text-[10px] font-black text-amber-700">{subIdx + 1}</div>
+                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
                                             </div>
-                                          </div>
-                                        </div>
-                                      )}
 
-                                    {/* Sub-questions breakdown for CQ */}
-                                    {(question.subQuestions || question.sub_questions) && (question.subQuestions || question.sub_questions || []).length > 0 && (
-                                      <div className="space-y-4 mt-4 ps-4 border-s-2 border-indigo-500/20">
-                                        {(question.subQuestions || question.sub_questions || []).map((subQ: any, subIdx: number) => (
-                                          <div key={subIdx} className="p-3 rounded-lg bg-indigo-50/50 dark:bg-indigo-900/5 border border-indigo-100 dark:border-indigo-900/20">
-                                            <div className="flex items-start gap-2">
-                                              <span className="shrink-0 font-bold text-indigo-600 dark:text-indigo-400">{subIdx + 1}.</span>
-                                              <div className="text-sm font-medium whitespace-pre-wrap break-words">
-                                                <UniversalMathJax inline dynamic>{cleanupMath(subQ.text || subQ.questionText || subQ.question || subQ.q || subQ.question_text || "")}</UniversalMathJax>
+                                            {isObj ? (
+                                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                {(subQ.options || []).map((opt: any, oi: number) => {
+                                                  const t = typeof opt === 'object' ? opt.text : opt;
+                                                  const isSel = String(subQ.studentAnswer || "").trim() === String(t).trim();
+                                                  const isCor = opt.isCorrect || String(subQ.correctAnswer || "").trim() === String(t).trim();
+                                                  return (
+                                                    <div key={oi} className={cn(
+                                                      "p-4 rounded-2xl border-2 flex items-center gap-4 transition-all",
+                                                      isSel && isCor ? "bg-emerald-500/10 border-emerald-500/50" :
+                                                      isSel && !isCor ? "bg-rose-500/10 border-rose-500/50" :
+                                                      !isSel && isCor ? "bg-emerald-500/5 border-emerald-500/20 border-dashed" :
+                                                      "bg-white/50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 opacity-60"
+                                                    )}>
+                                                      <span className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black bg-slate-100 dark:bg-slate-800">{String.fromCharCode(0x0995 + oi)}</span>
+                                                      <span className="flex-1 text-sm font-bold"><UniversalMathJax inline dynamic>{t}</UniversalMathJax></span>
+                                                    </div>
+                                                  );
+                                                })}
                                               </div>
-                                              <Badge variant="outline" className="ms-auto shrink-0 text-[10px]">{subQ.marks} Marks</Badge>
-                                            </div>
-
-                                            {/* Sub-question Specialized Response Rendering */}
-                                            {renderDescriptiveSubQuestion(subQ, subIdx, question.id)}
-
-                                            {!subQ.studentAnswer && !subQ.subType && (
-                                              <div className="mt-2 text-[10px] text-slate-400 italic ps-4">No response provided.</div>
+                                            ) : (
+                                              renderDescriptiveSubQuestion(subQ, subIdx, q.id)
                                             )}
 
-
-                                            {/* Sub-question Uploaded Images */}
+                                            {/* Student Images for Sub-part */}
                                             {subQ.studentImages && subQ.studentImages.length > 0 && (
-                                              <div className="mt-3 ps-4">
-                                                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                  <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></div> Visual Evidence
-                                                </div>
-                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                                  {subQ.studentImages.map((imageUrl: string, imgIdx: number) => {
-                                                    return (
-                                                      <div
-                                                        key={imgIdx}
-                                                        className="relative group cursor-pointer aspect-video rounded-2xl overflow-hidden border-2 border-white dark:border-slate-800 shadow-md hover:shadow-xl transition-all"
-                                                        onClick={() => {
-                                                          handleImageZoom(imageUrl, `Question ${index + 1} Part ${subIdx + 1} Image ${imgIdx + 1}`, imgIdx, subQ.studentImages || [], question);
-                                                        }}
-                                                      >
-                                                        <img 
-                                                          src={imageUrl} 
-                                                          alt={`Sub-Img ${imgIdx + 1}`} 
-                                                          className={`w-full h-full object-cover group-hover:scale-110 transition-transform duration-500`} 
-                                                        />
-                                                      </div>
-                                                    );
-                                                  })}
-                                                </div>
-                                              </div>
+                                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                                                  {subQ.studentImages.map((img: string, iIdx: number) => (
+                                                     <div key={iIdx} className="relative group aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg cursor-pointer" onClick={() => handleImageZoom(img, `SQ Part ${subIdx+1} - Page ${iIdx+1}`, iIdx, subQ.studentImages, q)}>
+                                                        <img src={img} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
+                                                     </div>
+                                                  ))}
+                                               </div>
                                             )}
                                           </div>
-                                        ))}
-                                      </div>
-                                    )}
+                                        );
+                                      })}
+                                   </div>
+                                 </motion.div>
+                               ))}
+                             </div>
 
-                                    {/* Explanation Section */}
-                                    {(question.explanation || (question as any).explanationImage) && (
-                                      <div className="mt-4 p-4 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-                                        <div className="flex items-center gap-2 mb-2 text-yellow-600 dark:text-yellow-400 font-bold text-sm">
-                                          <Star className="h-4 w-4" /> Explanation
-                                        </div>
-                                        <div className="text-sm text-foreground/90 pl-6">
-                                          <UniversalMathJax inline dynamic>{cleanupMath(question.explanation)}</UniversalMathJax>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </motion.div>
-                                );
-                              })}
-                            </div>
-
-                            {/* Pagination */}
-                            {totalPages > 1 && (
-                              <div className="flex items-center justify-center gap-2 mt-8">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setCurrentPage(curr => Math.max(1, curr - 1));
-                                    document.getElementById('creative-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                  }}
-                                  disabled={currentPage === 1}
-                                >
-                                  <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-                                </Button>
-                                <span className="text-sm mx-4">Page {currentPage} of {totalPages}</span>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setCurrentPage(curr => Math.min(totalPages, curr + 1));
-                                    document.getElementById('creative-questions-section')?.scrollIntoView({ behavior: 'smooth' });
-                                  }}
-                                  disabled={currentPage === totalPages}
-                                >
-                                  Next <ChevronRight className="h-4 w-4 ml-1" />
-                                </Button>
-                              </div>
-                            )}
+                             {totalPages > 1 && (
+                               <div className="flex items-center justify-between p-6 bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/50 rounded-3xl mt-12">
+                                 <Button variant="outline" disabled={sqPage === 1} onClick={() => { setSqPage(p => p - 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                 <span className="text-[10px] font-black uppercase text-amber-700 tracking-widest">Page {sqPage} of {totalPages}</span>
+                                 <Button variant="outline" disabled={sqPage === totalPages} onClick={() => { setSqPage(p => p + 1); document.getElementById('sq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                               </div>
+                             )}
                           </div>
                         );
                       })()}
 
-                      {/* SQ Section */}
+                      {/* 3. CQ SECTION (CREATIVE QUESTIONS) */}
                       {(() => {
-                        const filteredQuestions = result.questions.filter(q => {
-                          if (q.type?.toUpperCase() !== 'SQ') return false;
-                          const hasAnswer = hasStudentAnswered(q.type, q.studentAnswer);
-                          const isCorrect = isAnswerCorrect(q.awardedMarks, q.marks);
-
-                          switch (filterStatus) {
-                            case 'CORRECT': return isCorrect;
-                            case 'WRONG': return hasAnswer && !isCorrect;
-                            case 'UNANSWERED': return !hasAnswer;
-                            default: return true;
-                          }
-                        });
-
+                        const filteredQuestions = (result.questions || []).filter(q => q.type?.toUpperCase() === 'CQ');
                         if (filteredQuestions.length === 0) return null;
 
-                        return (
-                          <div id="short-questions-section">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="w-8 h-8 bg-amber-500/10 dark:bg-amber-500/20 rounded-full flex items-center justify-center">
-                                <FileText className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                              </div>
-                              <h3 className="text-xl sm:text-2xl font-bold text-foreground">Short Questions (SQ)</h3>
-                              <Badge variant="secondary" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-none text-[10px] sm:text-xs">
-                                {filteredQuestions.length} Questions
-                              </Badge>
-                            </div>
-                            <div className="space-y-6">
-                              {filteredQuestions.map((question, index) => {
-                                const isCorrect = isAnswerCorrect(question.awardedMarks, question.marks);
-                                return (
-                                  <motion.div
-                                    key={question.id}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: 0.1 * index }}
-                                    className="border rounded-lg p-6 bg-amber-500/5 dark:bg-amber-500/10 border-amber-500/20"
-                                  >
-                                    <div className="flex items-center justify-between mb-4">
-                                      <Badge className="bg-yellow-100 text-yellow-800">SQ</Badge>
-                                      <Badge variant="outline">{question.awardedMarks}/{question.marks}</Badge>
-                                    </div>
-                                    <div className="mb-4">
-                                      <UniversalMathJax inline dynamic>{cleanupMath(question.questionText)}</UniversalMathJax>
-                                    </div>
-                                    {question.studentAnswer && (
-                                      <div className="p-4 rounded-2xl border-2 border-indigo-200 bg-indigo-50/50 dark:bg-indigo-900/10 dark:border-indigo-900/50 shadow-inner">
-                                        <p className="text-sm font-medium leading-relaxed">{question.studentAnswer}</p>
-                                      </div>
-                                    )}
+                        const totalPages = Math.ceil(filteredQuestions.length / 10);
+                        const startIndex = (cqPage - 1) * 10;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
 
-                                    {/* SQ Student Images and Annotations */}
-                                    {question.studentAnswerImages && question.studentAnswerImages.length > 0 && (
-                                      <div className="mt-6">
-                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                          {question.studentAnswerImages.map((imageUrl: string, imgIdx: number) => {
-                                            return (
-                                              <div
-                                                key={imgIdx}
-                                                className="relative group cursor-pointer aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl hover:shadow-2xl transition-all duration-500 scale-100 hover:scale-[1.05] z-10"
-                                                onClick={() => {
-                                                  handleImageZoom(imageUrl, `Short Question ${index + 1} - Image ${imgIdx + 1}`, imgIdx, question.studentAnswerImages || [], question);
-                                                }}
-                                              >
-                                                <img
-                                                  src={imageUrl}
-                                                  alt={`Response ${imgIdx + 1}`}
-                                                  crossOrigin="anonymous"
-                                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
-                                                />
-                                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                                                  <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Page {imgIdx + 1}</span>
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
+                        return (
+                          <div id="cq-section" className="space-y-8 animate-in fade-in duration-700">
+                             <div className="flex items-center gap-4 mb-8">
+                                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20 shadow-inner">
+                                   <FileText className="h-6 w-6 text-emerald-600" />
+                                </div>
+                                <div>
+                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Creative Section (CQ)</h3>
+                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Questions</p>
+                                </div>
+                             </div>
+
+                             <div className="space-y-16">
+                               {paginatedQuestions.map((q, idx) => (
+                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-8">
+                                    <div className="flex items-center gap-4">
+                                       <Badge className="bg-emerald-600/10 text-emerald-600 border-emerald-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">CQ #{startIndex + idx + 1}</Badge>
+                                       <div className="h-px flex-1 bg-gradient-to-r from-emerald-600/20 to-transparent" />
+                                       <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
+                                    </div>
+                                    
+                                    <div className="p-10 bg-emerald-50/20 dark:bg-emerald-950/20 border-2 border-emerald-100 dark:border-emerald-900/40 rounded-[3.5rem] shadow-xl shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
+                                       <div className="text-xl font-bold leading-tight">
+                                         <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
+                                       </div>
+                                    </div>
+
+                                    <div className="pl-6 md:pl-12 border-l-4 border-dashed border-emerald-200 dark:border-emerald-900/40 space-y-12">
+                                       {(q.subQuestions || q.sub_questions || []).map((subQ: any, subIdx: number) => (
+                                         <div key={subIdx} className="space-y-6">
+                                            <div className="flex items-center gap-3">
+                                               <div className="w-6 h-6 rounded-lg bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center text-[10px] font-black text-emerald-700">{subIdx + 1}</div>
+                                               <div className="text-lg font-bold"><UniversalMathJax dynamic>{cleanupMath(subQ.text || subQ.questionText || "")}</UniversalMathJax></div>
+                                            </div>
+                                            {renderDescriptiveSubQuestion(subQ, subIdx, q.id)}
+                                         </div>
+                                       ))}
+                                    </div>
+                                 </motion.div>
+                               ))}
+                             </div>
+
+                             {totalPages > 1 && (
+                               <div className="flex items-center justify-between p-6 bg-emerald-50/50 dark:bg-slate-900/50 border border-emerald-200/50 rounded-3xl mt-12">
+                                 <Button variant="outline" disabled={cqPage === 1} onClick={() => { setCqPage(p => p - 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                 <span className="text-[10px] font-black uppercase text-emerald-700 tracking-widest">Page {cqPage} of {totalPages}</span>
+                                 <Button variant="outline" disabled={cqPage === totalPages} onClick={() => { setCqPage(p => p + 1); document.getElementById('cq-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                               </div>
+                             )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* 4. DESCRIPTIVE SECTION */}
+                      {(() => {
+                        const filteredQuestions = (result.questions || []).filter(q => q.type?.toUpperCase() === 'DESCRIPTIVE');
+                        if (filteredQuestions.length === 0) return null;
+
+                        const totalPages = Math.ceil(filteredQuestions.length / 10);
+                        const startIndex = (descriptivePage - 1) * 10;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
+
+                        return (
+                          <div id="descriptive-section" className="space-y-8 animate-in fade-in duration-700">
+                             <div className="flex items-center gap-4 mb-4">
+                                <div className="w-12 h-12 bg-slate-950/10 dark:bg-white/10 rounded-2xl flex items-center justify-center border border-slate-950/20 dark:border-white/20 shadow-inner">
+                                   <AlignLeft className="h-6 w-6" />
+                                </div>
+                                <div>
+                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Analysis Section</h3>
+                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items</p>
+                                </div>
+                             </div>
+
+                             <div className="space-y-12">
+                               {paginatedQuestions.map((q, idx) => (
+                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-6">
+                                   <div className="p-8 bg-slate-50/50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-800 rounded-[3rem]">
+                                      <div className="flex items-center justify-between mb-6">
+                                         <Badge className="bg-slate-950 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest">Question #{startIndex + idx + 1}</Badge>
+                                         <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
                                       </div>
-                                    )}
-                                    {question.modelAnswer && (
-                                      <div className="mt-4 p-3 rounded-lg border-2 border-green-200 bg-green-50 dark:bg-green-900/10 dark:border-green-900">
-                                        <p className="text-xs font-bold text-green-600 mb-1">Model Answer:</p>
-                                        <UniversalMathJax inline dynamic>{cleanupMath(question.modelAnswer)}</UniversalMathJax>
+                                      <div className="text-xl font-bold leading-tight mb-6"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
+                                      <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
+                                         <p className="text-sm font-medium leading-[1.8] text-slate-600 dark:text-slate-400 whitespace-pre-wrap">{q.studentAnswer || "No text response"}</p>
                                       </div>
-                                    )}
-                                  </motion.div>
-                                );
-                              })}
-                            </div>
+                                   </div>
+                                   {q.studentAnswerImages && q.studentAnswerImages.length > 0 && (
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                         {q.studentAnswerImages.map((img: string, iIdx: number) => (
+                                            <div key={iIdx} className="relative aspect-video rounded-[2rem] overflow-hidden border-2 border-white dark:border-slate-800 shadow-xl cursor-pointer" onClick={() => handleImageZoom(img, `Analysis Page ${iIdx+1}`, iIdx, q.studentAnswerImages || [], q)}>
+                                               <img src={img} className="w-full h-full object-cover transition-transform hover:scale-105" loading="lazy" />
+                                            </div>
+                                         ))}
+                                      </div>
+                                   )}
+                                 </motion.div>
+                               ))}
+                             </div>
+
+                             {totalPages > 1 && (
+                               <div className="flex items-center justify-between p-6 bg-slate-950/5 dark:bg-white/5 border border-slate-200 dark:border-slate-800 rounded-3xl mt-12">
+                                 <Button variant="outline" disabled={descriptivePage === 1} onClick={() => { setDescriptivePage(p => p - 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]"><ChevronLeft className="w-4 h-4 mr-2" /> Back</Button>
+                                 <span className="text-[10px] font-black uppercase tracking-widest">Page {descriptivePage} of {totalPages}</span>
+                                 <Button variant="outline" disabled={descriptivePage === totalPages} onClick={() => { setDescriptivePage(p => p + 1); document.getElementById('descriptive-section')?.scrollIntoView({ behavior: 'smooth' }); }} className="rounded-xl px-6 h-11 font-black uppercase tracking-widest text-[10px]">Next <ChevronRight className="w-4 h-4 ml-2" /></Button>
+                               </div>
+                             )}
                           </div>
                         );
                       })()}
@@ -3146,22 +2869,24 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </Link>
             </Button>
           )}
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => setShowReviewModal(true)}
-            disabled={(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')}
-            className={`${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
-              ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
-              : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
-              }`}
-          >
-            <MessageSquare className="h-5 w-5 mr-2" />
-            {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
-              ? 'Review Not Available (Suspended)'
-              : 'Request Review'
-            }
-          </Button>
+          {result.result?.isPublished && (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setShowReviewModal(true)}
+              disabled={(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')}
+              className={`${(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
+                ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
+                }`}
+            >
+              <MessageSquare className="h-5 w-5 mr-2" />
+              {(result.result?.status === 'SUSPENDED' || result.submission?.status === 'SUSPENDED')
+                ? 'Review Not Available (Suspended)'
+                : 'Request Review'
+              }
+            </Button>
+          )}
           <Button asChild variant="outline" size="lg">
             <Link href="/exams/online">
               <ArrowLeft className="h-5 w-5 mr-2" />
@@ -3325,9 +3050,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
               </DialogContent>
             </Dialog>
 
-            {/* Hidden Print Component */}
-            <div style={{ display: 'none' }}>
-              {printData && (
+            {/* Hidden Print Component - Only mounts when starting to print for performance */}
+            {isPrinting && printData && (
+              <div style={{ display: 'none' }}>
                 <MarkedQuestionPaper
                   ref={printRef}
                   examInfo={printData.examInfo}
@@ -3342,8 +3067,8 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     score: result.submission.score
                   }}
                 />
-              )}
-            </div>
+              </div>
+            )}
           </>
         )
       }
