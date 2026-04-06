@@ -228,7 +228,17 @@ const mathJaxConfig = {
 
 export default function ExamResultPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const [isMobile, setIsMobile] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   const [result, setResult] = useState<ExamResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -843,16 +853,26 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
         {/* 3. Official Teacher Feedback (Model Answer + Explanation) */}
         {(() => {
-          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans || subQ.sub_answer;
-          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : (Array.isArray(subQ.correctOrder) ? subQ.correctOrder : null)));
-          const explanation = subQ.explanation || subQ.sub_explanation || subQ.rationale || subQ.pedagogicalRationale;
+          // Broadened extraction logic to catch various backend key variants for SQ, CQ, and Descriptive
+          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || 
+                           (typeof subQ.answers === 'string' ? subQ.answers : null) || 
+                           subQ.q_ans || subQ.ans || subQ.sub_answer || subQ.model_answer || 
+                           subQ.correct_answer || (subQ.correctOrder && Array.isArray(subQ.correctOrder) ? subQ.correctOrder.join(', ') : null);
+          
+          const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : 
+                                (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : 
+                                (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
+          
+          const explanation = subQ.explanation || subQ.sub_explanation || subQ.rationale || 
+                              subQ.pedagogicalRationale || subQ.explanation_text || subQ.rationale_text;
+                              
           const hasExplanation = !!explanation;
 
           // If no content to show, return null
           if (!hasExplanation && (!modelAns && (!modelAnsArray || modelAnsArray.length === 0))) return null;
 
           return (
-            <div className="mt-6 p-4 rounded-3xl bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05] border border-emerald-500/10 dark:border-emerald-500/20 shadow-sm relative overflow-hidden group">
+            <div className="mt-6 p-4 md:p-6 rounded-3xl bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05] border border-emerald-500/10 dark:border-emerald-500/20 shadow-sm relative overflow-hidden group">
               {/* Background Accent */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-colors" />
 
@@ -871,9 +891,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
                         <CheckCircle className="w-3 h-3" /> Correct Key
                       </p>
-                      <div className="pl-4 border-l-2 border-emerald-500/20">
+                      <div className="pl-4 border-l-2 border-emerald-500/20 max-w-full overflow-x-auto scrollbar-thin">
                         {modelAns && (
-                          <div className="text-sm text-emerald-950 dark:text-emerald-50 font-bold leading-relaxed whitespace-pre-wrap">
+                          <div className="text-sm text-emerald-950 dark:text-emerald-50 font-bold leading-relaxed whitespace-pre-wrap break-words">
                             <UniversalMathJax dynamic>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
                           </div>
                         )}
@@ -897,7 +917,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
                         <Info className="w-3 h-3" /> Pedagogical Rationale
                       </p>
-                      <div className="pl-4 border-l-2 border-emerald-500/20 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed italic">
+                      <div className="pl-4 border-l-2 border-emerald-500/20 text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed italic max-w-full overflow-x-auto scrollbar-thin break-words">
                         <UniversalMathJax dynamic>{cleanupMath(explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                       </div>
                     </div>
@@ -1596,32 +1616,34 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
     <MathJaxContext config={mathJaxConfig}>
       <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-foreground transition-colors duration-500 overflow-x-hidden p-2 sm:p-4 md:p-8">
         {/* Animated Background Elements */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              rotate: [0, 90, 0],
-            }}
-            transition={{
-              duration: 20,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-            className="absolute -top-24 -left-24 w-96 h-96 bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-3xl"
-          />
-          <motion.div
-            animate={{
-              scale: [1.2, 1, 1.2],
-              rotate: [360, 180, 0],
-            }}
-            transition={{
-              duration: 25,
-              repeat: Infinity,
-              ease: "linear"
-            }}
-            className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-300/10 dark:bg-purple-600/10 rounded-full blur-3xl"
-          />
-        </div>
+        {!isMobile && (
+          <div className="fixed inset-0 overflow-hidden pointer-events-none">
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, 90, 0],
+              }}
+              transition={{
+                duration: 20,
+                repeat: Infinity,
+                ease: "linear"
+              }}
+              className="absolute -top-24 -left-24 w-96 h-96 bg-blue-500/10 dark:bg-blue-600/10 rounded-full blur-3xl"
+            />
+            <motion.div
+              animate={{
+                scale: [1.2, 1, 1.2],
+                rotate: [360, 180, 0],
+              }}
+              transition={{
+                duration: 25,
+                repeat: Infinity,
+                ease: "linear"
+              }}
+              className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-300/10 dark:bg-purple-600/10 rounded-full blur-3xl"
+            />
+          </div>
+        )}
 
         {Capacitor.isNativePlatform() && (
           <div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 z-[100] animate-pulse" />
@@ -2350,9 +2372,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / 15);
-                        const startIndex = (objectivePage - 1) * 15;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 15);
+                        const pageSize = 8;
+                        const totalPages = Math.ceil(filteredQuestions.length / pageSize);
+                        const startIndex = (objectivePage - 1) * pageSize;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
                         return (
                           <div id="objective-questions-section" className="space-y-8 animate-in fade-in duration-700">
@@ -2374,11 +2397,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 return (
                                   <motion.div
                                     key={question.id}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    whileInView={{ opacity: 1, x: 0 }}
+                                    initial={!isMobile ? { opacity: 0, x: -20 } : { opacity: 0 }}
+                                    whileInView={!isMobile ? { opacity: 1, x: 0 } : { opacity: 1 }}
                                     viewport={{ once: true }}
                                     className={cn(
-                                      "relative border-2 rounded-[2.5rem] p-8 transition-all duration-500",
+                                      "relative border-2 rounded-[1.5rem] md:rounded-[2.5rem] p-4 md:p-8 transition-all duration-500",
                                       isCorrect ? "bg-emerald-50/30 border-emerald-100/50 dark:bg-emerald-950/10 dark:border-emerald-900/40" :
                                       isPartial ? "bg-amber-50/30 border-amber-100/50 dark:bg-amber-950/10 dark:border-amber-900/40" :
                                       hasAns ? "bg-rose-50/30 border-rose-100/50 dark:bg-rose-950/10 dark:border-rose-900/40" :
@@ -2410,7 +2433,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     {/* SMCQ Scenario Rendering */}
                                     {type === 'SMCQ' && (
                                       <div className="mb-10 space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-700">
-                                        <div className="p-8 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[3rem] border-2 border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
+                                        <div className="p-4 md:p-8 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 dark:from-indigo-500/20 dark:to-purple-500/20 rounded-[2rem] md:rounded-[3rem] border-2 border-indigo-500/20 shadow-xl shadow-indigo-500/5 relative overflow-hidden group">
                                           <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                                             <Layers className="h-24 w-24 text-indigo-500" />
                                           </div>
@@ -2418,7 +2441,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest mb-4 border border-indigo-500/30">
                                               <Sparkles className="h-3.5 w-3.5" /> Scenario Context
                                             </div>
-                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">
+                                            <div className="text-xl md:text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight max-w-full overflow-x-auto scrollbar-thin">
                                               <UniversalMathJax dynamic>{cleanupMath(question.questionText || (question as any).text || "")}</UniversalMathJax>
                                             </div>
                                           </div>
@@ -2820,9 +2843,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const filteredQuestions = (result.questions || []).filter(q => sqTypes.includes((q.type || "").toUpperCase()));
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / 10);
-                        const startIndex = (sqPage - 1) * 10;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
+                        const pageSize = 8;
+                        const totalPages = Math.ceil(filteredQuestions.length / pageSize);
+                        const startIndex = (sqPage - 1) * pageSize;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
                         return (
                           <div id="sq-section" className="space-y-8 animate-in fade-in duration-700">
@@ -2844,14 +2868,14 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                              <div className="space-y-12">
                                {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-6">
+                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
                                    <div className="flex items-center gap-4">
                                       <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">SQ #{startIndex + idx + 1}</Badge>
                                       <div className="h-px flex-1 bg-gradient-to-r from-amber-600/20 to-transparent" />
                                       <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
                                    </div>
                                    
-                                   <div className="p-8 bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-100 dark:border-amber-900/40 rounded-[3rem]">
+                                   <div className="p-4 md:p-8 bg-amber-50/20 dark:bg-amber-950/20 border-2 border-amber-100 dark:border-amber-900/40 rounded-[2rem] md:rounded-[3rem]">
                                       <div className="text-xl font-bold leading-tight">
                                         <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
                                       </div>
@@ -2921,9 +2945,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const filteredQuestions = (result.questions || []).filter(q => q.type?.toUpperCase() === 'CQ');
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / 10);
-                        const startIndex = (cqPage - 1) * 10;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
+                        const pageSize = 8;
+                        const totalPages = Math.ceil(filteredQuestions.length / pageSize);
+                        const startIndex = (cqPage - 1) * pageSize;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
                         return (
                           <div id="cq-section" className="space-y-8 animate-in fade-in duration-700">
@@ -2939,15 +2964,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                              <div className="space-y-16">
                                {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-8">
+                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-8">
                                     <div className="flex items-center gap-4">
                                        <Badge className="bg-emerald-600/10 text-emerald-600 border-emerald-600/20 text-[10px] font-black px-4 py-1.5 rounded-full">CQ #{startIndex + idx + 1}</Badge>
                                        <div className="h-px flex-1 bg-gradient-to-r from-emerald-600/20 to-transparent" />
                                        <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
                                     </div>
                                     
-                                    <div className="p-10 bg-emerald-50/20 dark:bg-emerald-950/20 border-2 border-emerald-100 dark:border-emerald-900/40 rounded-[3.5rem] shadow-xl shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
-                                       <div className="text-xl font-bold leading-tight">
+                                    <div className="p-6 md:p-10 bg-emerald-50/20 dark:bg-emerald-950/20 border-2 border-emerald-100 dark:border-emerald-900/40 rounded-[2.5rem] md:rounded-[3.5rem] shadow-xl shadow-emerald-500/5 transition-all hover:shadow-emerald-500/10">
+                                       <div className="text-xl font-bold leading-tight max-w-full overflow-x-auto scrollbar-thin">
                                          <UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax>
                                        </div>
                                     </div>
@@ -2983,9 +3008,10 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                         const filteredQuestions = (result.questions || []).filter(q => q.type?.toUpperCase() === 'DESCRIPTIVE');
                         if (filteredQuestions.length === 0) return null;
 
-                        const totalPages = Math.ceil(filteredQuestions.length / 10);
-                        const startIndex = (descriptivePage - 1) * 10;
-                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + 10);
+                        const pageSize = 8;
+                        const totalPages = Math.ceil(filteredQuestions.length / pageSize);
+                        const startIndex = (descriptivePage - 1) * pageSize;
+                        const paginatedQuestions = filteredQuestions.slice(startIndex, startIndex + pageSize);
 
                         return (
                           <div id="descriptive-section" className="space-y-8 animate-in fade-in duration-700">
@@ -3001,13 +3027,13 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                              <div className="space-y-12">
                                {paginatedQuestions.map((q, idx) => (
-                                 <motion.div key={q.id} initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="space-y-6">
-                                   <div className="p-8 bg-slate-50/50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-800 rounded-[3rem]">
+                                 <motion.div key={q.id} initial={!isMobile ? { opacity: 0, y: 20 } : { opacity: 0 }} whileInView={!isMobile ? { opacity: 1, y: 0 } : { opacity: 1 }} viewport={{ once: true }} className="space-y-6">
+                                   <div className="p-4 md:p-8 bg-slate-50/50 dark:bg-slate-900/50 border-2 border-slate-200 dark:border-slate-800 rounded-[2rem] md:rounded-[3rem]">
                                       <div className="flex items-center justify-between mb-6">
                                          <Badge className="bg-slate-950 text-white text-[10px] font-black rounded-xl px-4 py-1.5 uppercase tracking-widest">Question #{startIndex + idx + 1}</Badge>
                                          <Badge variant="outline" className="font-black italic">{q.awardedMarks}/{q.marks}</Badge>
                                       </div>
-                                      <div className="text-xl font-bold leading-tight mb-6"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
+                                      <div className="text-xl font-bold leading-tight mb-6 max-w-full overflow-x-auto scrollbar-thin"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
                                       
                                       {q.studentAnswer && (
                                         <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
