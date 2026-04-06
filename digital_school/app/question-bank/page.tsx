@@ -114,9 +114,9 @@ type Question = {
   id: string; type: QuestionType; subject: string; topic?: string | null; marks: number; difficulty: Difficulty;
   questionText: string; hasMath: boolean;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
-  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
-  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
-  parts?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string; [key: string]: any }>;
+  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
+  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
+  parts?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string; [key: string]: any }>;
   modelAnswer?: string | null;
   assertion?: string | null; reason?: string | null; correctOption?: number | null;
   leftColumn?: Array<{ id: string; text: string }>;
@@ -135,9 +135,9 @@ type GeneratedQuestion = {
   type: QuestionType;
   questionText: string;
   options?: Array<{ text: string; isCorrect: boolean; explanation?: string; image?: string }>;
-  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
-  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
-  parts?: Array<{ question: string; marks: number; modelAnswer?: string; image?: string }>;
+  subQuestions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
+  sub_questions?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
+  parts?: Array<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }>;
   modelAnswer?: string;
   marks: number;
   difficulty: Difficulty;
@@ -1159,6 +1159,16 @@ const QuestionCard: React.FC<{
                       </div>
                     </div>
                   )}
+                  {sq.explanation && (
+                    <div className="pl-8 mt-1">
+                      <div className="p-2.5 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                        <p className="text-[9px] font-black uppercase text-indigo-700/70 dark:text-indigo-400/70 mb-1 leading-none tracking-tighter">Explanation</p>
+                        <div className="text-[11px] text-indigo-900/80 dark:text-indigo-300/80 font-medium whitespace-pre-wrap">
+                          <UniversalMathJax>{sq.explanation}</UniversalMathJax>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1190,6 +1200,16 @@ const QuestionCard: React.FC<{
                       </div>
                     ))}
                   </div>
+                  {sq.explanation && (
+                    <div className="pl-8 mt-1">
+                      <div className="p-2.5 rounded-xl bg-purple-50/30 dark:bg-purple-900/10 border border-purple-100/50 dark:border-purple-800/30">
+                        <p className="text-[9px] font-black uppercase text-purple-700/70 dark:text-purple-400/70 mb-1 leading-none tracking-tighter">Explanation</p>
+                        <div className="text-[11px] text-purple-900/80 dark:text-purple-300/80 font-medium whitespace-pre-wrap">
+                          <UniversalMathJax>{sq.explanation}</UniversalMathJax>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -2562,8 +2582,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       { text: 'Option D', isCorrect: false, explanation: '', image: '' }
     ]
   );
-  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string; image?: string }[]>(
-    initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '', image: '' }]
+  const [subQuestions, setSubQuestions] = useState<{ question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }[]>(
+    initialData?.subQuestions || [{ question: 'Sub-question 1', marks: 5, modelAnswer: '', explanation: '', image: '' }]
   );
   // DESCRIPTIVE parts state (stored as subQuestions JSON on save)
   const [descriptiveParts, setDescriptiveParts] = useState<DescPart[]>(
@@ -2573,10 +2593,10 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         { subType: 'writing', label: '১. অনুচ্ছেদ রচনা', marks: 10, writingType: 'paragraph', instructions: 'নিচের যেকোনো একটি বিষয়ে অনুচ্ছেদ লেখো:' },
       ]
   );
-  const [smcqQuestions, setSmcqQuestions] = useState<{ question: string; marks: number; options: { text: string; isCorrect: boolean }[]; image?: string }[]>(
+  const [smcqQuestions, setSmcqQuestions] = useState<{ question: string; marks: number; options: { text: string; isCorrect: boolean }[]; explanation?: string; image?: string }[]>(
     type === 'SMCQ' && initialData?.subQuestions
       ? (initialData.subQuestions as any)
-      : [{ question: '', marks: 1, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }] }]
+      : [{ question: '', marks: 1, options: [{ text: '', isCorrect: true }, { text: '', isCorrect: false }, { text: '', isCorrect: false }, { text: '', isCorrect: false }], explanation: '' }]
   );
   const [modelAnswer, setModelAnswer] = useState(initialData?.modelAnswer || '');
   const [correctAnswer, setCorrectAnswer] = useState<number>(initialData?.modelAnswer ? parseInt(initialData.modelAnswer) : 0);
@@ -2842,10 +2862,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         question: sq.question.trim(),
         marks: Number(sq.marks),
         modelAnswer: sq.modelAnswer?.trim() || undefined,
+        explanation: sq.explanation?.trim() || undefined,
         image: sq.image || undefined
       })) : type === 'SMCQ' ? smcqQuestions.map(sq => ({
         question: sq.question.trim(),
         marks: Number(sq.marks),
+        explanation: sq.explanation?.trim() || undefined,
         options: sq.options.map(opt => ({
           text: opt.text.trim(),
           isCorrect: opt.isCorrect
@@ -2865,7 +2887,8 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
         ((type === 'MCQ' || type === 'MC') && options.some((opt: { text: string; isCorrect: boolean; explanation?: string }) =>
           /\\/.test(opt.text) || (opt.explanation && /\\/.test(opt.explanation))
         )) ||
-        (type === 'CQ' && subQuestions.some(sq => /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer)))) ||
+        (type === 'CQ' && subQuestions.some(sq => /\\/.test(sq.question) || (sq.modelAnswer && /\\/.test(sq.modelAnswer)) || (sq.explanation && /\\/.test(sq.explanation)))) ||
+        (type === 'SMCQ' && smcqQuestions.some(sq => /\\/.test(sq.question) || (sq.explanation && /\\/.test(sq.explanation)) || sq.options.some(opt => /\\/.test(opt.text)))) ||
         (type === 'SQ' && /\\/.test(modelAnswer)) ||
         (type === 'AR' && (/\\/.test(assertion) || /\\/.test(reason))),
       questionBankIds: questionBankIds.length > 0 ? questionBankIds : null,
@@ -3161,7 +3184,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
             {type === 'CQ' && (
               <div className="space-y-2">
                 <Label>Sub-questions</Label>
-                {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
+                {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }, i: number) => (
                   <div key={i} className="space-y-3 p-3 border rounded-md bg-gray-50 dark:bg-gray-800/30">
                     <div className="flex items-start gap-2">
                       <div className="flex-grow space-y-2">
@@ -3207,6 +3230,27 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                               <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
                                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
                                 <span className="text-xs font-medium">Math detected in model answer</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="text-sm text-gray-600 dark:text-gray-400">Sub-explanation (Optional)</Label>
+                          <MathToolbar onInsert={handleInsertSymbol} />
+                          <Textarea
+                            ref={el => { textareaRefs.current[`sq-exp-${i}`] = el; }}
+                            onFocus={makeFocusHandler(`sq-exp-${i}`, (newText) => { const newSQs = [...(subQuestions || [])]; newSQs[i].explanation = newText; setSubQuestions(newSQs); })}
+                            value={sq.explanation || ''}
+                            onChange={e => { const newSQs = [...(subQuestions || [])]; newSQs[i].explanation = e.target.value; setSubQuestions(newSQs); }}
+                            placeholder="Sub-explanation text for this part..."
+                            rows={3}
+                            className="h-auto"
+                          />
+                          {sq.explanation && /\\/.test(sq.explanation) && (
+                            <div className="mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md border border-blue-200 dark:border-blue-700">
+                              <div className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                <span className="text-xs font-medium">Math detected in sub-explanation</span>
                               </div>
                             </div>
                           )}
@@ -3318,6 +3362,19 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           className="w-16 h-7 text-xs"
                         />
                       </div>
+                    </div>
+                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                      <Label className="text-[10px] uppercase text-gray-400">Sub-explanation (Optional)</Label>
+                      <MathToolbar onInsert={handleInsertSymbol} />
+                      <Textarea
+                        ref={el => { textareaRefs.current[`smcq-exp-${i}`] = el; }}
+                        onFocus={makeFocusHandler(`smcq-exp-${i}`, (newText) => { const newSQs = [...smcqQuestions]; newSQs[i].explanation = newText; setSmcqQuestions(newSQs); })}
+                        value={sq.explanation || ''}
+                        onChange={e => { const newSQs = [...smcqQuestions]; newSQs[i].explanation = e.target.value; setSmcqQuestions(newSQs); }}
+                        placeholder="Sub-explanation text for this scenario part..."
+                        rows={2}
+                        className="text-xs"
+                      />
                     </div>
                   </div>
                 ))}
@@ -3470,7 +3527,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                 <div className="mt-4">
                   <p className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">Sub-questions:</p>
                   <ol className="list-decimal pl-5 space-y-3">
-                    {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; image?: string }, i: number) => (
+                    {(subQuestions || []).map((sq: { question: string; marks: number; modelAnswer?: string; explanation?: string; image?: string }, i: number) => (
                       <li key={i} className="space-y-2">
                         <div>
                           <UniversalMathJax dynamic>{cleanupMath(sq.question || `(Sub-question ${i + 1})`)}</UniversalMathJax>
@@ -3485,6 +3542,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           <div className="ml-4 mt-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded-md">
                             <p className="text-xs font-semibold text-blue-700 dark:text-blue-300">Model Answer:</p>
                             <UniversalMathJax dynamic>{cleanupMath(sq.modelAnswer || '')}</UniversalMathJax>
+                          </div>
+                        )}
+                        {sq.explanation && (
+                          <div className="ml-4 mt-1 p-2 bg-indigo-50 dark:bg-indigo-900/10 rounded-md border border-indigo-100/50">
+                            <p className="text-[10px] font-semibold text-indigo-700 dark:text-indigo-400 uppercase tracking-tighter">Explanation:</p>
+                            <UniversalMathJax dynamic>{cleanupMath(sq.explanation || '')}</UniversalMathJax>
                           </div>
                         )}
                       </li>
@@ -3514,6 +3577,16 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
                           </div>
                         ))}
                       </div>
+                      {sq.explanation && (
+                        <div className="pl-7 mt-1">
+                          <div className="p-2 bg-indigo-50/50 dark:bg-indigo-900/5 rounded-md border border-indigo-100/30">
+                            <p className="text-[10px] font-semibold text-indigo-600/80 dark:text-indigo-400/80 uppercase mb-0.5">Explanation:</p>
+                            <div className="text-xs text-indigo-900/70 dark:text-indigo-300/70">
+                              <UniversalMathJax dynamic>{cleanupMath(sq.explanation)}</UniversalMathJax>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
