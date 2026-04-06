@@ -753,7 +753,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 return (
                   <div key={si} className="flex items-center justify-between gap-4 bg-white/50 p-1 rounded border border-emerald-50 text-emerald-900 font-medium">
                     <div className="flex items-center gap-2 max-w-[70%]">
-                      <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{si+1}</span>
+                      <span className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-[8px]">{si + 1}</span>
                       <span className="truncate opacity-75">{stmt}</span>
                     </div>
                     <Badge className="bg-emerald-600 text-white border-0 text-[8px] uppercase font-black px-1.5 h-3.5 leading-none">{String(ans ?? "—")}</Badge>
@@ -764,23 +764,59 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         )}
 
+        {/* Restoration: Student Response Artifacts (Annotated Pics) */}
+        {(subQ.studentImages && subQ.studentImages.length > 0) && (
+          <div className="my-6 p-5 rounded-[2rem] bg-slate-900 dark:bg-slate-950 text-white shadow-2xl relative overflow-hidden group/artifact">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover/artifact:rotate-12 group-hover/artifact:scale-110 transition-transform">
+              <ImageIcon className="w-16 h-16" />
+            </div>
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center">
+                    <Camera className="w-4 h-4 text-emerald-400" />
+                  </div>
+                  <div>
+                    <h5 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Submission Artifacts</h5>
+                    <p className="text-[9px] text-slate-500 font-bold uppercase tracking-tight">Part {subIdx + 1} • Student Response Screen</p>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-[9px] font-black border-white/20 text-emerald-400">Annotated Artifact</Badge>
+              </div>
+
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                {subQ.studentImages.map((imageUrl: string, imgIdx: number) => (
+                  <div
+                    key={imgIdx}
+                    className="aspect-video relative rounded-2xl overflow-hidden border border-white/10 group/img cursor-zoom-in"
+                    onClick={() => handleImageZoom(imageUrl, `Question Review • Part ${subIdx + 1}`, imgIdx, subQ.studentImages, subQ as unknown as Question)}
+                  >
+                    <img src={imageUrl} alt="Artifact" className="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-700" loading="lazy" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover/img:opacity-100 transition-opacity flex items-end p-3">
+                      <span className="text-[8px] font-black uppercase tracking-widest text-white/80">View Full Annotation</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Unified Teacher Feedback Section (Model Answer + Explanation) */}
         {(() => {
-          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans;
+          const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null) || subQ.q_ans || subQ.ans || subQ.sub_answer;
           const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : (Array.isArray(subQ.correctOrder) ? subQ.correctOrder : null)));
-          const hasExplanation = !!subQ.explanation;
-          
-          const specializedTypes = ['interpreting_graph', 'matching', 'flowchart', 'fill_in', 'true_false', 'short_answer', 'error_correction'];
-          const isSpecialized = specializedTypes.includes(subQ.subType || subQ.sub_type);
+          const explanation = subQ.explanation || subQ.sub_explanation || subQ.rationale || subQ.pedagogicalRationale;
+          const hasExplanation = !!explanation;
 
           // If no content to show, return null
-          if (!hasExplanation && (isSpecialized || (!modelAns && (!modelAnsArray || modelAnsArray.length === 0)))) return null;
+          if (!hasExplanation && (!modelAns && (!modelAnsArray || modelAnsArray.length === 0))) return null;
 
           return (
             <div className="mt-6 p-4 rounded-3xl bg-emerald-500/[0.03] dark:bg-emerald-500/[0.05] border border-emerald-500/10 dark:border-emerald-500/20 shadow-sm relative overflow-hidden group">
               {/* Background Accent */}
               <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-colors" />
-              
+
               <div className="relative z-10 space-y-4">
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
@@ -791,7 +827,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
                 <div className="grid grid-cols-1 gap-4 lg:gap-8">
                   {/* Model Answer Part */}
-                  {!isSpecialized && (modelAns || (modelAnsArray && modelAnsArray.length > 0)) && (
+                  {(modelAns || (modelAnsArray && modelAnsArray.length > 0)) && (
                     <div className="space-y-2">
                       <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tight flex items-center gap-1.5">
                         <CheckCircle className="w-3 h-3" /> Correct Key
@@ -824,7 +860,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                       </p>
                       <div className="pl-4 border-l-2 border-indigo-500/20">
                         <div className="text-xs text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
-                          <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                          <UniversalMathJax dynamic>{cleanupMath(explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
                         </div>
                       </div>
                     </div>
@@ -834,7 +870,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             </div>
           );
         })()}
-        
       </div>
     );
   };
@@ -2255,9 +2290,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                     </div>
 
                     <div className="space-y-12">
-                      {/* 1. OBJECTIVE SECTION (Unified MCQ, MC, MTF, AR, INT) */}
+                      {/* 1. OBJECTIVE SECTION (Unified MCQ, MC, MTF, AR, INT, SMCQ) */}
                       {(() => {
-                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC'];
+                        const objectiveTypes = ['MCQ', 'MC', 'MTF', 'AR', 'INT', 'NUMERIC', 'SMCQ'];
                         const filteredQuestions = (result.questions || []).filter(q => {
                           const type = (q.type || "").toUpperCase();
                           if (!objectiveTypes.includes(type)) return false;
@@ -2285,10 +2320,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                           <div id="objective-questions-section" className="space-y-8 animate-in fade-in duration-700">
                             <div className="flex items-center gap-4 mb-8">
                               <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20 shadow-inner">
-                                <CheckSquare className="h-6 w-6 text-indigo-600" />
-                              </div>
-                              <div>
-                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Objective Section</h3>
+                                <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Objective Section (MCQ, MC, AR, INT, MTF, SMCQ)</h3>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Items Found</p>
                               </div>
                             </div>
@@ -2550,32 +2582,35 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                       </div>
                                     ) : null}
 
-                                    {/* Explanation Section - Rendered for ALL types if available */}
+                                    {/* Restoration: Objective Explanation Section */}
                                     {(question.explanation || (question as any).explanationImage) && (
-                                      <div className="mt-4 p-4 bg-yellow-500/10 dark:bg-yellow-500/5 rounded-lg border border-yellow-500/20 dark:border-yellow-500/10">
-                                        <div className="flex items-center gap-2 mb-2">
-                                          <div className="bg-yellow-500/20 p-1.5 rounded-full shadow-inner">
-                                            <Star className="text-yellow-600 dark:text-yellow-400 h-4 w-4" />
+                                      <div className="mt-6 p-5 rounded-3xl bg-amber-500/[0.03] dark:bg-amber-500/[0.05] border border-amber-500/10 dark:border-amber-500/20 shadow-sm relative overflow-hidden group">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-amber-500/10 transition-colors" />
+                                        <div className="relative z-10 space-y-3">
+                                          <div className="flex items-center gap-2">
+                                            <div className="p-1.5 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                                              <Sparkles className="w-3.5 h-3.5" />
+                                            </div>
+                                            <h5 className="text-[10px] font-black uppercase tracking-widest text-amber-700 dark:text-amber-400">Explanation / ব্যাখ্যা</h5>
                                           </div>
-                                          <span className="font-bold text-yellow-600 dark:text-yellow-400 text-sm">Explanation / ব্যাখ্যা</span>
-                                        </div>
-                                        <div className="text-sm text-foreground/90 pl-8 leading-relaxed">
-                                          <UniversalMathJax inline dynamic>
-                                            {cleanupMath(renderDynamicExplanation(
-                                              question.explanation,
-                                              (question as any).leftColumn || question.options,
-                                              question.type,
-                                              (question as any).rightColumn
-                                            ))}
-                                          </UniversalMathJax>
-                                          {(question as any).explanationImage && (
-                                            <img
-                                              src={(question as any).explanationImage}
-                                              alt="Explanation"
-                                              className="mt-3 max-h-72 rounded-lg border border-border shadow-sm object-contain"
-                                              loading="lazy"
-                                            />
-                                          )}
+                                          <div className="pl-4 border-l-2 border-amber-500/20">
+                                            {question.explanation && (
+                                              <div className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 font-medium leading-relaxed italic">
+                                                <UniversalMathJax dynamic>{cleanupMath(question.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                              </div>
+                                            )}
+                                            {(question as any).explanationImage && (
+                                              <div className="mt-4 relative group/expimg cursor-zoom-in max-w-xl" onClick={() => handleImageZoom((question as any).explanationImage, "Explanation Diagram", 0, [(question as any).explanationImage], question as unknown as Question)}>
+                                                <img 
+                                                  src={(question as any).explanationImage} 
+                                                  alt="Explanation Graphic" 
+                                                  className="rounded-2xl border border-amber-200/50 shadow-md group-hover/expimg:scale-[1.01] transition-transform duration-500" 
+                                                  loading="lazy"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover/expimg:bg-black/5 transition-colors rounded-2xl" />
+                                              </div>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     )}
@@ -2628,9 +2663,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
 
 
 
-                      {/* 2. SQ SECTION (SQ, SMCQ) - Scenario Questions */}
+                      {/* 2. SHORT QUESTIONS SECTION (SQ) */}
                       {(() => {
-                        const sqTypes = ['SQ', 'SMCQ'];
+                        const sqTypes = ['SQ'];
                         const filteredQuestions = (result.questions || []).filter(q => sqTypes.includes((q.type || "").toUpperCase()));
                         if (filteredQuestions.length === 0) return null;
 
@@ -2644,9 +2679,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                 <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center border border-amber-500/20 shadow-inner">
                                    <Layers className="h-6 w-6 text-amber-600" />
                                 </div>
-                                <div>
-                                   <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Scenario Section (SQ)</h3>
-                                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{filteredQuestions.length} Questions</p>
+                                <div className="flex-1">
+                                   <div className="flex items-center justify-between mb-1">
+                                      <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">Short Questions</h3>
+                                      <Badge className="bg-amber-600/10 text-amber-600 border-amber-600/20 text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Evaluation Required</Badge>
+                                   </div>
+                                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                      <Info className="w-3 h-3" />
+                                      Section II • {filteredQuestions.length} Questions (Short Response)
+                                   </p>
                                 </div>
                              </div>
 
@@ -2697,17 +2738,6 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               </div>
                                             ) : (
                                               renderDescriptiveSubQuestion(subQ, subIdx, q.id)
-                                            )}
-
-                                            {/* Student Images for Sub-part */}
-                                            {subQ.studentImages && subQ.studentImages.length > 0 && (
-                                               <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
-                                                  {subQ.studentImages.map((img: string, iIdx: number) => (
-                                                     <div key={iIdx} className="relative group aspect-video rounded-2xl overflow-hidden border-2 border-white shadow-lg cursor-pointer" onClick={() => handleImageZoom(img, `SQ Part ${subIdx+1} - Page ${iIdx+1}`, iIdx, subQ.studentImages, q)}>
-                                                        <img src={img} className="w-full h-full object-cover group-hover:scale-105 transition-transform" loading="lazy" />
-                                                     </div>
-                                                  ))}
-                                               </div>
                                             )}
                                           </div>
                                         );
