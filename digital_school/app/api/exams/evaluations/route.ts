@@ -19,8 +19,9 @@ export async function GET(req: NextRequest) {
     const name = searchParams.get("name");
     const classId = searchParams.get("classId");
     const subject = searchParams.get("subject");
-
-    let exams;
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const skip = (page - 1) * limit;
 
     const commonWhere: any = {
       ...(status && status !== "ALL" && { evaluationAssignments: { some: { status: status as any } } }),
@@ -39,8 +40,12 @@ export async function GET(req: NextRequest) {
       })
     };
 
+    let exams;
+    let totalCount = 0;
+
     if (tokenData.user.role === "SUPER_USER" || tokenData.user.role === "ADMIN") {
       // Super user and Admin sees all exams (active and inactive) with evaluation assignments
+      totalCount = await prisma.exam.count({ where: commonWhere });
       exams = await prisma.exam.findMany({
         where: commonWhere,
         include: {
@@ -71,20 +76,25 @@ export async function GET(req: NextRequest) {
             }
           }
         },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit
       });
     } else {
       // Evaluators (TEACHER/ADMIN) see assigned exams
-      exams = await prisma.exam.findMany({
-        where: {
-          ...commonWhere,
-          evaluationAssignments: {
-            some: {
-              evaluatorId: tokenData.user.id,
-              ...(status && status !== "ALL" && { status: status as any })
-            }
+      const evaluatorWhere = {
+        ...commonWhere,
+        evaluationAssignments: {
+          some: {
+            evaluatorId: tokenData.user.id,
+            ...(status && status !== "ALL" && { status: status as any })
           }
-        },
+        }
+      };
+
+      totalCount = await prisma.exam.count({ where: evaluatorWhere });
+      exams = await prisma.exam.findMany({
+        where: evaluatorWhere,
         include: {
           class: { select: { name: true, section: true } },
           createdBy: {
@@ -114,11 +124,13 @@ export async function GET(req: NextRequest) {
             }
           }
         },
-        orderBy: { createdAt: "desc" }
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limit
       });
     }
 
-    console.log('Processing exams:', exams.length);
+    console.log('Processing exams:', exams.length, 'Total matching:', totalCount);
     const formattedExams = exams.map((exam: any) => {
       // Calculate evaluation status based on submissions
       let evaluationStatus = "UNASSIGNED";
@@ -157,9 +169,15 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    return NextResponse.json(formattedExams);
+    return NextResponse.json({
+      exams: formattedExams,
+      totalPages: Math.ceil(totalCount / limit),
+      currentPage: page,
+      totalCount
+    });
   } catch (error) {
     console.error("Error fetching evaluations:", error);
     return NextResponse.json({ error: "Failed to fetch evaluations" }, { status: 500 });
   }
-} 
+}
+ 

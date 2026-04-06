@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ActivityTab } from "./ActivityTab";
 
 import { useRouter } from "next/navigation";
-import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, LayoutDashboard } from "lucide-react";
+import { Calendar, Users, FileText, CheckCircle, Clock, AlertCircle, UserCheck, Eye, ArrowLeft, ArrowRight, LayoutDashboard } from "lucide-react";
 import { toast } from "sonner";
 import { verifyAdminAction } from "@/lib/native/auth";
 
@@ -69,6 +69,7 @@ export default function EvaluationsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [searchName, setSearchName] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [selectedClass, setSelectedClass] = useState<string>("ALL");
   const [selectedSubject, setSelectedSubject] = useState<string>("ALL");
   const [classes, setClasses] = useState<any[]>([]);
@@ -79,16 +80,32 @@ export default function EvaluationsPage() {
   const [isSuperUser, setIsSuperUser] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
+  // Search Debouncing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchName);
+      setCurrentPage(1); // Reset to first page on search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchName]);
 
   const fetchExams = useCallback(async () => {
     try {
       setLoading(true);
       const queryParams = new URLSearchParams();
       if (selectedStatus && selectedStatus !== "ALL") queryParams.append("status", selectedStatus);
-      if (searchName) queryParams.append("name", searchName);
+      if (debouncedSearch) queryParams.append("name", debouncedSearch);
       if (selectedClass && selectedClass !== "ALL") queryParams.append("classId", selectedClass);
       if (selectedSubject && selectedSubject !== "ALL") queryParams.append("subject", selectedSubject);
+      
+      queryParams.append("page", currentPage.toString());
+      queryParams.append("limit", ITEMS_PER_PAGE.toString());
 
       const response = await fetch(`/api/exams/evaluations?${queryParams.toString()}`, {
         credentials: 'include',
@@ -96,7 +113,9 @@ export default function EvaluationsPage() {
       });
       if (response.ok) {
         const data = await response.json();
-        setExams(data);
+        setExams(data.exams || []);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.totalCount || 0);
       } else {
         toast.error("Failed to fetch exams");
       }
@@ -106,7 +125,7 @@ export default function EvaluationsPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedStatus, searchName, selectedClass, selectedSubject]);
+  }, [selectedStatus, debouncedSearch, selectedClass, selectedSubject, currentPage]);
 
   const fetchClasses = async () => {
     try {
@@ -291,11 +310,12 @@ export default function EvaluationsPage() {
     }
   };
 
-  if (loading) {
+  if (loading && exams.length === 0) {
     return (
       <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading evaluations...</div>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <div className="w-12 h-12 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+          <div className="text-lg font-medium text-muted-foreground italic">Loading evaluations...</div>
         </div>
       </div>
     );
@@ -352,7 +372,7 @@ export default function EvaluationsPage() {
                 />
               </div>
 
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <Select value={selectedClass} onValueChange={(val) => { setSelectedClass(val); setCurrentPage(1); }}>
                 <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   <SelectValue placeholder="All Classes" />
                 </SelectTrigger>
@@ -366,7 +386,7 @@ export default function EvaluationsPage() {
                 </SelectContent>
               </Select>
 
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus} onValueChange={(val) => { setSelectedStatus(val); setCurrentPage(1); }}>
                 <SelectTrigger className="w-full sm:w-[180px] rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   <SelectValue placeholder="All Status" />
                 </SelectTrigger>
@@ -384,7 +404,7 @@ export default function EvaluationsPage() {
             <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
               {["ALL", "PENDING", "IN_PROGRESS", "COMPLETED"].includes(selectedStatus) && (
                 <Badge variant="outline" className="whitespace-nowrap rounded-lg px-3 py-1 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                  {selectedStatus === "ALL" ? `${exams.length} Exams` : `${exams.filter(e => e.status === selectedStatus).length} ${selectedStatus}`}
+                  {totalCount} Total Exams
                 </Badge>
               )}
               {isSuperUser && (
@@ -396,7 +416,12 @@ export default function EvaluationsPage() {
             </div>
           </div>
 
-          <div className="grid gap-6">
+          <div className="grid gap-6 relative">
+            {loading && exams.length > 0 && (
+              <div className="absolute inset-0 bg-white/20 dark:bg-slate-950/20 backdrop-blur-[2px] z-20 flex items-center justify-center rounded-3xl">
+                <div className="w-8 h-8 border-4 border-blue-500/30 border-t-blue-500 rounded-full animate-spin"></div>
+              </div>
+            )}
             {exams.map((exam) => (
               <Card key={exam.id} className="hover:shadow-md transition-shadow">
                 <CardHeader>
@@ -534,12 +559,73 @@ export default function EvaluationsPage() {
             ))}
           </div>
 
-          {exams.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-muted-foreground text-lg">No exams found</div>
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8 py-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="text-sm text-muted-foreground italic">
+                Showing <span className="font-bold">{(currentPage - 1) * ITEMS_PER_PAGE + 1}</span> to <span className="font-bold">{Math.min(currentPage * ITEMS_PER_PAGE, totalCount)}</span> of <span className="font-bold text-blue-500">{totalCount}</span> evaluations
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === 1}
+                  onClick={() => { setCurrentPage(prev => Math.max(1, prev - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="rounded-xl h-9"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" /> Previous
+                </Button>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                    // Simple pagination: show first, last, and current +/- 1
+                    if (p === 1 || p === totalPages || (p >= currentPage - 1 && p <= currentPage + 1)) {
+                      return (
+                        <Button
+                          key={p}
+                          variant={currentPage === p ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => { setCurrentPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className={`w-9 h-9 rounded-xl font-bold ${currentPage === p ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-md' : ''}`}
+                        >
+                          {p}
+                        </Button>
+                      );
+                    }
+                    if (p === 2 || p === totalPages - 1) return <span key={p} className="px-1 text-slate-400">...</span>;
+                    return null;
+                  })}
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={currentPage === totalPages}
+                  onClick={() => { setCurrentPage(prev => Math.min(totalPages, prev + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="rounded-xl h-9"
+                >
+                  Next <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {exams.length === 0 && !loading && (
+            <div className="text-center py-16 bg-slate-50/50 dark:bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800">
+              <div className="text-muted-foreground text-lg font-bold">No exams found</div>
               <p className="text-muted-foreground/60 mt-2">
-                Try adjusting your filters to find what you're looking for.
+                Try adjusting your filters or search query to find what you're looking for.
               </p>
+              <Button
+                variant="link"
+                className="mt-4 text-blue-500 font-bold"
+                onClick={() => {
+                  setSearchName("");
+                  setSelectedClass("ALL");
+                  setSelectedStatus("ALL");
+                  setCurrentPage(1);
+                }}
+              >
+                Clear all filters
+              </Button>
             </div>
           )}
         </TabsContent>
