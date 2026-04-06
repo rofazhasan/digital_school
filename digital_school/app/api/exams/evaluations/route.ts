@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       exams = await prisma.exam.findMany({
         where: commonWhere,
         include: {
-          class: true,
+          class: { select: { name: true, section: true } },
           createdBy: {
             select: { name: true, email: true }
           },
@@ -59,18 +59,16 @@ export async function GET(req: NextRequest) {
             }
           },
           examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: { name: true }
-                  }
-                }
-              }
+            select: {
+              id: true,
+              evaluatedAt: true,
+              evaluatorNotes: true
             }
           },
-          results: {
-            where: { isPublished: true }
+          _count: {
+            select: {
+              results: { where: { isPublished: true } }
+            }
           }
         },
         orderBy: { createdAt: "desc" }
@@ -88,7 +86,7 @@ export async function GET(req: NextRequest) {
           }
         },
         include: {
-          class: true,
+          class: { select: { name: true, section: true } },
           createdBy: {
             select: { name: true, email: true }
           },
@@ -104,18 +102,16 @@ export async function GET(req: NextRequest) {
             }
           },
           examSubmissions: {
-            include: {
-              student: {
-                include: {
-                  user: {
-                    select: { name: true }
-                  }
-                }
-              }
+            select: {
+              id: true,
+              evaluatedAt: true,
+              evaluatorNotes: true
             }
           },
-          results: {
-            where: { isPublished: true }
+          _count: {
+            select: {
+              results: { where: { isPublished: true } }
+            }
           }
         },
         orderBy: { createdAt: "desc" }
@@ -123,35 +119,25 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('Processing exams:', exams.length);
-    const formattedExams = await Promise.all(exams.map(async exam => {
+    const formattedExams = exams.map((exam: any) => {
       // Calculate evaluation status based on submissions
       let evaluationStatus = "UNASSIGNED";
 
       if (exam.evaluationAssignments.length > 0) {
-        // Check if any submissions have been evaluated
-        const evaluatedSubmissions = exam.examSubmissions.filter(submission =>
-          submission.evaluatedAt !== null
-        );
+        const totalSubmissions = exam.examSubmissions.length;
+        const evaluatedCount = exam.examSubmissions.filter((s: any) => s.evaluatedAt !== null).length;
+        const inProgressCount = exam.examSubmissions.filter((s: any) => s.evaluatedAt === null && s.evaluatorNotes).length;
 
-        const inProgressSubmissions = exam.examSubmissions.filter(submission => {
-          // Check if any questions have manual marks or evaluator notes
-          const answers = submission.answers as any;
-          const hasManualGrading = answers && Object.keys(answers).some(key =>
-            key.endsWith('_marks') && typeof answers[key] === 'number' && answers[key] > 0
-          );
-          return hasManualGrading || submission.evaluatorNotes;
-        });
-
-        if (evaluatedSubmissions.length === exam.examSubmissions.length && exam.examSubmissions.length > 0) {
+        if (evaluatedCount === totalSubmissions && totalSubmissions > 0) {
           evaluationStatus = "COMPLETED";
-        } else if (inProgressSubmissions.length > 0) {
+        } else if (evaluatedCount > 0 || inProgressCount > 0) {
           evaluationStatus = "IN_PROGRESS";
         } else {
           evaluationStatus = "PENDING";
         }
       }
 
-      const formattedExam = {
+      return {
         id: exam.id,
         name: exam.name,
         description: exam.description,
@@ -163,15 +149,13 @@ export async function GET(req: NextRequest) {
         createdBy: exam.createdBy,
         totalStudents: exam.examSubmissions.length,
         submittedStudents: exam.examSubmissions.length,
-        publishedResults: exam.results.length,
+        publishedResults: (exam as any)._count?.results || 0,
         evaluationAssignments: exam.evaluationAssignments,
         mcqNegativeMarking: exam.mcqNegativeMarking,
         mcNegativeMarking: exam.mcNegativeMarking,
         status: evaluationStatus
       };
-      console.log(`Exam ${exam.name}: status=${evaluationStatus}, submissions=${exam.examSubmissions.length}, assignments=${exam.evaluationAssignments.length}`);
-      return formattedExam;
-    }));
+    });
 
     return NextResponse.json(formattedExams);
   } catch (error) {

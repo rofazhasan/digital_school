@@ -2682,6 +2682,11 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               <span className="font-bold">Model Answer:</span> <UniversalMathJax inline dynamic>{cleanupMath((subQ?.modelAnswer || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                             </div>
                                           )}
+                                          {subQ?.explanation && (
+                                            <div className="mt-1 text-[10px] text-blue-600 bg-blue-50/50 p-2 rounded border border-blue-100/50 whitespace-pre-wrap">
+                                              <span className="font-bold opacity-70 uppercase mr-1">Explanation:</span> <UniversalMathJax inline dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                            </div>
+                                          )}
                                         </div>
                                       ))}
                                     </div>
