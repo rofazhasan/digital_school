@@ -12,7 +12,7 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
         text: s(getValue(row, [`${prefix} Text`, `${keyPrefix}Text`])),
         marks: n(getValue(row, [`${prefix} Marks`, `${keyPrefix}Marks`])),
         label: s(getValue(row, [`${prefix} Label`, `${keyPrefix}Label`])),
-        instruction: s(getValue(row, [`${prefix} Instructions`, `${keyPrefix}Instructions`])),
+        instructions: s(getValue(row, [`${prefix} Instructions`, `${keyPrefix}Instructions`])),
         modelAnswer: s(getValue(row, [`${prefix} Model Answer`, `${keyPrefix}ModelAnswer`])),
         explanation: s(getValue(row, [`${prefix} Explanation`, `${keyPrefix}Explanation`])),
         image: s(getValue(row, [`${prefix} Image URL`, `${keyPrefix}Img`]))
