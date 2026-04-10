@@ -3,35 +3,14 @@ import * as XLSX from 'xlsx';
 import prisma from "@/lib/db";
 import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
 import { parseDescriptiveSubQuestion } from '@/utils/descriptive-parser';
+import { s, n, getValue } from '@/utils/parser-utils';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
 type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
-// Helper to separate validation logic
-const s = (val: any) => {
-    if (val === null || val === undefined) return '';
-    return String(val).trim();
-}
-// Safe number parsing
-const n = (val: any) => {
-    if (val === undefined || val === null || val === '') return 0;
-    const items = String(val).match(/-?\d+/);
-    return items ? parseInt(items[0]) : 0;
-}
-
-// Helper to get value from multiple possible keys
-const getValue = (row: any, keys: string[]) => {
-    for (const key of keys) {
-        if (row[key] !== undefined && row[key] !== null && String(row[key]).trim() !== '') {
-            return row[key];
-        }
-    }
-    return '';
-}
-
-async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
+async function validateAndMapRow(row: any, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
     const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
@@ -285,7 +264,7 @@ export async function POST(req: NextRequest) {
 
             const previewRows = [];
             for (let i = 0; i < jsonData.length; i++) {
-                const result = await validateAndMapRow(jsonData[i], i + 2, classes);
+                const result = await validateAndMapRow(jsonData[i], classes);
                 if (result) {
                     previewRows.push({ ...result, rowNum: i + 2 });
                 }

@@ -1,15 +1,6 @@
-export function parseDescriptiveSubQuestion(row: any, i: number) {
-    const s = (val: any) => (val === undefined || val === null) ? '' : String(val).trim();
-    const n = (val: any) => isNaN(parseFloat(val)) ? 0 : parseFloat(val);
-    
-    // Helper to get value from multiple possible keys (handling Excel case/header variations)
-    const getValue = (r: any, keys: string[]) => {
-        for (const k of keys) {
-            if (r[k] !== undefined) return r[k];
-        }
-        return undefined;
-    };
+import { s, n, getValue } from './parser-utils';
 
+export function parseDescriptiveSubQuestion(row: any, i: number) {
     const prefix = `Sub ${i}`;
     const keyPrefix = `s${i}`;
 
