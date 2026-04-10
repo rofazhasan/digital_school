@@ -30,14 +30,14 @@ async function validateAndMapRow(row: any, classes: any[]) {
 
         explanation: s(getValue(row, ["Explanation", "Rationale", "Exp", "Solution", "Explaination"])),
         classId: null,
-        options: null,
-        subQuestions: null,
+        options: [],
+        subQuestions: [],
         assertion: null,
         reason: null,
         correctOption: null,
-        leftColumn: null,
-        rightColumn: null,
-        matches: null,
+        leftColumn: [],
+        rightColumn: [],
+        matches: {},
     };
 
     try {

@@ -1411,9 +1411,9 @@ const QuestionCard: React.FC<{
                           {(part.subType === 'fill_in' || part.sub_type === 'fill_in') && part.passage && (
                             <div className="p-2 rounded-xl bg-indigo-50/30 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/50 text-sm leading-relaxed whitespace-pre-wrap mt-2">
                               <UniversalMathJax>{part.passage}</UniversalMathJax>
-                              {(part.wordBox || part.word_box) && (part.wordBox || part.word_box).length > 0 && (
+                              {Array.isArray(part.wordBox || part.word_box) && (part.wordBox || part.word_box).length > 0 && (
                                 <div className="mt-2 pt-2 border-t border-indigo-100/50 flex flex-wrap gap-1.5">
-                                  {(part.wordBox || part.word_box).map((w: string, wi: number) => (
+                                  {(part.wordBox || part.word_box as any[]).map((w: string, wi: number) => (
                                     <span key={wi} className="px-2 py-0.5 bg-white dark:bg-gray-800 border rounded text-[9px] font-medium">{w}</span>
                                   ))}
                                 </div>
@@ -1421,17 +1421,17 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
-                          {(part.subType === 'matching' || part.sub_type === 'matching') && (part.leftColumn || part.left_column) && (
+                          {Array.isArray(part.leftColumn || part.left_column) && (part.subType === 'matching' || part.sub_type === 'matching') && (
                             <div className="grid grid-cols-2 gap-2 mt-2">
                               <div className="space-y-1">
-                                {(part.leftColumn || part.left_column).map((item: any, ii: number) => (
+                                {(part.leftColumn || part.left_column as any[]).map((item: any, ii: number) => (
                                   <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
                                     <span className="font-bold mr-1">{ii+1}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
                                   </div>
                                 ))}
                               </div>
                               <div className="space-y-1">
-                                {(part.rightColumn || part.right_column)?.map((item: any, ii: number) => (
+                                {Array.isArray(part.rightColumn || part.right_column) && (part.rightColumn || part.right_column as any[]).map((item: any, ii: number) => (
                                   <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
                                     <span className="font-bold mr-1">{String.fromCharCode(65+ii)}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
                                   </div>
@@ -1440,9 +1440,9 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
-                          {(part.subType === 'comprehension_mcq' || part.sub_type === 'comprehension_mcq') && part.options && (
+                          {Array.isArray(part.options) && (part.subType === 'comprehension_mcq' || part.sub_type === 'comprehension_mcq') && (
                             <div className="grid grid-cols-2 gap-2 mt-2">
-                              {part.options.map((opt: any, oi: number) => (
+                              {(part.options as any[]).map((opt: any, oi: number) => (
                                 <div key={oi} className={`text-[10px] p-2 rounded-lg border flex items-center gap-2 ${opt.isCorrect ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-white dark:bg-gray-900/20 border-gray-100 dark:border-gray-800'}`}>
                                   <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${opt.isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
                                     {String.fromCharCode(65 + oi)}
@@ -1453,10 +1453,10 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
-                          {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
+                          {Array.isArray(part.items) && (part.subType === 'flowchart' || part.sub_type === 'flowchart') && (
                             <div className="flex flex-wrap items-center gap-2 py-1 mt-2">
                               <div className="px-3 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
-                                <UniversalMathJax>{part.items[0]}</UniversalMathJax>
+                                <UniversalMathJax>{(part.items as any[])[0]}</UniversalMathJax>
                               </div>
                               <ArrowRight className="w-3 h-3 text-gray-400" />
                               <div className="px-4 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-[9px] font-bold text-gray-400 italic">
@@ -1509,23 +1509,23 @@ const QuestionCard: React.FC<{
                              const isFlowchart = part.subType === 'flowchart' || part.sub_type === 'flowchart';
                              const hasPairing = (part.subType === 'matching' || part.sub_type === 'matching') && !!part.matches;
 
-                             if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing && (!isFlowchart || !part.items)) return null;
+                             if (!modelAns && (!Array.isArray(pluralAnswers) || pluralAnswers.length === 0) && !hasExplanation && !hasPairing && (!isFlowchart || !Array.isArray(part.items))) return null;
 
                             return (
                               <div className="mt-3 space-y-2">
                                 {/* Complete Flowchart for Flowchart types */}
-                                {isFlowchart && part.items && (
+                                {isFlowchart && Array.isArray(part.items) && (
                                   <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100/50 text-[10px]">
                                     <p className="font-black uppercase text-emerald-700 mb-2 flex items-center gap-1">
                                       <ArrowRight className="w-2.5 h-2.5" /> Complete Flowchart
                                     </p>
                                     <div className="flex flex-wrap items-center gap-2 py-1">
-                                      {part.items.map((item: string, ii: number) => (
+                                      {(part.items as any[]).map((item: string, ii: number) => (
                                         <React.Fragment key={ii}>
                                           <div className="px-2.5 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap text-emerald-900 border-emerald-100">
                                             <UniversalMathJax inline>{item}</UniversalMathJax>
                                           </div>
-                                          {ii < part.items.length - 1 && <ArrowRight className="w-3 h-3 text-emerald-300" />}
+                                          {ii < (part.items as any[]).length - 1 && <ArrowRight className="w-3 h-3 text-emerald-300" />}
                                         </React.Fragment>
                                       ))}
                                     </div>
@@ -1563,13 +1563,13 @@ const QuestionCard: React.FC<{
                                 )}
 
                                 {/* Answer Keys for specialized types (Short Answer, True/False, etc.) */}
-                                {pluralAnswers && pluralAnswers.length > 0 && !hasPairing && !isFlowchart && (
+                                {Array.isArray(pluralAnswers) && pluralAnswers.length > 0 && !hasPairing && !isFlowchart && (
                                   <div className="p-3 rounded-xl bg-emerald-50/30 border border-emerald-100 dark:border-emerald-800/30">
                                     <p className="text-[10px] font-black uppercase text-emerald-700 dark:text-emerald-400 mb-2 flex items-center gap-1">
                                       <ArrowRight className="w-2.5 h-2.5" /> Answer Keys
                                     </p>
                                     <div className="flex flex-wrap gap-2">
-                                      {pluralAnswers.map((ans: any, ai: number) => (
+                                      {(pluralAnswers as any[]).map((ans: any, ai: number) => (
                                         <div key={ai} className="flex gap-2 items-center bg-white/50 p-1.5 rounded-lg border border-emerald-50">
                                           <span className="font-black text-[10px] bg-emerald-600 text-white w-4 h-4 rounded-full flex items-center justify-center shrink-0">{ai + 1}</span>
                                           <div className="text-[10px] font-bold text-emerald-900"><UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div>
