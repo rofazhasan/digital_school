@@ -40,9 +40,14 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
         const matchesStr = s(getValue(row, [`${prefix} Matches`, `${keyPrefix}Matches`]));
         if (matchesStr) {
             const matchMap: Record<string, string> = {};
-            matchesStr.split(',').forEach(m => {
-                const [l, r] = m.split('-').map(x => x.trim());
-                if (l && r) matchMap[l] = r;
+            // Support "1-A, 2-B" or "1-A 2-B"
+            matchesStr.split(/[,\s]+/).forEach(m => {
+                const parts = m.split('-').map(x => x.trim());
+                if (parts.length === 2) {
+                    const l = parts[0];
+                    const r = parts[1].toUpperCase();
+                    if (l && r) matchMap[l] = r;
+                }
             });
             subQ.matches = matchMap;
         }
@@ -78,7 +83,7 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
         const optB = s(getValue(row, [`${prefix} Option B`, `${keyPrefix}B`]));
         const optC = s(getValue(row, [`${prefix} Option C`, `${keyPrefix}C`]));
         const optD = s(getValue(row, [`${prefix} Option D`, `${keyPrefix}D`]));
-        const correct = s(getValue(row, [`${prefix} Correct Option`, `${keyPrefix}Correct`]));
+        const correct = s(getValue(row, [`${prefix} Correct Option`, `${keyPrefix}Correct`])).trim().toUpperCase();
 
         if (optA || optB) {
             subQ.options = [

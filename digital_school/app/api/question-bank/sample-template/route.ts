@@ -53,6 +53,7 @@ export async function GET(req: any) {
             ["COMPREHENSION", "Use 'Sub X Stem Passage' for the context. 'Sub X Questions' and 'Sub X Answers' for Q&A parts. OR used Option A-D for Passage MCQ."],
             ["GRAPHS", "Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe |), 'Sub X Chart Data' (pipe | numbers), and Axis labels."],
             ["DIAGRAMS", "Use 'Sub X Label' for the object name. Labels in 'Sub X Labels' using 'Text:x:y' format."],
+            ["IMAGES", "Use 'Primary Image URL' for the main question or 'Sub X Image URL' for specific parts (e.g., a diagram to be labeled)."],
             ["TIPS", "Always use Pipe symbol (|) to separate items in a list. Use 'Sub X Text' for the sub-question prompt (e.g., 'Analyze the graph')."],
         ];
 
@@ -93,6 +94,7 @@ export async function GET(req: any) {
             { header: "Difficulty", key: "difficulty", width: 12 },
             { header: "Marks", key: "marks", width: 8 },
             { header: "Question Text", key: "questionText", width: 40 },
+            { header: "Primary Image URL", key: "primaryImage", width: 25 },
             { header: "Teacher Note / Explanation", key: "explanation", width: 30 },
             { header: "Model Answer", key: "modelAnswer", width: 20 },
         ];
