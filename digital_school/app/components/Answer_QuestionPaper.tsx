@@ -1339,8 +1339,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               </div>
                             </div>
                           </div>
-                        </div>
-                      );
+                        );
                     })}
                   </div>
                 </>
