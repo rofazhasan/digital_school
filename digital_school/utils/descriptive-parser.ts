@@ -101,7 +101,7 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
 
         const questionsStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`]));
         const answersStr = s(getValue(row, [`${prefix} Answers`, `${keyPrefix}Answers`]));
-        if (questionsStr) subQ.subquestions = questionsStr.split('|').map(x => x.trim());
+        if (questionsStr) subQ.questions = questionsStr.split('|').map(x => x.trim());
         if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
     } else if (subType === 'short_answer' || subType === 'error_correction' || subType === 'writing') {
         const qStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`]));

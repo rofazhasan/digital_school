@@ -225,66 +225,6 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
         } else if (data.type === 'DESCRIPTIVE') {
             data.subQuestions = [];
             for (let i = 1; i <= 10; i++) {
-                const prefix = `Sub ${i}`;
-                const text = s(getValue(row, [`${prefix} Text`, `${prefix} Question`]));
-                if (!text && i > 1) continue;
-                if (!text && i === 1) break; // Should have at least one
-
-                const subType = s(getValue(row, [`${prefix} Type`])).toLowerCase() || 'writing';
-                const marks = n(getValue(row, [`${prefix} Marks`]));
-                const modelAnswer = s(getValue(row, [`${prefix} Model Answer`, `${prefix} Answer`]));
-                const explanation = s(getValue(row, [`${prefix} Explanation`, `${prefix} Note`]));
-                const label = s(getValue(row, [`${prefix} Label`]));
-                const instructions = s(getValue(row, [`${prefix} Instructions`]));
-
-                const subQ: any = { subType, text, questionText: text, marks, modelAnswer, explanation, label, instructions };
-                subQ.imageUrl = s(getValue(row, [`${prefix} Image URL`, `${prefix} Diagram URL`, `${prefix} Image`]));
-
-                // Handle Sub-type specific data from delimited strings
-                if (subType === 'fill_in') {
-                    subQ.fillType = s(getValue(row, [`${prefix} Fill Type`])) || 'gap_passage';
-                    subQ.clueType = s(getValue(row, [`${prefix} Clue Type`])) || 'none';
-                    subQ.passage = s(getValue(row, [`${prefix} Passage`]));
-                    const wordBoxStr = s(getValue(row, [`${prefix} Word Box`]));
-                    if (wordBoxStr) subQ.wordBox = wordBoxStr.split('|').map(x => x.trim());
-                    const answersStr = s(getValue(row, [`${prefix} Answers`]));
-                    if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
-                } else if (subType === 'short_answer') {
-                    const itemsStr = s(getValue(row, [`${prefix} Questions`, `${prefix} Items`]));
-                    if (itemsStr) subQ.questions = itemsStr.split('|').map(x => x.trim());
-                } else if (subType === 'error_correction') {
-                    const itemsStr = s(getValue(row, [`${prefix} Sentences`, `${prefix} Items`]));
-                    if (itemsStr) subQ.sentences = itemsStr.split('|').map(x => x.trim());
-                } else if (subType === 'table') {
-                    const headersStr = s(getValue(row, [`${prefix} Table Headers`]));
-                    if (headersStr) subQ.tableHeaders = headersStr.split('|').map(x => x.trim());
-                    const rowsStr = s(getValue(row, [`${prefix} Table Rows`]));
-                    if (rowsStr) {
-                        subQ.tableRows = rowsStr.split('||').map(r => r.split('|').map(x => x.trim()));
-                    }
-                } else if (subType === 'comprehension') {
-                    subQ.stemPassage = s(getValue(row, [`${prefix} Stem Passage`, `${prefix} Stem`]));
-                    subQ.passage = s(getValue(row, [`${prefix} Passage`])); // Fallback/Alternative
-                    const questionsStr = s(getValue(row, [`${prefix} Questions`]));
-                    if (questionsStr) subQ.questions = questionsStr.split('|').map(x => x.trim());
-                    const answersStr = s(getValue(row, [`${prefix} Answers`]));
-                    if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
-                } else if (subType === 'matching' || subType === 'mtf') {
-                    const getRoman = (num: number) => {
-                        const lookup: any = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
-                        let roman = '', i;
-                        for (i in lookup) {
-                            while (num >= lookup[i]) { roman += i; num -= lookup[i]; }
-                        }
-                        return roman;
-                    };
-                    const getSmallAlpha = (num: number) => String.fromCharCode(97 + num);
-
-                    const leftStr = s(getValue(row, [`${prefix} Left`]));
-                    if (leftStr) subQ.leftColumn = leftStr.split('|').map((t, idx) => ({ id: (idx + 1).toString(), text: t.trim() }));
-                    const rightStr = s(getValue(row, [`${prefix} Right`]));
-                    if (rightStr) subQ.rightColumn = rightStr.split('|').map((t, idx) => ({ id: String.fromCharCode(65 + idx), text: t.trim() }));
-                    
                 const subQ = parseDescriptiveSubQuestion(row, i);
                 if (subQ) data.subQuestions.push(subQ);
             }

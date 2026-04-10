@@ -37,7 +37,8 @@ import {
   PlusCircle, Wand2, Eye, EyeOff, CheckSquare,
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
-  Download, Save, AlertTriangle, LayoutDashboard, Info
+  Download, Save, AlertTriangle, LayoutDashboard, Info,
+  BarChart3
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
