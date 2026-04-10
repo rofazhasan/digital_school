@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import prisma from "@/lib/db";
 import { processQuestionWithInlineFBDs } from '@/utils/fbd/inline-parser';
+import { parseDescriptiveSubQuestion } from '@/utils/descriptive-parser';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
@@ -284,72 +285,8 @@ async function validateAndMapRow(row: any, rowNum: number, classes: any[]) {
                     const rightStr = s(getValue(row, [`${prefix} Right`]));
                     if (rightStr) subQ.rightColumn = rightStr.split('|').map((t, idx) => ({ id: String.fromCharCode(65 + idx), text: t.trim() }));
                     
-                    const colCStr = s(getValue(row, [`${prefix} Column C`]));
-                    if (colCStr) subQ.columnC = colCStr.split('|').map((t, idx) => ({ id: getRoman(idx + 1), text: t.trim() }));
-                    const colDStr = s(getValue(row, [`${prefix} Column D`]));
-                    if (colDStr) subQ.columnD = colDStr.split('|').map((t, idx) => ({ id: getSmallAlpha(idx), text: t.trim() }));
-
-                    const matchesStr = s(getValue(row, [`${prefix} Matches`]));
-                    if (matchesStr) {
-                        const matchMap: any = {};
-                        matchesStr.split(',').forEach(p => {
-                            const pts = p.split('-');
-                            if (pts.length >= 2) {
-                                matchMap[pts[0].trim()] = pts.slice(1).map(x => x.trim()).join('-');
-                            }
-                        });
-                        subQ.matches = matchMap;
-                    }
-                } else if (subType === 'rearranging' || subType === 'flowchart') {
-                    const itemsStr = s(getValue(row, [`${prefix} Rearrange Items`, `${prefix} Items`]));
-                    if (itemsStr) subQ.items = itemsStr.split('|').map(x => x.trim());
-                    const correctOrderStr = s(getValue(row, [`${prefix} Correct Order`, `${prefix} Model Answer`]));
-                    if (correctOrderStr) {
-                        subQ.correctOrder = correctOrderStr.split('|').map(x => x.trim());
-                        subQ.modelAnswers = correctOrderStr.split('|').map(x => x.trim()); // Double mapping for compatibility
-                    }
-                    subQ.flowchartStyle = s(getValue(row, [`${prefix} Flow Style`])) || 'vertical';
-                } else if (subType === 'true_false') {
-                    const statementsStr = s(getValue(row, [`${prefix} Statements`]));
-                    if (statementsStr) subQ.statements = statementsStr.split('|').map(x => x.trim());
-                    const correctAnswersStr = s(getValue(row, [`${prefix} Answers`]));
-                    if (correctAnswersStr) {
-                        subQ.correctAnswers = correctAnswersStr.split('|').map(x => {
-                            const val = x.trim().toLowerCase();
-                            return val === 'true' || val === 't' || val === '1';
-                        });
-                    }
-                } else if (subType === 'label_diagram') {
-                    const labelsStr = s(getValue(row, [`${prefix} Labels`]));
-                    if (labelsStr) {
-                        // Expect format: "Name1:x1:y1|Name2:x2:y2"
-                        subQ.labels = labelsStr.split('|').map(item => {
-                            const [text, x, y] = item.split(':').map(s => s.trim());
-                            return { text, x: n(x), y: n(y) };
-                        });
-                    }
-                } else if (subType === 'interpreting_graph') {
-                    const chartType = s(getValue(row, [`${prefix} Chart Type`, `s${i}ChartType`])) || 'bar';
-                    const chartLabels = s(getValue(row, [`${prefix} Chart Labels`, `s${i}ChartLabels`]));
-                    const chartData = s(getValue(row, [`${prefix} Chart Data`, `s${i}ChartData`]));
-                    const xAxisLabel = s(getValue(row, [`${prefix} X-Axis Label`, `s${i}XLabel`]));
-                    const yAxisLabel = s(getValue(row, [`${prefix} Y-Axis Label`, `s${i}YLabel`]));
-                    
-                    if (chartLabels && chartData) {
-                        subQ.chartConfig = {
-                            type: chartType,
-                            labels: chartLabels.split('|').map((x: string) => x.trim()),
-                            data: chartData.split('|').map((x: string) => n(x.trim())),
-                            xAxisLabel,
-                            yAxisLabel
-                        };
-                    }
-                } else if (subType === 'short_answer' || subType === 'error_correction') {
-                    const ansStr = s(getValue(row, [`${prefix} Model Answers`, `${prefix} Correct Answers`]));
-                    if (ansStr) subQ.modelAnswers = ansStr.split('|').map(x => x.trim());
-                }
-
-                data.subQuestions.push(subQ);
+                const subQ = parseDescriptiveSubQuestion(row, i);
+                if (subQ) data.subQuestions.push(subQ);
             }
             if (data.subQuestions.length === 0) throw new Error("DESCRIPTIVE requires at least one Sub-Question");
         }

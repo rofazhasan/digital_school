@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import ExcelJS from 'exceljs';
 import prisma from '@/lib/db';
 
-export async function GET() {
+export async function GET(req: any) {
     try {
+        const { searchParams } = new URL(req.url);
+        const mode = searchParams.get('type') || 'all'; // 'objective', 'descriptive', or 'all'
+
         const workbook = new ExcelJS.Workbook();
         workbook.creator = 'Digital School';
         workbook.created = new Date();
@@ -18,32 +21,42 @@ export async function GET() {
             { header: 'Instruction', key: 'instruction', width: 80 }
         ];
 
-        const instructions = [
+        const commonInstructions = [
             ["Step 1", "Download this template and fill it with your questions."],
             ["Step 2", "Do not change the header names in the 'Template' sheet."],
             ["Step 3", "Select values from the dropdowns for Type, Class, Subject, Difficulty, etc."],
             ["Step 4", "For Class Name, you MUST pick from the dropdown (these match your system classes)."],
             ["Step 5", "Save and upload this file back to the system."],
             [""],
-            ["FIELD GUIDE BY TYPE:", ""],
+            ["FIELD GUIDE:", ""],
+            ["Difficulty", "EASY, MEDIUM, HARD"],
+            ["Marks", "Number only."],
+            ["POETRY / PASSAGE", "For Poem/Passage, use '||' for forced line breaks or type with Newlines (Alt+Enter)."],
+        ];
+
+        const objectiveGuide = [
             ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
             ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
             ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
-            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B'). For 3+ columns, use 'Sub X Column C/D' in DESCRIPTIVE mode."],
-            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields 1-10. For poetry, use '||' for line breaks or just use Alt+Enter in Excel."],
-            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-10 including 'Option A-D' and 'Correct Option'. Provides automated marking."],
-            ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer'. Supports 'Sub X Type' for specialized layout."],
+            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
+            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields 1-10."],
+            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-10 including 'Option A-D' and 'Correct Option'."],
+        ];
+
+        const descriptiveGuide = [
             ["DESCRIPTIVE", "Flexible format. Use 'Sub X Type' (writing, fill_in, matching, rearranging, flowchart, comprehension, label_diagram, etc.)."],
+            ["  - Passage MCQ", "Use 'Sub X Type' = 'comprehension'. Use 'Sub X Stem Passage' and then fill 'Sub X Option A-D' and 'Sub X Correct Option'."],
             ["  - Flowchart", "Use 'Sub X Items' for all nodes (pipe separated '|'). The FIRST node is the starting prompt shown to students. Use 'Sub X Correct Order' for the full sequence."],
             ["  - Fill-in", "Use 'Sub X Clue Type' (word_box, in_text, none) and 'Sub X Word Box' (pipe separated). Use 'Sub X Passage' with '___' for gaps."],
             ["  - Labels", "Use 'Sub X Labels' with 'Text|Text' or 'Text:x:y|Text:x:y' format."],
-            ["POETRY / PASSAGE", "For Poem/Passage, use '||' for forced line breaks or type with Newlines (Alt+Enter). The system will preserve the poetic format."],
-            ["EXPLANATIONS", "Fill 'Teacher Note / Explanation' for the main question or 'Sub X Explanation' for each part. These show in Results/Evaluations."],
             ["  - Graphs", "Use 'Sub X Type' = 'interpreting_graph'. Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe separated '|'), 'Sub X Chart Data' (pipe separated '|'), and Axis labels."],
-            [""],
-            ["Difficulty", "EASY, MEDIUM, HARD"],
-            ["Marks", "Number only."]
         ];
+
+        const instructions = mode === 'objective' 
+            ? [...commonInstructions, ...objectiveGuide] 
+            : mode === 'descriptive' 
+                ? [...commonInstructions, ...descriptiveGuide] 
+                : [...commonInstructions, ...objectiveGuide, ...descriptiveGuide];
 
         instructions.forEach(row => infoSheet.addRow(row));
 
@@ -56,23 +69,19 @@ export async function GET() {
             }
         });
 
-        // 2. REFERENCE SHEET (Hidden logic for dropdowns)
+        // 2. REFERENCE SHEET
         const refSheet = workbook.addWorksheet('Valid Classes Reference');
-        // Retrieve classes
         const classes = await prisma.class.findMany({ select: { name: true, section: true } });
         const classNames = classes.map((c: any) => c.section ? `${c.name} - ${c.section}` : c.name);
-
         refSheet.columns = [{ header: 'Valid Classes', key: 'class', width: 50 }];
         refSheet.addRows(classNames.map((c: string) => [c]));
-
-        // Hide it so users don't mess with it, but keep it available for validation logic
         refSheet.state = 'hidden';
 
         // 3. TEMPLATE SHEET
         const templateSheet = workbook.addWorksheet('Template');
 
-        // Headers
-        const columns = [
+        // Headers Base
+        const baseColumns = [
             { header: "Type", key: "type", width: 10 },
             { header: "Class Name", key: "className", width: 25 },
             { header: "Subject", key: "subject", width: 15 },
@@ -80,6 +89,11 @@ export async function GET() {
             { header: "Difficulty", key: "difficulty", width: 12 },
             { header: "Marks", key: "marks", width: 8 },
             { header: "Question Text", key: "questionText", width: 40 },
+            { header: "Teacher Note / Explanation", key: "explanation", width: 30 },
+            { header: "Model Answer", key: "modelAnswer", width: 20 },
+        ];
+
+        const objectiveColumns = [
             { header: "Option A", key: "optionA", width: 15 },
             { header: "Option B", key: "optionB", width: 15 },
             { header: "Option C", key: "optionC", width: 15 },
@@ -100,15 +114,13 @@ export async function GET() {
             { header: "Right D", key: "rd", width: 15 },
             { header: "Right E", key: "re", width: 15 },
             { header: "Matches", key: "matches", width: 15 },
-            { header: "Teacher Note / Explanation", key: "explanation", width: 30 },
-            { header: "Model Answer", key: "modelAnswer", width: 20 },
         ];
 
-        // ADD SUB-QUESTION COLUMNS (1-10)
+        const descriptiveColumns: any[] = [];
         for (let i = 1; i <= 10; i++) {
             const prefix = `Sub ${i}`;
             const keyPrefix = `s${i}`;
-            columns.push(
+            descriptiveColumns.push(
                 { header: `${prefix} Text`, key: `${keyPrefix}Text`, width: 25 },
                 { header: `${prefix} Type`, key: `${keyPrefix}Type`, width: 15 },
                 { header: `${prefix} Marks`, key: `${keyPrefix}Marks`, width: 10 },
@@ -116,25 +128,22 @@ export async function GET() {
                 { header: `${prefix} Instructions`, key: `${keyPrefix}Instructions`, width: 25 },
                 { header: `${prefix} Model Answer`, key: `${keyPrefix}ModelAnswer`, width: 25 },
                 { header: `${prefix} Explanation`, key: `${keyPrefix}Explanation`, width: 25 },
-                // Special fields for sub-types
-                { header: `${prefix} Clue Type`, key: `${keyPrefix}ClueType`, width: 12 },
-                { header: `${prefix} Word Box`, key: `${keyPrefix}WordBox`, width: 20 },
-                { header: `${prefix} Passage`, key: `${keyPrefix}Passage`, width: 30 },
+                { header: `${prefix} Clue Type`, key: `${keyPrefix}ClueType`, width: 15 },
+                { header: `${prefix} Word Box`, key: `${keyPrefix}WordBox`, width: 25 },
+                { header: `${prefix} Passage`, key: `${keyPrefix}Passage`, width: 40 },
                 { header: `${prefix} Column C`, key: `${keyPrefix}ColC`, width: 15 },
                 { header: `${prefix} Column D`, key: `${keyPrefix}ColD`, width: 15 },
-                { header: `${prefix} Items`, key: `${keyPrefix}Items`, width: 20 },
-                { header: `${prefix} Correct Order`, key: `${keyPrefix}Order`, width: 20 },
-                { header: `${prefix} Stem Passage`, key: `${keyPrefix}Stem`, width: 30 },
-                { header: `${prefix} Questions`, key: `${keyPrefix}Questions`, width: 25 },
-                { header: `${prefix} Answers`, key: `${keyPrefix}Answers`, width: 25 },
-                { header: `${prefix} Image URL`, key: `${keyPrefix}Img`, width: 20 },
-                // MCQ specific in SMCQ/CQ
+                { header: `${prefix} Items`, key: `${keyPrefix}Items`, width: 25 },
+                { header: `${prefix} Correct Order`, key: `${keyPrefix}Order`, width: 25 },
+                { header: `${prefix} Stem Passage`, key: `${keyPrefix}Stem`, width: 40 },
+                { header: `${prefix} Questions`, key: `${keyPrefix}Questions`, width: 30 },
+                { header: `${prefix} Answers`, key: `${keyPrefix}Answers`, width: 30 },
+                { header: `${prefix} Image URL`, key: `${keyPrefix}Img`, width: 25 },
                 { header: `${prefix} Option A`, key: `${keyPrefix}A`, width: 15 },
                 { header: `${prefix} Option B`, key: `${keyPrefix}B`, width: 15 },
                 { header: `${prefix} Option C`, key: `${keyPrefix}C`, width: 15 },
                 { header: `${prefix} Option D`, key: `${keyPrefix}D`, width: 15 },
                 { header: `${prefix} Correct Option`, key: `${keyPrefix}Correct`, width: 15 },
-                // Chart specific fields
                 { header: `${prefix} Chart Type`, key: `${keyPrefix}ChartType`, width: 12 },
                 { header: `${prefix} Chart Labels`, key: `${keyPrefix}ChartLabels`, width: 25 },
                 { header: `${prefix} Chart Data`, key: `${keyPrefix}ChartData`, width: 20 },
@@ -142,8 +151,17 @@ export async function GET() {
                 { header: `${prefix} Y-Axis Label`, key: `${keyPrefix}YLabel`, width: 15 }
             );
         }
-        templateSheet.columns = columns;
 
+        let finalColumns = [...baseColumns];
+        if (mode === 'objective') {
+            finalColumns.push(...objectiveColumns);
+        } else if (mode === 'descriptive') {
+            finalColumns.push(...descriptiveColumns);
+        } else {
+            finalColumns.push(...objectiveColumns, ...descriptiveColumns);
+        }
+        
+        templateSheet.columns = finalColumns;
 
         // Header Styling
         const headerRow = templateSheet.getRow(1);
@@ -151,215 +169,108 @@ export async function GET() {
         headerRow.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FF4F46E5' } // Indigo-600 ish
+            fgColor: { argb: 'FF4F46E5' }
         };
         headerRow.alignment = { horizontal: 'center' };
 
-        // DATA VALIDATION & DROPDOWNS
+        // DATA VALIDATION
         const rowCount = 200;
+        const sampleClass = classNames[0] || "Class 10";
 
         for (let i = 2; i <= rowCount; i++) {
             const row = templateSheet.getRow(i);
-
-            // Type Dropdown (Col 1)
             row.getCell(1).dataValidation = {
                 type: 'list',
                 allowBlank: true,
-                formulae: ['"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"'],
-                showErrorMessage: true,
-                errorTitle: 'Invalid Type',
-                error: 'Select: MCQ, MC, INT, AR, MTF, CQ, SQ, SMCQ'
+                formulae: [`"${mode === 'objective' ? 'MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ' : mode === 'descriptive' ? 'DESCRIPTIVE' : 'MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE'}"`],
             };
-
-            // Class Name Dropdown (Col 2)
             if (classNames.length > 0) {
-                const lastRow = classNames.length + 1;
                 row.getCell(2).dataValidation = {
                     type: 'list',
                     allowBlank: false,
-                    formulae: [`'Valid Classes Reference'!$A$2:$A$${lastRow}`],
-                    showErrorMessage: true
+                    formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
                 };
             }
-
-            // Difficulty Dropdown (Col 5)
             row.getCell(5).dataValidation = {
                 type: 'list',
                 allowBlank: true,
                 formulae: ['"EASY,MEDIUM,HARD"'],
-                showErrorMessage: true
-            };
-
-            // Correct Option Dropdown (Col 13)
-            row.getCell(13).dataValidation = {
-                type: 'list',
-                allowBlank: true,
-                formulae: ['"A,B,C,D,E,1,2,3,4,5"'],
-                showErrorMessage: true
             };
         }
 
-        // Add Samples
-        const sampleClass = classNames[0] || "Class 10";
-        templateSheet.addRow(["MCQ", sampleClass, "Physics", "Light", "EASY", 1, "What is light?", "Wave", "Particle", "Both", "None", "", "C", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Both theories are correct."]);
-        templateSheet.addRow(["MC", sampleClass, "Math", "Primes", "MEDIUM", 4, "Pick primes:", "2", "3", "4", "5", "9", "A, B, D", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "2, 3, 5 are primes."]);
-        templateSheet.addRow(["INT", sampleClass, "Math", "Algebra", "EASY", 2, "2+2=?", "", "", "", "", "", "", "4"]);
-        templateSheet.addRow(["AR", sampleClass, "History", "Events", "MEDIUM", 1, "", "", "", "", "", "", "1", "", "S1 is true", "S2 is reason"]);
-        templateSheet.addRow(["MTF", sampleClass, "GK", "Capitals", "MEDIUM", 5, "Match capitals:", "", "", "", "", "", "", "", "", "", "India", "USA", "France", "", "", "Delhi", "Washington", "Paris", "", "", "1-A, 2-B, 3-C"]);
-        templateSheet.addRow(["SMCQ", sampleClass, "Physics", "Thermodynamics", "HARD", 5, "Consider a heat engine...", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "Explanation for stem", "", "What is efficiency?", 1, "0.5", "0.5", "0.3", "0.2", "A", "", "Efficiency formula..."]);
-        // Detailed Descriptive Examples
-        const descriptiveCommon = {
-            class: sampleClass,
-            subject: "English 2nd",
-            difficulty: "MEDIUM",
-            status: "PUBLISHED",
-            complexity: "CONCEPTUAL"
-        };
+        // Add Samples based on mode
+        if (mode === 'objective' || mode === 'all') {
+            templateSheet.addRow({
+                type: "MCQ", className: sampleClass, subject: "Physics", topic: "Light", difficulty: "EASY", marks: 1,
+                questionText: "What is the speed of light?", optionA: "3e8 m/s", optionB: "2e8 m/s", optionC: "1e8 m/s",
+                correctOption: "A", explanation: "Speed of light in vacuum is approx 300,000 km/s."
+            });
+            templateSheet.addRow({
+                type: "MTF", className: sampleClass, subject: "GK", topic: "Capitals", difficulty: "MEDIUM", marks: 5,
+                questionText: "Match capitals:", l1: "France", l2: "Japan", ra: "Tokyo", rb: "Paris",
+                matches: "1-B, 2-A"
+            });
+        }
 
-        // 1. Matching
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Matching",
-            marks: 5,
-            text: "Match the parts of sentences from Column A and Column B.",
-            explanation: "Model matching answer demonstrating Left:Right syntax.",
-            D1_SubType: "matching",
-            D1_Label: "A",
-            D1_Marks: 5,
-            D1_Instructions: "Match the following items.",
-            D1_Questions: "Row 1:Val 1|Row 2:Val 2|Row 3:Val 3",
-            D1_Answers: "Row 1:Val 1|Row 2:Val 2|Row 3:Val 3"
-        });
+        if (mode === 'descriptive' || mode === 'all') {
+            templateSheet.addRow({
+                type: "DESCRIPTIVE",
+                className: sampleClass,
+                subject: "English",
+                topic: "Comprehension",
+                difficulty: "MEDIUM",
+                marks: 10,
+                questionText: "Read the passage and answer.",
+                s1Text: "Passage Analysis",
+                s1Type: "comprehension",
+                s1Marks: 5,
+                s1Stem: "21st February is a historical day for Bangladesh...",
+                s1Questions: "What happened on this day?|Why is it important?",
+                s1Answers: "Language movement|National identity"
+            });
+            templateSheet.addRow({
+                type: "DESCRIPTIVE",
+                className: sampleClass,
+                subject: "English",
+                topic: "Grammar",
+                difficulty: "MEDIUM",
+                marks: 5,
+                questionText: "Fill in the blanks.",
+                s1Text: "Article usage",
+                s1Type: "fill_in",
+                s1Marks: 5,
+                s1ClueType: "word_box",
+                s1WordBox: "a|an|the|none",
+                s1Passage: "He is ___ honest man. ___ sun rises in the east.",
+                s1Answers: "an|The"
+            });
+            templateSheet.addRow({
+                type: "DESCRIPTIVE",
+                className: sampleClass,
+                subject: "Economics",
+                topic: "Price Index",
+                difficulty: "HARD",
+                marks: 5,
+                questionText: "Analyze the price trend.",
+                s1Type: "interpreting_graph",
+                s1Marks: 5,
+                s1ChartType: "line",
+                s1ChartLabels: "2020|2021|2022|2023",
+                s1ChartData: "100|105|112|120",
+                s1XLabel: "Year",
+                s1YLabel: "Index",
+                s1Explanation: "Graph shows steady inflation."
+            });
+        }
 
-        // 2. Fill in the gaps (Cloze Test)
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Fill in the gaps",
-            marks: 5,
-            text: "Read the following passage and fill in the blanks with suitable words.",
-            explanation: "Model gap-fill answer demonstrating triple underscore syntax.",
-            D1_SubType: "fill_in",
-            D1_Label: "B",
-            D1_Marks: 5,
-            D1_Instructions: "Use words from the box if necessary.",
-            D1_WordBox: "honest|hardworking|sincere|truth",
-            D1_Passage: "A man is known by the ___ he keeps. One should be ___ in life.",
-            D1_Answers: "company|honest"
-        });
-
-        // 3. Short Answer (New)
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Short Questions",
-            marks: 10,
-            text: "Answer the following questions in one or two sentences.",
-            explanation: "Model short answer demonstrating piped questions and model answers.",
-            D1_SubType: "short_answer",
-            D1_Label: "C",
-            D1_Marks: 10,
-            D1_Instructions: "Write concise answers.",
-            D1_Questions: "What is the capital of Bangladesh?|Name the national fruit.",
-            D1_Answers: "Dhaka|Jackfruit"
-        });
-
-        // 4. Error Correction (New)
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Error Correction",
-            marks: 10,
-            text: "The following sentences contain grammatical errors. Correct them.",
-            explanation: "Model error correction demonstrating piped sentences and corrections.",
-            D1_SubType: "error_correction",
-            D1_Label: "D",
-            D1_Marks: 10,
-            D1_Instructions: "Underline the change.",
-            D1_Questions: "She don't like apples.|He are a good boy.",
-            D1_Answers: "She doesn't like apples.|He is a good boy."
-        });
-
-        // 5. Rearranging
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Rearranging",
-            marks: 10,
-            text: "The following sentences are in jumbled order. Rearrange them.",
-            D1_SubType: "rearranging",
-            D1_Label: "E",
-            D1_Marks: 10,
-            D1_Instructions: "Put the numbers in correct order.",
-            D1_Questions: "Once there was a king.|He had a beautiful daughter.|Her name was Lily.",
-            D1_Answers: "1,2,3"
-        });
-
-        // 6. Interpreting Graph
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Graph Analysis",
-            marks: 5,
-            text: "Analyze the following sales data and answer.",
-            explanation: "Model analysis of the sales trends.",
-            D1_SubType: "interpreting_graph",
-            D1_Label: "F",
-            D1_Marks: 5,
-            D1_Instructions: "What does the graph show about Q3?",
-            D1_ChartType: "bar",
-            D1_ChartLabels: "Q1|Q2|Q3|Q4",
-            D1_ChartData: "400|600|800|500",
-            D1_XLabel: "Quarter",
-            D1_YLabel: "Sales (USD)",
-            D1_Answers: "The graph shows a peak in sales during Q3, reaching 800 USD."
-        });
-        
-        // 7. Flowchart (Standardized)
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Process Flow",
-            marks: 5,
-            text: "Complete the following flowchart representing the photosynthesis process.",
-            explanation: "Model flowchart answer showing the sequential steps.",
-            D1_SubType: "flowchart",
-            D1_Label: "G",
-            D1_Marks: 5,
-            D1_Instructions: "Identify the missing steps in the sequence.",
-            D1_Items: "Sunlight & CO2|Chlorophyll Absorption|Glucose Production|Oxygen Release",
-            D1_Order: "Sunlight & CO2|Chlorophyll Absorption|Glucose Production|Oxygen Release"
-        });
-
-        // 8. Interpreting Graph (Pie Chart)
-        templateSheet.addRow({
-            type: "DESCRIPTIVE",
-            ...descriptiveCommon,
-            topic: "Distribution of Gases",
-            marks: 5,
-            text: "Analyze the following pie chart showing the composition of Earth's atmosphere.",
-            explanation: "Model analysis of atmospheric gases.",
-            D1_SubType: "interpreting_graph",
-            D1_Label: "H",
-            D1_Marks: 5,
-            D1_Instructions: "Which gas is most abundant?",
-            D1_ChartType: "pie",
-            D1_ChartLabels: "Nitrogen|Oxygen|Argon|CO2 & Others",
-            D1_ChartData: "78|21|0.9|0.1",
-            D1_Answers: "Nitrogen is the most abundant gas at 78%."
-        });
-
-        // Freeze top row
         templateSheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
-
         const buffer = await workbook.xlsx.writeBuffer();
 
         return new NextResponse(buffer, {
             status: 200,
             headers: {
                 'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                'Content-Disposition': 'attachment; filename="question_upload_template.xlsx"',
+                'Content-Disposition': `attachment; filename="question_template_${mode}.xlsx"`,
             },
         });
     } catch (error) {
@@ -367,3 +278,4 @@ export async function GET() {
         return NextResponse.json({ error: "Failed to generate sample template" }, { status: 500 });
     }
 }
+

@@ -1439,6 +1439,19 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
+                          {(part.subType === 'comprehension_mcq' || part.sub_type === 'comprehension_mcq') && part.options && (
+                            <div className="grid grid-cols-2 gap-2 mt-2">
+                              {part.options.map((opt: any, oi: number) => (
+                                <div key={oi} className={`text-[10px] p-2 rounded-lg border flex items-center gap-2 ${opt.isCorrect ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-white dark:bg-gray-900/20 border-gray-100 dark:border-gray-800'}`}>
+                                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${opt.isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                                    {String.fromCharCode(65 + oi)}
+                                  </span>
+                                  <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
                           {(part.subType === 'flowchart' || part.sub_type === 'flowchart') && part.items && (
                             <div className="flex flex-wrap items-center gap-2 py-1 mt-2">
                               <div className="px-3 py-1.5 rounded-lg border bg-white dark:bg-gray-800 text-[10px] font-bold shadow-sm whitespace-pre-wrap">
@@ -1448,6 +1461,25 @@ const QuestionCard: React.FC<{
                               <div className="px-4 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-[9px] font-bold text-gray-400 italic">
                                 Continue flowchart...
                               </div>
+                            </div>
+                          )}
+
+                          {(part.subType === 'interpreting_graph' || part.sub_type === 'interpreting_graph') && part.chartConfig && (
+                            <div className="mt-2 p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800">
+                                <div className="flex items-center gap-2 mb-2 text-[10px] font-bold uppercase text-slate-500">
+                                    <BarChart3 className="w-3 h-3" /> {part.chartConfig.type} Chart: {part.chartConfig.xAxisLabel} vs {part.chartConfig.yAxisLabel}
+                                </div>
+                                <div className="flex items-end gap-1.5 h-20 px-2 overflow-hidden">
+                                    {part.chartConfig.data.map((val: number, vi: number) => (
+                                        <div key={vi} className="flex-1 flex flex-col items-center gap-1">
+                                            <div 
+                                                className="w-full bg-indigo-500/80 rounded-t-sm transition-all hover:bg-indigo-600" 
+                                                style={{ height: `${Math.min(100, (val / Math.max(...part.chartConfig.data)) * 100)}%` }}
+                                            ></div>
+                                            <span className="text-[7px] font-bold rotate-45 origin-left whitespace-nowrap mt-1">{part.chartConfig.labels[vi]}</span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                           )}
 
@@ -4567,9 +4599,24 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
 
               {inputType === 'file' ? (
                 <>
-                  <div className="flex justify-center">
-                    <Button variant="outline" onClick={() => window.open('/api/question-bank/sample-template', '_blank')}>
-                      <Download className="mr-2 h-4 w-4" /> Download Sample Template
+                  <div className="grid grid-cols-2 gap-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.open('/api/question-bank/sample-template?type=objective', '_blank')}
+                      className="h-auto py-4 flex flex-col gap-2 border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50/50"
+                    >
+                      <Download className="h-5 w-5 text-indigo-600" />
+                      <div className="text-xs font-bold">Objective Template</div>
+                      <div className="text-[10px] text-gray-400 font-normal">MCQ, CQ, MTF, etc.</div>
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.open('/api/question-bank/sample-template?type=descriptive', '_blank')}
+                      className="h-auto py-4 flex flex-col gap-2 border-purple-200 hover:border-purple-400 hover:bg-purple-50/50"
+                    >
+                      <Download className="h-5 w-5 text-purple-600" />
+                      <div className="text-xs font-bold">Descriptive Template</div>
+                      <div className="text-[10px] text-gray-400 font-normal">Fill-in, Rearrange, Graphs</div>
                     </Button>
                   </div>
 
@@ -4721,6 +4768,16 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                               {row.data.leftColumn?.length || 0} items matching...
                             </div>
                           )}
+                          {(row.data.type === 'CQ' || row.data.type === 'DESCRIPTIVE') && row.data.subQuestions && (
+                            <div className="mt-1 border-t pt-1 space-y-1">
+                              {row.data.subQuestions.map((sq: any, si: number) => (
+                                <div key={si} className="text-[9px] bg-slate-100 dark:bg-slate-800 p-1 rounded">
+                                  <span className="font-bold opacity-50 mr-1">{String.fromCharCode(97 + si)}.</span>
+                                  {sq.subType === 'comprehension_mcq' ? 'Passage MCQ' : (sq.question || sq.text || sq.subType || 'No text').substring(0, 30)}...
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell>{row.data.marks}</TableCell>
@@ -4793,13 +4850,16 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                   <li><b>Correct:</b> Use <code>A</code>, <code>B</code>, <code>C</code>, or <code>D</code>.</li>
                 </ul>
               </div>
-              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm">
-                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">CQ (Creative Question)</h4>
-                <p className="text-xs text-gray-500 mb-2">Stem-based question with multi-part MCQs.</p>
-                <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
                   <li><b>Type:</b> <code>CQ</code></li>
-                  <li><b>Stem:</b> Use the <code>Stem</code> column for the passage.</li>
-                  <li><b>Parts:</b> Map sub-questions in the <code>D1_</code>, <code>D2_</code> columns.</li>
+                  <li><b>Parts:</b> Map sub-questions in the <code>Sub X</code> columns. (Standard CQ)</li>
+                </ul>
+              </div>
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-indigo-600">
+                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">SMCQ (Scenario MCQ)</h4>
+                <p className="text-xs text-gray-500 mb-2">Automated marking for MCQ parts within a stem.</p>
+                <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
+                  <li><b>Type:</b> <code>SMCQ</code></li>
+                  <li><b>Parts:</b> Use <code>Sub X Questions</code> and <code>Sub X Option A-D</code>.</li>
                 </ul>
               </div>
             </div>
