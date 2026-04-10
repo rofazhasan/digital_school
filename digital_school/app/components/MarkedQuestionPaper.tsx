@@ -685,7 +685,10 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         <div className="flex-1">
                             <div className="text-[10px] font-bold leading-tight">
                                 <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.question || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                <span className="ml-1 text-[8px] text-slate-400 uppercase tra                             {subQ.instructions?.trim() && (
+                                <span className="ml-1 text-[8px] text-slate-400 uppercase tracking-tighter">[{subQ.marks || 0}]</span>
+                            </div>
+
+                            {subQ.instructions?.trim() && (
                                 <div className="text-[9px] italic text-slate-500 mt-1 mb-2">
                                     <UniversalMathJax dynamic>{subQ.instructions}</UniversalMathJax>
                                 </div>
