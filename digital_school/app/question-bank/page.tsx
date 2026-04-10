@@ -4859,19 +4859,28 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
 
           <TabsContent value="standard" className="space-y-4 pt-2">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* First Card: Single MCQ */}
               <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm">
-                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">SMCQ (Single MCQ)</h4>
+                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">MCQ (Single Choice)</h4>
                 <p className="text-xs text-gray-500 mb-2">Basic multiple choice questions.</p>
                 <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
-                  <li><b>Type:</b> <code>SMCQ</code></li>
+                  <li><b>Type:</b> <code>MCQ</code></li>
                   <li><b>Options:</b> Enter in columns <code>Option A</code>, <code>Option B</code>, etc.</li>
                   <li><b>Correct:</b> Use <code>A</code>, <code>B</code>, <code>C</code>, or <code>D</code>.</li>
                 </ul>
               </div>
+
+              {/* Second Card: Comprehension Questions (CQ) */}
+              <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-indigo-600">
+                <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">CQ (Comprehension)</h4>
+                <p className="text-xs text-gray-500 mb-2">Multi-part questions with sub-questions.</p>
+                <ul className="text-[11px] space-y-1.5 list-disc pl-4 text-gray-600 dark:text-gray-400">
                   <li><b>Type:</b> <code>CQ</code></li>
                   <li><b>Parts:</b> Map sub-questions in the <code>Sub X</code> columns. (Standard CQ)</li>
                 </ul>
               </div>
+
+              {/* Third Card: Scenario MCQ */}
               <div className="p-4 rounded-xl bg-white dark:bg-gray-800 border shadow-sm border-l-4 border-l-indigo-600">
                 <h4 className="font-bold text-sm mb-2 text-indigo-600 underline underline-offset-4 decoration-2 decoration-indigo-200">SMCQ (Scenario MCQ)</h4>
                 <p className="text-xs text-gray-500 mb-2">Automated marking for MCQ parts within a stem.</p>
