@@ -32,7 +32,7 @@ export const DescriptiveSection = ({
     submitted,
     onAnswerChange
 }: DescriptiveSectionProps) => {
-    const parts: any[] = question.subQuestions || [];
+    const parts: any[] = question.subQuestions || question.sub_questions || question.parts || [];
 
     return (
         <div className="space-y-8">
@@ -45,26 +45,30 @@ export const DescriptiveSection = ({
                 return (
                     <div key={pIdx} className="space-y-3 border rounded-xl p-4 bg-amber-50/40 dark:bg-amber-900/10 text-left">
                         {/* Part header */}
-                        <div className="flex items-center gap-2">
-                            <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${pIdx + 1}`}</span>
-                            <span className="text-xs text-muted-foreground">[{part.marks} marks]</span>
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="font-semibold text-sm text-amber-800 dark:text-amber-300">{part.label || `Part ${pIdx + 1}`}</span>
+                                <span className="text-xs text-muted-foreground">[{part.marks} marks]</span>
+                            </div>
                         </div>
+
+                        {/* Instructions */}
+                        {part.instructions?.trim() && (
+                            <div className="p-3 bg-white/60 dark:bg-amber-900/5 border-l-4 border-amber-500 rounded-r shadow-sm border-y border-r border-amber-100 dark:border-amber-900/20">
+                                <div className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5">
+                                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
+                                    Student Instructions
+                                </div>
+                                <div className="text-sm font-medium text-amber-900 dark:text-amber-100 italic leading-relaxed">
+                                    <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Main Text Content */}
                         {(part.text || part.questionText) && (
                             <div className="text-base font-medium text-amber-900 dark:text-amber-100 leading-relaxed bg-white/40 dark:bg-gray-800/20 p-4 rounded-xl border border-amber-200/20 shadow-sm whitespace-pre-wrap">
                                 <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
-                            </div>
-                        )}
-
-                        {/* Instructions */}
-                        {part.instructions?.trim() && (
-                            <div className="flex items-center gap-2 px-1">
-                                <div className="h-px flex-1 bg-amber-200/50"></div>
-                                <div className="text-[10px] font-black uppercase tracking-tighter text-amber-600/60 dark:text-amber-400/40 italic">
-                                    <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
-                                </div>
-                                <div className="h-px flex-1 bg-amber-200/50"></div>
                             </div>
                         )}
 

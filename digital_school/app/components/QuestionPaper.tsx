@@ -692,10 +692,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               </div>
                               {/* Render each sub-part of the descriptive question */}
                               <div className="space-y-4">
-                                {(q.subQuestions || []).map((part: any, pIdx: number) => (
+                                {(q.subQuestions || q.sub_questions || q.parts || []).map((part: any, pIdx: number) => (
                                   <div key={pIdx} className="border border-black/10 rounded-md p-3 bg-gray-50/10 break-inside-avoid shadow-sm">
                                     {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
-                                    {part.instructions?.trim() && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
+                                    
+                                    {/* Instructions Rendering */}
+                                    {part.instructions?.trim() && (
+                                      <div className="p-2 border-l-2 border-slate-400 bg-slate-50 mb-3 text-[10px] leading-relaxed italic text-slate-600">
+                                        <span className="font-bold uppercase not-italic mr-1 text-slate-900 pr-1 border-r border-slate-300">Instructions:</span>
+                                        <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                                      </div>
+                                    )}
                                     {(part.text || part.questionText) && (
                                       <div className="font-medium mb-2 leading-relaxed whitespace-pre-wrap">
                                         <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>

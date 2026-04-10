@@ -689,7 +689,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             </div>
 
                             {subQ.instructions?.trim() && (
-                                <div className="text-[9px] italic text-slate-500 mt-1 mb-2">
+                                <div className="p-2 border-l-2 border-indigo-400 bg-indigo-50/30 text-[9px] leading-relaxed italic text-indigo-700 mt-1 mb-2 rounded-r">
+                                    <span className="font-bold uppercase not-italic mr-1 text-indigo-800 pr-1 border-r border-indigo-200">Student Instructions:</span>
                                     <UniversalMathJax dynamic>{subQ.instructions}</UniversalMathJax>
                                 </div>
                             )}
@@ -707,12 +708,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0) && !isFlowchart) return null;
 
                                 return (
-                                    <div className="mt-3 pl-3 py-2 border-l-2 border-green-600 bg-green-50/20 text-[9px] text-green-900 leading-relaxed shadow-sm print:shadow-none">
-                                        <div className="font-black uppercase flex items-center gap-1.5 text-green-800 tracking-tight mb-1.5 opacity-80">
-                                            <div className="bg-green-600 p-0.5 rounded-sm">
+                                    <div className="mt-3 pl-3 ry-2 border-l-2 border-green-600 bg-green-50/20 text-[9px] text-green-900 leading-relaxed shadow-sm print:shadow-none rounded-r border-y border-r border-green-100/50">
+                                        <div className="font-black uppercase flex items-center gap-1.5 text-green-800 tracking-tight mb-1.5 opacity-90 pb-1 border-b border-green-200/50">
+                                            <div className="bg-green-600 p-0.5 rounded-sm shrink-0">
                                                 <BookOpen className="w-2.5 h-2.5 text-white" />
                                             </div>
-                                            Solution / Model Answer
+                                            Expert Solution / Model Answer
                                         </div>
 
                                         {isFlowchart && (
@@ -1411,15 +1412,19 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                 </div>
                                             </div>
 
-                                            {q.subQuestions && (
-                                                <div className="mt-4 space-y-4">
-                                                    {q.subQuestions.map((sub: any, sidx: number) => {
-                                                        const subId = sub.id || `${q.id || 'q'}_sub_${sidx}`;
-                                                        const studentAnswer = submission.answers[subId] || submission.answers[`${q.id || 'q'}_sub_${sidx}`] || submission.answers[`${q.id || 'q'}_desc_${sidx}_answer`];
-                                                        return renderSubQuestion({ ...sub, studentAnswer }, sidx, q.id || 'q');
-                                                    })}
-                                                </div>
-                                            )}
+                                            {(() => {
+                                                const subParts = q.subQuestions || q.sub_questions || q.parts || [];
+                                                if (subParts.length === 0) return null;
+                                                return (
+                                                    <div className="mt-4 space-y-4">
+                                                        {subParts.map((sub: any, sidx: number) => {
+                                                            const subId = sub.id || `${q.id || 'q'}_sub_${sidx}`;
+                                                            const studentAnswer = submission.answers[subId] || submission.answers[`${q.id || 'q'}_sub_${sidx}`] || submission.answers[`${q.id || 'q'}_desc_${sidx}_answer`];
+                                                            return renderSubQuestion({ ...sub, studentAnswer }, sidx, q.id || 'q');
+                                                        })}
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     );
                                 })}

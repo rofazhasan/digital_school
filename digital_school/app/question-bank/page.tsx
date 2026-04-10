@@ -4903,9 +4903,14 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                           {(row.data.type === 'CQ' || row.data.type === 'DESCRIPTIVE') && row.data.subQuestions && (
                             <div className="mt-1 border-t pt-1 space-y-1">
                               {row.data.subQuestions.map((sq: any, si: number) => (
-                                <div key={si} className="text-[9px] bg-slate-100 dark:bg-slate-800 p-1 rounded">
-                                  <span className="font-bold opacity-50 mr-1">{String.fromCharCode(97 + si)}.</span>
-                                  {sq.subType === 'comprehension_mcq' ? 'Passage MCQ' : (sq.question || sq.text || sq.subType || 'No text').substring(0, 30)}...
+                                <div key={si} className="text-[9px] bg-slate-100 dark:bg-slate-800 p-1 rounded flex items-center justify-between gap-1 overflow-hidden">
+                                  <div className="truncate flex-1">
+                                    <span className="font-bold opacity-50 mr-1">{String.fromCharCode(97 + si)}.</span>
+                                    {sq.subType === 'comprehension_mcq' ? 'Passage MCQ' : (sq.question || sq.text || sq.subType || 'No text').substring(0, 30)}...
+                                  </div>
+                                  {sq.instructions?.trim() && (
+                                    <div className="shrink-0 px-1 bg-amber-500 text-white rounded-[2px] font-black text-[7px] leading-none py-0.5" title={sq.instructions}>INST</div>
+                                  )}
                                 </div>
                               ))}
                             </div>
