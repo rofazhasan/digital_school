@@ -816,12 +816,12 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                                       {part.subType === 'comprehension' && (
                                         <div className="space-y-3">
-                                          {part.stemPassage && (
+                                          {(part.passage || part.stemPassage) && (
                                             <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
-                                              <UniversalMathJax dynamic>{part.stemPassage.replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                              <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           )}
-                                          {part.stemImage && <img src={part.stemImage} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
+                                          {(part.stemImage || part.imageUrl) && <img src={part.stemImage || part.imageUrl} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
 
                                           {(!part.answerType || part.answerType === 'qa') && (
                                             <div className="grid grid-cols-1 gap-2 ml-4">
@@ -829,7 +829,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                                 <div key={qIdx} className="flex flex-col gap-1">
                                                    <div className="flex items-start gap-2">
                                                       <span className="font-bold">{isEn ? String.fromCharCode(97 + qIdx) : BENGALI_SUB_LABELS[qIdx]}.</span>
-                                                      <UniversalMathJax dynamic>{typeof quest === 'string' ? quest : quest.text}</UniversalMathJax>
+                                                      <UniversalMathJax dynamic>{typeof quest === 'string' ? quest.replace(/\|\|/g, '\n') : (quest.text || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                                    </div>
                                                    <div className="border-b border-dotted border-gray-400 w-full mt-4 h-1 ml-6"></div>
                                                 </div>

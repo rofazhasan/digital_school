@@ -1163,11 +1163,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       <div>
                                         {part.subType === 'comprehension' && (!part.answerType || part.answerType === 'qa') && (
                                           <div className="space-y-2">
-                                            {(part.answers || part.modelAnswers || []).map((ans: string, aIdx: number) => (
+                                            {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, aIdx: number) => (
                                               <div key={aIdx} className="flex items-start gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
                                                 <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
                                                 <span className="flex-1 text-red-700 font-medium">
-                                                  <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                                  <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                                 </span>
                                               </div>
                                             ))}

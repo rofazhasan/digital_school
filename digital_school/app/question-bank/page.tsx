@@ -3805,12 +3805,12 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
 
                         {part.subType === 'comprehension' && (
                           <div className="space-y-2">
-                            {part.stemPassage && <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-3"><UniversalMathJax dynamic>{part.stemPassage}</UniversalMathJax></p>}
+                            {(part.passage || part.stemPassage) && <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-3"><UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax></p>}
                             <div className="grid grid-cols-1 gap-1 pl-2 border-l border-amber-200/50">
                               {(part.questions || []).slice(0, 3).map((q: any, qi: number) => (
                                 <p key={qi} className="text-[10px] text-gray-500 dark:text-gray-400 flex gap-1">
                                   <span className="font-bold opacity-50">{qi+1}.</span>
-                                  <UniversalMathJax inline dynamic>{q.text || q}</UniversalMathJax>
+                                  <UniversalMathJax inline dynamic>{(typeof q === 'string' ? q : (q.text || q.question || "")).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                 </p>
                               ))}
                               {(part.questions || []).length > 3 && <p className="text-[9px] text-gray-400">... and {(part.questions || []).length - 3} more</p>}

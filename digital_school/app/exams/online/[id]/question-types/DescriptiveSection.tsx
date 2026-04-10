@@ -186,24 +186,29 @@ export const DescriptiveSection = ({
                         {part.subType === 'comprehension' && (
                             <div className="space-y-4 text-left">
                                 {(part.passage || part.stemPassage) && (
-                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 whitespace-pre-wrap shadow-sm">
                                         <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                    </div>
+                                )}
+                                {part.primaryImage && (
+                                    <div className="flex justify-center p-2 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-border/50">
+                                        <ZoomableImage src={part.primaryImage} alt="Passage Image" className="max-h-64 rounded-lg object-contain" />
                                     </div>
                                 )}
                                 <div className="grid grid-cols-1 gap-4">
                                     {(part.questions || []).map((q: any, qi: number) => (
-                                        <div key={qi} className="space-y-2">
-                                            <p className="text-sm font-bold text-foreground/80 flex gap-2">
-                                                <span className="shrink-0">{qi + 1}.</span>
+                                        <div key={qi} className="p-4 bg-muted/10 rounded-2xl border border-border/40 space-y-3">
+                                            <div className="text-sm font-bold text-foreground/80 flex gap-2">
+                                                <span className="shrink-0 text-primary">{qi + 1}.</span>
                                                 <UniversalMathJax inline dynamic>{q.text || q}</UniversalMathJax>
-                                            </p>
+                                            </div>
                                             <DebouncedTextarea
                                                 value={getAns(qi) as string}
                                                 onChange={(val) => setAns(qi, val)}
                                                 disabled={disabled || submitted}
                                                 rows={3}
-                                                placeholder="Your answer…"
-                                                className="w-full p-3 rounded-xl border border-border bg-background focus:border-primary transition-all text-sm"
+                                                placeholder="Write your answer here..."
+                                                className="w-full p-4 rounded-xl border border-border bg-background focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all text-sm leading-relaxed"
                                             />
                                         </div>
                                     ))}
