@@ -821,12 +821,16 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                 <UniversalMathJax dynamic>{(q.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                               </div>
                               <div className="text-red-600 font-bold mt-2 mb-2">{isEn ? 'Answer Sheet:' : 'উত্তরপত্র:'}</div>
-                              <div className="space-y-4">
-
-                              {(q.subQuestions || []).map((part: any, pIdx: number) => (
+{(q.subQuestions || []).map((part: any, pIdx: number) => (
                                 <div key={pIdx} className="border border-black/20 rounded-md p-3 bg-gray-50/20 break-inside-avoid shadow-sm">
                                   {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
-                                  {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
+                                   {(part.instructions || part.instruction) && (
+                                     <div className="p-2 border-l-2 border-slate-300 bg-slate-50/50 mb-3 text-[10px] leading-relaxed italic text-slate-500 rounded-r">
+                                       <span className="font-bold uppercase not-italic mr-1 text-slate-700 font-mono">[Instructions:</span>
+                                       <UniversalMathJax dynamic>{part.instructions || part.instruction}</UniversalMathJax>
+                                       <span className="font-bold uppercase not-italic ml-1 text-slate-700 font-mono">]</span>
+                                     </div>
+                                   )}
                                   {(part.text || part.questionText) && (
                                     <div className="font-medium mb-2 leading-relaxed whitespace-pre-wrap">
                                       <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
@@ -1238,13 +1242,27 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     )}
 
                                     {part.subType === 'rearranging' && (
-                                      <div className="flex flex-wrap gap-2 ml-4 bg-white p-3 rounded border border-gray-100 shadow-sm">
-                                        {(part.correctOrder || []).map((o: string, oIdx: number) => (
-                                          <React.Fragment key={oIdx}>
-                                            <span className="w-8 h-8 rounded-full bg-red-600 text-white flex items-center justify-center font-bold">{o}</span>
-                                            {oIdx < (part.correctOrder || []).length - 1 && <span className="pt-1 text-gray-300">→</span>}
-                                          </React.Fragment>
-                                        ))}
+                                      <div className="mt-2 ml-4 relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50/30 print:border-slate-400">
+                                        <div className="bg-slate-800 text-white px-3 py-1.5 text-[9px] font-black uppercase tracking-widest flex items-center gap-2 print:bg-slate-100 print:text-slate-900 print:border-b print:border-slate-300">
+                                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse print:hidden"></div>
+                                          Correct Execution Sequence
+                                        </div>
+                                        <div className="p-4 flex flex-wrap items-center gap-2.5">
+                                          {(part.correctOrder || []).map((o: string, oIdx: number) => (
+                                            <React.Fragment key={oIdx}>
+                                              <div className="flex flex-col items-center">
+                                                <div className="w-9 h-9 rounded-lg bg-white border-2 border-slate-200 flex items-center justify-center font-black text-slate-800 shadow-sm print:border-slate-300 print:shadow-none transition-all hover:border-red-500 group">
+                                                  <span className="text-sm">{o}</span>
+                                                </div>
+                                              </div>
+                                              {oIdx < (part.correctOrder || []).length - 1 && (
+                                                <div className="text-slate-300 print:text-slate-400 transform scale-x-125">
+                                                  <ArrowRight className="w-4 h-4" />
+                                                </div>
+                                              )}
+                                            </React.Fragment>
+                                          ))}
+                                        </div>
                                       </div>
                                     )}
 

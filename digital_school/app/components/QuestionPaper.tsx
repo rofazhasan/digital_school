@@ -697,10 +697,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
                                     
                                     {/* Instructions Rendering */}
-                                    {part.instructions?.trim() && (
+                                    {(part.instructions || part.instruction)?.trim() && (
                                       <div className="p-2 border-l-2 border-slate-400 bg-slate-50 mb-3 text-[10px] leading-relaxed italic text-slate-600">
                                         <span className="font-bold uppercase not-italic mr-1 text-slate-900 pr-1 border-r border-slate-300">Instructions:</span>
-                                        <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                                        <UniversalMathJax dynamic>{part.instructions || part.instruction}</UniversalMathJax>
                                       </div>
                                     )}
                                     {(part.text || part.questionText) && (

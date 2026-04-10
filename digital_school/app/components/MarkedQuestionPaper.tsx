@@ -688,10 +688,10 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 <span className="ml-1 text-[8px] text-slate-400 uppercase tracking-tighter">[{subQ.marks || 0}]</span>
                             </div>
 
-                            {subQ.instructions?.trim() && (
+                            {(subQ.instructions || subQ.instruction)?.trim() && (
                                 <div className="p-2 border-l-2 border-indigo-400 bg-indigo-50/30 text-[9px] leading-relaxed italic text-indigo-700 mt-1 mb-2 rounded-r">
                                     <span className="font-bold uppercase not-italic mr-1 text-indigo-800 pr-1 border-r border-indigo-200">Student Instructions:</span>
-                                    <UniversalMathJax dynamic>{subQ.instructions}</UniversalMathJax>
+                                    <UniversalMathJax dynamic>{subQ.instructions || subQ.instruction}</UniversalMathJax>
                                 </div>
                             )}
 

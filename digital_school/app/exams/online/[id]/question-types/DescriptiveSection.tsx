@@ -53,14 +53,14 @@ export const DescriptiveSection = ({
                         </div>
 
                         {/* Instructions */}
-                        {part.instructions?.trim() && (
+                        {(part.instructions || part.instruction)?.trim() && (
                             <div className="p-3 bg-white/60 dark:bg-amber-900/5 border-l-4 border-amber-500 rounded-r shadow-sm border-y border-r border-amber-100 dark:border-amber-900/20">
                                 <div className="text-[9px] font-black uppercase tracking-widest text-amber-600 mb-1 flex items-center gap-1.5">
                                     <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse"></span>
                                     Student Instructions
                                 </div>
                                 <div className="text-sm font-medium text-amber-900 dark:text-amber-100 italic leading-relaxed">
-                                    <UniversalMathJax dynamic>{part.instructions}</UniversalMathJax>
+                                    <UniversalMathJax dynamic>{part.instructions || part.instruction}</UniversalMathJax>
                                 </div>
                             </div>
                         )}

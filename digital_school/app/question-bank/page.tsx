@@ -1394,9 +1394,9 @@ const QuestionCard: React.FC<{
                             <UniversalMathJax dynamic>{part.sourceText}</UniversalMathJax>
                           </div>
                         )}
-                        {part.instruction && (
+                        {(part.instruction || part.instructions) && (
                           <div className="text-[10px] text-blue-600 dark:text-blue-400 font-bold uppercase flex items-center gap-1">
-                            <Info className="w-3 h-3" /> {part.instruction}
+                            <Info className="w-3 h-3" /> {part.instruction || part.instructions}
                           </div>
                         )}
 
@@ -4908,7 +4908,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                                     <span className="font-bold opacity-50 mr-1">{String.fromCharCode(97 + si)}.</span>
                                     {sq.subType === 'comprehension_mcq' ? 'Passage MCQ' : (sq.question || sq.text || sq.subType || 'No text').substring(0, 30)}...
                                   </div>
-                                  {sq.instructions?.trim() && (
+                                  {(sq.instructions || sq.instruction)?.trim() && (
                                     <div className="shrink-0 px-1 bg-amber-500 text-white rounded-[2px] font-black text-[7px] leading-none py-0.5" title={sq.instructions}>INST</div>
                                   )}
                                 </div>
