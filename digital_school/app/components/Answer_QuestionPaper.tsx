@@ -1133,27 +1133,47 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                       </div>
                                     )}
 
-                                    {part.subType === 'comprehension' && (
+                                    {(part.subType === 'comprehension' || part.subType === 'comprehension_mcq') && (
                                       <div>
-                                        {(!part.answerType || part.answerType === 'qa') ? (
+                                        {part.subType === 'comprehension' && (!part.answerType || part.answerType === 'qa') && (
                                           <div className="space-y-2">
-                                            {(part.answers || []).map((ans: string, aIdx: number) => (
-                                              <div key={aIdx} className="flex items-start gap-2">
-                                                <span className="font-bold text-xs">{isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)}.</span>
-                                                <UniversalMathJax dynamic>{ans}</UniversalMathJax>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        ) : (
-                                          <div className="grid grid-cols-2 gap-2">
-                                            {(part.stemAnswers || []).map((ans: string, aIdx: number) => (
-                                              <div key={aIdx} className="flex gap-2">
-                                                <span className="font-bold">{isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)}.</span>
-                                                <span className="font-bold text-red-600">{normalizeAnswer(ans)}</span>
+                                            {(part.answers || part.modelAnswers || []).map((ans: string, aIdx: number) => (
+                                              <div key={aIdx} className="flex items-start gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                                <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
+                                                <span className="flex-1 text-red-700 font-medium">
+                                                  <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                                </span>
                                               </div>
                                             ))}
                                           </div>
                                         )}
+                                        
+                                        {part.subType === 'comprehension_mcq' && (
+                                          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                                            {(part.subQuestions || part.questions || []).map((sq: any, sqIdx: number) => {
+                                              const cAns = normalizeAnswer(sq.correct || sq.correctAnswer || (sq.options || []).find((o: any) => o.isCorrect)?.text);
+                                              const labelIdx = MCQ_LABELS_BN.indexOf(cAns);
+                                              const displayAns = isEn ? (MCQ_LABELS_EN[labelIdx] || cAns) : cAns;
+                                              return (
+                                                <div key={sqIdx} className="flex gap-2 items-center bg-white p-2 rounded border border-red-50 shadow-sm">
+                                                  <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + sqIdx) : BENGALI_SUB_LABELS[sqIdx]})</span>
+                                                  <span className="text-red-700 font-black">
+                                                     {displayAns}
+                                                  </span>
+                                                  <span className="text-[10px] text-gray-500 truncate opacity-60">
+                                                     <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
+                                                  </span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {part.subType === 'interpreting_graph' && (
+                                      <div className="p-2 bg-white rounded border border-gray-100 shadow-sm italic text-red-700">
+                                         <UniversalMathJax dynamic>{(part.modelAnswer || part.answer || part.correctAnswer || (isEn ? "No interpretation provided." : "কোনো ফলাফল প্রদান করা হয়নি।")).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                       </div>
                                     )}
 

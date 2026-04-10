@@ -359,47 +359,55 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             const getVal = (key: string) => (typeof studentAnswer === 'object' && studentAnswer !== null) ? studentAnswer[key] : null;
 
             switch (subType) {
-                case 'flowchart':
-                    const isHorizontal = subQ.flowchartStyle === 'horizontal';
+                case 'comprehension_mcq':
                     return (
-                        <div className={`mt-2 flex ${isHorizontal ? 'flex-row flex-wrap items-center' : 'flex-col'} gap-2 text-[10px]`}>
-                            {(subQ.items || []).map((item: string, ii: number) => {
-                                const isPrompt = ii === 0;
-                                const val = getVal(`flow_${ii}_0`) || (typeof studentAnswer === 'object' && studentAnswer !== null ? studentAnswer[`flow_${ii}_0`] : null);
-                                const isCorrect = normalize(val) === normalize(item);
+                        <div className="space-y-4">
+                            {(subQ.stemPassage || subQ.passage) && (
+                                <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded text-[9px] leading-relaxed italic">
+                                    <UniversalMathJax dynamic>{(subQ.stemPassage || subQ.passage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                </div>
+                            )}
+                            {(subQ.stemImage || subQ.imageUrl) && <img src={subQ.stemImage || subQ.imageUrl} alt="Stem" className="max-h-32 mx-auto rounded border" />}
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-2">
+                                {(subQ.subQuestions || subQ.questions || []).map((sq: any, sqi: number) => {
+                                    const studentAns = studentAnswer?.[sqi] || (typeof studentAnswer === 'object' ? studentAnswer[sqi] : null);
+                                    const correctText = sq.correct || sq.correctAnswer || sq.options?.find((o: any) => o.isCorrect)?.text;
+                                    const isCorrect = String(studentAns).trim() === String(correctText).trim();
 
-                                return (
-                                    <React.Fragment key={ii}>
-                                        <div className={`p-2 border rounded shadow-sm min-w-[120px] max-w-[200px] text-center ${isPrompt ? 'bg-slate-100 border-slate-300' : (val ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-slate-50 border-dashed border-slate-200')}`}>
-                                            <div className="font-black text-[7px] text-slate-400 uppercase mb-1">Step {ii + 1}</div>
-                                            <div className="font-bold text-slate-800">
-                                                {isPrompt ? (
-                                                    <Text>{item}</Text>
-                                                ) : (
-                                                    <div className="flex flex-col gap-1">
-                                                        <div className={val ? (isCorrect ? 'text-green-700' : 'text-red-700') : 'text-slate-400'}>
-                                                            {val || '__________'}
+                                    return (
+                                        <div key={sqi} className={`p-2 rounded border ${studentAns ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-gray-50'}`}>
+                                            <div className="font-bold mb-1 flex gap-1">
+                                                <span className="text-gray-400">{subIdx + 1}.{sqi + 1}</span>
+                                                <div className="inline-block"><Text>{sq.questionText || sq.text || sq.question}</Text></div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 ml-4">
+                                                {(sq.options || []).map((opt: any, oidx: number) => {
+                                                    const isSelected = String(studentAns).trim() === String(typeof opt === 'string' ? opt : opt.text).trim();
+                                                    const isOptCorrect = (typeof opt === 'string' ? opt : opt.text).trim() === String(correctText).trim();
+                                                    
+                                                    let optClass = "text-[8px] text-gray-500";
+                                                    if (isSelected && isOptCorrect) optClass = "text-green-700 font-bold";
+                                                    else if (isSelected && !isOptCorrect) optClass = "text-red-600 font-bold line-through";
+                                                    else if (isOptCorrect) optClass = "text-green-600 font-bold italic";
+
+                                                    return (
+                                                        <div key={oidx} className={`flex items-center gap-1 ${optClass}`}>
+                                                            <span className="font-bold opacity-60">{MCQ_LABELS[oidx]}.</span>
+                                                            <Text>{typeof opt === 'string' ? opt : opt.text}</Text>
+                                                            {isSelected && (isOptCorrect ? <CheckCircle className="w-2 h-2 text-green-600" /> : <XCircle className="w-2 h-2 text-red-600" />)}
                                                         </div>
-                                                        {!isCorrect && val && (
-                                                            <div className="text-[7px] text-green-700 opacity-60 border-t border-green-100 pt-1 mt-1">
-                                                                Key: <Text>{item}</Text>
-                                                                {val ? <XCircle className="w-2 h-2 ml-1 inline" /> : null}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                    );
+                                                })}
                                             </div>
                                         </div>
-                                        {ii < (subQ.items || []).length - 1 && (
-                                            <div className="flex items-center justify-center text-slate-300">
-                                                {isHorizontal ? <ArrowRight className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                                            </div>
-                                        )}
-                                    </React.Fragment>
-                                );
-                            })}
+                                    );
+                                })}
+                            </div>
                         </div>
                     );
+
+                case 'flowchart':
 
                 case 'fill_in':
                     const isBoxType = subQ.clueType === 'box';

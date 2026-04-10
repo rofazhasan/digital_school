@@ -180,17 +180,17 @@ export const DescriptiveSection = ({
 
                         {/* ── COMPREHENSION ── */}
                         {part.subType === 'comprehension' && (
-                            <div className="space-y-4">
+                            <div className="space-y-4 text-left">
                                 {(part.passage || part.stemPassage) && (
-                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 text-left whitespace-pre-wrap">
+                                    <div className="p-5 bg-card/50 border border-border rounded-2xl text-base leading-relaxed text-foreground/90 whitespace-pre-wrap">
                                         <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                     </div>
                                 )}
                                 <div className="grid grid-cols-1 gap-4">
                                     {(part.questions || []).map((q: any, qi: number) => (
-                                        <div key={qi} className="space-y-2 text-left">
+                                        <div key={qi} className="space-y-2">
                                             <p className="text-sm font-bold text-foreground/80 flex gap-2">
-                                                <span>{qi + 1}.</span>
+                                                <span className="shrink-0">{qi + 1}.</span>
                                                 <UniversalMathJax inline dynamic>{q.text || q}</UniversalMathJax>
                                             </p>
                                             <DebouncedTextarea
@@ -201,6 +201,51 @@ export const DescriptiveSection = ({
                                                 placeholder="Your answer…"
                                                 className="w-full p-3 rounded-xl border border-border bg-background focus:border-primary transition-all text-sm"
                                             />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* ── COMPREHENSION_MCQ ── */}
+                        {part.subType === 'comprehension_mcq' && (
+                            <div className="space-y-6 text-left">
+                                {(part.passage || part.stemPassage) && (
+                                    <div className="p-5 bg-card/50 border-l-4 border-amber-400 rounded-2xl text-base leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                                        <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                    </div>
+                                )}
+                                {part.primaryImage && (
+                                    <div className="flex justify-center p-2 bg-white/50 dark:bg-gray-800/50 rounded-xl border border-border/50">
+                                        <ZoomableImage src={part.primaryImage} alt="Passage Image" className="max-h-64 rounded-lg object-contain" />
+                                    </div>
+                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(part.subQuestions || part.questions || []).map((sq: any, sqi: number) => (
+                                        <div key={sqi} className="p-5 bg-white dark:bg-gray-800/40 border border-border/50 rounded-2xl shadow-sm space-y-4">
+                                            <div className="flex gap-3">
+                                                <span className="shrink-0 w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center text-xs font-black text-amber-700 dark:text-amber-400 border border-amber-200/50">{sqi + 1}</span>
+                                                <div className="text-base font-bold leading-tight">
+                                                    <UniversalMathJax dynamic>{sq.questionText || sq.text || sq.question}</UniversalMathJax>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 gap-2 pl-9">
+                                                {(sq.options || []).map((opt: any, oidx: number) => {
+                                                    const optText = typeof opt === 'string' ? opt : opt.text;
+                                                    const isSelected = getAns(sqi) === optText;
+                                                    return (
+                                                        <button
+                                                            key={oidx}
+                                                            onClick={() => !disabled && !submitted && setAns(sqi, optText)}
+                                                            disabled={disabled || submitted}
+                                                            className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${isSelected ? 'bg-amber-100 border-amber-400 dark:bg-amber-900/40 dark:border-amber-600 text-amber-900 dark:text-amber-200 ring-2 ring-amber-400/20' : 'bg-transparent border-border/60 hover:border-amber-200 dark:hover:border-amber-800 hover:bg-amber-50/30'}`}
+                                                        >
+                                                            <span className={`shrink-0 w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold ${isSelected ? 'bg-amber-500 text-white' : 'bg-muted text-muted-foreground'}`}>{String.fromCharCode(65 + oidx)}</span>
+                                                            <div className="flex-1 text-sm"><UniversalMathJax inline>{optText}</UniversalMathJax></div>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

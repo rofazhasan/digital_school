@@ -1440,16 +1440,38 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
-                          {Array.isArray(part.options) && (part.subType === 'comprehension_mcq' || part.sub_type === 'comprehension_mcq') && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              {(part.options as any[]).map((opt: any, oi: number) => (
-                                <div key={oi} className={`text-[10px] p-2 rounded-lg border flex items-center gap-2 ${opt.isCorrect ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-300' : 'bg-white dark:bg-gray-900/20 border-gray-100 dark:border-gray-800'}`}>
-                                  <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold ${opt.isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
-                                    {String.fromCharCode(65 + oi)}
-                                  </span>
-                                  <UniversalMathJax inline>{opt.text || ''}</UniversalMathJax>
+                          {/* Comprehension MCQ Nested Parts */}
+                          {(part.subType === 'comprehension_mcq' || part.sub_type === 'comprehension_mcq') && (
+                            <div className="space-y-4 mt-2">
+                                {(part.passage || part.stemPassage) && (
+                                    <div className="p-2.5 bg-slate-100/50 dark:bg-slate-800/50 border-l-4 border-amber-300 rounded text-[11px] text-slate-700 dark:text-slate-300 italic">
+                                        <UniversalMathJax dynamic>{cleanupMath(part.passage || part.stemPassage)}</UniversalMathJax>
+                                    </div>
+                                )}
+                                <div className="space-y-3">
+                                    {(part.subQuestions || part.questions || []).map((sq: any, sqi: number) => (
+                                        <div key={sqi} className="pl-4 border-l-2 border-slate-100 dark:border-slate-800 py-1">
+                                            <div className="text-[11px] font-bold mb-1.5 flex gap-1">
+                                                <span className="text-slate-400">{sqi + 1}.</span>
+                                                <UniversalMathJax inline>{sq.questionText || sq.text || sq.question}</UniversalMathJax>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {(sq.options || []).map((opt: any, oi: number) => {
+                                                    const optText = typeof opt === 'string' ? opt : opt.text;
+                                                    const isCorrect = sq.correct === optText || sq.correctAnswer === optText || opt.isCorrect;
+                                                    return (
+                                                        <div key={oi} className={`text-[9px] p-1.5 rounded border flex items-center gap-1.5 ${isCorrect ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800 text-green-700 dark:text-green-300 font-bold' : 'bg-white dark:bg-gray-950 border-gray-100 dark:border-gray-800'}`}>
+                                                            <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'}`}>
+                                                                {String.fromCharCode(65 + oi)}
+                                                            </span>
+                                                            <UniversalMathJax inline>{optText || ''}</UniversalMathJax>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                              ))}
                             </div>
                           )}
 

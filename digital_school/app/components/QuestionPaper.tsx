@@ -832,6 +832,38 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                         </div>
                                       )}
 
+                                       {part.subType === 'comprehension_mcq' && (
+                                         <div className="space-y-4">
+                                           {(part.stemPassage || part.passage) && (
+                                             <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
+                                               <UniversalMathJax dynamic>{(part.stemPassage || part.passage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                             </div>
+                                           )}
+                                           {(part.stemImage || part.imageUrl) && <img src={part.stemImage || part.imageUrl} alt="Stem" className="max-h-64 mx-auto mb-4 rounded border shadow-sm" />}
+
+                                           <div className="grid grid-cols-2 gap-x-4 gap-y-6 ml-4">
+                                             {(part.subQuestions || part.questions || []).map((sq: any, sqi: number) => (
+                                               <div key={sqi} className="flex flex-col gap-2">
+                                                 <div className="flex items-start gap-2">
+                                                   <span className="font-bold underline">({isEn ? (sqi + 1) : toBengaliNumerals(sqi + 1)})</span>
+                                                   <div className="font-semibold text-sm">
+                                                     <UniversalMathJax dynamic>{sq.questionText || sq.text || sq.question}</UniversalMathJax>
+                                                   </div>
+                                                 </div>
+                                                 <div className="grid grid-cols-2 gap-x-2 gap-y-1 ml-6">
+                                                   {(sq.options || []).map((opt: any, oidx: number) => (
+                                                     <div key={oidx} className="flex items-center gap-1.5 text-xs">
+                                                       <span className="font-bold opacity-60">({MCQ_LABELS[oidx]})</span>
+                                                       <UniversalMathJax inline>{typeof opt === 'string' ? opt : opt.text}</UniversalMathJax>
+                                                     </div>
+                                                   ))}
+                                                 </div>
+                                               </div>
+                                             ))}
+                                           </div>
+                                         </div>
+                                       )}
+
                                       {part.subType === 'true_false' && (
                                         <div className="space-y-2 mt-2 ml-4">
                                           {(part.statements || []).map((stmt: string, sIdx: number) => (
