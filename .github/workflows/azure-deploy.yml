@@ -1,11 +1,15 @@
-# Triggering fresh build at 2026-03-01T21:30:00
-name: Deploy V3 - Fix Install
+# Triggering fresh build at 2026-04-10
+name: Deploy to Azure App Service
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  NODE_OPTIONS: "--max-old-space-size=4096"
 
 jobs:
   build-and-deploy:
@@ -25,12 +29,14 @@ jobs:
           password: ${{ secrets.AZURE_CONTAINER_REGISTRY_PASSWORD }}
 
       - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: digital_school
           file: digital_school/Dockerfile
           push: true
           tags: ${{ secrets.AZURE_CONTAINER_REGISTRY_LOGIN_SERVER }}/digital-school:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
