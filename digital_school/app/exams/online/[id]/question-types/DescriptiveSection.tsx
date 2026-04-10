@@ -58,7 +58,7 @@ export const DescriptiveSection = ({
                         )}
 
                         {/* Instructions */}
-                        {part.instructions && (
+                        {part.instructions?.trim() && (
                             <div className="flex items-center gap-2 px-1">
                                 <div className="h-px flex-1 bg-amber-200/50"></div>
                                 <div className="text-[10px] font-black uppercase tracking-tighter text-amber-600/60 dark:text-amber-400/40 italic">

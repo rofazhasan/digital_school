@@ -2983,7 +2983,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                       <UniversalMathJax dynamic>{subQ.sourceText}</UniversalMathJax>
                                                     </div>
                                                   )}
-                                                  {subQ.instructions && (
+                                                  {subQ.instructions?.trim() && (
                                                     <div className="text-[10px] text-blue-600 font-bold uppercase mb-1 flex items-center gap-1">
                                                       <Info className="w-3 h-3" /> {subQ.instructions}
                                                     </div>

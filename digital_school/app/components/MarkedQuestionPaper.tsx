@@ -685,10 +685,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         <div className="flex-1">
                             <div className="text-[10px] font-bold leading-tight">
                                 <UniversalMathJax inline dynamic>{cleanupMath((subQ.text || subQ.question || subQ.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                <span className="ml-1 text-[8px] text-slate-400 uppercase tracking-tighter">[{subQ.marks || 0}]</span>
-                            </div>
-
-                            {subQ.instructions && (
+                                <span className="ml-1 text-[8px] text-slate-400 uppercase tra                             {subQ.instructions?.trim() && (
                                 <div className="text-[9px] italic text-slate-500 mt-1 mb-2">
                                     <UniversalMathJax dynamic>{subQ.instructions}</UniversalMathJax>
                                 </div>
@@ -707,37 +704,42 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                 if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0) && !isFlowchart) return null;
 
                                 return (
-                                    <div className="mt-2 p-2 bg-green-50 border border-green-100 rounded text-[8px] text-green-800">
-                                        <div className="font-bold uppercase flex items-center gap-1 opacity-70 mb-0.5">
-                                            <BookOpen className="w-2 h-2" /> Model Answer / Key
+                                    <div className="mt-3 pl-3 py-2 border-l-2 border-green-600 bg-green-50/20 text-[9px] text-green-900 leading-relaxed shadow-sm print:shadow-none">
+                                        <div className="font-black uppercase flex items-center gap-1.5 text-green-800 tracking-tight mb-1.5 opacity-80">
+                                            <div className="bg-green-600 p-0.5 rounded-sm">
+                                                <BookOpen className="w-2.5 h-2.5 text-white" />
+                                            </div>
+                                            Solution / Model Answer
                                         </div>
 
                                         {isFlowchart && (
-                                            <div className="flex flex-wrap items-center gap-1.5 py-1 mb-1">
+                                            <div className="flex flex-wrap items-center gap-1.5 py-1 mb-1.5">
                                                 {(subQ.items || []).map((item: string, ii: number) => (
                                                     <React.Fragment key={ii}>
-                                                        <div className="px-1.5 py-1 rounded border border-green-200 bg-white font-bold text-green-700">
+                                                        <div className="px-2 py-1 rounded border border-green-200 bg-white font-bold text-green-700 shadow-sm print:shadow-none">
                                                             <UniversalMathJax inline>{item}</UniversalMathJax>
                                                         </div>
-                                                        {ii < (subQ.items || []).length - 1 && <ArrowRight className="w-2 h-2 text-green-300" />}
+                                                        {ii < (subQ.items || []).length - 1 && <ArrowRight className="w-2.5 h-2.5 text-green-400" />}
                                                     </React.Fragment>
                                                 ))}
                                             </div>
                                         )}
 
-                                        {modelAns && (
-                                            <UniversalMathJax dynamic inline>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                        )}
-                                        {modelAnsArray && modelAnsArray.length > 0 && (
-                                            <div className="flex flex-col gap-1 mt-1">
-                                                {modelAnsArray.map((ans: any, ai: number) => (
-                                                    <div key={ai} className="flex gap-1">
-                                                        <span className="font-black">({ai + 1})</span>
-                                                        <UniversalMathJax inline>{cleanupMath(String(ans))}</UniversalMathJax>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
+                                        <div className="font-medium">
+                                            {modelAns && (
+                                                <UniversalMathJax dynamic inline>{cleanupMath(String(modelAns).replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                            )}
+                                            {modelAnsArray && modelAnsArray.length > 0 && (
+                                                <div className="flex flex-col gap-1.5 mt-1.5">
+                                                    {modelAnsArray.map((ans: any, ai: number) => (
+                                                        <div key={ai} className="flex gap-1.5 items-start">
+                                                            <span className="font-black text-green-700 opacity-60">({ai + 1})</span>
+                                                            <UniversalMathJax inline>{cleanupMath(String(ans))}</UniversalMathJax>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })()}

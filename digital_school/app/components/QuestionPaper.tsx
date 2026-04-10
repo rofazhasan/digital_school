@@ -695,7 +695,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                 {(q.subQuestions || []).map((part: any, pIdx: number) => (
                                   <div key={pIdx} className="border border-black/10 rounded-md p-3 bg-gray-50/10 break-inside-avoid shadow-sm">
                                     {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
-                                    {part.instructions && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
+                                    {part.instructions?.trim() && <div className="text-[10px] italic mb-2 text-gray-500">{part.instructions}</div>}
                                     {(part.text || part.questionText) && (
                                       <div className="font-medium mb-2 leading-relaxed whitespace-pre-wrap">
                                         <UniversalMathJax dynamic>{(part.text || part.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
