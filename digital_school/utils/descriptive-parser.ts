@@ -40,12 +40,13 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
         const matchesStr = s(getValue(row, [`${prefix} Matches`, `${keyPrefix}Matches`]));
         if (matchesStr) {
             const matchMap: Record<string, string> = {};
-            // Support "1-A, 2-B" or "1-A 2-B"
+            // Support "1-A, 2-B" (2-way) or "1-A-I, 2-B-II" (3-way)
             matchesStr.split(/[,\s]+/).forEach(m => {
-                const parts = m.split('-').map(x => x.trim());
-                if (parts.length === 2) {
+                const parts = m.split('-').map(x => x.trim().toUpperCase());
+                if (parts.length >= 2) {
                     const l = parts[0];
-                    const r = parts[1].toUpperCase();
+                    // Join remaining parts back with - to represent the full match key (A-I or B-II)
+                    const r = parts.slice(1).join('-');
                     if (l && r) matchMap[l] = r;
                 }
             });
@@ -76,29 +77,63 @@ export function parseDescriptiveSubQuestion(row: any, i: number) {
             };
         }
     } else if (subType === 'comprehension' || subType === 'comprehension_mcq') {
-        subQ.passage = s(getValue(row, [`${prefix} Stem Passage`, `${keyPrefix}Stem`]));
+        const stemPassage = s(getValue(row, [`${prefix} Stem Passage`, `${keyPrefix}Stem`]));
+        subQ.passage = stemPassage || s(getValue(row, [`${prefix} Passage`, `${keyPrefix}Passage`]));
         
         // Support for MCQ options within comprehension
         const optA = s(getValue(row, [`${prefix} Option A`, `${keyPrefix}A`]));
         const optB = s(getValue(row, [`${prefix} Option B`, `${keyPrefix}B`]));
         const optC = s(getValue(row, [`${prefix} Option C`, `${keyPrefix}C`]));
         const optD = s(getValue(row, [`${prefix} Option D`, `${keyPrefix}D`]));
-        const correct = s(getValue(row, [`${prefix} Correct Option`, `${keyPrefix}Correct`])).trim().toUpperCase();
+        const qStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`]));
+        const ansStr = s(getValue(row, [`${prefix} Answers`, `${keyPrefix}Answers`]));
+        const correctStr = s(getValue(row, [`${prefix} Correct Option`, `${keyPrefix}Correct`])).trim().toUpperCase();
 
-        if (optA || optB) {
+        // CHECK FOR MULTI-MCQ (Pipe separated)
+        if (qStr.includes('|') || optA.includes('|')) {
+            const qs = qStr.split('|').map(x => x.trim());
+            const as = optA.split('|').map(x => x.trim());
+            const bs = optB.split('|').map(x => x.trim());
+            const cs = optC.split('|').map(x => x.trim());
+            const ds = optD.split('|').map(x => x.trim());
+            const corrects = correctStr.split('|').map(x => x.trim().toUpperCase());
+
+            subQ.subQuestions = qs.map((q, qidx) => {
+                const correct = corrects[qidx];
+                const options = [
+                    { text: as[qidx] || '', isCorrect: correct === 'A' || correct === '1' },
+                    { text: bs[qidx] || '', isCorrect: correct === 'B' || correct === '2' },
+                    { text: cs[qidx] || '', isCorrect: correct === 'C' || correct === '3' },
+                    { text: ds[qidx] || '', isCorrect: correct === 'D' || correct === '4' }
+                ].filter(o => o.text !== '');
+                
+                return { questionText: q, options };
+            });
+            subQ.subType = 'comprehension_mcq';
+        } 
+        // Single MCQ logic
+        else if (optA || optB) {
             subQ.options = [
-                { text: optA, isCorrect: correct === 'A' || correct === '1' },
-                { text: optB, isCorrect: correct === 'B' || correct === '2' },
-                { text: optC, isCorrect: correct === 'C' || correct === '3' },
-                { text: optD, isCorrect: correct === 'D' || correct === '4' }
+                { text: optA, isCorrect: correctStr === 'A' || correctStr === '1' },
+                { text: optB, isCorrect: correctStr === 'B' || correctStr === '2' },
+                { text: optC, isCorrect: correctStr === 'C' || correctStr === '3' },
+                { text: optD, isCorrect: correctStr === 'D' || correctStr === '4' }
             ].filter(o => o.text !== '');
             subQ.subType = 'comprehension_mcq';
         }
 
-        const questionsStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`]));
-        const answersStr = s(getValue(row, [`${prefix} Answers`, `${keyPrefix}Answers`]));
-        if (questionsStr) subQ.questions = questionsStr.split('|').map(x => x.trim());
-        if (answersStr) subQ.answers = answersStr.split('|').map(x => x.trim());
+        if (qStr && !subQ.subQuestions) subQ.questions = qStr.split('|').map(x => x.trim());
+        if (ansStr) subQ.answers = ansStr.split('|').map(x => x.trim());
+    } else if (subType === 'true_false') {
+        const qStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`, `${prefix} Text`, `${keyPrefix}Text`]));
+        if (qStr) subQ.statements = qStr.split('|').map(x => x.trim());
+        const ansStr = s(getValue(row, [`${prefix} Answers`, `${keyPrefix}Answers`]));
+        if (ansStr) subQ.answers = ansStr.split('|').map(x => x.trim().toUpperCase()); // TRUE/FALSE
+    } else if (subType === 'label_diagram') {
+        const labelsStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`, `${prefix} Labels`, `${keyPrefix}Labels`]));
+        if (labelsStr) subQ.labels = labelsStr.split('|').map(x => x.trim());
+        const ansStr = s(getValue(row, [`${prefix} Answers`, `${keyPrefix}Answers`]));
+        if (ansStr) subQ.answers = ansStr.split('|').map(x => x.trim());
     } else if (subType === 'short_answer' || subType === 'error_correction' || subType === 'writing') {
         const qStr = s(getValue(row, [`${prefix} Questions`, `${keyPrefix}Questions`]));
         if (qStr) subQ.questions = qStr.split('|').map(x => x.trim());

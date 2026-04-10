@@ -45,16 +45,16 @@ export async function GET(req: any) {
 
         const descriptiveGuide = [
             ["Sub X Type", "writing, fill_in, comprehension, matching, rearranging, flowchart, interpreting_graph, label_diagram, true_false, error_correction."],
-            ["MATCHING", "Use 'Sub X Questions' for Left Column (pipe | separated) and 'Sub X Answers' for Right Column. Use 'Sub X Matches' for pairing (e.g., 1-A, 2-C)."],
-            ["  - 3/4-Way Match", "Use 'Sub X Column C' and 'Sub X Column D' for extra matching layers (pipe | separated). Matches remain IDs like '1-A'."],
-            ["FILLING-IN", "Use 'Sub X Clue Type' (word_box, in_text, none). If word_box, use 'Sub X Word Box' (A|B|C). Use 'Sub X Passage' with '___' for gaps. 'Sub X Answers' for keys."],
-            ["REARRANGING", "Use 'Sub X Items' for the SHUFFLED list (pipe | separated). Use 'Sub X Correct Order' (or 'Sub X Model Answer') for the correct sequence of texts."],
-            ["FLOWCHART", "Use 'Sub X Items' (pipe | separated). The FIRST item is the starting prompt. Use 'Sub X Correct Order' for the full solved path."],
-            ["COMPREHENSION", "Use 'Sub X Stem Passage' for the context. 'Sub X Questions' and 'Sub X Answers' for Q&A parts. OR used Option A-D for Passage MCQ."],
-            ["GRAPHS", "Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe |), 'Sub X Chart Data' (pipe | numbers), and Axis labels."],
-            ["DIAGRAMS", "Use 'Sub X Label' for the object name. Labels in 'Sub X Labels' using 'Text:x:y' format."],
-            ["IMAGES", "Use 'Primary Image URL' for the main question or 'Sub X Image URL' for specific parts (e.g., a diagram to be labeled)."],
-            ["TIPS", "Always use Pipe symbol (|) to separate items in a list. Use 'Sub X Text' for the sub-question prompt (e.g., 'Analyze the graph')."],
+            ["MATCHING (Simple)", "Use 'Sub X Questions' for Left (A|B|C) and 'Sub X Answers' for Right. 'Sub X Matches' for pairing (e.g., 1-A, 2-B)."],
+            ["MATCHING (3/4-Way)", "Use 'Sub X Column C' (I|II|III) and 'Sub X Column D' (i|ii|iii). 'Sub X Matches' must include all parts (e.g., 1-A-I or 1-A-I-i)."],
+            ["FILLING-IN", "Use 'Sub X Clue Type' (word_box, in_text, none). If word_box, use 'Sub X Word Box' (A|B|C). 'Sub X Passage' should use '___' for gaps. 'Sub X Answers' for keys."],
+            ["REARRANGING / FLOW", "Use 'Sub X Items' for the shuffled list (A|B|C). Use 'Sub X Correct Order' for the full string of items in correct sequence (e.g., Seed|Sprout|Tree)."],
+            ["COMPREHENSION (Q&A)", "Use 'Sub X Stem Passage' for context. 'Sub X Questions' and 'Sub X Answers' for short questions."],
+            ["COMPREHENSION (MCQ)", "For Passage MCQs: Use 'Sub X Stem Passage' for context. Use 'Sub X Questions' and 'Option A-D' to list questions and options. Use 'Sub X Correct Option' for keys. To add MULTIPLE MCQs under one passage, use Pipe symbol (|) in all MCQ columns."],
+            ["GRAPHS", "Use 'Sub X Chart Type' (bar, line, pie). 'Sub X Chart Labels' (Jan|Feb|Mar), 'Sub X Chart Data' (100|200|300). Use Axis labels for clarity."],
+            ["DIAGRAMS / TF", "For 'label_diagram', use 'Sub X Questions' for label texts. For 'true_false', use 'Sub X Questions' for the list of statements. Answers go in 'Sub X Answers'."],
+            ["IMAGES", "Use 'Primary Image URL' for the main question or 'Sub X Image URL' for specific parts."],
+            ["IMPORTANT (PIPE |)", "Always use the Pipe symbol (|) to separate items in a list (Options, Answers, Questions, Items) within a single cell."],
         ];
 
         const instructions = mode === 'objective' 
@@ -275,17 +275,17 @@ export async function GET(req: any) {
                 topic: "Comprehension",
                 difficulty: "MEDIUM",
                 marks: 10,
-                primaryImage: "https://example.com/passage-image.jpg",
-                questionText: "Read the text carefully and choose the correct answer for each question.",
+                questionText: "Read the following passage carefully and answer the questions that follow.",
                 s1Text: "Passage MCQs",
                 s1Type: "comprehension_mcq",
                 s1Marks: 10,
-                s1Stem: "Global warming is the unusually rapid increase in Earth’s average surface temperature over the past century primarily due to the greenhouse gases released as people burn fossil fuels...",
-                s1Questions: "What is the primary cause of global warming?|How long has this increase been observed?",
-                s2Text: "Q1 Options",
-                s2A: "Fossil fuels", s2B: "Planting trees", s2C: "Ocean currents", s2D: "Solar flares", s2Correct: "A",
-                s3Text: "Q2 Options",
-                s3A: "Last decade", s3B: "Past century", s3C: "Few years", s3D: "Millions of years", s3Correct: "B"
+                s1Stem: "The Sundarbans, a UNESCO World Heritage site, is the largest mangrove forest in the world... It spans between Bangladesh and India.",
+                s1Questions: "Where is the Sundarbans located?|Which organization declared it a heritage site?",
+                s1A: "Amazon Delta|UNESCO",
+                s1B: "Ganges-Brahmaputra Delta|UNICEF",
+                s1C: "The Nile Delta|WHO",
+                s1D: "Everglades|UNDP",
+                s1Correct: "B|A"
             });
             templateSheet.addRow({
                 type: "DESCRIPTIVE",
@@ -325,9 +325,16 @@ export async function GET(req: any) {
                 questionText: "Complete the Matching and Rearranging tasks.",
                 s1Type: "matching", s1Text: "Match the Country to Capital and Currency.",
                 s1Questions: "Bangladesh|USA|Japan", s1Answers: "Dhaka|Washington|Tokyo", s1ColC: "Taka|Dollar|Yen",
-                s1Matches: "1-A, 2-B, 3-C",
+                s1Matches: "1-A-I, 2-B-II, 3-C-III",
                 s2Type: "rearranging", s2Text: "Arrange the plant growth stages.",
                 s2Items: "Sprout|Seed|Tree|Fruit", s2Order: "Seed|Sprout|Tree|Fruit"
+            });
+            templateSheet.addRow({
+                type: "DESCRIPTIVE", className: sampleClass, subject: "Science", topic: "Facts", difficulty: "MEDIUM", marks: 5,
+                questionText: "Evaluate the following statements.",
+                s1Type: "true_false", s1Text: "Identify if the statements are True or False.",
+                s1Questions: "Water boils at 100°C.|Earth is flat.|Light travels faster than sound.",
+                s1Answers: "TRUE|FALSE|TRUE"
             });
             templateSheet.addRow({
                 type: "DESCRIPTIVE", className: sampleClass, subject: "ICT", topic: "Flowchart", difficulty: "MEDIUM", marks: 5,
