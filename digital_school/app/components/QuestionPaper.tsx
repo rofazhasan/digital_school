@@ -4,7 +4,7 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import Latex from 'react-latex';
 import { cleanupMath } from '@/lib/utils';
-import { toBengaliNumerals, formatBengaliDuration } from '@/utils/numeralConverter';
+import { toBengaliNumerals, formatBengaliDuration, toRoman } from '@/utils/numeralConverter';
 import { BeautifulChart } from "@/app/components/BeautifulChart";
 
 
@@ -921,28 +921,47 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                                       {(part.subType === 'matching' || part.subType === 'mtf') && (
                                         <div className="mt-3 ml-4">
-                                          <div className="grid grid-cols-2 gap-0 border-2 border-slate-800 max-w-2xl mx-auto rounded overflow-hidden">
-                                            {/* Header */}
-                                            <div className="border-r border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-xs uppercase tracking-wider">Column A</div>
-                                            <div className="border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-xs uppercase tracking-wider">Column B</div>
+                                          <div 
+                                            className="grid gap-0 border-2 border-slate-800 max-w-4xl mx-auto rounded overflow-hidden"
+                                            style={{ gridTemplateColumns: `repeat(${[part.leftColumn, part.rightColumn, part.columnC, part.columnD].filter(c => Array.isArray(c) && c.length > 0).length}, 1fr)` }}
+                                          >
+                                            {/* Headers */}
+                                            <div className="border-r border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-[10px] uppercase tracking-wider">Column A</div>
+                                            <div className="border-r border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-[10px] uppercase last:border-r-0 tracking-wider">Column B</div>
+                                            {Array.isArray(part.columnC) && part.columnC.length > 0 && <div className="border-r border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-[10px] uppercase last:border-r-0 tracking-wider">Column C</div>}
+                                            {Array.isArray(part.columnD) && part.columnD.length > 0 && <div className="border-b border-slate-800 p-2 bg-slate-100 font-bold text-center text-[10px] uppercase tracking-wider">Column D</div>}
 
                                             {/* Rows */}
                                             {(() => {
                                               const left = part.leftColumn || [];
                                               const right = part.rightColumn || [];
-                                              const rows = Math.max(left.length, right.length);
+                                              const colC = part.columnC || [];
+                                              const colD = part.columnD || [];
+                                              const rows = Math.max(left.length, right.length, colC.length, colD.length);
                                               const res = [];
                                               for (let i = 0; i < rows; i++) {
                                                 res.push(
                                                   <React.Fragment key={i}>
-                                                    <div className="border-r border-b border-slate-300 p-3 flex items-start gap-2 bg-white last:border-b-0">
-                                                      <span className="font-black text-slate-500 w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
+                                                    <div className="border-r border-b border-slate-300 p-2 flex items-start gap-1 bg-white last:border-b-0 text-[11px]">
+                                                      <span className="font-black text-slate-500 w-5 shrink-0">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
                                                       <span className="flex-1"><UniversalMathJax inline dynamic>{left[i]?.text || ""}</UniversalMathJax></span>
                                                     </div>
-                                                    <div className="border-b border-slate-300 p-3 flex items-start gap-2 bg-white last:border-b-0">
-                                                      <span className="font-black text-slate-500 w-6">({isEn ? String.fromCharCode(105 + i) : (BENGALI_SUB_LABELS[i] || toBengaliNumerals(i + 1))})</span>
+                                                    <div className="border-r border-b border-slate-300 p-2 flex items-start gap-1 bg-white last:border-b-0 last:border-r-0 text-[11px]">
+                                                      <span className="font-black text-slate-500 w-5 shrink-0">({isEn ? String.fromCharCode(65 + i) : (BENGALI_SUB_LABELS[i] || toBengaliNumerals(i + 1))})</span>
                                                       <span className="flex-1"><UniversalMathJax inline dynamic>{right[i]?.text || ""}</UniversalMathJax></span>
                                                     </div>
+                                                    {colC.length > 0 && (
+                                                        <div className="border-r border-b border-slate-300 p-2 flex items-start gap-1 bg-white last:border-b-0 last:border-r-0 text-[11px]">
+                                                            <span className="font-black text-slate-500 w-5 shrink-0">({toRoman(i + 1)})</span>
+                                                            <span className="flex-1"><UniversalMathJax inline dynamic>{colC[i]?.text || colC[i] || ""}</UniversalMathJax></span>
+                                                        </div>
+                                                    )}
+                                                    {colD.length > 0 && (
+                                                        <div className="border-b border-slate-300 p-2 flex items-start gap-1 bg-white last:border-b-0 text-[11px]">
+                                                            <span className="font-black text-slate-500 w-5 shrink-0">({String.fromCharCode(97 + i)})</span>
+                                                            <span className="flex-1"><UniversalMathJax inline dynamic>{colD[i]?.text || colD[i] || ""}</UniversalMathJax></span>
+                                                        </div>
+                                                    )}
                                                   </React.Fragment>
                                                 );
                                               }

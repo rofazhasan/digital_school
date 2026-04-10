@@ -48,3 +48,22 @@ export const toBengaliAlphabets = (index: number): string => {
     const alphabets = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ', 'ড়', 'ঢ়', 'য়'];
     return alphabets[index] || String.fromCharCode(0x0995 + index);
 };
+
+/**
+ * Converts index (1, 2, 3...) to Roman Numerals (I, II, III...).
+ */
+export const toRoman = (num: number): string => {
+    const romanMap: [number, string][] = [
+        [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+        [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+        [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']
+    ];
+    let result = '';
+    for (const [value, symbol] of romanMap) {
+        while (num >= value) {
+            result += symbol;
+            num -= value;
+        }
+    }
+    return result;
+};

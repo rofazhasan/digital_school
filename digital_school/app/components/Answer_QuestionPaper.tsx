@@ -3,7 +3,7 @@ import QRCode from "react-qr-code";
 import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
-import { toBengaliNumerals, formatBengaliDuration } from '@/utils/numeralConverter';
+import { toBengaliNumerals, formatBengaliDuration, toRoman } from '@/utils/numeralConverter';
 
 // --- TYPES ---
 interface MCQ {
@@ -949,25 +949,47 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {(part.subType === 'matching' || part.subType === 'mtf') && (
                                       <div className="mt-3 ml-4">
-                                        <div className="grid grid-cols-2 gap-0 border border-black max-w-2xl mx-auto">
-                                          <div className="border-r border-b border-black p-2 bg-gray-100 font-bold text-center">Column A</div>
-                                          <div className="border-b border-black p-2 bg-gray-100 font-bold text-center">Column B</div>
+                                        <div 
+                                          className="grid gap-0 border border-black max-w-4xl mx-auto"
+                                          style={{ gridTemplateColumns: `repeat(${[part.leftColumn, part.rightColumn, part.columnC, part.columnD].filter(c => Array.isArray(c) && c.length > 0).length}, 1fr)` }}
+                                        >
+                                          {/* Headers */}
+                                          <div className="border-r border-b border-black p-1.5 bg-gray-100 font-bold text-center text-[10px] uppercase">Column A</div>
+                                          <div className="border-r border-b border-black p-1.5 bg-gray-100 font-bold text-center text-[10px] uppercase last:border-r-0">Column B</div>
+                                          {Array.isArray(part.columnC) && part.columnC.length > 0 && <div className="border-r border-b border-black p-1.5 bg-gray-100 font-bold text-center text-[10px] uppercase last:border-r-0">Column C</div>}
+                                          {Array.isArray(part.columnD) && part.columnD.length > 0 && <div className="border-b border-black p-1.5 bg-gray-100 font-bold text-center text-[10px] uppercase">Column D</div>}
+
+                                          {/* Rows */}
                                           {(() => {
                                             const left = part.leftColumn || [];
                                             const right = part.rightColumn || [];
-                                            const rows = Math.max(left.length, right.length);
+                                            const colC = part.columnC || [];
+                                            const colD = part.columnD || [];
+                                            const rows = Math.max(left.length, right.length, colC.length, colD.length);
                                             const res = [];
                                             for (let i = 0; i < rows; i++) {
                                               res.push(
                                                 <React.Fragment key={i}>
-                                                  <div className="border-r border-b border-black p-2 flex items-start gap-2">
-                                                    <span className="font-bold w-6">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
+                                                  <div className="border-r border-b border-black p-1.5 flex items-start gap-1 text-[10px] last:border-b-0">
+                                                    <span className="font-bold w-5 shrink-0">({isEn ? (i + 1) : toBengaliNumerals(i + 1)})</span>
                                                     <span className="flex-1"><UniversalMathJax inline dynamic>{(left[i]?.text || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
                                                   </div>
-                                                  <div className="border-b border-black p-2 flex items-start gap-2">
-                                                    <span className="font-bold w-6">({isEn ? String.fromCharCode(105 + i) : toBengaliNumerals(i + 1)})</span>
+                                                  <div className="border-r border-b border-black p-1.5 flex items-start gap-1 text-[10px] last:border-b-0 last:border-r-0">
+                                                    <span className="font-bold w-5 shrink-0">({isEn ? String.fromCharCode(65 + i) : (BENGALI_SUB_LABELS[i] || toBengaliNumerals(i + 1))})</span>
                                                     <span className="flex-1"><UniversalMathJax inline dynamic>{(right[i]?.text || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
                                                   </div>
+                                                  {colC.length > 0 && (
+                                                    <div className="border-r border-b border-black p-1.5 flex items-start gap-1 text-[10px] last:border-b-0 last:border-r-0">
+                                                      <span className="font-bold w-5 shrink-0">({toRoman(i + 1)})</span>
+                                                      <span className="flex-1"><UniversalMathJax inline dynamic>{(colC[i]?.text || colC[i] || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
+                                                    </div>
+                                                  )}
+                                                  {colD.length > 0 && (
+                                                    <div className="border-b border-black p-1.5 flex items-start gap-1 text-[10px] last:border-b-0">
+                                                      <span className="font-bold w-5 shrink-0">({String.fromCharCode(97 + i)})</span>
+                                                      <span className="flex-1"><UniversalMathJax inline dynamic>{(colD[i]?.text || colD[i] || "").replace(/\|\|/g, '\n')}</UniversalMathJax></span>
+                                                    </div>
+                                                  )}
                                                 </React.Fragment>
                                               );
                                             }

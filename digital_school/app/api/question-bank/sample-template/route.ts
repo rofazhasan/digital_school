@@ -188,40 +188,49 @@ export async function GET(req: any) {
         
         templateSheet.columns = finalColumns;
 
-        // Header Styling
+        // Header Styling & Data Validation
         const headerRow = templateSheet.getRow(1);
         headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
         headerRow.fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'FF4F46E5' }
+            fgColor: { argb: 'FF4F46E5' } // Indigo
         };
-        headerRow.alignment = { horizontal: 'center' };
+        headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
-        // DATA VALIDATION
-        const rowCount = 200;
-        const sampleClass = classNames[0] || "Class 10";
+        const subTypeFormula = '"writing,fill_in,comprehension,matching,rearranging,flowchart,interpreting_graph,label_diagram,true_false,error_correction,short_answer"';
+        const chartTypeFormula = '"bar,line,pie,scatter,area"';
+        const typeFormula = mode === 'objective' ? '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ"' : mode === 'descriptive' ? '"DESCRIPTIVE"' : '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"';
 
-        for (let i = 2; i <= rowCount; i++) {
-            const row = templateSheet.getRow(i);
-            row.getCell(1).dataValidation = {
+        // Apply column-level validation + styles
+        templateSheet.getColumn('type').dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
+        templateSheet.getColumn('difficulty').dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
+        
+        if (classNames.length > 0) {
+            templateSheet.getColumn('className').dataValidation = {
                 type: 'list',
-                allowBlank: true,
-                formulae: [`"${mode === 'objective' ? 'MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ' : mode === 'descriptive' ? 'DESCRIPTIVE' : 'MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE'}"`],
-            };
-            if (classNames.length > 0) {
-                row.getCell(2).dataValidation = {
-                    type: 'list',
-                    allowBlank: false,
-                    formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
-                };
-            }
-            row.getCell(5).dataValidation = {
-                type: 'list',
-                allowBlank: true,
-                formulae: ['"EASY,MEDIUM,HARD"'],
+                allowBlank: false,
+                formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
             };
         }
+
+        // descriptive subtype validations
+        for (let i = 1; i <= 10; i++) {
+            const keyPrefix = `s${i}`;
+            const typeCol = templateSheet.getColumn(`${keyPrefix}Type`);
+            if (typeCol) {
+                typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
+                // Cyan for sub-headers
+                const cell = headerRow.getCell(typeCol.number);
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+            }
+            const chartCol = templateSheet.getColumn(`${keyPrefix}ChartType`);
+            if (chartCol) {
+                chartCol.dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
+            }
+        }
+
+        const sampleClass = classNames[0] || "Class 10";
 
         // Add Samples based on mode
         if (mode === 'objective' || mode === 'all') {

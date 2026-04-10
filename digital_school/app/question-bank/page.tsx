@@ -1421,22 +1421,29 @@ const QuestionCard: React.FC<{
                             </div>
                           )}
 
-                          {Array.isArray(part.leftColumn || part.left_column) && (part.subType === 'matching' || part.sub_type === 'matching') && (
-                            <div className="grid grid-cols-2 gap-2 mt-2">
-                              <div className="space-y-1">
-                                {(part.leftColumn || part.left_column as any[]).map((item: any, ii: number) => (
-                                  <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
-                                    <span className="font-bold mr-1">{ii+1}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="space-y-1">
-                                {Array.isArray(part.rightColumn || part.right_column) && (part.rightColumn || part.right_column as any[]).map((item: any, ii: number) => (
-                                  <div key={ii} className="p-1.5 bg-white dark:bg-gray-800 border rounded text-[10px] whitespace-pre-wrap">
-                                    <span className="font-bold mr-1">{String.fromCharCode(65+ii)}.</span> <UniversalMathJax inline>{item.text}</UniversalMathJax>
-                                  </div>
-                                ))}
-                              </div>
+                          {/* Matching Rendering (Handles up to 4 columns) */}
+                          {(part.subType === 'matching' || part.sub_type === 'matching') && (
+                            <div className="mt-2 space-y-2">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5">
+                                    {[
+                                        { label: 'Col A', data: part.leftColumn || part.left_column },
+                                        { label: 'Col B', data: part.rightColumn || part.right_column },
+                                        { label: 'Col C', data: part.columnC || part.col_c },
+                                        { label: 'Col D', data: part.columnD || part.col_d }
+                                    ].filter(c => Array.isArray(c.data) && c.data.length > 0).map((col, ci) => (
+                                        <div key={ci} className="space-y-1">
+                                            <div className="text-[7px] font-black uppercase text-slate-400 px-1">{col.label}</div>
+                                            <div className="space-y-1">
+                                                {(col.data as any[]).map((item: any, ii: number) => (
+                                                    <div key={ii} className="p-1 px-1.5 bg-white dark:bg-gray-800 border rounded-[6px] text-[9px] leading-tight shadow-sm">
+                                                        <span className="font-bold mr-1 text-indigo-500">{ci === 0 ? (ii + 1) : String.fromCharCode(65 + ii)}.</span>
+                                                        <UniversalMathJax inline>{item.text || item}</UniversalMathJax>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                           )}
 
@@ -1484,6 +1491,91 @@ const QuestionCard: React.FC<{
                               <div className="px-4 py-1.5 rounded-lg border border-dashed border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-[9px] font-bold text-gray-400 italic">
                                 Continue flowchart...
                               </div>
+                            </div>
+                          )}
+
+                          {/* Table Preview */}
+                          {(part.subType === 'table' || part.sub_type === 'table') && Array.isArray(part.tableHeaders) && (
+                            <div className="mt-2 rounded-lg border border-slate-200 overflow-hidden text-[9px]">
+                                <table className="w-full border-collapse">
+                                    <thead className="bg-slate-50 dark:bg-slate-900/50">
+                                        <tr>
+                                            {part.tableHeaders.map((h: string, hi: number) => (
+                                                <th key={hi} className="px-2 py-1 text-left font-bold border-r border-slate-100">{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {(part.tableRows || []).slice(0, 2).map((row: string[], ri: number) => (
+                                            <tr key={ri}>
+                                                {row.map((cell, ci) => (
+                                                    <td key={ci} className="px-2 py-1 border-r border-slate-100">{cell === '___' ? '...' : cell}</td>
+                                                ))}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                                {(part.tableRows || []).length > 2 && <div className="p-1 bg-slate-50 dark:bg-slate-900/10 text-center text-[8px] text-slate-400">+{part.tableRows.length - 2} more rows</div>}
+                            </div>
+                          )}
+
+                          {/* True/False Statement List Preview */}
+                          {(part.subType === 'true_false' || part.sub_type === 'true_false') && Array.isArray(part.statements) && (
+                            <div className="mt-2 space-y-1 bg-slate-50/50 dark:bg-slate-900/20 p-2 rounded-xl border border-slate-100 dark:border-slate-800">
+                                {part.statements.slice(0, 3).map((stmt: string, si: number) => (
+                                    <div key={si} className="flex gap-2 text-[10px] leading-tight">
+                                        <span className="text-slate-400 font-bold shrink-0">{si + 1}.</span>
+                                        <div className="flex-1"><UniversalMathJax inline>{stmt}</UniversalMathJax></div>
+                                        <div className="w-10 h-4 rounded border bg-white dark:bg-gray-800 shrink-0"></div>
+                                    </div>
+                                ))}
+                                {part.statements.length > 3 && <p className="text-[8px] text-slate-400 pl-4">+{part.statements.length - 3} more statements</p>}
+                            </div>
+                          )}
+
+                          {/* Label Diagram Preview */}
+                          {(part.subType === 'label_diagram' || part.sub_type === 'label_diagram') && (
+                            <div className="mt-2 space-y-2">
+                                {part.imageUrl && (
+                                    <div className="relative inline-block rounded-lg border border-slate-200 overflow-hidden bg-white max-w-full">
+                                        <img src={part.imageUrl} alt="Diagram" className="max-h-24 object-contain" />
+                                        {(part.labels || []).slice(0, 5).map((l: any, i: number) => (
+                                            <div key={i} className="absolute w-2 h-2 bg-indigo-500 rounded-full border border-white" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}></div>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="flex flex-wrap gap-1">
+                                    {(part.labels || []).map((l: any, i: number) => (
+                                        <span key={i} className="px-1.5 py-0.5 bg-slate-100 dark:bg-slate-800 border rounded text-[9px] text-slate-500 font-bold tracking-tighter">Label {i + 1}</span>
+                                    ))}
+                                </div>
+                            </div>
+                          )}
+
+                          {/* Rearranging Preview */}
+                          {(part.subType === 'rearranging' || part.sub_type === 'rearranging') && Array.isArray(part.items) && (
+                            <div className="mt-2 p-2 bg-slate-50/50 dark:bg-slate-900/20 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <div className="flex flex-wrap gap-1.5">
+                                    {part.items.map((item: string, ii: number) => (
+                                        <div key={ii} className="px-2 py-1 bg-white dark:bg-gray-800 border rounded shadow-sm text-[9px] leading-tight flex items-center gap-1">
+                                            <span className="w-3 h-3 rounded flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-[8px] font-black text-slate-400">{String.fromCharCode(65 + ii)}</span>
+                                            <UniversalMathJax inline>{item}</UniversalMathJax>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                          )}
+
+                          {/* Comprehension / Short Answer / Error Correction Questions */}
+                          {(['comprehension', 'short_answer', 'error_correction'].includes(part.subType || part.sub_type)) && Array.isArray(part.questions || part.sentences) && (
+                            <div className="mt-2 space-y-1.5">
+                                {(part.questions || part.sentences).slice(0, 3).map((q: string, qi: number) => (
+                                    <div key={qi} className="text-[10px] leading-tight flex gap-2">
+                                        <span className="text-slate-400 font-black shrink-0">{qi + 1}.</span>
+                                        <div className="flex-1"><UniversalMathJax inline>{q}</UniversalMathJax></div>
+                                    </div>
+                                ))}
+                                {(part.questions || part.sentences).length > 3 && <p className="text-[8px] text-slate-400 pl-4">+{ (part.questions || part.sentences).length - 3 } more items</p>}
                             </div>
                           )}
 
