@@ -684,7 +684,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 })()}
                 xAxisLabel={(subQ.chartConfig || subQ.chart_config).xAxisLabel || (subQ.chartConfig || subQ.chart_config).xAxis_label}
                 yAxisLabel={(subQ.chartConfig || subQ.chart_config).yAxisLabel || (subQ.chartConfig || subQ.chart_config).yAxis_label}
-                isPrint={true}
+                isPrint={false}
               />
             </div>
           )}

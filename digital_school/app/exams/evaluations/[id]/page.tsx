@@ -3017,7 +3017,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                             })()} 
                                                             xAxisLabel={subQ.chartConfig.xAxisLabel} 
                                                             yAxisLabel={subQ.chartConfig.yAxisLabel}
-                                                            isPrint={true}
+                                                            isPrint={false}
                                                           />
                                                         </div>
                                                       )}

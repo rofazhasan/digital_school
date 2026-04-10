@@ -633,7 +633,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         })()} 
                                         xAxisLabel={cc.xAxisLabel || cc.xAxis_label} 
                                         yAxisLabel={cc.yAxisLabel || cc.yAxis_label}
-                                        isPrint={true}
+                                        isPrint={false}
                                     />
                                 </div>
                              )}
