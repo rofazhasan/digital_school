@@ -325,14 +325,14 @@ export async function POST(req: NextRequest) {
                         matches: q.matches || undefined,
                         createdById: creator.id,
                         hasMath: Boolean(
-                            /\\/.test(q.questionText || '') ||
-                            /\\/.test(q.modelAnswer || '') ||
-                            /\\/.test(q.assertion || '') ||
-                            /\\/.test(q.reason || '') ||
-                            (q.options ? q.options.some((o: any) => /\\/.test(o.text)) : false) ||
-                            (q.subQuestions ? q.subQuestions.some((sq: any) =>
-                                /\\/.test(sq.question) ||
-                                (sq.options ? sq.options.some((o: any) => /\\/.test(o.text)) : false)
+                            /\\/.test(String(q.questionText || '')) ||
+                            /\\/.test(String(q.modelAnswer || '')) ||
+                            /\\/.test(String(q.assertion || '')) ||
+                            /\\/.test(String(q.reason || '')) ||
+                            (Array.isArray(q.options) ? q.options.some((o: any) => /\\/.test(String(o.text))) : false) ||
+                            (Array.isArray(q.subQuestions) ? q.subQuestions.some((sq: any) =>
+                                /\\/.test(String(sq.question || sq.text || '')) ||
+                                (Array.isArray(sq.options) ? sq.options.some((o: any) => /\\/.test(String(o.text))) : false)
                             ) : false)
                         )
                     });

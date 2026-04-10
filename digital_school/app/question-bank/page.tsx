@@ -1471,28 +1471,45 @@ const QuestionCard: React.FC<{
                                     <BarChart3 className="w-3 h-3" /> {part.chartConfig.type} Chart: {part.chartConfig.xAxisLabel} vs {part.chartConfig.yAxisLabel}
                                 </div>
                                 <div className="flex items-end gap-1.5 h-20 px-2 overflow-hidden">
-                                    {part.chartConfig.data.map((val: number, vi: number) => (
-                                        <div key={vi} className="flex-1 flex flex-col items-center gap-1">
-                                            <div 
-                                                className="w-full bg-indigo-500/80 rounded-t-sm transition-all hover:bg-indigo-600" 
-                                                style={{ height: `${Math.min(100, (val / Math.max(...part.chartConfig.data)) * 100)}%` }}
-                                            ></div>
-                                            <span className="text-[7px] font-bold rotate-45 origin-left whitespace-nowrap mt-1">{part.chartConfig.labels[vi]}</span>
-                                        </div>
-                                    ))}
+                                    {Array.isArray(part.chartConfig.data) && part.chartConfig.data.length > 0 ? (
+                                        (() => {
+                                            const numericData = part.chartConfig.data.map((v: any) => parseFloat(v) || 0);
+                                            const maxVal = Math.max(...numericData, 1); // Avoid div by zero
+                                            return numericData.map((val: number, vi: number) => (
+                                                <div key={vi} className="flex-1 flex flex-col items-center gap-1">
+                                                    <div 
+                                                        className="w-full bg-indigo-500/80 rounded-t-sm transition-all hover:bg-indigo-600" 
+                                                        style={{ height: `${Math.min(100, (val / maxVal) * 100)}%` }}
+                                                    ></div>
+                                                    <span className="text-[7px] font-bold rotate-45 origin-left whitespace-nowrap mt-1">{(part.chartConfig.labels && part.chartConfig.labels[vi]) || vi}</span>
+                                                </div>
+                                            ));
+                                        })()
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-[10px] text-slate-400 italic">No graph data available</div>
+                                    )}
                                 </div>
                             </div>
                           )}
 
-                          {/* Final Consolidated Answer & Explanation Section */}
-                          {(() => {
-                            const modelAns = part.modelAnswer || part.answer || part.correctAnswer || (typeof part.answers === 'string' ? part.answers : null) || part.q_ans || part.ans;
-                            const pluralAnswers = Array.isArray(part.answers) ? part.answers : (Array.isArray(part.modelAnswers) ? part.modelAnswers : (Array.isArray(part.correctAnswers) ? part.correctAnswers : (Array.isArray(part.correctOrder) ? part.correctOrder : null)));
-                            const hasExplanation = !!part.explanation;
-                            const isFlowchart = part.subType === 'flowchart' || part.sub_type === 'flowchart';
-                            const hasPairing = (part.subType === 'matching' || part.sub_type === 'matching') && part.matches;
+                           {/* Final Consolidated Answer & Explanation Section */}
+                           {(() => {
+                             // Robust answer resolution
+                             let modelAns = part.modelAnswer || part.answer || part.correctAnswer || part.q_ans || part.ans;
+                             if (!modelAns && typeof part.answers === 'string') modelAns = part.answers;
 
-                            if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing && (!isFlowchart || !part.items)) return null;
+                             // Robust plural answer resolution (Arrays)
+                             let pluralAnswers = null;
+                             if (Array.isArray(part.answers)) pluralAnswers = part.answers;
+                             else if (Array.isArray(part.modelAnswers)) pluralAnswers = part.modelAnswers;
+                             else if (Array.isArray(part.correctAnswers)) pluralAnswers = part.correctAnswers;
+                             else if (Array.isArray(part.correctOrder)) pluralAnswers = part.correctOrder;
+
+                             const hasExplanation = !!part.explanation;
+                             const isFlowchart = part.subType === 'flowchart' || part.sub_type === 'flowchart';
+                             const hasPairing = (part.subType === 'matching' || part.sub_type === 'matching') && !!part.matches;
+
+                             if (!modelAns && (!pluralAnswers || pluralAnswers.length === 0) && !hasExplanation && !hasPairing && (!isFlowchart || !part.items)) return null;
 
                             return (
                               <div className="mt-3 space-y-2">
