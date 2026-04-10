@@ -44,12 +44,16 @@ export async function GET(req: any) {
         ];
 
         const descriptiveGuide = [
-            ["DESCRIPTIVE", "Flexible format. Use 'Sub X Type' (writing, fill_in, matching, rearranging, flowchart, comprehension, label_diagram, etc.)."],
-            ["  - Passage MCQ", "Use 'Sub X Type' = 'comprehension'. Use 'Sub X Stem Passage' and then fill 'Sub X Option A-D' and 'Sub X Correct Option'."],
-            ["  - Flowchart", "Use 'Sub X Items' for all nodes (pipe separated '|'). The FIRST node is the starting prompt shown to students. Use 'Sub X Correct Order' for the full sequence."],
-            ["  - Fill-in", "Use 'Sub X Clue Type' (word_box, in_text, none) and 'Sub X Word Box' (pipe separated). Use 'Sub X Passage' with '___' for gaps."],
-            ["  - Labels", "Use 'Sub X Labels' with 'Text|Text' or 'Text:x:y|Text:x:y' format."],
-            ["  - Graphs", "Use 'Sub X Type' = 'interpreting_graph'. Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe separated '|'), 'Sub X Chart Data' (pipe separated '|'), and Axis labels."],
+            ["Sub X Type", "writing, fill_in, comprehension, matching, rearranging, flowchart, interpreting_graph, label_diagram, true_false, error_correction."],
+            ["MATCHING", "Use 'Sub X Questions' for Left Column (pipe | separated) and 'Sub X Answers' for Right Column. Use 'Sub X Matches' for pairing (e.g., 1-A, 2-C)."],
+            ["  - 3/4-Way Match", "Use 'Sub X Column C' and 'Sub X Column D' for extra matching layers (pipe | separated). Matches remain IDs like '1-A'."],
+            ["FILLING-IN", "Use 'Sub X Clue Type' (word_box, in_text, none). If word_box, use 'Sub X Word Box' (A|B|C). Use 'Sub X Passage' with '___' for gaps. 'Sub X Answers' for keys."],
+            ["REARRANGING", "Use 'Sub X Items' for the SHUFFLED list (pipe | separated). Use 'Sub X Correct Order' (or 'Sub X Model Answer') for the correct sequence of texts."],
+            ["FLOWCHART", "Use 'Sub X Items' (pipe | separated). The FIRST item is the starting prompt. Use 'Sub X Correct Order' for the full solved path."],
+            ["COMPREHENSION", "Use 'Sub X Stem Passage' for the context. 'Sub X Questions' and 'Sub X Answers' for Q&A parts. OR used Option A-D for Passage MCQ."],
+            ["GRAPHS", "Use 'Sub X Chart Type' (bar, line, pie, etc.), 'Sub X Chart Labels' (pipe |), 'Sub X Chart Data' (pipe | numbers), and Axis labels."],
+            ["DIAGRAMS", "Use 'Sub X Label' for the object name. Labels in 'Sub X Labels' using 'Text:x:y' format."],
+            ["TIPS", "Always use Pipe symbol (|) to separate items in a list. Use 'Sub X Text' for the sub-question prompt (e.g., 'Analyze the graph')."],
         ];
 
         const instructions = mode === 'objective' 
@@ -157,6 +161,7 @@ export async function GET(req: any) {
                 { header: `${prefix} Questions`, key: `${keyPrefix}Questions`, width: 30 },
                 { header: `${prefix} Answers`, key: `${keyPrefix}Answers`, width: 30 },
                 { header: `${prefix} Image URL`, key: `${keyPrefix}Img`, width: 25 },
+                { header: `${prefix} Matches`, key: `${keyPrefix}Matches`, width: 25 },
                 { header: `${prefix} Option A`, key: `${keyPrefix}A`, width: 15 },
                 { header: `${prefix} Option B`, key: `${keyPrefix}B`, width: 15 },
                 { header: `${prefix} Option C`, key: `${keyPrefix}C`, width: 15 },
@@ -293,6 +298,22 @@ export async function GET(req: any) {
                 s1XLabel: "Year",
                 s1YLabel: "Index",
                 s1Explanation: "Graph shows steady inflation."
+            });
+            templateSheet.addRow({
+                type: "DESCRIPTIVE", className: sampleClass, subject: "Biology", topic: "Plants", difficulty: "HARD", marks: 10,
+                questionText: "Complete the Matching and Rearranging tasks.",
+                s1Type: "matching", s1Text: "Match the Country to Capital and Currency.",
+                s1Questions: "Bangladesh|USA|Japan", s1Answers: "Dhaka|Washington|Tokyo", s1ColC: "Taka|Dollar|Yen",
+                s1Matches: "1-A, 2-B, 3-C",
+                s2Type: "rearranging", s2Text: "Arrange the plant growth stages.",
+                s2Items: "Sprout|Seed|Tree|Fruit", s2Order: "Seed|Sprout|Tree|Fruit"
+            });
+            templateSheet.addRow({
+                type: "DESCRIPTIVE", className: sampleClass, subject: "ICT", topic: "Flowchart", difficulty: "MEDIUM", marks: 5,
+                questionText: "Review the program logic.",
+                s1Type: "flowchart", s1Text: "Find the largest of 3 numbers.",
+                s1Items: "Start|Read A,B,C|Is A > B?|Is A > C?|Print A|Stop",
+                s1Order: "Start|Read A,B,C|Is A > B?|Is A > C?|Print A|Stop"
             });
         }
 
