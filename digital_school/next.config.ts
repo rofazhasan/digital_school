@@ -1,13 +1,15 @@
-const withPWA = require('next-pwa')({
+import type { NextConfig } from 'next';
+import withPWAInit from 'next-pwa';
+
+const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   skipWaiting: true,
 });
 
 /** @type {import('next').NextConfig} */
-const nextConfig = withPWA({
+const nextConfig: NextConfig = {
   output: 'standalone',
-  turbopack: {},
   typescript: {
     // Warning: This allows production builds to successfully complete even if
     // your project has type errors.
@@ -33,12 +35,10 @@ const nextConfig = withPWA({
   },
   // Ensure proper client-side navigation
   trailingSlash: false,
-  // Netlify specific optimizations
-
-  // Disable image optimization for Netlify (handled by Netlify's image optimization)
+  // Disable image optimization for Netlify/Azure if needed
   images: {
     unoptimized: true,
   },
-});
+};
 
-module.exports = nextConfig;
+export default withPWA(nextConfig);
