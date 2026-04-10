@@ -39,8 +39,8 @@ export async function GET(req: any) {
             ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
             ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
-            ["CQ (Creative)", "Fill 'Question Text' (passage), 'Sub-Question' fields 1-10."],
-            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem), 'Sub-Question' fields 1-10 including 'Option A-D' and 'Correct Option'."],
+            ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer', and 'Sub X Explanation' for parts."],
+            ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem). Use 'Sub X Text', 'Sub X Marks', 'Sub X Option A-D', and 'Sub X Correct Option' for parts."],
         ];
 
         const descriptiveGuide = [
@@ -116,6 +116,24 @@ export async function GET(req: any) {
             { header: "Matches", key: "matches", width: 15 },
         ];
 
+        // ADD CQ/SMCQ columns to Objective template for full coverage
+        const commonSubCols: any[] = [];
+        for (let i = 1; i <= 10; i++) {
+            const prefix = `Sub ${i}`;
+            const keyPrefix = `objSub${i}`;
+            commonSubCols.push(
+                { header: `${prefix} Text`, key: `${keyPrefix}Text`, width: 25 },
+                { header: `${prefix} Marks`, key: `${keyPrefix}Marks`, width: 10 },
+                { header: `${prefix} Model Answer`, key: `${keyPrefix}ModelAnswer`, width: 25 },
+                { header: `${prefix} Explanation`, key: `${keyPrefix}Explanation`, width: 25 },
+                { header: `${prefix} Option A`, key: `${keyPrefix}A`, width: 15 },
+                { header: `${prefix} Option B`, key: `${keyPrefix}B`, width: 15 },
+                { header: `${prefix} Option C`, key: `${keyPrefix}C`, width: 15 },
+                { header: `${prefix} Option D`, key: `${keyPrefix}D`, width: 15 },
+                { header: `${prefix} Correct Option`, key: `${keyPrefix}Correct`, width: 15 }
+            );
+        }
+
         const descriptiveColumns: any[] = [];
         for (let i = 1; i <= 10; i++) {
             const prefix = `Sub ${i}`;
@@ -154,11 +172,11 @@ export async function GET(req: any) {
 
         let finalColumns = [...baseColumns];
         if (mode === 'objective') {
-            finalColumns.push(...objectiveColumns);
+            finalColumns.push(...objectiveColumns, ...commonSubCols);
         } else if (mode === 'descriptive') {
             finalColumns.push(...descriptiveColumns);
         } else {
-            finalColumns.push(...objectiveColumns, ...descriptiveColumns);
+            finalColumns.push(...objectiveColumns, ...commonSubCols, ...descriptiveColumns);
         }
         
         templateSheet.columns = finalColumns;
@@ -209,6 +227,21 @@ export async function GET(req: any) {
                 type: "MTF", className: sampleClass, subject: "GK", topic: "Capitals", difficulty: "MEDIUM", marks: 5,
                 questionText: "Match capitals:", l1: "France", l2: "Japan", ra: "Tokyo", rb: "Paris",
                 matches: "1-B, 2-A"
+            });
+            // SAMPLE CQ
+            templateSheet.addRow({
+                type: "CQ", className: sampleClass, subject: "English", topic: "Grammar", difficulty: "MEDIUM", marks: 10,
+                questionText: "Complete the following parts based on the context of 'Environment'.",
+                objSub1Text: "Define Global Warming.", objSub1Marks: 2, objSub1ModelAnswer: "The rise in Earth's temperature.",
+                objSub2Text: "Explain how plastic pollution affects oceans.", objSub2Marks: 3, objSub2ModelAnswer: "Harmful to marine life."
+            });
+            // SAMPLE SMCQ
+            templateSheet.addRow({
+                type: "SMCQ", className: sampleClass, subject: "Biology", topic: "Cells", difficulty: "MEDIUM", marks: 4,
+                questionText: "Read the stem: A plant cell is different from an animal cell.",
+                objSub1Text: "Which organelle is present only in plants?", objSub1Marks: 1, 
+                objSub1A: "Chloroplast", objSub1B: "Mitochondria", objSub1C: "Ribosome", objSub1D: "Nucleus", 
+                objSub1Correct: "A"
             });
         }
 
