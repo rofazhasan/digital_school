@@ -558,6 +558,267 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         );
 
+      case 'comprehension': {
+        // Passage + numbered short-answer questions
+        const passage = subQ.passage || subQ.stemPassage || subQ.passageText || '';
+        const questions = subQ.questions || subQ.subQuestions || [];
+        return (
+          <div className="mt-3 space-y-4">
+            {passage && (
+              <div className="p-4 bg-blue-50/40 dark:bg-blue-900/10 border-l-4 border-blue-400 rounded-r-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Stem Passage</div>
+                <UniversalMathJax dynamic>{cleanupMath(passage.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              </div>
+            )}
+            {subQ.primaryImage && (
+              <img src={subQ.primaryImage} alt="Passage" className="max-h-64 rounded-xl border object-contain" />
+            )}
+            <div className="space-y-3">
+              {questions.map((q: any, qi: number) => {
+                const ans = getVal(qi.toString());
+                const correct = subQ.answers?.[qi] || subQ.correctAnswers?.[qi] || q.answer || q.modelAnswer;
+                return (
+                  <div key={qi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+                    <div className="text-[11px] font-black text-slate-600 dark:text-slate-300 flex gap-2">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-[9px] font-black text-blue-600">{qi + 1}</span>
+                      <UniversalMathJax inline dynamic>{cleanupMath(q.text || q.question || q)}</UniversalMathJax>
+                    </div>
+                    <div className="pl-7 space-y-1">
+                      {ans ? (
+                        <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap italic">
+                          <UniversalMathJax dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] italic text-muted-foreground/40">No response</span>
+                      )}
+                      {correct && (
+                        <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1">
+                          <CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'comprehension_mcq': {
+        // Passage + MCQ sub-questions with A/B/C/D options
+        const passage = subQ.passage || subQ.stemPassage || subQ.passageText || '';
+        const subQs = subQ.subQuestions || subQ.questions || [];
+        return (
+          <div className="mt-3 space-y-4">
+            {passage && (
+              <div className="p-4 bg-amber-50/40 dark:bg-amber-900/10 border-l-4 border-amber-400 rounded-r-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-2">Stem Passage</div>
+                <UniversalMathJax dynamic>{cleanupMath(passage.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              </div>
+            )}
+            {subQ.primaryImage && (
+              <img src={subQ.primaryImage} alt="Passage" className="max-h-64 rounded-xl border object-contain" />
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {subQs.map((sq: any, sqi: number) => {
+                const studentPick = getVal(sqi.toString());
+                return (
+                  <div key={sqi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+                    <div className="text-[11px] font-black text-slate-700 dark:text-slate-200 flex gap-2 items-start">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[9px] font-black text-amber-700">{sqi + 1}</span>
+                      <UniversalMathJax inline dynamic>{cleanupMath(sq.questionText || sq.text || sq.question || '')}</UniversalMathJax>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 pl-7">
+                      {(sq.options || []).map((opt: any, oidx: number) => {
+                        const optText = typeof opt === 'string' ? opt : opt.text;
+                        const isCorrect = (typeof opt === 'object' && opt.isCorrect) ||
+                          (sq.correctAnswer !== undefined && (Number(sq.correctAnswer) === oidx || normalize(sq.correctAnswer) === normalize(optText)));
+                        const isSelected = normalize(studentPick) === normalize(optText);
+                        return (
+                          <div key={oidx} className={cn(
+                            'flex items-center gap-2 p-1.5 rounded-lg text-[11px] border transition-colors',
+                            isSelected && isCorrect ? 'bg-green-50 border-green-300 text-green-800 dark:bg-green-900/20' :
+                              isSelected && !isCorrect ? 'bg-red-50 border-red-300 text-red-800 dark:bg-red-900/20' :
+                                isCorrect ? 'bg-emerald-50/50 border-emerald-200 text-emerald-700' :
+                                  'bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 text-slate-600'
+                          )}>
+                            <span className={cn(
+                              'shrink-0 w-5 h-5 rounded flex items-center justify-center text-[9px] font-black',
+                              isSelected && isCorrect ? 'bg-green-500 text-white' :
+                                isSelected && !isCorrect ? 'bg-red-500 text-white' :
+                                  isCorrect ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-600'
+                            )}>{String.fromCharCode(65 + oidx)}</span>
+                            <UniversalMathJax inline dynamic>{cleanupMath(optText || '')}</UniversalMathJax>
+                            {isSelected && isCorrect && <CheckCircle className="w-3 h-3 text-green-600 ml-auto shrink-0" />}
+                            {isSelected && !isCorrect && <XCircle className="w-3 h-3 text-red-600 ml-auto shrink-0" />}
+                            {!isSelected && isCorrect && <CheckCircle className="w-3 h-3 text-emerald-400 ml-auto shrink-0 opacity-60" />}
+                          </div>
+                        );
+                      })}
+                      {!studentPick && <span className="text-[10px] italic text-muted-foreground/40 pl-1">Not answered</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'short_answer': {
+        const questions = subQ.questions || subQ.items || [];
+        return (
+          <div className="mt-3 space-y-2">
+            {questions.map((q: any, qi: number) => {
+              const ans = getVal(qi.toString());
+              const correct = subQ.answers?.[qi] || subQ.correctAnswers?.[qi];
+              return (
+                <div key={qi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+                  <div className="text-[11px] font-bold text-slate-600 flex gap-2 items-start">
+                    <span className="shrink-0 w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-600">{qi + 1}</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(typeof q === 'string' ? q : q.text || q.question || '')}</UniversalMathJax>
+                  </div>
+                  <div className="pl-7 space-y-1">
+                    {ans ? (
+                      <div className="p-2 rounded bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-sm whitespace-pre-wrap italic text-slate-700">
+                        <UniversalMathJax dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] italic text-muted-foreground/40">No response</span>
+                    )}
+                    {correct && (
+                      <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1">
+                        <CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      case 'error_correction': {
+        const sentences = subQ.sentences || subQ.items || [];
+        return (
+          <div className="mt-3 space-y-2">
+            {sentences.map((s: string, si: number) => {
+              const ans = getVal(si.toString());
+              const correct = subQ.answers?.[si] || subQ.correctAnswers?.[si];
+              const isCorrect = ans && correct && normalize(ans) === normalize(correct);
+              return (
+                <div key={si} className={cn(
+                  'p-3 rounded-xl border shadow-sm space-y-1.5',
+                  ans ? (isCorrect ? 'bg-green-50/50 border-green-200' : 'bg-red-50/30 border-red-200') : 'bg-white dark:bg-slate-950 border-slate-200'
+                )}>
+                  <div className="text-[10px] font-bold text-slate-500 flex gap-2 items-start">
+                    <span className="shrink-0 w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-black">{String.fromCharCode(97 + si)}</span>
+                    <span className="line-through opacity-60">{s}</span>
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    {ans ? (
+                      <div className={cn('text-sm font-bold', isCorrect ? 'text-green-700' : 'text-red-700')}>
+                        <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] italic text-muted-foreground/40">No correction provided</span>
+                    )}
+                    {correct && !isCorrect && (
+                      <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1">
+                        <CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      case 'rearranging': {
+        const items = subQ.items || [];
+        const studentOrder = getVal('order');
+        const correctOrder = subQ.correctOrder || subQ.answers?.[0] || subQ.modelAnswer;
+        return (
+          <div className="mt-3 space-y-3">
+            {items.length > 0 && (
+              <div className="grid grid-cols-1 gap-1.5">
+                {items.map((item: string, ii: number) => (
+                  <div key={ii} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-[11px]">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold">{String.fromCharCode(65 + ii)}</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 shadow-sm space-y-1">
+              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Student&apos;s Sequence</div>
+              {studentOrder ? (
+                <div className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
+                  {String(studentOrder)}
+                </div>
+              ) : (
+                <span className="text-[10px] italic text-muted-foreground/40">No sequence provided</span>
+              )}
+              {correctOrder && (
+                <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1 pt-1 border-t border-slate-100">
+                  <CheckCircle className="w-2.5 h-2.5" /> Key: {String(correctOrder)}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
+
+      case 'table': {
+        const headers = subQ.tableHeaders || [];
+        const rows = subQ.tableRows || [];
+        return (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <table className="w-full text-[11px]">
+              {headers.length > 0 && (
+                <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    {headers.map((h: string, hi: number) => (
+                      <th key={hi} className="p-2 text-left font-black text-slate-600 dark:text-slate-300">
+                        <UniversalMathJax inline dynamic>{cleanupMath(h)}</UniversalMathJax>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {rows.map((row: string[], ri: number) => (
+                  <tr key={ri} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                    {headers.map((_: string, ci: number) => {
+                      const isBlank = !row[ci] || row[ci] === '___';
+                      const studentVal = getVal(`${ri}_${ci}`);
+                      return (
+                        <td key={ci} className="p-2">
+                          {isBlank ? (
+                            <span className={cn(
+                              'px-2 py-1 rounded font-bold inline-block',
+                              studentVal ? 'bg-blue-50 border border-blue-200 text-blue-800' : 'bg-slate-100 text-slate-400 italic'
+                            )}>
+                              {studentVal ? String(studentVal) : '___'}
+                            </span>
+                          ) : (
+                            <UniversalMathJax inline dynamic>{cleanupMath(row[ci])}</UniversalMathJax>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+
       default: {
         // Standard Writing/Comprehension/Rearranging
         // studentAnswer may be an aggregated object from descriptive keys

@@ -2989,9 +2989,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               return (
                                                 <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-3">
                                                   {/* Metadata rendering (Passages, Source, etc.) */}
-                                                  {subQ.passage && (
+                                                  {(subQ.passage || subQ.stemPassage || subQ.passageText) && (
                                                     <div className="p-3 bg-slate-50 border-l-4 border-slate-300 rounded-r text-sm text-slate-700 italic mb-2">
-                                                      <UniversalMathJax dynamic>{cleanupMath(subQ.passage)}</UniversalMathJax>
+                                                      <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Stem Passage</div>
+                                                      <UniversalMathJax dynamic>{cleanupMath((subQ.passage || subQ.stemPassage || subQ.passageText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                     </div>
                                                   )}
                                                   {subQ.sourceText && (
@@ -3077,8 +3078,76 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                         </div>
                                                       )}
 
-                                                      {/* Student Text Response */}
-                                                      {subText && (
+                                                      {/* Student Answer — structured by sub-type */}
+                                                      {subQ.subType === 'comprehension' && (() => {
+                                                        const qs = subQ.questions || subQ.subQuestions || [];
+                                                        const descPrefix = `${qId}_desc_${subIdx}_`;
+                                                        const obj: Record<string, any> = {};
+                                                        Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix)).forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
+                                                        return qs.length > 0 ? (
+                                                          <div className="mt-2 space-y-2">
+                                                            {qs.map((q: any, qi: number) => {
+                                                              const ans = obj[qi.toString()];
+                                                              const correct = subQ.answers?.[qi] || subQ.correctAnswers?.[qi] || q.answer || q.modelAnswer;
+                                                              return (
+                                                                <div key={qi} className="p-2 rounded border border-slate-200 bg-white space-y-1">
+                                                                  <div className="text-xs font-bold text-slate-600 flex gap-2">
+                                                                    <span className="shrink-0 w-4 h-4 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-[9px] font-black">{qi + 1}</span>
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(q.text || q.question || q)}</UniversalMathJax>
+                                                                  </div>
+                                                                  <div className="pl-6">
+                                                                    {ans ? <div className="text-sm italic whitespace-pre-wrap text-slate-700"><UniversalMathJax dynamic>{cleanupMath(String(ans))}</UniversalMathJax></div> : <span className="text-[10px] text-gray-400 italic">Not answered</span>}
+                                                                    {correct && <div className="text-[9px] text-emerald-600 font-bold mt-0.5">Key: {String(correct)}</div>}
+                                                                  </div>
+                                                                </div>
+                                                              );
+                                                            })}
+                                                          </div>
+                                                        ) : subText ? <div className="mt-3 mb-2 text-gray-800 text-sm bg-white/50 p-3 rounded border border-indigo-50/50 whitespace-pre-wrap italic">{subText}</div> : null;
+                                                      })()}
+
+                                                      {subQ.subType === 'comprehension_mcq' && (() => {
+                                                        const sqs = subQ.subQuestions || subQ.questions || [];
+                                                        const descPrefix = `${qId}_desc_${subIdx}_`;
+                                                        const obj: Record<string, any> = {};
+                                                        Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix)).forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
+                                                        return sqs.length > 0 ? (
+                                                          <div className="mt-2 space-y-2">
+                                                            {sqs.map((sq: any, sqi: number) => {
+                                                              const studentPick = obj[sqi.toString()];
+                                                              const normalize = (s: any) => String(s || '').trim().toLowerCase();
+                                                              return (
+                                                                <div key={sqi} className="p-2 rounded border border-slate-200 bg-white space-y-1.5">
+                                                                  <div className="text-xs font-bold text-slate-700 flex gap-2">
+                                                                    <span className="shrink-0 w-4 h-4 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center text-[9px] font-black">{sqi + 1}</span>
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(sq.questionText || sq.text || sq.question || '')}</UniversalMathJax>
+                                                                  </div>
+                                                                  <div className="pl-6 grid grid-cols-2 gap-1">
+                                                                    {(sq.options || []).map((opt: any, oidx: number) => {
+                                                                      const optText = typeof opt === 'string' ? opt : opt.text;
+                                                                      const isCorrect = (typeof opt === 'object' && opt.isCorrect) || (sq.correctAnswer !== undefined && (Number(sq.correctAnswer) === oidx || normalize(sq.correctAnswer) === normalize(optText)));
+                                                                      const isSelected = normalize(studentPick) === normalize(optText);
+                                                                      return (
+                                                                        <div key={oidx} className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] border ${isSelected && isCorrect ? 'bg-green-50 border-green-300 font-bold text-green-800' : isSelected && !isCorrect ? 'bg-red-50 border-red-300 font-bold text-red-800' : isCorrect ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-slate-50 border-slate-100 text-slate-500'}`}>
+                                                                          <span className="shrink-0 font-black">{String.fromCharCode(65 + oidx)}.</span>
+                                                                          <UniversalMathJax inline dynamic>{cleanupMath(optText || '')}</UniversalMathJax>
+                                                                          {isSelected && isCorrect && <CheckCircle className="w-2.5 h-2.5 text-green-600 ml-auto shrink-0" />}
+                                                                          {isSelected && !isCorrect && <XCircle className="w-2.5 h-2.5 text-red-600 ml-auto shrink-0" />}
+                                                                          {!isSelected && isCorrect && <CheckCircle className="w-2.5 h-2.5 text-emerald-400 ml-auto shrink-0 opacity-60" />}
+                                                                        </div>
+                                                                      );
+                                                                    })}
+                                                                  </div>
+                                                                  {!studentPick && <span className="text-[10px] text-gray-400 italic pl-6">Not answered</span>}
+                                                                </div>
+                                                              );
+                                                            })}
+                                                          </div>
+                                                        ) : null;
+                                                      })()}
+
+                                                      {/* Generic text response fallback for writing/interpreting_graph/rearranging etc */}
+                                                      {!['comprehension', 'comprehension_mcq'].includes(subQ.subType || '') && subText && (
                                                         <div className="mt-3 mb-2 text-gray-800 text-sm md:text-base bg-white/50 p-3 rounded border border-indigo-50/50 whitespace-pre-wrap italic ring-1 ring-indigo-50/30 shadow-sm">
                                                           <UniversalMathJax dynamic>{cleanupMath((subText || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                         </div>
