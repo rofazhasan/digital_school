@@ -99,7 +99,8 @@ function collectAllImages(obj: any): string[] {
   return Array.from(new Set(images));
 }
 
-const MCQ_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+const MCQ_LABELS_BN = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ'];
+const MCQ_LABELS_EN = ['A', 'B', 'C', 'D', 'E', 'F'];
 const BENGALI_SUB_LABELS = ['ক', 'খ', 'গ', 'ঘ', 'ঙ', 'চ', 'ছ', 'জ', 'ঝ', 'ঞ', 'ট', 'ঠ', 'ড', 'ঢ', 'ণ', 'ত', 'থ', 'দ', 'ধ', 'ন', 'প', 'ফ', 'ব', 'ভ', 'ম', 'য', 'র', 'ল', 'শ', 'ষ', 'স', 'হ'];
 
 const normalize = (val: any) => String(val || "").trim().toLowerCase();
@@ -2954,15 +2955,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               const subIdx = idx;
                                               const qId = currentQuestion.id;
                                               const studentAnswers = currentStudent?.answers || {};
+                                              const isDescriptive = currentQuestion?.type?.toLowerCase() === 'descriptive';
 
                                               // Dual-key support for answers
-                                              // For descriptive types, answers are stored under _desc_{subIdx}_{field} keys
                                               let subText = (studentAnswers as any)[`${qId}_sub_${subIdx}`] || "";
                                               if (!subText) {
                                                 const descPrefix = `${qId}_desc_${subIdx}_`;
                                                 const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
                                                 if (descKeys.length > 0) {
-                                                  // Extract best text representation from the aggregated fields
                                                   const obj: Record<string, any> = {};
                                                   descKeys.forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
                                                   const extracted = obj['ans'] ?? obj['order'] ?? obj['match'];
@@ -2975,7 +2975,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 }
                                               }
                                               
-                                              // Collect images from both prefixes
                                               const subImgArr = studentAnswers[`${qId}_sub_${subIdx}_images`] || studentAnswers[`${qId}_desc_${subIdx}_images`] || [];
                                               const subImgSingle = studentAnswers[`${qId}_sub_${subIdx}_image`] || studentAnswers[`${qId}_desc_${subIdx}_image`];
                                               const allSubImages = subImgSingle ? [subImgSingle, ...subImgArr] : subImgArr;
@@ -2986,6 +2985,248 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                 </div>
                                               );
 
+                                              if (isDescriptive) {
+                                                // --- ENHANCED WORLD CLASS RENDERING FOR DESCRIPTIVE ---
+                                                return (
+                                                  <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-4 py-2">
+                                                    {(subQ.passage || subQ.stemPassage || subQ.passageText) && (
+                                                      <div className="p-3 bg-slate-100/50 border-l-[3px] border-slate-900 rounded-r text-[10px] text-slate-700 italic mb-2 shadow-sm ring-1 ring-slate-200/50">
+                                                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5 underline decoration-slate-200 underline-offset-4">
+                                                          <FileText className="w-2.5 h-2.5" /> Stem Passage
+                                                        </div>
+                                                        <UniversalMathJax dynamic>{cleanupMath((subQ.passage || subQ.stemPassage || subQ.passageText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                      </div>
+                                                    )}
+                                                    
+                                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                                      <div className="flex-1">
+                                                        <div className="text-sm font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
+                                                          <span className="w-5 h-5 rounded-md bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                                                            {String.fromCharCode(97 + idx)}
+                                                          </span>
+                                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sub-Question {idx + 1}</div>
+                                                          <span className="text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                            {subQ.marks || subQ.mark || 0} Points
+                                                          </span>
+                                                        </div>
+                                                        
+                                                        <div className="text-gray-900 text-sm md:text-base font-bold leading-relaxed mb-3 whitespace-pre-wrap border-l-2 border-slate-200 pl-3">
+                                                          <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+
+                                                        {subQ.chartConfig && (
+                                                          <div className="mb-4 p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm max-w-md ring-1 ring-slate-200/50">
+                                                            <BeautifulChart 
+                                                              type={subQ.chartConfig.type} 
+                                                              data={(() => {
+                                                                const cc = subQ.chartConfig;
+                                                                const labels = cc.labels || cc.chartLabels || cc.chart_labels;
+                                                                const data = cc.data || cc.chartData || cc.chart_data;
+                                                                if (Array.isArray(labels) && Array.isArray(data)) {
+                                                                  return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
+                                                                }
+                                                                return Array.isArray(data) ? data : [];
+                                                              })()} 
+                                                              xAxisLabel={subQ.chartConfig.xAxisLabel} 
+                                                              yAxisLabel={subQ.chartConfig.yAxisLabel}
+                                                              isPrint={false}
+                                                            />
+                                                          </div>
+                                                        )}
+                                                        
+                                                        {/* MODEL ANSWER / KEY SECTION */}
+                                                        <div className="mt-4 pt-4 border-t border-dashed border-slate-200 space-y-3">
+                                                          <div className="flex items-center gap-2">
+                                                            <div className="px-3 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-emerald-200">
+                                                              Model Answer / Key
+                                                            </div>
+                                                            <div className="h-[1px] flex-1 bg-emerald-100"></div>
+                                                          </div>
+
+                                                          {(() => {
+                                                            const isEn = exam?.language?.toLowerCase() === 'english' || (subQ.text || subQ.questionText || "").match(/^[A-Za-z0-9\s.,?'"-]+$/);
+                                                            const normalizeAnswer = (val: any) => String(val || "").trim().toLowerCase();
+
+                                                            if (subQ.subType === 'comprehension_mcq') {
+                                                              return (
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                                                  {(subQ.subQuestions || subQ.questions || []).map((sq: any, sqIdx: number) => {
+                                                                    const rawAns = sq.correct || sq.correctAnswer || (sq.options || []).find((o: any) => o.isCorrect)?.text;
+                                                                    const cAns = normalizeAnswer(rawAns);
+                                                                    let labelIdx = MCQ_LABELS_BN.indexOf(cAns);
+                                                                    if (labelIdx === -1) labelIdx = MCQ_LABELS_EN.indexOf(cAns.toUpperCase());
+                                                                    if (labelIdx === -1) {
+                                                                        const optMatchIdx = (sq.options || []).findIndex((o: any) => normalizeAnswer(typeof o === 'string' ? o : o.text) === cAns);
+                                                                        if (optMatchIdx !== -1) labelIdx = optMatchIdx;
+                                                                    }
+                                                                    const displayLabel = isEn ? (MCQ_LABELS_EN[labelIdx] || cAns) : (MCQ_LABELS_BN[labelIdx] || cAns);
+                                                                    return (
+                                                                      <div key={sqIdx} className="flex gap-3 items-center bg-white p-2.5 rounded-xl border-2 border-emerald-50 shadow-sm hover:border-emerald-200 transition-all group">
+                                                                        <span className="font-black text-emerald-300 w-6 shrink-0 underline decoration-emerald-100 underline-offset-4 decoration-2">({sqIdx + 1})</span>
+                                                                        <div className="flex flex-col flex-1 min-w-0">
+                                                                          <div className="text-[8px] text-slate-400 font-bold uppercase truncate mb-0.5 group-hover:text-emerald-400">
+                                                                             <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
+                                                                          </div>
+                                                                          <span className="text-emerald-700 font-black text-sm flex items-center gap-2">
+                                                                             <span className="px-3 py-0.5 bg-emerald-50 rounded border border-emerald-100 shadow-[2px_2px_0px_rgba(16,185,129,0.1)]">{displayLabel}</span>
+                                                                          </span>
+                                                                        </div>
+                                                                      </div>
+                                                                    );
+                                                                  })}
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            if (subQ.subType === 'matching' || subQ.subType === 'mtf') {
+                                                              return (
+                                                                <div className="grid grid-cols-1 gap-2">
+                                                                  {Object.entries((subQ.matches as Record<string, string>) || {}).map(([l, r], mIdx) => (
+                                                                    <div key={mIdx} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-emerald-100 shadow-sm text-xs">
+                                                                      <span className="font-black w-14 text-center bg-emerald-50 rounded text-emerald-600 py-1">({l})</span>
+                                                                      <span className="text-emerald-200">⟷</span>
+                                                                      <span className="font-black text-white px-3 min-w-[40px] text-center bg-emerald-500 rounded-lg py-1 shadow-sm">({r})</span>
+                                                                      <div className="h-[1px] flex-1 bg-emerald-50"></div>
+                                                                    </div>
+                                                                  ))}
+                                                                  {!(subQ.matches) && (
+                                                                    <div className="text-xs font-bold text-emerald-800 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                                                                      <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || ""))}</UniversalMathJax>
+                                                                    </div>
+                                                                  )}
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            if (subQ.subType === 'rearranging') {
+                                                              return (
+                                                                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl relative overflow-hidden">
+                                                                  <div className="bg-emerald-600 text-white px-3 py-1 text-[8px] font-black uppercase tracking-widest inline-block rounded-br-xl rounded-tl-sm absolute top-0 left-0">Correct Sequence</div>
+                                                                  <div className="pt-2 flex flex-wrap items-center gap-2">
+                                                                    {(subQ.correctOrder || []).map((o: string, oIdx: number) => (
+                                                                      <React.Fragment key={oIdx}>
+                                                                        <div className="w-10 h-10 rounded-xl bg-white border-2 border-emerald-200 flex items-center justify-center font-black text-emerald-700 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.1)] hover:-translate-y-0.5 transition-transform duration-300">
+                                                                          {o}
+                                                                        </div>
+                                                                        {oIdx < (subQ.correctOrder || []).length - 1 && <ArrowRight className="w-4 h-4 text-emerald-200 animate-pulse" />}
+                                                                      </React.Fragment>
+                                                                    ))}
+                                                                  </div>
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            if (subQ.subType === 'flowchart') {
+                                                              return (
+                                                                <div className="flex flex-wrap items-center gap-2">
+                                                                  {(subQ.items || []).map((item: string, ii: number) => (
+                                                                    <React.Fragment key={ii}>
+                                                                      <div className="px-3 py-2 rounded-xl border-2 border-emerald-100 bg-white shadow-sm text-[10px] font-black text-emerald-900 group hover:border-emerald-300 transition-all">
+                                                                        <span className="text-[8px] text-emerald-300 mr-1.5 border-r border-emerald-50 pr-1.5 uppercase tracking-tighter">{ii + 1}</span>
+                                                                        <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
+                                                                      </div>
+                                                                      {ii < subQ.items.length - 1 && <ArrowRight className="w-4 h-4 text-emerald-200" />}
+                                                                    </React.Fragment>
+                                                                  ))}
+                                                                </div>
+                                                              );
+                                                            }
+
+                                                            return (
+                                                              <div className="p-4 bg-white/70 rounded-2xl border-2 border-emerald-100 shadow-[4px_4px_0px_0px_rgba(16,185,129,0.05)] ring-1 ring-emerald-50">
+                                                                <div className="text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap text-sm">
+                                                                  <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                                </div>
+                                                              </div>
+                                                            );
+                                                          })()}
+
+                                                          {subQ.explanation && (
+                                                            <div className="mt-3 p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-indigo-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                                                              <div className="flex items-center gap-2 mb-1.5">
+                                                                <Info className="w-3 h-3 text-indigo-400" />
+                                                                <span className="font-black uppercase text-[8px] tracking-[0.1em]">Teaching Tip / Explanation</span>
+                                                              </div>
+                                                              <div className="font-medium text-indigo-900/80 leading-relaxed">
+                                                                <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                              </div>
+                                                            </div>
+                                                          )}
+                                                        </div>
+
+                                                        {/* STUDENT RESPONSE SECTION */}
+                                                        <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner">
+                                                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                            <User className="w-2.5 h-2.5" /> Student Answer
+                                                          </div>
+                                                          <div className="text-slate-800 text-sm italic whitespace-pre-wrap">
+                                                            <UniversalMathJax dynamic>{cleanupMath((subText || "No answer provided").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                          </div>
+                                                        </div>
+                                                      </div>
+
+                                                      {/* Grading Controls */}
+                                                      <div className="flex flex-wrap items-center gap-2 bg-indigo-50/20 p-2.5 rounded-xl border border-indigo-100/50 self-start shadow-sm ring-1 ring-indigo-50">
+                                                        <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mr-1">Points:</div>
+                                                        <div className="flex gap-1.5">
+                                                          {Array.from({ length: (subQ?.marks || subQ?.mark || 0) + 1 }, (_, i) => i).map((mark) => {
+                                                            const marksKey = `${qId}_sub_${subIdx}_marks`;
+                                                            const descMarksKey = `${qId}_desc_${subIdx}_marks`;
+                                                            const isSelected = (studentAnswers[marksKey]) === mark || (studentAnswers[descMarksKey]) === mark;
+                                                            return (
+                                                              <button
+                                                                key={mark}
+                                                                onClick={() => updateMarks(qId, mark, idx)}
+                                                                disabled={!canEditMarks()}
+                                                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all ring-offset-2 ${isSelected
+                                                                  ? 'bg-slate-900 text-white shadow-lg ring-2 ring-slate-900 scale-110'
+                                                                  : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-900 hover:text-slate-900'
+                                                                  } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                                                              >
+                                                                {mark}
+                                                              </button>
+                                                            );
+                                                          })}
+                                                        </div>
+                                                      </div>
+                                                    </div>
+
+                                                    {allSubImages && allSubImages.length > 0 && (
+                                                      <div className="flex flex-wrap gap-3 mt-3 ml-4 p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
+                                                        {allSubImages.map((imgUrl: string, imgIdx: number) => {
+                                                          const questionIndex = idx * 100 + imgIdx;
+                                                          const displayUrl = getImageUrl(imgUrl, qId, questionIndex);
+                                                          const hasAnnotation = displayUrl !== imgUrl;
+                                                          return (
+                                                            <div key={imgIdx} className="relative inline-block group">
+                                                              <img
+                                                                src={displayUrl}
+                                                                alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
+                                                                crossOrigin="anonymous"
+                                                                className="h-28 w-28 rounded-xl border-2 border-white shadow-xl bg-muted/50 object-cover cursor-pointer hover:scale-[1.05] transition-transform duration-500 ring-1 ring-slate-200"
+                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                              />
+                                                              <button
+                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                                className="absolute top-2 right-2 bg-slate-900/90 p-2 rounded-lg shadow-xl hover:bg-slate-900 text-white opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm"
+                                                              >
+                                                                <PenTool className="w-3.5 h-3.5" />
+                                                              </button>
+                                                              {hasAnnotation && (
+                                                                <div className="absolute top-0 left-0 bg-green-500 text-white text-[8px] px-2 py-0.5 rounded-br-lg rounded-tl-xl font-black shadow-lg z-10 pointer-events-none ring-2 ring-white">
+                                                                  ANNOTATED
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          );
+                                                        })}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                );
+                                              }
+
+                                              // --- ORIGINAL REDERING FALLBACK FOR CQ/SQ (AS REQUESTED) ---
                                               return (
                                                 <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-3">
                                                   {/* Metadata rendering (Passages, Source, etc.) */}
