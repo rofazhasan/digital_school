@@ -1097,20 +1097,23 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     )}
                                   </div>
 
-                                  <div className="bg-gray-50 p-3 rounded border border-gray-200 shadow-sm leading-relaxed text-sm whitespace-pre-wrap">
-                                    <div className="font-bold text-xs text-red-700 mb-1">{isEn ? 'Solution:' : 'সমাধান:'}</div>
+                                  <div className="bg-white p-4 rounded-xl border-2 border-slate-200 border-l-[6px] border-l-red-600 shadow-[0_4px_12px_rgba(0,0,0,0.03)] leading-relaxed text-sm whitespace-pre-wrap mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <div className="bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest">{isEn ? 'Solution' : 'সমাধান'}</div>
+                                      <div className="h-[1px] flex-1 bg-red-100"></div>
+                                    </div>
                                     {part.subType === 'writing' && (
-                                      <div>
+                                      <div className="text-slate-800 font-medium">
                                         <UniversalMathJax dynamic>{(part.modelAnswer || (isEn ? 'No sample answer provided.' : 'নমুনা উত্তর প্রদান করা হয়নি।')).replace(/\|\|/g, '\n')}</UniversalMathJax>
                                       </div>
                                     )}
 
                                     {part.subType === 'short_answer' && (
-                                      <div className="space-y-2">
+                                      <div className="grid grid-cols-1 gap-3">
                                         {(part.answers || []).map((ans: string, aIdx: number) => (
-                                          <div key={aIdx} className="flex gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
-                                            <span className="font-bold text-gray-500 w-6">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
-                                            <span className="flex-1 text-red-700 font-medium">
+                                          <div key={aIdx} className="flex gap-3 text-sm bg-slate-50/50 p-3 rounded-lg border border-slate-200 group hover:border-red-200 transition-colors">
+                                            <span className="font-black text-slate-400 w-6 shrink-0 group-hover:text-red-400 transition-colors">({isEn ? (aIdx + 1) : toBengaliNumerals(aIdx + 1)})</span>
+                                            <span className="flex-1 text-red-900 font-bold leading-relaxed">
                                               <UniversalMathJax dynamic>{ans.replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </span>
                                           </div>
@@ -1164,37 +1167,47 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                     {(part.subType === 'comprehension' || part.subType === 'comprehension_mcq') && (
                                       <div>
                                         {part.subType === 'comprehension' && (!part.answerType || part.answerType === 'qa') && (
-                                          <div className="space-y-2">
-                                            {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, aIdx: number) => (
-                                              <div key={aIdx} className="flex items-start gap-2 text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
-                                                <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
-                                                <span className="flex-1 text-red-700 font-medium">
-                                                  <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
-                                                </span>
-                                              </div>
-                                            ))}
-                                          </div>
+                                            <div className="grid grid-cols-1 gap-2">
+                                              {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, aIdx: number) => (
+                                                <div key={aIdx} className="flex items-start gap-3 text-sm bg-slate-50/30 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                                  <span className="font-black text-slate-400 w-6 shrink-0 underline decoration-red-100 underline-offset-4">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
+                                                  <span className="flex-1 text-red-800 font-medium leading-relaxed">
+                                                    <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                                  </span>
+                                                </div>
+                                              ))}
+                                            </div>
                                         )}
                                         
                                         {part.subType === 'comprehension_mcq' && (
-                                          <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             {(part.subQuestions || part.questions || []).map((sq: any, sqIdx: number) => {
-                                              const cAns = normalizeAnswer(sq.correct || sq.correctAnswer || (sq.options || []).find((o: any) => o.isCorrect)?.text);
-                                              const labelIdx = MCQ_LABELS_BN.indexOf(cAns);
-                                              const displayAns = isEn ? (MCQ_LABELS_EN[labelIdx] || cAns) : cAns;
+                                              const rawAns = sq.correct || sq.correctAnswer || (sq.options || []).find((o: any) => o.isCorrect)?.text || (sq.options || [])[sq.correctIndex]?.text || (sq.options || [])[sq.correctIndex];
+                                              const cAns = normalizeAnswer(rawAns);
+                                              
+                                              let labelIdx = MCQ_LABELS_BN.indexOf(cAns);
+                                              if (labelIdx === -1) labelIdx = MCQ_LABELS_EN.indexOf(cAns.toUpperCase());
+                                              if (labelIdx === -1) {
+                                                  const optMatchIdx = (sq.options || []).findIndex((o: any) => normalizeAnswer(typeof o === 'string' ? o : o.text) === cAns);
+                                                  if (optMatchIdx !== -1) labelIdx = optMatchIdx;
+                                              }
+
+                                              const displayLabel = isEn ? (MCQ_LABELS_EN[labelIdx] || cAns) : (MCQ_LABELS_BN[labelIdx] || cAns);
                                               return (
-                                                <div key={sqIdx} className="flex gap-2 items-center bg-white p-2 rounded border border-red-50 shadow-sm">
-                                                  <span className="font-bold text-gray-500 w-6">({isEn ? String.fromCharCode(97 + sqIdx) : BENGALI_SUB_LABELS[sqIdx]})</span>
-                                                  <span className="text-red-700 font-black">
-                                                     {displayAns}
-                                                  </span>
-                                                  <span className="text-[10px] text-gray-500 truncate opacity-60">
-                                                     <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
-                                                  </span>
+                                                <div key={sqIdx} className="flex gap-3 items-center bg-white p-3 rounded-xl border-2 border-red-50 shadow-sm hover:border-red-200 transition-all group">
+                                                  <span className="font-black text-slate-400 w-6 shrink-0 underline decoration-red-100 underline-offset-4 decoration-2">({isEn ? (sqIdx + 1) : toBengaliNumerals(sqIdx + 1)})</span>
+                                                  <div className="flex flex-col flex-1 min-w-0">
+                                                    <div className="text-[9px] text-slate-400 font-bold uppercase truncate mb-0.5 group-hover:text-red-300 transition-colors">
+                                                       <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
+                                                    </div>
+                                                    <span className="text-red-700 font-black text-lg flex items-center gap-2">
+                                                       <span className="px-3 py-0.5 bg-red-50 rounded border border-red-100 shadow-[2px_2px_0px_rgba(185,28,28,0.1)]">{displayLabel}</span>
+                                                    </span>
+                                                  </div>
                                                 </div>
                                               );
-                                            })}
-                                          </div>
+                                             })}
+                                           </div>
                                         )}
                                       </div>
                                     )}

@@ -687,7 +687,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                           <div className="flex items-start">
                             <span className="font-bold mr-2 text-lg">{isEn ? questionBaseNum : toBengaliNumerals(questionBaseNum)}.</span>
                             <div className="flex-1">
-                              <div className="whitespace-pre-wrap mb-2 font-bold">
+                              <div className="whitespace-pre-wrap mb-3 font-bold text-gray-900 border-l-[3px] border-black pl-3 py-1">
                                 <UniversalMathJax dynamic>{(q.questionText || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                               </div>
                               {/* Render each sub-part of the descriptive question */}
@@ -698,8 +698,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                     
                                     {/* Instructions Rendering */}
                                     {(part.instructions || part.instruction)?.trim() && (
-                                      <div className="p-2 border-l-2 border-slate-400 bg-slate-50 mb-3 text-[10px] leading-relaxed italic text-slate-600">
-                                        <span className="font-bold uppercase not-italic mr-1 text-slate-900 pr-1 border-r border-slate-300">Instructions:</span>
+                                      <div className="p-3 border-l-2 border-slate-900 bg-slate-100/50 mb-4 text-[10px] leading-relaxed italic text-slate-700 rounded-r shadow-sm">
+                                        <span className="font-black uppercase not-italic mr-2 text-slate-900 pr-2 border-r border-slate-300">Instructions:</span>
                                         <UniversalMathJax dynamic>{part.instructions || part.instruction}</UniversalMathJax>
                                       </div>
                                     )}
@@ -741,14 +741,16 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                             if (words.length === 0) return null;
 
                                             return (
-                                              <div className="mb-6 p-4 border-2 border-slate-800 rounded-lg bg-slate-50/30 relative print:bg-transparent overflow-hidden shadow-sm">
-                                                <div className="absolute top-0 left-0 w-full h-1 bg-slate-800"></div>
-                                                <div className="text-[11px] font-black uppercase mb-3 text-center text-slate-800 tracking-wider">
-                                                  {isEn ? 'Complete the following text with suitable words from the box' : 'নিচের বক্স থেকে সঠিক শব্দ নিয়ে শূন্যস্থান পূরণ করো'}
+                                              <div className="mb-6 p-5 border-2 border-black rounded-lg bg-white relative print:bg-transparent shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]">
+                                                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-black text-white px-4 py-0.5 rounded text-[9px] font-black uppercase tracking-widest">
+                                                  {isEn ? 'Vocabulary Box' : 'শব্দসমূহ'}
                                                 </div>
-                                                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 px-2">
+                                                <div className="text-[10px] font-semibold mb-4 text-center text-slate-600 italic">
+                                                  {isEn ? 'Complete the following text using suitable words from the box below' : 'নিচের বক্স থেকে সঠিক শব্দ নিয়ে শূন্যস্থান পূরণ করো'}
+                                                </div>
+                                                <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 px-2">
                                                   {words.filter(Boolean).map((word: string, wIdx: number) => (
-                                                    <div key={wIdx} className="px-3 py-1 border border-slate-300 rounded bg-white font-bold text-sm shadow-sm print:shadow-none min-w-[60px] text-center">
+                                                    <div key={wIdx} className="px-4 py-1.5 border border-slate-400 rounded-md font-bold text-sm bg-white min-w-[70px] text-center hover:bg-slate-50 transition-colors">
                                                       <UniversalMathJax inline>{word}</UniversalMathJax>
                                                     </div>
                                                   ))}
@@ -817,7 +819,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                       {part.subType === 'comprehension' && (
                                         <div className="space-y-3">
                                           {(part.passage || part.stemPassage) && (
-                                            <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
+                                            <div className="p-5 bg-white border-2 border-slate-200 border-l-[6px] border-l-slate-800 rounded-r-xl mb-6 text-[13px] leading-relaxed whitespace-pre-wrap shadow-[2px_2px_10px_rgba(0,0,0,0.02)]">
+                                              <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-[-5px]">Stem Passage Content</div>
                                               <UniversalMathJax dynamic>{(part.passage || part.stemPassage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                             </div>
                                           )}
@@ -842,7 +845,8 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                        {part.subType === 'comprehension_mcq' && (
                                          <div className="space-y-4">
                                            {(part.stemPassage || part.passage) && (
-                                             <div className="p-4 bg-gray-50 border-l-4 border-gray-400 rounded-r-lg mb-4 text-sm leading-relaxed whitespace-pre-wrap">
+                                             <div className="p-5 bg-white border-2 border-slate-200 border-l-[6px] border-l-slate-800 rounded-r-xl mb-6 text-[13px] leading-relaxed whitespace-pre-wrap shadow-[2px_2px_10px_rgba(0,0,0,0.02)]">
+                                               <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-[-5px]">Stem Passage Content</div>
                                                <UniversalMathJax dynamic>{(part.stemPassage || part.passage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
                                              </div>
                                            )}
@@ -859,8 +863,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                                                  </div>
                                                  <div className="grid grid-cols-2 gap-x-2 gap-y-1 ml-6">
                                                    {(sq.options || []).map((opt: any, oidx: number) => (
-                                                     <div key={oidx} className="flex items-center gap-1.5 text-xs">
-                                                       <span className="font-bold opacity-60">({MCQ_LABELS[oidx]})</span>
+                                                     <div key={oidx} className="flex items-center gap-2 text-xs py-1 px-2 border border-slate-100 rounded bg-slate-50/30">
+                                                       <span className="font-black text-slate-900 border-r border-slate-300 pr-1.5 mr-0.5 min-w-[24px]">
+                                                         {isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx]}
+                                                       </span>
                                                        <UniversalMathJax inline>{typeof opt === 'string' ? opt : opt.text}</UniversalMathJax>
                                                      </div>
                                                    ))}
