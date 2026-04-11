@@ -514,7 +514,15 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Your Interpretation
               </div>
               <div className="text-foreground whitespace-pre-wrap italic font-medium">
-                {studentAnswer || <span className="text-muted-foreground/30">No response provided</span>}
+                {(() => {
+                  // studentAnswer may be an aggregated object — extract 'ans' key for interpreting_graph
+                  const graphAns = typeof studentAnswer === 'object' && studentAnswer !== null
+                    ? (studentAnswer as any)['ans'] ?? JSON.stringify(studentAnswer)
+                    : studentAnswer;
+                  return graphAns
+                    ? <span>{String(graphAns)}</span>
+                    : <span className="text-muted-foreground/30">No response provided</span>;
+                })()}
               </div>
             </div>
           </div>
@@ -550,9 +558,25 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
           </div>
         );
 
-      default:
+      default: {
         // Standard Writing/Comprehension/Rearranging
-        const hasText = studentAnswer && typeof studentAnswer === 'string';
+        // studentAnswer may be an aggregated object from descriptive keys
+        let displayAnswer: string | null = null;
+        if (typeof studentAnswer === 'string' && studentAnswer.trim()) {
+          displayAnswer = studentAnswer;
+        } else if (typeof studentAnswer === 'object' && studentAnswer !== null) {
+          // Try well-known keys first (writing/interpreting_graph → 'ans', rearranging → 'order', matching → 'match')
+          const obj = studentAnswer as Record<string, any>;
+          const extracted = obj['ans'] ?? obj['order'] ?? obj['match'];
+          if (extracted !== undefined && extracted !== null && String(extracted).trim()) {
+            displayAnswer = String(extracted);
+          } else {
+            // Collect all non-image string values from the object
+            const vals = Object.values(obj).filter(v => typeof v === 'string' && !v.startsWith('http') && !v.includes('/uploads/') && v.trim());
+            displayAnswer = vals.length > 0 ? vals.join(' | ') : null;
+          }
+        }
+        const hasText = !!displayAnswer;
         const hasImages = Array.isArray(subQ.studentImages) && subQ.studentImages.length > 0;
 
         if (!hasText && !hasImages) return null;
@@ -564,7 +588,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                 <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
                   <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Written Response
                 </div>
-                <div className="text-foreground whitespace-pre-wrap">{studentAnswer}</div>
+                <div className="text-foreground whitespace-pre-wrap">{displayAnswer}</div>
               </div>
             )}
 
@@ -627,6 +651,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
             )}
           </div>
         );
+      } // end default
     }
   };
 
@@ -2637,7 +2662,11 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                               Your Answer:
                                               {((question.studentAnswer as any)?.answer !== undefined || (question.studentAnswer !== undefined && question.studentAnswer !== null && question.studentAnswer !== '')) ? (
                                                 <span className={`ml-2 ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                                                  {(question.studentAnswer as any)?.answer !== undefined ? (question.studentAnswer as any).answer : question.studentAnswer}
+                                                  {(question.studentAnswer as any)?.answer !== undefined
+                                                    ? String((question.studentAnswer as any).answer)
+                                                    : typeof question.studentAnswer === 'object'
+                                                      ? JSON.stringify(question.studentAnswer)
+                                                      : String(question.studentAnswer)}
                                                 </span>
                                               ) : (
                                                 <span className="ml-2 text-gray-400 italic">Unanswered</span>
@@ -3034,7 +3063,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                     </div>
                                     <div className="text-xl font-bold leading-tight mb-6 max-w-full overflow-x-auto scrollbar-thin"><UniversalMathJax dynamic>{cleanupMath(q.questionText || "")}</UniversalMathJax></div>
 
-                                    {q.studentAnswer && (
+                                    {q.studentAnswer && typeof q.studentAnswer === 'string' && (
                                       <div className="p-6 bg-white dark:bg-slate-950 rounded-2xl border-2 border-slate-100 dark:border-slate-800 shadow-inner">
                                         <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
                                           <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Primary Analysis Response

@@ -2956,7 +2956,24 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               const studentAnswers = currentStudent?.answers || {};
 
                                               // Dual-key support for answers
-                                              const subText = studentAnswers[`${qId}_sub_${subIdx}`] || studentAnswers[`${qId}_desc_${subIdx}`] || "";
+                                              // For descriptive types, answers are stored under _desc_{subIdx}_{field} keys
+                                              let subText = (studentAnswers as any)[`${qId}_sub_${subIdx}`] || "";
+                                              if (!subText) {
+                                                const descPrefix = `${qId}_desc_${subIdx}_`;
+                                                const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
+                                                if (descKeys.length > 0) {
+                                                  // Extract best text representation from the aggregated fields
+                                                  const obj: Record<string, any> = {};
+                                                  descKeys.forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
+                                                  const extracted = obj['ans'] ?? obj['order'] ?? obj['match'];
+                                                  if (extracted && String(extracted).trim()) {
+                                                    subText = String(extracted);
+                                                  } else {
+                                                    const vals = Object.values(obj).filter(v => typeof v === 'string' && !v.startsWith('http') && !v.includes('/uploads/') && String(v).trim());
+                                                    subText = vals.length > 0 ? (vals as string[]).join(' | ') : "";
+                                                  }
+                                                }
+                                              }
                                               
                                               // Collect images from both prefixes
                                               const subImgArr = studentAnswers[`${qId}_sub_${subIdx}_images`] || studentAnswers[`${qId}_desc_${subIdx}_images`] || [];
