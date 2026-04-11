@@ -4,6 +4,8 @@ import { MathJaxContext } from 'better-react-mathjax';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals, formatBengaliDuration, toRoman } from '@/utils/numeralConverter';
+import { ArrowRight } from 'lucide-react';
+
 
 // --- TYPES ---
 interface MCQ {
