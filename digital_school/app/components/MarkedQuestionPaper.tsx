@@ -359,7 +359,53 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             const getVal = (key: string) => (typeof studentAnswer === 'object' && studentAnswer !== null) ? studentAnswer[key] : null;
 
             switch (subType) {
-                case 'comprehension':
+                case 'comprehension': {
+                    const questions = subQ.subQuestions || subQ.questions || [];
+                    return (
+                        <div className="space-y-4">
+                            {(subQ.stemPassage || subQ.passage) && (
+                                <div className="p-3 bg-gray-50 border-l-4 border-gray-400 rounded text-[9px] leading-relaxed italic">
+                                    <UniversalMathJax dynamic>{(subQ.stemPassage || subQ.passage || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                </div>
+                            )}
+                            {(subQ.stemImage || subQ.imageUrl) && <img src={subQ.stemImage || subQ.imageUrl} alt="Stem" className="max-h-32 mx-auto rounded border" />}
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-2">
+                                {questions.map((sq: any, sqi: number) => {
+                                    const studentAns = studentAnswer?.[sqi] || (typeof studentAnswer === 'object' ? studentAnswer[sqi] : null);
+                                    const correctText = sq.correct || sq.correctAnswer || sq.modelAnswer || subQ.answers?.[sqi];
+                                    
+                                    return (
+                                        <div key={sqi} className={`p-2 rounded border bg-gray-50/50`}>
+                                            <div className="font-bold mb-1 flex gap-1">
+                                                <span className="text-gray-400">{subIdx + 1}.{sqi + 1}</span>
+                                                <div className="inline-block text-[10px]"><UniversalMathJax inline>{sq.questionText || sq.text || sq.question || (typeof sq === 'string' ? sq : '')}</UniversalMathJax></div>
+                                            </div>
+
+                                            <div className="mt-1.5 ml-4 space-y-1.5">
+                                                <div className="p-2 bg-white/50 border border-slate-100 rounded text-[8px] text-slate-700 italic">
+                                                    <span className="font-bold text-slate-500 mr-1 opacity-60 uppercase text-[7px]">Response:</span>
+                                                    {studentAns ? (
+                                                        <UniversalMathJax inline>{cleanupMath(String(studentAns))}</UniversalMathJax>
+                                                    ) : (
+                                                        <span className="text-slate-300">No response provided</span>
+                                                    )}
+                                                </div>
+                                                {correctText && (
+                                                    <div className="p-1 px-2 bg-emerald-50 border border-emerald-100 rounded text-[8px] text-emerald-700 font-bold">
+                                                        <span className="text-emerald-500 mr-1 opacity-60 uppercase text-[7px]">Key:</span>
+                                                        <UniversalMathJax inline>{cleanupMath(String(correctText))}</UniversalMathJax>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                }
+
                 case 'comprehension_mcq':
                     return (
                         <div className="space-y-4">
@@ -380,15 +426,16 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         <div key={sqi} className={`p-2 rounded border ${studentAns ? (isCorrect ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200') : 'bg-gray-50'}`}>
                                             <div className="font-bold mb-1 flex gap-1">
                                                 <span className="text-gray-400">{subIdx + 1}.{sqi + 1}</span>
-                                                <div className="inline-block"><Text>{sq.questionText || sq.text || sq.question || (typeof sq === 'string' ? sq : '')}</Text></div>
+                                                <div className="inline-block text-[10px]"><UniversalMathJax inline>{sq.questionText || sq.text || sq.question || (typeof sq === 'string' ? sq : '')}</UniversalMathJax></div>
                                             </div>
 
                                             {/* MCQ Options Rendering */}
                                             {Array.isArray(sq.options) && sq.options.length > 0 ? (
                                                 <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 ml-4">
                                                     {(sq.options || []).map((opt: any, oidx: number) => {
-                                                        const isSelected = String(studentAns).trim() === String(typeof opt === 'string' ? opt : opt.text).trim();
-                                                        const isOptCorrect = (typeof opt === 'string' ? opt : opt.text).trim() === String(correctText).trim();
+                                                        const optLabel = MCQ_LABELS[oidx] || String.fromCharCode(65 + oidx);
+                                                        const isSelected = String(studentAns).trim() === String(typeof opt === 'string' ? opt : opt.text).trim() || String(studentAns).trim() === optLabel;
+                                                        const isOptCorrect = (typeof opt === 'string' ? opt : opt.text).trim() === String(correctText).trim() || optLabel === String(correctText).trim();
                                                         
                                                         let optClass = "text-[8px] text-gray-500";
                                                         if (isSelected && isOptCorrect) optClass = "text-green-700 font-bold";
@@ -397,8 +444,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                                         return (
                                                             <div key={oidx} className={`flex items-center gap-1 ${optClass}`}>
-                                                                <span className="font-bold opacity-60">{MCQ_LABELS[oidx]}.</span>
-                                                                <Text>{typeof opt === 'string' ? opt : opt.text}</Text>
+                                                                <span className="font-bold opacity-60">{optLabel}.</span>
+                                                                <div className="text-[8px]"><UniversalMathJax inline>{typeof opt === 'string' ? opt : opt.text}</UniversalMathJax></div>
                                                                 {isSelected && (isOptCorrect ? <CheckCircle className="w-2 h-2 text-green-600" /> : <XCircle className="w-2 h-2 text-red-600" />)}
                                                             </div>
                                                         );

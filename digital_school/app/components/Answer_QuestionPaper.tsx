@@ -1166,16 +1166,35 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {(part.subType === 'comprehension' || part.subType === 'comprehension_mcq') && (
                                       <div>
-                                        {part.subType === 'comprehension' && (!part.answerType || part.answerType === 'qa') && (
+                                        {part.subType === 'comprehension' && (
                                             <div className="grid grid-cols-1 gap-2">
-                                              {(part.answers || part.modelAnswers || part.correctAnswers || []).map((ans: string, aIdx: number) => (
-                                                <div key={aIdx} className="flex items-start gap-3 text-sm bg-slate-50/30 p-2.5 rounded-lg border border-slate-100 shadow-sm">
-                                                  <span className="font-black text-slate-400 w-6 shrink-0 underline decoration-red-100 underline-offset-4">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
-                                                  <span className="flex-1 text-red-800 font-medium leading-relaxed">
-                                                    <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
-                                                  </span>
-                                                </div>
-                                              ))}
+                                              {(() => {
+                                                const subQs = part.subQuestions || part.questions || [];
+                                                const topLevelAns = part.answers || part.modelAnswers || part.correctAnswers || [];
+                                                
+                                                if (subQs.length > 0) {
+                                                  return subQs.map((sq: any, aIdx: number) => {
+                                                    const ans = sq.correct || sq.correctAnswer || sq.modelAnswer || topLevelAns[aIdx];
+                                                    return (
+                                                      <div key={aIdx} className="flex items-start gap-3 text-sm bg-slate-50/30 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                                        <span className="font-black text-slate-400 w-6 shrink-0 underline decoration-red-100 underline-offset-4">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
+                                                        <span className="flex-1 text-red-800 font-medium leading-relaxed">
+                                                          <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                                        </span>
+                                                      </div>
+                                                    );
+                                                  });
+                                                }
+                                                
+                                                return topLevelAns.map((ans: string, aIdx: number) => (
+                                                  <div key={aIdx} className="flex items-start gap-3 text-sm bg-slate-50/30 p-2.5 rounded-lg border border-slate-100 shadow-sm">
+                                                    <span className="font-black text-slate-400 w-6 shrink-0 underline decoration-red-100 underline-offset-4">({isEn ? String.fromCharCode(97 + aIdx) : BENGALI_SUB_LABELS[aIdx]})</span>
+                                                    <span className="flex-1 text-red-800 font-medium leading-relaxed">
+                                                      <UniversalMathJax dynamic>{String(ans || "").replace(/\|\|/g, '\n')}</UniversalMathJax>
+                                                    </span>
+                                                  </div>
+                                                ));
+                                              })()}
                                             </div>
                                         )}
                                         

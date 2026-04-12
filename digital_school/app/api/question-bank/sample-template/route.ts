@@ -44,7 +44,7 @@ export async function GET(req: any) {
         ];
 
         const descriptiveGuide = [
-            ["Sub X Type", "writing, fill_in, comprehension, matching, rearranging, flowchart, interpreting_graph, label_diagram, true_false, error_correction."],
+            ["Sub X Type", "writing, fill_in, comprehension, comprehension_mcq, matching, rearranging, flowchart, interpreting_graph, label_diagram, true_false, error_correction, short_answer."],
             ["MATCHING (Simple)", "Use 'Sub X Questions' for Left (A|B|C) and 'Sub X Answers' for Right. 'Sub X Matches' for pairing (e.g., 1-A, 2-B)."],
             ["MATCHING (3/4-Way)", "Use 'Sub X Column C' (I|II|III) and 'Sub X Column D' (i|ii|iii). 'Sub X Matches' must include all parts (e.g., 1-A-I or 1-A-I-i)."],
             ["FILLING-IN", "Use 'Sub X Clue Type' (word_box, in_text, none). If word_box, use 'Sub X Word Box' (A|B|C). 'Sub X Passage' should use '___' for gaps. 'Sub X Answers' for keys."],
@@ -76,7 +76,13 @@ export async function GET(req: any) {
 
         // 2. REFERENCE SHEET
         const refSheet = workbook.addWorksheet('Valid Classes Reference');
-        const classes = await prisma.class.findMany({ select: { name: true, section: true } });
+        let classes: any[] = [];
+        try {
+            classes = await prisma.class.findMany({ select: { name: true, section: true } });
+        } catch (dbError) {
+            console.error("Database error fetching classes for template:", dbError);
+            // Non-fatal: continue with empty classes
+        }
         const classNames = classes.map((c: any) => c.section ? `${c.name} - ${c.section}` : c.name);
         refSheet.columns = [{ header: 'Valid Classes', key: 'class', width: 50 }];
         refSheet.addRows(classNames.map((c: string) => [c]));
@@ -198,35 +204,48 @@ export async function GET(req: any) {
         };
         headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
 
-        const subTypeFormula = '"writing,fill_in,comprehension,matching,rearranging,flowchart,interpreting_graph,label_diagram,true_false,error_correction,short_answer"';
+        const subTypeFormula = '"writing,fill_in,comprehension,comprehension_mcq,matching,rearranging,flowchart,interpreting_graph,label_diagram,true_false,error_correction,short_answer"';
         const chartTypeFormula = '"bar,line,pie,scatter,area"';
         const typeFormula = mode === 'objective' ? '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ"' : mode === 'descriptive' ? '"DESCRIPTIVE"' : '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"';
 
         // Apply column-level validation + styles
-        templateSheet.getColumn('type').dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
-        templateSheet.getColumn('difficulty').dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
+        const typeCol = templateSheet.getColumn('type');
+        if (typeCol) typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
+        
+        const diffCol = templateSheet.getColumn('difficulty');
+        if (diffCol) diffCol.dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
         
         if (classNames.length > 0) {
-            templateSheet.getColumn('className').dataValidation = {
-                type: 'list',
-                allowBlank: false,
-                formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
-            };
+            const classCol = templateSheet.getColumn('className');
+            if (classCol) {
+                classCol.dataValidation = {
+                    type: 'list',
+                    allowBlank: false,
+                    formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
+                };
+            }
         }
 
-        // descriptive subtype validations
+        // Apply validations and styling for sub-columns (both Objective objSub and Descriptive s prefixes)
         for (let i = 1; i <= 10; i++) {
-            const keyPrefix = `s${i}`;
-            const typeCol = templateSheet.getColumn(`${keyPrefix}Type`);
-            if (typeCol) {
-                typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
-                // Cyan for sub-headers
-                const cell = headerRow.getCell(typeCol.number);
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+            // Objective Sub-columns styling
+            const objSubMarks = templateSheet.getColumn(`objSub${i}Marks`);
+            if (objSubMarks && objSubMarks.number > 0) {
+                const cell = headerRow.getCell(objSubMarks.number);
+                if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
             }
-            const chartCol = templateSheet.getColumn(`${keyPrefix}ChartType`);
-            if (chartCol) {
-                chartCol.dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
+
+            // Descriptive Sub-columns validations & styling
+            const descTypeCol = templateSheet.getColumn(`s${i}Type`);
+            if (descTypeCol && descTypeCol.number > 0) {
+                descTypeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
+                const cell = headerRow.getCell(descTypeCol.number);
+                if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
+            }
+            
+            const descChartCol = templateSheet.getColumn(`s${i}ChartType`);
+            if (descChartCol && descChartCol.number > 0) {
+                descChartCol.dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
             }
         }
 
@@ -366,7 +385,11 @@ export async function GET(req: any) {
         });
     } catch (error) {
         console.error("Error creating sample template:", error);
-        return NextResponse.json({ error: "Failed to generate sample template" }, { status: 500 });
+        return NextResponse.json({ 
+            error: "Failed to generate sample template",
+            message: error instanceof Error ? error.message : String(error),
+            stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+        }, { status: 500 });
     }
 }
 
