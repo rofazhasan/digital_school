@@ -218,7 +218,8 @@ export async function GET(
                     sqMarks,
                     maxScore: exam.totalMarks,
                     lastActive: submission.evaluatedAt || submission.cqSqSubmittedAt || submission.objectiveSubmittedAt || null,
-                    answers: answers
+                    answers: answers,
+                    examSetId: examSetId
                 };
             })
         );

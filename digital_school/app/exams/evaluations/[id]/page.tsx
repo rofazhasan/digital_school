@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import React, { useState, useEffect, useRef, use } from "react";
+import React, { useState, useEffect, useRef, use, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -122,6 +122,7 @@ interface LiveStudent {
   batteryLevel?: number;
   isOnline?: boolean;
   isFocus?: boolean;
+  examSetId?: string;
 }
 
 interface LiveExamStats {
@@ -155,6 +156,7 @@ interface StudentSubmission {
     total: number;
     isPublished?: boolean;
   };
+  examSetId?: string;
 }
 
 interface Question {
@@ -191,6 +193,7 @@ interface Exam {
   mcqNegativeMarking?: number;
   questions: Question[];
   submissions: StudentSubmission[];
+  questionsBySet?: Record<string, Question[]>;
 }
 
 const mathJaxConfig = {
@@ -722,7 +725,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               <div className="grid grid-cols-1 gap-1.5">
                 {items.map((item: string, ii: number) => (
                   <div key={ii} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-[11px]">
-                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold">{String.fromCharCode(65 + ii)}</span>
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold">{String.fromCharCode(97 + ii)}</span>
                     <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
                   </div>
                 ))}
@@ -1375,7 +1378,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
               <div className="space-y-4">
                 <h4 className="font-semibold text-lg border-b pb-2">Question Analysis</h4>
                 {selectedLiveStudent && liveStats?.questionsBySet && liveStats.defaultQuestions && (() => {
-                  const relevantQuestions = liveStats.defaultQuestions;
+                  const relevantQuestions = (selectedLiveStudent.examSetId && liveStats.questionsBySet[selectedLiveStudent.examSetId])
+                    ? liveStats.questionsBySet[selectedLiveStudent.examSetId]
+                    : liveStats.defaultQuestions;
 
                   return (relevantQuestions || [])?.map((q: any, idx: number) => {
                     const ans = selectedLiveStudent.answers[q.id];
@@ -1719,13 +1724,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   };
 
   // Get filtered questions based on type (Case-insensitive)
-  const filteredQuestions = exam?.questions?.filter(q =>
+  const activeQuestions = useMemo(() => {
+    if (currentStudent?.examSetId && exam?.questionsBySet?.[currentStudent.examSetId]) {
+      return exam.questionsBySet[currentStudent.examSetId];
+    }
+    return exam?.questions || [];
+  }, [currentStudent, exam]);
+
+  const filteredQuestions = activeQuestions?.filter(q =>
     questionTypeFilter === 'all' || q?.type?.toLowerCase() === questionTypeFilter.toLowerCase()
   ) || [];
 
 
 
-  const currentStudent = exam?.submissions?.[currentStudentIndex];
   const currentQuestion = filteredQuestions?.[currentQuestionIndex];
 
   // Ensure currentQuestionIndex is always valid when filteredQuestions changes

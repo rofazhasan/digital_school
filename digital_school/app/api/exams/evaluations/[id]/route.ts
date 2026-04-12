@@ -319,7 +319,8 @@ export async function GET(
             total: evaluation.totalScore,
             isPublished: studentResultMap.get(submission.studentId)?.isPublished || false
           },
-          submissionStatus: submission.status
+          submissionStatus: submission.status,
+          examSetId: examSetId
         });
       } catch (error) {
         console.error(`Error processing submission for ${submission.studentId}:`, error);
@@ -336,6 +337,12 @@ export async function GET(
 
     // Get questions from any available source
     let baseQuestions: any[] = [];
+    
+    // Prepare questionsBySet for frontend mapping
+    const questionsBySet: Record<string, any[]> = {};
+    for (const [key, val] of studentQuestionsMap.entries()) {
+      questionsBySet[key] = val;
+    }
 
     // First try to get questions from generatedSet
     if (exam.generatedSet && typeof exam.generatedSet === 'object') {
@@ -445,7 +452,8 @@ export async function GET(
           image: q.image || q.imageUrl || q.image_url || null
         };
       }),
-      submissions: processedSubmissions
+      submissions: processedSubmissions,
+      questionsBySet: questionsBySet
     };
 
     return NextResponse.json(examData);

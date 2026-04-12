@@ -889,6 +889,84 @@ export default function ExamBuilderPage() {
             }
           }
 
+          // Shuffle DESCRIPTIVE sub-types
+          if (q.type === 'DESCRIPTIVE') {
+            const parts = q.parts || q.sub_questions || q.subQuestions || [];
+            if (Array.isArray(parts) && parts.length > 0) {
+              const processedParts = parts.map((part: any) => {
+                let processedPart = { ...part };
+
+                // 1. Shuffling for Rearranging
+                if (part.subType === 'rearranging' && Array.isArray(part.items)) {
+                  // Keep track of original item content to label mapping
+                  const originalItemsWithLabels = part.items.map((item: string, idx: number) => ({
+                    content: item,
+                    originalLabel: String.fromCharCode(97 + idx)
+                  }));
+
+                  const shuffledItems = shuffleArray(part.items);
+                  processedPart = { ...processedPart, items: shuffledItems };
+
+                  // Map original modelAnswer labels to new shuffled labels
+                  if (part.modelAnswer) {
+                    const originalAnsLabels = part.modelAnswer.split(',').map((s: string) => s.trim().toLowerCase());
+                    const newAnsLabels = originalAnsLabels.map((origLabel: string) => {
+                      // Find which content had this label
+                      const item = originalItemsWithLabels.find((it: any) => it.originalLabel === origLabel);
+                      if (!item) return origLabel;
+                      // Find new index of this content
+                      const newIdx = shuffledItems.indexOf(item.content);
+                      return String.fromCharCode(97 + newIdx);
+                    });
+                    processedPart.modelAnswer = newAnsLabels.join(', ');
+                  }
+                }
+
+                // 2. Shuffling for Fill-in Word Box
+                if (part.subType === 'fill_in' && Array.isArray(part.wordBox)) {
+                  processedPart.wordBox = shuffleArray(part.wordBox);
+                }
+
+                // 3. Shuffling for Comprehension MCQ
+                if (part.subType === 'comprehension_mcq') {
+                  const subQs = part.subQuestions || part.questions || [];
+                  if (Array.isArray(subQs) && subQs.length > 0) {
+                    const shuffledSubQs = shuffleArray(subQs).map((sq: any) => {
+                      let processedSq = { ...sq };
+                      if (Array.isArray(sq.options)) {
+                        const shuffledOptions = shuffleArray(sq.options);
+                        processedSq = { ...processedSq, options: shuffledOptions };
+
+                        // Recalculate correctAnswer for the sub-question
+                        const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                          const isCorrect = typeof opt === 'object' ? (opt.isCorrect === true || String(opt.isCorrect) === 'true') : false;
+                          if (isCorrect) acc.push(idx);
+                          return acc;
+                        }, []);
+
+                        if (correctIndices.length > 0) {
+                          const answerString = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                          processedSq = { ...processedSq, correctAnswer: answerString };
+                        }
+                      }
+                      return processedSq;
+                    });
+                    processedPart.subQuestions = shuffledSubQs;
+                  }
+                }
+
+                return processedPart;
+              });
+
+              processedQuestion = {
+                ...processedQuestion,
+                parts: processedParts,
+                sub_questions: processedParts,
+                subQuestions: processedParts
+              };
+            }
+          }
+
           // Add negative marks for all Objective-style questions (MCQ, MC, AR, INT, MTF, NUMERIC, SMCQ)
           const isObjective = ['MCQ', 'MC', 'AR', 'INT', 'MTF', 'NUMERIC', 'SMCQ'].includes(q.type);
           const negativePercentage = q.type === 'MC' ? (exam?.mcNegativeMarking || 0) : (exam?.mcqNegativeMarking || 0);
