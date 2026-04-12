@@ -1723,6 +1723,8 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  const currentStudent = exam?.submissions?.[currentStudentIndex];
+
   // Get filtered questions based on type (Case-insensitive)
   const activeQuestions = useMemo(() => {
     if (currentStudent?.examSetId && exam?.questionsBySet?.[currentStudent.examSetId]) {

@@ -1200,9 +1200,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                                     <div className="text-[9px] text-slate-400 font-bold uppercase truncate mb-0.5 group-hover:text-red-300 transition-colors">
                                                        <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
                                                     </div>
-                                                    <span className="text-red-700 font-black text-lg flex items-center gap-2">
-                                                       <span className="px-3 py-0.5 bg-red-50 rounded border border-red-100 shadow-[2px_2px_0px_rgba(185,28,28,0.1)]">{displayLabel}</span>
-                                                    </span>
+                                                    <div className="text-red-700 font-black text-sm flex items-baseline gap-2 flex-wrap">
+                                                       <span className="px-3 py-0.5 bg-red-50 rounded border border-red-100 shadow-[2px_2px_0px_rgba(185,28,28,0.1)] shrink-0">{displayLabel}</span>
+                                                       <span className="flex-1 min-w-0 leading-snug"><UniversalMathJax inline>{String(rawAns || "")}</UniversalMathJax></span>
+                                                    </div>
                                                   </div>
                                                 </div>
                                               );
@@ -1262,17 +1263,17 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                                           <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse print:hidden"></div>
                                           Correct Execution Sequence
                                         </div>
-                                        <div className="p-4 flex flex-wrap items-center gap-2.5">
+                                        <div className="p-4 flex flex-wrap items-center gap-x-1.5 gap-y-3">
                                           {(part.correctOrder || []).map((o: string, oIdx: number) => (
                                             <React.Fragment key={oIdx}>
                                               <div className="flex flex-col items-center">
-                                                <div className="w-9 h-9 rounded-lg bg-white border-2 border-slate-200 flex items-center justify-center font-black text-slate-800 shadow-sm print:border-slate-300 print:shadow-none transition-all hover:border-red-500 group">
+                                                <div className="w-8 h-8 rounded bg-white border border-slate-300 flex items-center justify-center font-black text-slate-800 shadow-sm print:border-slate-400 print:shadow-none shrink-0">
                                                   <span className="text-sm">{o}</span>
                                                 </div>
                                               </div>
                                               {oIdx < (part.correctOrder || []).length - 1 && (
-                                                <div className="text-slate-300 print:text-slate-400 transform scale-x-125">
-                                                  <ArrowRight className="w-4 h-4" />
+                                                <div className="text-slate-400 print:text-slate-500 font-bold px-0.5">
+                                                  →
                                                 </div>
                                               )}
                                             </React.Fragment>

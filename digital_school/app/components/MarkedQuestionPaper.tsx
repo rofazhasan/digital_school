@@ -563,17 +563,37 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                         </div>
                     );
 
-                case 'rearranging':
-                    const orderAns = getVal('order');
-                    return (
-                        <div className="mt-2 p-2 border border-slate-200 rounded bg-slate-50 text-[10px] text-left">
-                            <div className="font-bold text-slate-500 mb-1">Student Sequence:</div>
-                            <div className="font-black text-indigo-700 bg-white p-1 border border-indigo-100 rounded inline-block uppercase tracking-widest">{orderAns || 'None Provided'}</div>
-                            {subQ.correctOrder && (
-                                <div className="mt-2 font-bold text-slate-500">Correct Sequence: <span className="text-green-600 ml-1">{subQ.correctOrder.join(', ')}</span></div>
-                            )}
-                        </div>
-                    );
+                 case 'rearranging':
+                     const orderAns = getVal('order');
+                     return (
+                         <div className="mt-2 p-3 border border-slate-200 rounded-xl bg-slate-50/30 text-[9px] text-left">
+                             <div className="mb-2">
+                                 <div className="text-[7px] font-black text-slate-400 uppercase tracking-widest mb-1">Student Sequence</div>
+                                 <div className="flex flex-wrap items-center gap-1">
+                                     {(String(orderAns || '')).split(/[,>→]-?/).map(s => s.trim()).filter(Boolean).map((o, oi) => (
+                                         <React.Fragment key={oi}>
+                                             <span className="w-6 h-6 rounded bg-indigo-50 border border-indigo-200 flex items-center justify-center font-black text-indigo-700 text-[10px] uppercase">{o}</span>
+                                             {oi < (String(orderAns || '').split(/[,>→]-?/).filter(Boolean).length - 1) && <span className="text-slate-300">→</span>}
+                                         </React.Fragment>
+                                     ))}
+                                     {!orderAns && <span className="italic text-slate-400">No response</span>}
+                                 </div>
+                             </div>
+                             {subQ.correctOrder && (
+                                 <div className="pt-2 border-t border-slate-100">
+                                     <div className="text-[7px] font-black text-green-600 uppercase tracking-widest mb-1">Correct Execution Path</div>
+                                     <div className="flex flex-wrap items-center gap-1">
+                                         {subQ.correctOrder.map((o: string, oi: number) => (
+                                             <React.Fragment key={oi}>
+                                                 <span className="w-6 h-6 rounded bg-green-50 border border-green-200 flex items-center justify-center font-black text-green-700 text-[10px] uppercase">{o}</span>
+                                                 {oi < (subQ.correctOrder.length - 1) && <span className="text-green-300">→</span>}
+                                             </React.Fragment>
+                                         ))}
+                                     </div>
+                                 </div>
+                             )}
+                         </div>
+                     );
 
                 case 'true_false':
                     return (
@@ -714,11 +734,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             </div>
 
                             {(() => {
+                                const isCompMCQ = subQ.subType === 'comprehension_mcq';
                                 const modelAns = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (typeof subQ.answers === 'string' ? subQ.answers : null);
                                 const modelAnsArray = Array.isArray(subQ.answers) ? subQ.answers : (Array.isArray(subQ.modelAnswers) ? subQ.modelAnswers : (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers : null));
                                 const isFlowchart = (subQ.subType === 'flowchart' || subQ.sub_type === 'flowchart') && subQ.items;
 
-                                if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0) && !isFlowchart) return null;
+                                if (!modelAns && (!modelAnsArray || modelAnsArray.length === 0) && !isFlowchart && !isCompMCQ) return null;
 
                                 return (
                                     <div className="mt-3 pl-3 ry-2 border-l-2 border-green-600 bg-green-50/20 text-[9px] text-green-900 leading-relaxed shadow-sm print:shadow-none rounded-r border-y border-r border-green-100/50">
@@ -739,6 +760,32 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                         {ii < (subQ.items || []).length - 1 && <ArrowRight className="w-2.5 h-2.5 text-green-400" />}
                                                     </React.Fragment>
                                                 ))}
+                                            </div>
+                                        )}
+
+                                        {isCompMCQ && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 py-1 mb-1.5">
+                                                {(subQ.subQuestions || subQ.questions || []).map((sq: any, sqi: number) => {
+                                                    const correctText = sq.correct || sq.correctAnswer || sq.options?.find((o: any) => o.isCorrect)?.text || (sq.options || [])[sq.correctIndex]?.text || (sq.options || [])[sq.correctIndex];
+                                                    const normalizeKey = (s: any) => String(s || '').trim().toLowerCase();
+                                                    const cKey = normalizeKey(correctText);
+                                                    
+                                                    let labelIdx = -1;
+                                                    if (sq.options) {
+                                                        labelIdx = (sq.options || []).findIndex((o: any) => normalizeKey(typeof o === 'string' ? o : o.text) === cKey);
+                                                    }
+                                                    const label = labelIdx !== -1 ? MCQ_LABELS[labelIdx] : '?';
+
+                                                    return (
+                                                        <div key={sqi} className="flex gap-2 items-baseline bg-white/40 p-1.5 rounded border border-green-100/50">
+                                                            <span className="font-bold text-green-700 opacity-60">({sqi + 1})</span>
+                                                            <div className="flex-1 flex items-baseline gap-1.5 flex-wrap">
+                                                                <span className="font-black text-green-800">[{label}]</span>
+                                                                <span className="font-medium text-green-900 leading-snug"><UniversalMathJax inline>{String(correctText || "")}</UniversalMathJax></span>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
 
