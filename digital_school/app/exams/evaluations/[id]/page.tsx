@@ -62,7 +62,7 @@ import {
 import { BeautifulChart } from "@/app/components/BeautifulChart";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
-import { cleanupMath, renderDynamicExplanation } from "@/lib/utils";
+import { cleanupMath, renderDynamicExplanation, cn } from "@/lib/utils";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { toBengaliNumerals } from "@/utils/numeralConverter";
@@ -278,6 +278,507 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [annotations, setAnnotations] = useState<Record<string, string>>({});
   // Store the JSON vector data for non-destructive editing
   const [drawingDataStore, setDrawingDataStore] = useState<Record<string, any>>({});
+
+  // Helper to reconstruct student answer for advanced descriptive types
+  const reconstructStudentAnswer = (studentAnswers: any, qId: string, subIdx: number) => {
+    const descPrefix = `${qId}_desc_${subIdx}_`;
+    const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
+    if (descKeys.length > 0) {
+      const obj: Record<string, any> = {};
+      descKeys.forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
+      return obj;
+    }
+    const subKey = `${qId}_sub_${subIdx}`;
+    return studentAnswers[subKey] || null;
+  };
+
+  // Helper to render advanced descriptive sub-questions content in evaluation context
+  const renderEvalSubQuestionContent = (subQ: any, subIdx: number, questionId: string, studentAnswers: any) => {
+    const subType = subQ.subType || 'writing';
+    const studentAnswer = reconstructStudentAnswer(studentAnswers, questionId, subIdx);
+    const normalize = (s: any) => String(s || '').trim().toLowerCase();
+
+    const getMatchAns = (leftId: string) => {
+      if (typeof studentAnswer === 'object' && studentAnswer !== null) return studentAnswer[leftId];
+      return null;
+    };
+
+    const getVal = (key: string) => {
+      if (typeof studentAnswer === 'object' && studentAnswer !== null) return studentAnswer[key];
+      return null;
+    };
+
+    switch (subType) {
+      case 'flowchart':
+        return (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(subQ.items || []).map((item: string, ii: number) => {
+              const segments = item.split('___');
+              const modelAnswers = (subQ.modelAnswers?.[ii] || '').split('|');
+              return (
+                <div key={ii} className="p-3 bg-amber-50/10 dark:bg-amber-900/5 rounded-xl border border-amber-200/30 flex flex-col gap-2">
+                  <div className="text-[9px] font-black text-amber-600 uppercase flex items-center justify-between">
+                    <span>Step {ii + 1}</span>
+                    {subQ.style && <Badge variant="outline" className="text-[8px] h-3 px-1 border-amber-200 text-amber-500 uppercase">{subQ.style}</Badge>}
+                  </div>
+                  {segments.map((seg, si) => (
+                    <div key={si} className="flex flex-col gap-1">
+                      <div className="text-xs text-muted-foreground font-medium italic whitespace-pre-wrap">
+                        <UniversalMathJax inline dynamic>{cleanupMath(seg.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                      </div>
+                      {si < segments.length - 1 && (
+                        <div className="space-y-1">
+                          <div className={cn(
+                            "p-2 rounded border text-sm font-bold shadow-sm",
+                            normalize(getVal(`flow_${ii}_${si}`)) === normalize(modelAnswers[si])
+                              ? "bg-green-50 dark:bg-green-950/20 border-green-200 text-green-700"
+                              : "bg-white dark:bg-slate-950 border-amber-200"
+                          )}>
+                            {getVal(`flow_${ii}_${si}`) || <span className="text-muted-foreground italic opacity-30">Missing</span>}
+                          </div>
+                          {modelAnswers[si] && (
+                            <div className="text-[10px] text-green-600 font-bold px-1 flex items-center gap-1">
+                              <ArrowRight className="w-2.5 h-2.5" /> Key: {modelAnswers[si]}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case 'fill_in':
+        return (
+          <div className="mt-3 p-4 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+            {(subQ.wordBox || subQ.clues) && (
+              <div className="mb-4 flex flex-wrap gap-2">
+                <div className="text-[10px] font-black text-slate-400 uppercase w-full mb-1">
+                  {subQ.clueType === 'box' ? 'Word Box:' : 'Clues:'}
+                </div>
+                {(subQ.wordBox || subQ.clues || []).map((clue: string, ci: number) => (
+                  <Badge key={ci} variant="outline" className="bg-white dark:bg-slate-950 font-bold border-indigo-100">{clue}</Badge>
+                ))}
+              </div>
+            )}
+            <div className="text-sm leading-relaxed text-foreground whitespace-pre-wrap">
+              {(subQ.passage || subQ.questionText || '').split('___').map((part: string, pi: number, arr: any[]) => {
+                const ans = getVal(pi.toString());
+                const correct = subQ.answers?.[pi];
+                const isCorrect = normalize(ans) === normalize(correct);
+                return (
+                  <span key={pi}>
+                    <UniversalMathJax inline dynamic>{cleanupMath(part.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                    {pi < arr.length - 1 && (
+                      <span className="relative group inline-block mx-1">
+                        <span className={cn(
+                          "px-2 py-0.5 rounded border-b-2 font-bold transition-all",
+                          ans ? (isCorrect ? "border-green-400 bg-green-50 text-green-700" : "border-red-400 bg-red-50 text-red-700") : "border-indigo-400 bg-indigo-50 text-indigo-600"
+                        )}>
+                          {ans || '___'}
+                        </span>
+                        {correct && (
+                          <span className="absolute -top-6 left-1/2 -translate-x-1/2 bg-green-600 text-white text-[10px] px-1.5 py-0.5 rounded shadow-sm whitespace-nowrap z-10 transition-opacity">
+                            Key: {correct}
+                          </span>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'matching':
+        const columns = [
+          { key: 'leftColumn', title: 'Col A', idPrefix: '' },
+          { key: 'rightColumn', title: 'Col B', idPrefix: '' },
+          { key: 'columnC', title: 'Col C', idPrefix: '' },
+          { key: 'columnD', title: 'Col D', idPrefix: '' }
+        ].filter(c => subQ[c.key] && subQ[c.key].length > 0);
+
+        return (
+          <div className="mt-3 space-y-4">
+            <div className={`grid grid-cols-2 md:grid-cols-${Math.min(4, columns.length)} gap-3`}>
+              {columns.map(col => (
+                <div key={col.key} className="space-y-2">
+                  <div className="text-[10px] font-black text-muted-foreground uppercase opacity-60 px-1">{col.title}</div>
+                  <div className="space-y-1.5">
+                    {(subQ[col.key] || []).map((item: any, i: number) => (
+                      <div key={i} className="p-2 text-[11px] bg-card/50 border border-border/50 rounded-lg flex items-start gap-2 shadow-sm">
+                        <Badge variant="secondary" className="h-4 min-w-[16px] rounded bg-muted text-[9px] p-0 flex items-center justify-center font-black">{item.id}</Badge>
+                        <div className="flex-1 leading-tight whitespace-pre-wrap"><UniversalMathJax inline dynamic>{cleanupMath(item.text.replace(/\|\|/g, '\n'))}</UniversalMathJax></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="rounded-xl border border-indigo-100 dark:border-indigo-900/30 overflow-hidden shadow-md bg-white dark:bg-slate-950">
+              <div className="p-2 bg-indigo-50/50 dark:bg-indigo-900/10 border-b border-indigo-100 dark:border-indigo-900/30 text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider">
+                Matching Correspondence Details
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-[11px] border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 dark:bg-slate-900 divide-x divide-slate-100 dark:divide-slate-800">
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Reference Item</th>
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Student Response</th>
+                      <th className="p-2.5 text-left font-black text-slate-500 uppercase text-[9px] w-1/3">Correct Answer</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {subQ.leftColumn?.map((l: any, i: number) => {
+                      const ans = getMatchAns(l.id);
+                      const correct = subQ.matches?.[l.id];
+                      const isCorrect = normalize(ans) === normalize(correct);
+
+                      const getItemText = (id: string) => {
+                        if (!id) return null;
+                        const parts = id.split('-');
+                        return parts.map((pid, idx) => {
+                          const colKey = ['leftColumn', 'rightColumn', 'columnC', 'columnD'][idx];
+                          const item = subQ[colKey]?.find((r: any) => r.id === pid);
+                          return item ? (idx > 0 ? ` → ${item.text}` : item.text) : (idx > 0 ? ` → ${pid}` : pid);
+                        }).join('');
+                      };
+
+                      return (
+                        <tr key={i} className={cn("divide-x divide-slate-100 dark:divide-slate-800 transition-colors", isCorrect ? "bg-green-50/20" : "bg-red-50/20")}>
+                          <td className="p-2.5 font-bold text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                            <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 text-[10px] mr-2">{l.id}</span>
+                            <UniversalMathJax inline>{cleanupMath(l.text.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                          </td>
+                          <td className={cn("p-2.5 font-black whitespace-pre-wrap", isCorrect ? "text-green-600" : "text-red-500")}>
+                            {ans ? <UniversalMathJax inline>{cleanupMath((getItemText(ans) || ans).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="italic opacity-30">No match</span>}
+                          </td>
+                          <td className="p-2.5 text-green-600 font-black whitespace-pre-wrap">
+                            {correct ? <UniversalMathJax inline>{cleanupMath((getItemText(correct) || correct).replace(/\|\|/g, '\n'))}</UniversalMathJax> : <span className="opacity-30">—</span>}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'true_false':
+        return (
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {(subQ.statements || []).map((stmt: string, i: number) => {
+              const ans = getVal(i.toString());
+              const correct = subQ.correctAnswers?.[i];
+              const isCorrect = normalize(ans) === normalize(correct);
+              return (
+                <div key={i} className={cn(
+                  "p-3 rounded-xl border flex items-start gap-3 transition-colors",
+                  isCorrect ? "bg-green-50/50 border-green-200" : "bg-red-50/50 border-red-200"
+                )}>
+                  <div className="flex-1 whitespace-pre-wrap leading-relaxed self-center">
+                    <UniversalMathJax inline dynamic>{cleanupMath(stmt.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <Badge variant={isCorrect ? "default" : "destructive"} className="text-[9px] h-4 px-1.5 uppercase font-bold">{ans || 'Empty'}</Badge>
+                    {correct && <span className="text-[8px] font-black text-green-600">Key: {correct}</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+
+      case 'interpreting_graph':
+        return (
+          <div className="mt-3 space-y-4">
+            {subQ.chartConfig && (
+              <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+                <BeautifulChart
+                  type={subQ.chartConfig.type}
+                  data={(() => {
+                    const cc = subQ.chartConfig;
+                    const labels = cc.labels || cc.chartLabels || cc.chart_labels;
+                    const data = cc.data || cc.chartData || cc.chart_data;
+                    if (Array.isArray(labels) && Array.isArray(data)) return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
+                    return Array.isArray(data) ? data : [];
+                  })()}
+                  xAxisLabel={subQ.chartConfig.xAxisLabel}
+                  yAxisLabel={subQ.chartConfig.yAxisLabel}
+                />
+              </div>
+            )}
+            <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800">
+              <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div> Student Interpretation
+              </div>
+              <div className="text-foreground whitespace-pre-wrap italic font-medium">
+                {(() => {
+                  const graphAns = typeof studentAnswer === 'object' && studentAnswer !== null ? (studentAnswer as any)['ans'] ?? JSON.stringify(studentAnswer) : studentAnswer;
+                  return graphAns ? <span>{String(graphAns)}</span> : <span className="text-muted-foreground/30">No response provided</span>;
+                })()}
+              </div>
+            </div>
+          </div>
+        );
+
+      case 'label_diagram':
+        return (
+          <div className="mt-3 space-y-4">
+            {subQ.imageUrl && (
+              <div className="relative inline-block border rounded-xl overflow-hidden shadow-sm max-w-full">
+                <img src={subQ.imageUrl} alt="Diagram" className="max-h-64 object-contain" loading="lazy" />
+                {(subQ.labels || []).map((l: any, i: number) => (
+                  <div key={i} className="absolute w-5 h-5 bg-indigo-600 text-white rounded-full flex items-center justify-center text-[10px] font-bold border border-white" style={{ top: `${l.y}%`, left: `${l.x}%`, transform: 'translate(-50%, -50%)' }}>
+                    {i + 1}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {(subQ.labels || []).map((_: any, i: number) => {
+                const ans = getVal(i.toString());
+                const correct = subQ.correctLabels?.[i];
+                const isCorrect = normalize(ans) === normalize(correct);
+                return (
+                  <div key={i} className={cn("p-2 rounded border flex flex-col", isCorrect ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200")}>
+                    <div className="text-[9px] font-bold opacity-50">Label {i + 1}</div>
+                    <div className="text-xs font-bold">{ans || '___'}</div>
+                    {correct && <div className="text-[8px] text-green-600 font-bold">Key: {correct}</div>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+
+      case 'comprehension': {
+        const passage = subQ.passage || subQ.stemPassage || subQ.passageText || '';
+        const questions = subQ.questions || subQ.subQuestions || [];
+        return (
+          <div className="mt-3 space-y-4">
+            {passage && (
+              <div className="p-4 bg-blue-50/40 dark:bg-blue-900/10 border-l-4 border-blue-400 rounded-r-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[9px] font-black text-blue-600 uppercase tracking-widest mb-2">Stem Passage</div>
+                <UniversalMathJax dynamic>{cleanupMath(passage.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              </div>
+            )}
+            {subQ.primaryImage && <img src={subQ.primaryImage} alt="Passage" className="max-h-64 rounded-xl border object-contain" />}
+            <div className="space-y-3">
+              {questions.map((q: any, qi: number) => {
+                const ans = getVal(qi.toString());
+                const correct = subQ.answers?.[qi] || subQ.correctAnswers?.[qi] || q.answer || q.modelAnswer;
+                return (
+                  <div key={qi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+                    <div className="text-[11px] font-black text-slate-600 dark:text-slate-300 flex gap-2">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center text-[9px] font-black text-blue-600">{qi + 1}</span>
+                      <UniversalMathJax inline dynamic>{cleanupMath(q.text || q.question || q)}</UniversalMathJax>
+                    </div>
+                    <div className="pl-7 space-y-1">
+                      {ans ? (
+                        <div className="p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap italic">
+                          <UniversalMathJax dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                        </div>
+                      ) : <span className="text-[10px] italic text-muted-foreground/40">No response</span>}
+                      {correct && <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1"><CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'comprehension_mcq': {
+        const passage = subQ.passage || subQ.stemPassage || subQ.passageText || '';
+        const subQs = subQ.subQuestions || subQ.questions || [];
+        return (
+          <div className="mt-3 space-y-4">
+            {passage && (
+              <div className="p-4 bg-amber-50/40 dark:bg-amber-900/10 border-l-4 border-amber-400 rounded-r-2xl text-sm leading-relaxed whitespace-pre-wrap">
+                <div className="text-[9px] font-black text-amber-600 uppercase tracking-widest mb-2">Stem Passage</div>
+                <UniversalMathJax dynamic>{cleanupMath(passage.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+              </div>
+            )}
+            {subQ.primaryImage && <img src={subQ.primaryImage} alt="Passage" className="max-h-64 rounded-xl border object-contain" />}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {subQs.map((sq: any, sqi: number) => {
+                const studentPick = getVal(sqi.toString());
+                return (
+                  <div key={sqi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-2">
+                    <div className="text-[11px] font-black text-slate-700 dark:text-slate-200 flex gap-2 items-start">
+                      <span className="shrink-0 w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-[9px] font-black text-amber-700">{sqi + 1}</span>
+                      <UniversalMathJax inline dynamic>{cleanupMath(sq.questionText || sq.text || sq.question || '')}</UniversalMathJax>
+                    </div>
+                    <div className="grid grid-cols-1 gap-1 pl-7">
+                      {(sq.options || []).map((opt: any, oidx: number) => {
+                        const optText = typeof opt === 'string' ? opt : opt.text;
+                        const isCorrect = (typeof opt === 'object' && opt.isCorrect) || (sq.correctAnswer !== undefined && (Number(sq.correctAnswer) === oidx || normalize(sq.correctAnswer) === normalize(optText)));
+                        const isSelected = normalize(studentPick) === normalize(optText);
+                        return (
+                          <div key={oidx} className={cn(
+                            'flex items-center gap-2 p-1.5 rounded-lg text-[11px] border transition-colors',
+                            isSelected && isCorrect ? 'bg-green-50 border-green-300 text-green-800 dark:bg-green-900/20' :
+                            isSelected && !isCorrect ? 'bg-red-50 border-red-300 text-red-800 dark:bg-red-900/20' :
+                            isCorrect ? 'bg-emerald-50/50 border-emerald-200 text-emerald-700' : 'bg-slate-50/50 dark:bg-slate-900/30 border-slate-100 dark:border-slate-800 text-slate-600'
+                          )}>
+                            <span className={cn('shrink-0 w-5 h-5 rounded flex items-center justify-center text-[9px] font-black', isSelected && isCorrect ? 'bg-green-500 text-white' : isSelected && !isCorrect ? 'bg-red-500 text-white' : isCorrect ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-200 text-slate-600')}>{String.fromCharCode(65 + oidx)}</span>
+                            <UniversalMathJax inline dynamic>{cleanupMath(optText || '')}</UniversalMathJax>
+                            {isSelected && isCorrect && <CheckCircle className="w-3 h-3 text-green-600 ml-auto shrink-0" />}
+                            {isSelected && !isCorrect && <XCircle className="w-3 h-3 text-red-600 ml-auto shrink-0" />}
+                            {!isSelected && isCorrect && <CheckCircle className="w-3 h-3 text-emerald-400 ml-auto shrink-0 opacity-60" />}
+                          </div>
+                        );
+                      })}
+                      {!studentPick && <span className="text-[10px] italic text-muted-foreground/40 pl-1">Not answered</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      case 'short_answer': {
+        const questions = subQ.questions || subQ.items || [];
+        return (
+          <div className="mt-3 space-y-2">
+            {questions.map((q: any, qi: number) => {
+              const ans = getVal(qi.toString());
+              const correct = subQ.answers?.[qi] || subQ.correctAnswers?.[qi];
+              return (
+                <div key={qi} className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm space-y-1.5">
+                  <div className="text-[11px] font-bold text-slate-600 flex gap-2 items-start">
+                    <span className="shrink-0 w-5 h-5 rounded bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[9px] font-black text-slate-600">{qi + 1}</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(typeof q === 'string' ? q : q.text || q.question || '')}</UniversalMathJax>
+                  </div>
+                  <div className="pl-7 space-y-1">
+                    {ans ? (
+                      <div className="p-2 rounded bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-sm whitespace-pre-wrap italic text-slate-700">
+                        <UniversalMathJax dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                      </div>
+                    ) : <span className="text-[10px] italic text-muted-foreground/40">No response</span>}
+                    {correct && <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1"><CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}</div>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      case 'error_correction': {
+        const sentences = subQ.sentences || subQ.items || [];
+        return (
+          <div className="mt-3 space-y-2">
+            {sentences.map((s: string, si: number) => {
+              const ans = getVal(si.toString());
+              const correct = subQ.answers?.[si] || subQ.correctAnswers?.[si];
+              const isCorrect = ans && correct && normalize(ans) === normalize(correct);
+              return (
+                <div key={si} className={cn(
+                  'p-3 rounded-xl border shadow-sm space-y-1.5',
+                  ans ? (isCorrect ? 'bg-green-50/50 border-green-200' : 'bg-red-50/30 border-red-200') : 'bg-white dark:bg-slate-950 border-slate-200'
+                )}>
+                  <div className="text-[10px] font-bold text-slate-500 flex gap-2 items-start">
+                    <span className="shrink-0 w-4 h-4 rounded bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-black">{String.fromCharCode(97 + si)}</span>
+                    <span className="line-through opacity-60">{s}</span>
+                  </div>
+                  <div className="pl-6 space-y-1">
+                    {ans ? (
+                      <div className={cn('text-sm font-bold', isCorrect ? 'text-green-700' : 'text-red-700')}>
+                        <UniversalMathJax inline dynamic>{cleanupMath(String(ans))}</UniversalMathJax>
+                      </div>
+                    ) : <span className="text-[10px] italic text-muted-foreground/40">No correction provided</span>}
+                    {correct && !isCorrect && (
+                      <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1">
+                        <CheckCircle className="w-2.5 h-2.5" /> Key: {String(correct)}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      }
+
+      case 'rearranging': {
+        const items = subQ.items || [];
+        const studentOrder = getVal('order');
+        const correctOrder = subQ.correctOrder || subQ.answers?.[0] || subQ.modelAnswer;
+        return (
+          <div className="mt-3 space-y-3">
+            {items.length > 0 && (
+              <div className="grid grid-cols-1 gap-1.5">
+                {items.map((item: string, ii: number) => (
+                  <div key={ii} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 text-[11px]">
+                    <span className="shrink-0 w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-[9px] font-bold">{String.fromCharCode(65 + ii)}</span>
+                    <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="p-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 shadow-sm space-y-1">
+              <div className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Student&apos;s Sequence</div>
+              {studentOrder ? <div className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">{String(studentOrder)}</div> : <span className="text-[10px] italic text-muted-foreground/40">No sequence provided</span>}
+              {correctOrder && <div className="text-[9px] text-emerald-600 font-black flex items-center gap-1 pt-1 border-t border-slate-100"><CheckCircle className="w-2.5 h-2.5" /> Key: {String(correctOrder)}</div>}
+            </div>
+          </div>
+        );
+      }
+
+      case 'table': {
+        const headers = subQ.tableHeaders || [];
+        const rows = subQ.tableRows || [];
+        return (
+          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+            <table className="w-full text-[11px]">
+              {headers.length > 0 && (
+                <thead className="bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                  <tr>
+                    {headers.map((h: string, hi: number) => (
+                      <th key={hi} className="p-2 text-left font-black text-slate-600 dark:text-slate-300">
+                        <UniversalMathJax inline dynamic>{cleanupMath(h)}</UniversalMathJax>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+              )}
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {rows.map((row: string[], ri: number) => (
+                  <tr key={ri} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/30">
+                    {headers.map((_: string, ci: number) => {
+                      const isBlank = !row[ci] || row[ci] === '___';
+                      const studentVal = getVal(`${ri}_${ci}`);
+                      return (
+                        <td key={ci} className="p-2">
+                          {isBlank ? (
+                            <span className={cn('px-2 py-1 rounded font-bold inline-block', studentVal ? 'bg-blue-50 border border-blue-200 text-blue-800' : 'bg-slate-100 text-slate-400 italic')}>{studentVal ? String(studentVal) : '___'}</span>
+                          ) : <UniversalMathJax inline dynamic>{cleanupMath(row[ci])}</UniversalMathJax>}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+
+      default: return null;
+    }
+  };
 
   const openAnnotation = (imageUrl: string, questionId: string, index: number = 0, studentId: string, allImages: string[] = []) => {
     setActiveAnnotationImages(allImages);
@@ -2974,7 +3475,6 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                   }
                                                 }
                                               }
-                                              
                                               const subImgArr = studentAnswers[`${qId}_sub_${subIdx}_images`] || studentAnswers[`${qId}_desc_${subIdx}_images`] || [];
                                               const subImgSingle = studentAnswers[`${qId}_sub_${subIdx}_image`] || studentAnswers[`${qId}_desc_${subIdx}_image`];
                                               const allSubImages = subImgSingle ? [subImgSingle, ...subImgArr] : subImgArr;
@@ -2986,211 +3486,91 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               );
 
                                               if (isDescriptive) {
-                                                // --- ENHANCED WORLD CLASS RENDERING FOR DESCRIPTIVE ---
+                                                // --- ENHANCED PORTED RENDERING FROM RESULTS PAGE ---
                                                 return (
-                                                  <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-4 py-2">
-                                                    {(subQ.passage || subQ.stemPassage || subQ.passageText) && (
-                                                      <div className="p-3 bg-slate-100/50 border-l-[3px] border-slate-900 rounded-r text-[10px] text-slate-700 italic mb-2 shadow-sm ring-1 ring-slate-200/50">
-                                                        <div className="text-[8px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1 flex items-center gap-1.5 underline decoration-slate-200 underline-offset-4">
-                                                          <FileText className="w-2.5 h-2.5" /> Stem Passage
-                                                        </div>
-                                                        <UniversalMathJax dynamic>{cleanupMath((subQ.passage || subQ.stemPassage || subQ.passageText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                      </div>
-                                                    )}
-                                                    
-                                                    <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
-                                                      <div className="flex-1">
-                                                        <div className="text-sm font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
-                                                          <span className="w-5 h-5 rounded-md bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
-                                                            {String.fromCharCode(97 + idx)}
-                                                          </span>
-                                                          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sub-Question {idx + 1}</div>
-                                                          <span className="text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                                            {subQ.marks || subQ.mark || 0} Points
-                                                          </span>
-                                                        </div>
-                                                        
-                                                        <div className="text-gray-900 text-sm md:text-base font-bold leading-relaxed mb-3 whitespace-pre-wrap border-l-2 border-slate-200 pl-3">
-                                                          <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                        </div>
-
-                                                        {subQ.chartConfig && (
-                                                          <div className="mb-4 p-4 bg-white border-2 border-slate-100 rounded-xl shadow-sm max-w-md ring-1 ring-slate-200/50">
-                                                            <BeautifulChart 
-                                                              type={subQ.chartConfig.type} 
-                                                              data={(() => {
-                                                                const cc = subQ.chartConfig;
-                                                                const labels = cc.labels || cc.chartLabels || cc.chart_labels;
-                                                                const data = cc.data || cc.chartData || cc.chart_data;
-                                                                if (Array.isArray(labels) && Array.isArray(data)) {
-                                                                  return labels.map((l: string, i: number) => ({ label: l, value: data[i] || 0 }));
-                                                                }
-                                                                return Array.isArray(data) ? data : [];
-                                                              })()} 
-                                                              xAxisLabel={subQ.chartConfig.xAxisLabel} 
-                                                              yAxisLabel={subQ.chartConfig.yAxisLabel}
-                                                              isPrint={false}
-                                                            />
+                                                  <div key={idx} className="pl-4 border-l-2 border-indigo-100 space-y-4 py-4">
+                                                    {/* Question Structure & Keys (Ported) */}
+                                                    <div className="space-y-4">
+                                                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                                        <div className="flex-1">
+                                                          <div className="text-sm font-semibold text-slate-900 mb-1.5 flex items-center gap-2">
+                                                            <span className="w-5 h-5 rounded-md bg-slate-900 text-white flex items-center justify-center text-[10px] font-black shadow-sm">
+                                                              {String.fromCharCode(97 + idx)}
+                                                            </span>
+                                                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sub-Question {idx + 1}</div>
+                                                            <span className="text-[9px] text-slate-400 font-bold bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                                                              {subQ.marks || subQ.mark || 0} Points
+                                                            </span>
                                                           </div>
-                                                        )}
-                                                        
-                                                        {/* MODEL ANSWER / KEY SECTION */}
-                                                        <div className="mt-4 pt-4 border-t border-dashed border-slate-200 space-y-3">
-                                                          <div className="flex items-center gap-2">
-                                                            <div className="px-3 py-1 bg-emerald-600 text-white text-[9px] font-black rounded-full uppercase tracking-widest shadow-lg shadow-emerald-200">
-                                                              Model Answer / Key
-                                                            </div>
-                                                            <div className="h-[1px] flex-1 bg-emerald-100"></div>
+                                                          
+                                                          <div className="text-gray-900 text-sm md:text-base font-bold leading-relaxed mb-3 whitespace-pre-wrap border-l-2 border-slate-200 pl-3">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath((subQ?.text || subQ?.question || subQ?.questionText || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                           </div>
 
-                                                          {(() => {
-                                                            const isEn = exam?.language?.toLowerCase() === 'english' || (subQ.text || subQ.questionText || "").match(/^[A-Za-z0-9\s.,?'"-]+$/);
-                                                            const normalizeAnswer = (val: any) => String(val || "").trim().toLowerCase();
-
-                                                            if (subQ.subType === 'comprehension_mcq') {
-                                                              return (
-                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                                  {(subQ.subQuestions || subQ.questions || []).map((sq: any, sqIdx: number) => {
-                                                                    const rawAns = sq.correct || sq.correctAnswer || (sq.options || []).find((o: any) => o.isCorrect)?.text;
-                                                                    const cAns = normalizeAnswer(rawAns);
-                                                                    let labelIdx = MCQ_LABELS_BN.indexOf(cAns);
-                                                                    if (labelIdx === -1) labelIdx = MCQ_LABELS_EN.indexOf(cAns.toUpperCase());
-                                                                    if (labelIdx === -1) {
-                                                                        const optMatchIdx = (sq.options || []).findIndex((o: any) => normalizeAnswer(typeof o === 'string' ? o : o.text) === cAns);
-                                                                        if (optMatchIdx !== -1) labelIdx = optMatchIdx;
-                                                                    }
-                                                                    const displayLabel = isEn ? (MCQ_LABELS_EN[labelIdx] || cAns) : (MCQ_LABELS_BN[labelIdx] || cAns);
-                                                                    return (
-                                                                      <div key={sqIdx} className="flex gap-3 items-center bg-white p-2.5 rounded-xl border-2 border-emerald-50 shadow-sm hover:border-emerald-200 transition-all group">
-                                                                        <span className="font-black text-emerald-300 w-6 shrink-0 underline decoration-emerald-100 underline-offset-4 decoration-2">({sqIdx + 1})</span>
-                                                                        <div className="flex flex-col flex-1 min-w-0">
-                                                                          <div className="text-[8px] text-slate-400 font-bold uppercase truncate mb-0.5 group-hover:text-emerald-400">
-                                                                             <UniversalMathJax inline>{sq.questionText || sq.text || ""}</UniversalMathJax>
-                                                                          </div>
-                                                                          <span className="text-emerald-700 font-black text-sm flex items-center gap-2">
-                                                                             <span className="px-3 py-0.5 bg-emerald-50 rounded border border-emerald-100 shadow-[2px_2px_0px_rgba(16,185,129,0.1)]">{displayLabel}</span>
-                                                                          </span>
-                                                                        </div>
-                                                                      </div>
-                                                                    );
-                                                                  })}
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            if (subQ.subType === 'matching' || subQ.subType === 'mtf') {
-                                                              return (
-                                                                <div className="grid grid-cols-1 gap-2">
-                                                                  {Object.entries((subQ.matches as Record<string, string>) || {}).map(([l, r], mIdx) => (
-                                                                    <div key={mIdx} className="flex gap-2 items-center bg-white p-2 rounded-xl border border-emerald-100 shadow-sm text-xs">
-                                                                      <span className="font-black w-14 text-center bg-emerald-50 rounded text-emerald-600 py-1">({l})</span>
-                                                                      <span className="text-emerald-200">⟷</span>
-                                                                      <span className="font-black text-white px-3 min-w-[40px] text-center bg-emerald-500 rounded-lg py-1 shadow-sm">({r})</span>
-                                                                      <div className="h-[1px] flex-1 bg-emerald-50"></div>
-                                                                    </div>
-                                                                  ))}
-                                                                  {!(subQ.matches) && (
-                                                                    <div className="text-xs font-bold text-emerald-800 p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                                                                      <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || ""))}</UniversalMathJax>
-                                                                    </div>
-                                                                  )}
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            if (subQ.subType === 'rearranging') {
-                                                              return (
-                                                                <div className="p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl relative overflow-hidden">
-                                                                  <div className="bg-emerald-600 text-white px-3 py-1 text-[8px] font-black uppercase tracking-widest inline-block rounded-br-xl rounded-tl-sm absolute top-0 left-0">Correct Sequence</div>
-                                                                  <div className="pt-2 flex flex-wrap items-center gap-2">
-                                                                    {(subQ.correctOrder || []).map((o: string, oIdx: number) => (
-                                                                      <React.Fragment key={oIdx}>
-                                                                        <div className="w-10 h-10 rounded-xl bg-white border-2 border-emerald-200 flex items-center justify-center font-black text-emerald-700 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.1)] hover:-translate-y-0.5 transition-transform duration-300">
-                                                                          {o}
-                                                                        </div>
-                                                                        {oIdx < (subQ.correctOrder || []).length - 1 && <ArrowRight className="w-4 h-4 text-emerald-200 animate-pulse" />}
-                                                                      </React.Fragment>
-                                                                    ))}
-                                                                  </div>
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            if (subQ.subType === 'flowchart') {
-                                                              return (
-                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                  {(subQ.items || []).map((item: string, ii: number) => (
-                                                                    <React.Fragment key={ii}>
-                                                                      <div className="px-3 py-2 rounded-xl border-2 border-emerald-100 bg-white shadow-sm text-[10px] font-black text-emerald-900 group hover:border-emerald-300 transition-all">
-                                                                        <span className="text-[8px] text-emerald-300 mr-1.5 border-r border-emerald-50 pr-1.5 uppercase tracking-tighter">{ii + 1}</span>
-                                                                        <UniversalMathJax inline dynamic>{cleanupMath(item)}</UniversalMathJax>
-                                                                      </div>
-                                                                      {ii < subQ.items.length - 1 && <ArrowRight className="w-4 h-4 text-emerald-200" />}
-                                                                    </React.Fragment>
-                                                                  ))}
-                                                                </div>
-                                                              );
-                                                            }
-
-                                                            return (
-                                                              <div className="p-4 bg-white/70 rounded-2xl border-2 border-emerald-100 shadow-[4px_4px_0px_0px_rgba(16,185,129,0.05)] ring-1 ring-emerald-50">
-                                                                <div className="text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap text-sm">
-                                                                  <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                                </div>
-                                                              </div>
-                                                            );
-                                                          })()}
-
-                                                          {subQ.explanation && (
-                                                            <div className="mt-3 p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-indigo-800 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                                                              <div className="flex items-center gap-2 mb-1.5">
-                                                                <Info className="w-3 h-3 text-indigo-400" />
-                                                                <span className="font-black uppercase text-[8px] tracking-[0.1em]">Teaching Tip / Explanation</span>
-                                                              </div>
-                                                              <div className="font-medium text-indigo-900/80 leading-relaxed">
-                                                                <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                              </div>
-                                                            </div>
-                                                          )}
+                                                          {/* Advanced Content (Flowchart, Matching, etc.) */}
+                                                          {renderEvalSubQuestionContent(subQ, idx, qId, studentAnswers)}
                                                         </div>
 
-                                                        {/* STUDENT RESPONSE SECTION */}
-                                                        <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner">
-                                                          <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                                            <User className="w-2.5 h-2.5" /> Student Answer
+                                                        {/* Grading Controls (Preserved) */}
+                                                        <div className="flex flex-wrap items-center gap-2 bg-indigo-50/20 p-2.5 rounded-xl border border-indigo-100/50 self-start shadow-sm ring-1 ring-indigo-50">
+                                                          <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mr-1">Points:</div>
+                                                          <div className="flex gap-1.5">
+                                                            {Array.from({ length: (subQ?.marks || subQ?.mark || 0) + 1 }, (_, i) => i).map((mark) => {
+                                                              const marksKey = `${qId}_sub_${subIdx}_marks`;
+                                                              const descMarksKey = `${qId}_desc_${subIdx}_marks`;
+                                                              const isSelected = (studentAnswers[marksKey]) === mark || (studentAnswers[descMarksKey]) === mark;
+                                                              return (
+                                                                <button
+                                                                  key={mark}
+                                                                  onClick={() => updateMarks(qId, mark, idx)}
+                                                                  disabled={!canEditMarks()}
+                                                                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all ring-offset-2 ${isSelected
+                                                                    ? 'bg-slate-900 text-white shadow-lg ring-2 ring-slate-900 scale-110'
+                                                                    : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-900 hover:text-slate-900'
+                                                                    } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
+                                                                >
+                                                                  {mark}
+                                                                </button>
+                                                              );
+                                                            })}
                                                           </div>
-                                                          <div className="text-slate-800 text-sm italic whitespace-pre-wrap">
-                                                            <UniversalMathJax dynamic>{cleanupMath((subText || "No answer provided").replace(/\|\|/g, '\n'))}</UniversalMathJax>
-                                                          </div>
-                                                        </div>
-                                                      </div>
-
-                                                      {/* Grading Controls */}
-                                                      <div className="flex flex-wrap items-center gap-2 bg-indigo-50/20 p-2.5 rounded-xl border border-indigo-100/50 self-start shadow-sm ring-1 ring-indigo-50">
-                                                        <div className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mr-1">Points:</div>
-                                                        <div className="flex gap-1.5">
-                                                          {Array.from({ length: (subQ?.marks || subQ?.mark || 0) + 1 }, (_, i) => i).map((mark) => {
-                                                            const marksKey = `${qId}_sub_${subIdx}_marks`;
-                                                            const descMarksKey = `${qId}_desc_${subIdx}_marks`;
-                                                            const isSelected = (studentAnswers[marksKey]) === mark || (studentAnswers[descMarksKey]) === mark;
-                                                            return (
-                                                              <button
-                                                                key={mark}
-                                                                onClick={() => updateMarks(qId, mark, idx)}
-                                                                disabled={!canEditMarks()}
-                                                                className={`w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black transition-all ring-offset-2 ${isSelected
-                                                                  ? 'bg-slate-900 text-white shadow-lg ring-2 ring-slate-900 scale-110'
-                                                                  : 'bg-white text-slate-400 border border-slate-200 hover:border-slate-900 hover:text-slate-900'
-                                                                  } ${!canEditMarks() ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer active:scale-95'}`}
-                                                              >
-                                                                {mark}
-                                                              </button>
-                                                            );
-                                                          })}
                                                         </div>
                                                       </div>
                                                     </div>
 
+                                                    {/* Original Model Answer / Explanation (Backup display for types not covered by renderEvalSubQuestionContent) */}
+                                                    {!['flowchart', 'matching', 'fill_in', 'true_false', 'interpreting_graph', 'label_diagram', 'comprehension', 'comprehension_mcq', 'short_answer', 'error_correction', 'rearranging', 'table'].includes(subQ.subType) && (
+                                                        <div className="mt-4 p-4 bg-emerald-50/40 rounded-2xl border-2 border-emerald-100/50 shadow-sm">
+                                                          <div className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-2">Model Answer / Key</div>
+                                                          <div className="text-emerald-900 font-bold text-sm whitespace-pre-wrap">
+                                                            <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                          </div>
+                                                        </div>
+                                                    )}
+
+                                                    {subQ.explanation && (
+                                                      <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-indigo-800">
+                                                        <div className="flex items-center gap-2 mb-1.5">
+                                                          <Info className="w-3 h-3 text-indigo-400" />
+                                                          <span className="font-black uppercase text-[8px] tracking-widest">Pedagogical Rationale</span>
+                                                        </div>
+                                                        <div className="font-medium text-indigo-900/80 leading-relaxed">
+                                                          <UniversalMathJax dynamic>{cleanupMath(subQ.explanation.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                        </div>
+                                                      </div>
+                                                    )}
+
+                                                    {/* Raw Student Answer (Preserved) */}
+                                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 shadow-inner">
+                                                      <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                        <User className="w-2.5 h-2.5" /> Raw Response Text
+                                                      </div>
+                                                      <div className="text-slate-800 text-sm italic whitespace-pre-wrap">
+                                                        <UniversalMathJax dynamic>{cleanupMath((subText || "No numeric or text response provided").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                      </div>
+                                                    </div>
+
+                                                    {/* Student Images & Annotations (Preserved) */}
                                                     {allSubImages && allSubImages.length > 0 && (
                                                       <div className="flex flex-wrap gap-3 mt-3 ml-4 p-3 bg-slate-50/50 rounded-2xl border border-slate-100">
                                                         {allSubImages.map((imgUrl: string, imgIdx: number) => {
@@ -3204,10 +3584,10 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                                 alt={`Sub ${idx + 1} Image ${imgIdx + 1}`}
                                                                 crossOrigin="anonymous"
                                                                 className="h-28 w-28 rounded-xl border-2 border-white shadow-xl bg-muted/50 object-cover cursor-pointer hover:scale-[1.05] transition-transform duration-500 ring-1 ring-slate-200"
-                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, allSubImages)}
                                                               />
                                                               <button
-                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, subQ.studentImages)}
+                                                                onClick={() => openAnnotation(imgUrl, qId, questionIndex, currentStudent?.student?.id, allSubImages)}
                                                                 className="absolute top-2 right-2 bg-slate-900/90 p-2 rounded-lg shadow-xl hover:bg-slate-900 text-white opacity-0 group-hover:opacity-100 transition-all duration-300 backdrop-blur-sm"
                                                               >
                                                                 <PenTool className="w-3.5 h-3.5" />
