@@ -211,16 +211,31 @@ export async function GET(
           let subAns = (studentAnswers as any)[subId];
           
           // Check for advanced descriptive keys (aggregated object)
-          const studentAnsKeys = Object.keys(studentAnswers);
-          const descKeys = studentAnsKeys.filter(k => k.startsWith(descPrefix));
+          // 1. Check in nested questionId object
+          const nested = (studentAnswers as any)[questionId];
+          if (typeof nested === 'object' && nested !== null) {
+            const descKeys = Object.keys(nested).filter(k => k.startsWith(descPrefix));
+            if (descKeys.length > 0) {
+              const aggregated: Record<string, any> = {};
+              descKeys.forEach(k => {
+                aggregated[k.replace(descPrefix, '')] = (nested as any)[k];
+              });
+              subAns = aggregated;
+            } else if (typeof nested === 'string' && subIdx === 0) {
+              subAns = nested;
+            }
+          }
           
-          if (descKeys.length > 0) {
-            const aggregated: Record<string, any> = {};
-            descKeys.forEach(k => {
-              const field = k.replace(descPrefix, '');
-              aggregated[field] = (studentAnswers as any)[k];
-            });
-            subAns = aggregated;
+          // 2. Fallback to flat studentAnswers keys
+          if (!subAns) {
+            const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
+            if (descKeys.length > 0) {
+              const aggregated: Record<string, any> = {};
+              descKeys.forEach(k => {
+                aggregated[k.replace(descPrefix, '')] = (studentAnswers as any)[k];
+              });
+              subAns = aggregated;
+            }
           }
 
           // MAP SUB-QUESTION IMAGES (Robust prefix-based collection)

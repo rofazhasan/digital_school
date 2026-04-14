@@ -284,15 +284,30 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   // Helper to reconstruct student answer for advanced descriptive types
   const reconstructStudentAnswer = (studentAnswers: any, qId: string, subIdx: number) => {
+    // 1. Check if answers are nested under the question ID (DescriptiveSection style)
+    const nestedAnswers = studentAnswers[qId];
     const descPrefix = `${qId}_desc_${subIdx}_`;
+
+    if (typeof nestedAnswers === 'object' && nestedAnswers !== null) {
+      const descKeys = Object.keys(nestedAnswers).filter(k => k.startsWith(descPrefix));
+      if (descKeys.length > 0) {
+        const obj: Record<string, any> = {};
+        descKeys.forEach(k => { obj[k.replace(descPrefix, '')] = (nestedAnswers as any)[k]; });
+        return obj;
+      }
+    }
+
+    // 2. Check for flat descriptive keys (starts with qId_desc_subIdx_)
     const descKeys = Object.keys(studentAnswers).filter(k => k.startsWith(descPrefix));
     if (descKeys.length > 0) {
       const obj: Record<string, any> = {};
       descKeys.forEach(k => { obj[k.replace(descPrefix, '')] = (studentAnswers as any)[k]; });
       return obj;
     }
+
+    // 3. Fallback to subKey or direct qId answer (for SQ/Simple components)
     const subKey = `${qId}_sub_${subIdx}`;
-    return studentAnswers[subKey] || null;
+    return studentAnswers[subKey] || (typeof nestedAnswers === 'string' ? nestedAnswers : null);
   };
 
   // Helper to render advanced descriptive sub-questions content in evaluation context
