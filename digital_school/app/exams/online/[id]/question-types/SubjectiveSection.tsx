@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, memo } from "react";
+import React, { useState, useEffect, memo, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
 // Debounced Textarea for Subjective Answers
@@ -20,18 +20,31 @@ export const DebouncedTextarea = memo(({
     className?: string,
 }) => {
     const [localValue, setLocalValue] = useState(value);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     // Sync local state if global state changes externally
     useEffect(() => {
         setLocalValue(value);
     }, [value]);
 
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
+    }, []);
+
     const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newVal = e.target.value;
         setLocalValue(newVal);
-        // Debounce the global update
-        const timeout = setTimeout(() => onChange(newVal), 1000);
-        return () => clearTimeout(timeout);
+
+        // Cancel previous pending update
+        if (timerRef.current) clearTimeout(timerRef.current);
+        
+        // Schedule new update
+        timerRef.current = setTimeout(() => {
+            onChange(newVal);
+        }, 1000);
     };
 
     return (
@@ -61,16 +74,26 @@ export const DebouncedInput = memo(({
     placeholder: string
 }) => {
     const [localValue, setLocalValue] = useState(value);
+    const timerRef = useRef<NodeJS.Timeout | null>(null);
 
     useEffect(() => {
         setLocalValue(value);
     }, [value]);
 
+    useEffect(() => {
+        return () => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+        };
+    }, []);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newVal = e.target.value;
         setLocalValue(newVal);
-        const timeout = setTimeout(() => onChange(newVal), 1000);
-        return () => clearTimeout(timeout);
+
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            onChange(newVal);
+        }, 1000);
     };
 
     return (

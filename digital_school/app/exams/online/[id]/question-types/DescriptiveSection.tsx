@@ -39,8 +39,18 @@ export const DescriptiveSection = ({
             {parts.map((part: any, pIdx: number) => {
                 const ansKey = (sub: string | number) => `${question.id}_desc_${pIdx}_${sub}`;
                 const getAns = (sub: string | number) => userAnswer?.[ansKey(sub)] ?? '';
-                const setAns = (sub: string | number, val: string) =>
-                    onAnswerChange({ ...userAnswer, [ansKey(sub)]: val });
+                const setAns = (sub: string | number, val: string) => {
+                    setAnswers((prev: any) => {
+                        const currentAns = prev[question.id] || {};
+                        return {
+                            ...prev,
+                            [question.id]: {
+                                ...currentAns,
+                                [ansKey(sub)]: val
+                            }
+                        };
+                    });
+                };
 
                 return (
                     <div key={pIdx} className="space-y-3 border rounded-xl p-4 bg-amber-50/40 dark:bg-amber-900/10 text-left">
