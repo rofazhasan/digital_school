@@ -81,20 +81,29 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
     }
   };
 
-  const handleAnswerChange = useCallback((value: any) => {
+  const handleAnswerChange = useCallback((value: any | ((prev: any) => any)) => {
     if (disabled || !question) return;
-    setAnswers((prev: any) => ({
-      ...prev,
-      [question.id]: value
-    }));
+    setAnswers((prev: any) => {
+      const currentVal = prev[question.id];
+      const newVal = typeof value === 'function' ? value(currentVal) : value;
+      return {
+        ...prev,
+        [question.id]: newVal
+      };
+    });
   }, [disabled, question?.id, setAnswers]);
 
-  const handleSubAnswerChange = useCallback((idx: number, value: any) => {
+  const handleSubAnswerChange = useCallback((idx: number, value: any | ((prev: any) => any)) => {
     if (disabled || !question) return;
-    setAnswers((prev: any) => ({
-      ...prev,
-      [`${question.id}_sub_${idx}`]: value
-    }));
+    setAnswers((prev: any) => {
+      const key = `${question.id}_sub_${idx}`;
+      const currentVal = prev[key];
+      const newVal = typeof value === 'function' ? value(currentVal) : value;
+      return {
+        ...prev,
+        [key]: newVal
+      };
+    });
   }, [disabled, question?.id, setAnswers]);
 
   const handleMarkQuestion = useCallback(() => {
@@ -224,10 +233,14 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
                       showResult={showResult} disabled={!!disabled} submitted={!!submitted}
                       fontSize={fontSize}
                       onSelect={(idx) => {
-                        const newSelection = isSelected
-                          ? currentSelected.filter((item: number) => item !== idx)
-                          : [...currentSelected, idx];
-                        handleAnswerChange({ selectedOptions: newSelection });
+                        handleAnswerChange((prev: any) => {
+                          const currentSelected = prev?.selectedOptions || [];
+                          const isSelected = currentSelected.includes(idx);
+                          const newSelection = isSelected
+                            ? currentSelected.filter((item: number) => item !== idx)
+                            : [...currentSelected, idx];
+                          return { ...prev, selectedOptions: newSelection };
+                        });
                       }}
                     />
                   );
@@ -262,7 +275,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
             {type === "mtf" && (
               <MTFGrid
                 question={question} userAnswer={userAnswer} showResult={showResult} disabled={!!disabled}
-                onSelect={(l, r) => handleAnswerChange({ ...(userAnswer || {}), [l]: r })}
+                onSelect={(l, r) => handleAnswerChange((prev: any) => ({ ...(prev || {}), [l]: r }))}
               />
             )}
 

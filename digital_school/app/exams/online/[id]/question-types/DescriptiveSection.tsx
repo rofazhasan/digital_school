@@ -40,16 +40,10 @@ export const DescriptiveSection = ({
                 const ansKey = (sub: string | number) => `${question.id}_desc_${pIdx}_${sub}`;
                 const getAns = (sub: string | number) => userAnswer?.[ansKey(sub)] ?? '';
                 const setAns = (sub: string | number, val: string) => {
-                    setAnswers((prev: any) => {
-                        const currentAns = prev[question.id] || {};
-                        return {
-                            ...prev,
-                            [question.id]: {
-                                ...currentAns,
-                                [ansKey(sub)]: val
-                            }
-                        };
-                    });
+                    onAnswerChange((prev: any) => ({
+                        ...(prev || {}),
+                        [ansKey(sub)]: val
+                    }));
                 };
 
                 return (
