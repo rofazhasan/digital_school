@@ -246,7 +246,8 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                             const studentOrder = getDesc('order');
                             const correctOrder = sub.correctOrder || sub.modelAnswer || sub.answers?.[0];
                             if (studentOrder && correctOrder) {
-                                autoScore = normalize(studentOrder) === normalize(correctOrder) ? subMaxMarks : 0;
+                                const clean = (s: any) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                autoScore = clean(studentOrder) === clean(correctOrder) ? subMaxMarks : 0;
                             }
                         } else if (subType === 'fill_in') {
                             const passage = sub.passage || sub.questionText || '';
