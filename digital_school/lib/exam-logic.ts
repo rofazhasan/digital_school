@@ -196,22 +196,115 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             const studentAnswer = answers[question.id] as any;
             const manualMark = answers[`${question.id}_marks`];
 
-            // A. Handle Manual Grading (CQ/SQ/DESCRIPTIVE)
+            // A. Handle Manual Grading (CQ/SQ/DESCRIPTIVE) — with auto-scoring for structured sub-types
             if (type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE') {
                 let score = 0;
 
-                const subQs = question.subQuestions || question.sub_questions;
+                const subQs = (question as any).subQuestions || (question as any).sub_questions || (question as any).parts;
                 if ((type === 'DESCRIPTIVE' || type === 'CQ' || type === 'SQ') && subQs) {
-                    // Sum up sub-question marks if they exist
-                    subQs.forEach((sub: SubQuestion, idx: number) => {
-                        // Support both _desc_ and _sub_ prefixes for maximum compatibility
-                        const subMark = answers[`${question.id}_desc_${idx}_marks`] ?? answers[`${question.id}_sub_${idx}_marks`];
-                        if (typeof subMark === 'number') {
-                            score += subMark;
+                    // Sum up sub-question marks
+                    subQs.forEach((sub: any, idx: number) => {
+                        const descPrefix = `${question.id}_desc_${idx}_`;
+                        const subDescMark = answers[`${question.id}_desc_${idx}_marks`];
+                        const subSubMark = answers[`${question.id}_sub_${idx}_marks`];
+
+                        // Evaluator manually graded — trust it completely
+                        if (typeof subDescMark === 'number') { score += subDescMark; return; }
+                        if (typeof subSubMark === 'number') { score += subSubMark; return; }
+
+                        // --- Auto-scoring for structured sub-types ---
+                        const subType = sub.subType || sub.sub_type || '';
+                        const normalize = (s: any) => String(s ?? '').trim().toLowerCase();
+                        const getDesc = (key: string | number) => (answers as any)[`${descPrefix}${key}`];
+                        const subMaxMarks = Number(sub.marks || sub.mark || 0);
+
+                        if (subMaxMarks === 0) return; // Nothing to score
+
+                        let autoScore: number | null = null;
+
+                        if (subType === 'comprehension_mcq') {
+                            // Each inner MCQ sub-question is indexed: descPrefix + sqi
+                            const sqList = sub.subQuestions || sub.questions || [];
+                            if (sqList.length > 0) {
+                                let correct = 0;
+                                sqList.forEach((sq: any, sqi: number) => {
+                                    const studentPick = getDesc(sqi);
+                                    if (!studentPick) return;
+                                    const opts = sq.options || [];
+                                    const correctOpt = opts.find((o: any) =>
+                                        (typeof o === 'object' && o.isCorrect) ||
+                                        (sq.correctAnswer !== undefined && (Number(sq.correctAnswer) === opts.indexOf(o) || normalize(sq.correctAnswer) === normalize(typeof o === 'string' ? o : o.text)))
+                                    );
+                                    if (correctOpt && normalize(studentPick) === normalize(typeof correctOpt === 'string' ? correctOpt : correctOpt.text)) {
+                                        correct++;
+                                    }
+                                });
+                                // Pro-rate marks across sub-questions
+                                autoScore = Math.round((correct / sqList.length) * subMaxMarks * 100) / 100;
+                            }
+                        } else if (subType === 'rearranging') {
+                            const studentOrder = getDesc('order');
+                            const correctOrder = sub.correctOrder || sub.modelAnswer || sub.answers?.[0];
+                            if (studentOrder && correctOrder) {
+                                autoScore = normalize(studentOrder) === normalize(correctOrder) ? subMaxMarks : 0;
+                            }
+                        } else if (subType === 'fill_in') {
+                            const passage = sub.passage || sub.questionText || '';
+                            const blanks = passage.split('___').length - 1;
+                            const items = sub.items || [];
+                            const total = blanks > 0 ? blanks : items.length;
+                            if (total > 0 && sub.answers) {
+                                let correct = 0;
+                                for (let i = 0; i < total; i++) {
+                                    const studentVal = getDesc(i);
+                                    const correctVal = sub.answers[i];
+                                    if (studentVal && correctVal && normalize(studentVal) === normalize(correctVal)) correct++;
+                                }
+                                autoScore = Math.round((correct / total) * subMaxMarks * 100) / 100;
+                            }
+                        } else if (subType === 'true_false') {
+                            const statements = sub.statements || [];
+                            if (statements.length > 0 && sub.correctAnswers) {
+                                let correct = 0;
+                                statements.forEach((_: any, i: number) => {
+                                    const studentVal = getDesc(i);
+                                    const correctVal = sub.correctAnswers[i];
+                                    if (studentVal && correctVal && normalize(studentVal) === normalize(correctVal)) correct++;
+                                });
+                                autoScore = Math.round((correct / statements.length) * subMaxMarks * 100) / 100;
+                            }
+                        } else if (subType === 'error_correction') {
+                            const sentences = sub.sentences || [];
+                            if (sentences.length > 0 && sub.answers) {
+                                let correct = 0;
+                                sentences.forEach((_: any, i: number) => {
+                                    const studentVal = getDesc(i);
+                                    const correctVal = sub.answers[i];
+                                    if (studentVal && correctVal && normalize(studentVal) === normalize(correctVal)) correct++;
+                                });
+                                autoScore = Math.round((correct / sentences.length) * subMaxMarks * 100) / 100;
+                            }
+                        } else if (subType === 'short_answer') {
+                            const questions = sub.questions || sub.items || [];
+                            if (questions.length > 0 && sub.answers) {
+                                let correct = 0;
+                                questions.forEach((_: any, i: number) => {
+                                    const studentVal = getDesc(i);
+                                    const correctVal = sub.answers[i];
+                                    if (studentVal && correctVal && normalize(studentVal) === normalize(correctVal)) correct++;
+                                });
+                                autoScore = Math.round((correct / questions.length) * subMaxMarks * 100) / 100;
+                            }
+                        }
+
+                        if (autoScore !== null) {
+                            score += autoScore;
+                            // Persist the auto-computed mark so evaluators can see and override it
+                            (answers as any)[`${question.id}_desc_${idx}_marks`] = autoScore;
                         }
                     });
 
-                    // Fallback to top-level manual mark if no sub-marks were found but a main mark exists
+                    // Fallback to top-level manual mark if no sub-marks found at all
                     if (score === 0 && typeof manualMark === 'number') {
                         score = manualMark;
                     }
@@ -220,7 +313,7 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 }
 
                 if (type === 'CQ') allCqScores.push(score);
-                else allSqScores.push(score); // DESCRIPTIVE is usually grouped with SQ marks
+                else allSqScores.push(score); // DESCRIPTIVE grouped with SQ marks
                 continue;
             }
 

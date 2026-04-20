@@ -249,6 +249,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
   const [saving, setSaving] = useState(false);
   const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive'>('all');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
+  const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [drawingMode, setDrawingMode] = useState<'pen' | 'highlighter' | 'eraser'>('pen');
@@ -3508,7 +3509,14 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                               const subImgSingle = studentAnswers[`${qId}_sub_${subIdx}_image`] || studentAnswers[`${qId}_desc_${subIdx}_image`];
                                               const allSubImages = subImgSingle ? [subImgSingle, ...subImgArr] : subImgArr;
 
-                                              if (!subText && (!allSubImages || allSubImages.length === 0)) return (
+                                              // Check if there are ANY structured desc-prefixed answer keys for this sub-question
+                                              // (covers comprehension_mcq MCQ picks, rearranging order, fill_in gaps, true_false selects, etc.)
+                                              const descPrefixCheck = `${qId}_desc_${subIdx}_`;
+                                              const hasDescAnswerData = Object.keys(studentAnswers).some(k => k.startsWith(descPrefixCheck) && !k.endsWith('_marks') && !k.endsWith('_image') && !k.endsWith('_images'));
+                                              // Also auto-render structured sub-types that always have question structure to show
+                                              const isStructuredSubType = ['comprehension_mcq', 'comprehension', 'rearranging', 'fill_in', 'true_false', 'matching', 'flowchart', 'short_answer', 'error_correction', 'table', 'label_diagram', 'interpreting_graph'].includes(subQ?.subType || '');
+
+                                              if (!subText && (!allSubImages || allSubImages.length === 0) && !hasDescAnswerData && !isStructuredSubType) return (
                                                 <div key={idx} className="text-sm text-gray-400 italic pl-2 border-l-2 border-transparent">
                                                   (Part {toBengaliNumerals(idx + 1)} not answered)
                                                 </div>
@@ -3711,9 +3719,9 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                                                             </div>
                                                           )}
 
-                                                          {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans) && (
+                                                          {(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || subQ.correctAnswers || subQ.q_ans || subQ.ans || subQ.correctOrder) && (
                                                             <div className="bg-white/70 p-2 rounded border border-emerald-100 shadow-sm text-emerald-900 font-bold leading-relaxed whitespace-pre-wrap">
-                                                              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.q_ans || subQ.ans || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                                              <UniversalMathJax dynamic>{cleanupMath(String(subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.q_ans || subQ.ans || (Array.isArray(subQ.correctOrder) ? subQ.correctOrder.join(', ') : subQ.correctOrder) || "").replace(/\|\|/g, '\n'))}</UniversalMathJax>
                                                             </div>
                                                           )}
                                                         </div>
@@ -4518,6 +4526,19 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                           </Button>
                         </div>
 
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-semibold text-gray-700">Reference</h4>
+                          <Button
+                            size="sm"
+                            variant={showReference ? "default" : "outline"}
+                            onClick={() => setShowReference(!showReference)}
+                            className="w-full flex items-center gap-2"
+                          >
+                            <Layout className="h-3 w-3" />
+                            {showReference ? "Hide Reference" : "Show Reference"}
+                          </Button>
+                        </div>
+
                         {/* Image Navigation */}
                         {(() => {
                           const currentAnswer = currentStudent?.answers?.[currentQuestion?.id || ''];
@@ -4585,6 +4606,60 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
                       {/* Enhanced Canvas Container */}
                       <div className="flex-1 relative border-2 border-gray-300 rounded-lg overflow-hidden bg-gray-50 min-h-0">
                         <div className="relative overflow-auto h-full">
+                          {/* Floating Reference Window */}
+                          {showReference && currentQuestion && (
+                            <div className="absolute top-4 right-4 z-50 w-72 max-h-[60%] overflow-y-auto bg-white/95 backdrop-blur shadow-2xl rounded-2xl border border-indigo-200 p-4 transition-all duration-300 animate-in fade-in zoom-in slide-in-from-top-2">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest flex items-center gap-1.5">
+                                  <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse"></div>
+                                  Reference Info
+                                </div>
+                                <button onClick={() => setShowReference(false)} className="text-gray-400 hover:text-gray-600">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+
+                              <div className="space-y-3">
+                                <div className="text-xs font-semibold text-slate-800 leading-relaxed bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                  <UniversalMathJax dynamic>{cleanupMath((currentQuestion.text || currentQuestion.question || '').replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                </div>
+
+                                {(() => {
+                                  // Get current sub-question if applicable
+                                  const subIdx = annotationTarget?.index || 0;
+                                  const subQ = (currentQuestion.subQuestions || currentQuestion.sub_questions || currentQuestion.parts || [])[subIdx % 100];
+                                  if (!subQ) return null;
+
+                                  const modelAnswer = subQ.modelAnswer || subQ.answer || subQ.correctAnswer || (Array.isArray(subQ.correctAnswers) ? subQ.correctAnswers.join(', ') : subQ.correctAnswers) || subQ.correctOrder || subQ.q_ans || subQ.ans;
+
+                                  return (
+                                    <div className="space-y-2">
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-[8px] h-4 bg-indigo-50 font-black text-indigo-600 uppercase">Part {subIdx % 100 + 1}</Badge>
+                                        <div className="text-[8px] font-bold text-slate-400 uppercase">[{subQ.marks || 0} Marks]</div>
+                                      </div>
+                                      {subQ.text && (
+                                        <div className="text-[10px] font-medium text-slate-600 italic">
+                                          <UniversalMathJax dynamic>{cleanupMath(subQ.text.replace(/\|\|/g, '\n'))}</UniversalMathJax>
+                                        </div>
+                                      )}
+                                      {modelAnswer && (
+                                        <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-100 text-[10px]">
+                                          <div className="font-black text-emerald-700 uppercase mb-1 flex items-center gap-1">
+                                            <CheckCircle className="w-2.5 h-2.5" /> Key
+                                          </div>
+                                          <div className="text-emerald-900 font-bold whitespace-pre-wrap">
+                                            <UniversalMathJax dynamic>{cleanupMath(String(Array.isArray(modelAnswer) ? modelAnswer.join(', ') : modelAnswer))}</UniversalMathJax>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          )}
+
                           <img
                             ref={imageRef}
                             src={currentImage || ''}
