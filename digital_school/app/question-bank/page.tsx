@@ -587,6 +587,8 @@ export default function QuestionBankPage() {
               }>
                 <Canvas
                   camera={{ position: [0, 0, 5] }}
+                  frameloop="demand"
+                  dpr={[1, 1.5]}
                   gl={{
                     powerPreference: "high-performance",
                     antialias: true,
@@ -596,7 +598,7 @@ export default function QuestionBankPage() {
                   }}
                   onCreated={({ gl }) => {
                     gl.setClearColor(0x000000, 0);
-                    gl.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+                    // No need to set pixel ratio manually, dpr prop handles it
 
                     // Handle WebGL context loss
                     const canvas = gl.domElement;

@@ -51,7 +51,8 @@ import {
   RefreshCw,
   ArrowRight,
   BookOpen,
-  Info
+  Info,
+  Layout
 } from "lucide-react";
 import {
   Tooltip,
