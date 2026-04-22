@@ -52,7 +52,8 @@ import {
   ArrowRight,
   BookOpen,
   Info,
-  Layout
+  Layout,
+  X
 } from "lucide-react";
 import {
   Tooltip,
