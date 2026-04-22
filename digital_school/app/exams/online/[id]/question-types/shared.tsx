@@ -6,6 +6,7 @@ import { ZoomIn, X, Upload, Camera as CameraIcon } from "lucide-react";
 import { memo } from "react";
 import { toast } from "sonner";
 import { Capacitor } from '@capacitor/core';
+import { compressImage } from "../performance-utils";
 
 // Image Zoom Component
 export const ZoomableImage = ({ src, alt, className }: { src: string, alt: string, className?: string }) => {
@@ -52,8 +53,11 @@ export const QuestionImageGallery = memo(({ qId, subIdx, answers, setAnswers, di
 
         const urls: string[] = [];
         for (const f of toUpload) {
+            // Compress image before upload
+            const compressedFile = await compressImage(f);
+            
             const fd = new FormData();
-            fd.append('file', f);
+            fd.append('file', compressedFile);
             try {
                 const res = await fetch('/api/upload', { method: 'POST', body: fd });
                 const data = await res.json();

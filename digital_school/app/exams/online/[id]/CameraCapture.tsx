@@ -62,12 +62,29 @@ export default function CameraCapture({ onCapture, onClose, questionId, examId }
 
     if (!context) return;
 
-    // Set canvas size to match video
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Limit maximum dimension to 1280px to save memory
+    const MAX_DIM = 1280;
+    let width = video.videoWidth;
+    let height = video.videoHeight;
 
-    // Draw video frame to canvas
-    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    if (width > height) {
+      if (width > MAX_DIM) {
+        height *= MAX_DIM / width;
+        width = MAX_DIM;
+      }
+    } else {
+      if (height > MAX_DIM) {
+        width *= MAX_DIM / height;
+        height = MAX_DIM;
+      }
+    }
+
+    // Set canvas size to optimized dimensions
+    canvas.width = width;
+    canvas.height = height;
+
+    // Draw video frame to canvas with scaling
+    context.drawImage(video, 0, 0, width, height);
 
     // Convert to blob and store both URL and blob
     canvas.toBlob((blob) => {
@@ -77,7 +94,7 @@ export default function CameraCapture({ onCapture, onClose, questionId, examId }
         setCapturedBlob(blob);
         stopCamera();
       }
-    }, "image/jpeg", 0.8);
+    }, "image/jpeg", 0.7);
   };
 
   const retakePhoto = () => {

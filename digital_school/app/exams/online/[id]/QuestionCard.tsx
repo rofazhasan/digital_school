@@ -16,6 +16,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { useExamContext } from "./ExamContext";
 import { toBengaliAlphabets } from '@/utils/numeralConverter';
 import { cn } from "@/lib/utils";
+import { compressImage } from "./performance-utils";
 
 // Sub-components
 import { ZoomableImage, mathJaxConfig, QuestionImageGallery } from "./question-types/shared";
@@ -57,8 +58,12 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
   const handleCapture = async (file: File, qId: string, subIdx?: number) => {
     setIsUploading?.(true);
     setCameraTarget(null);
+    
+    // Compress image before upload
+    const compressedFile = await compressImage(file);
+    
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', compressedFile);
     try {
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
       const data = await res.json();
