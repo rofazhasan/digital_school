@@ -5,11 +5,11 @@
 
 export const mathJaxConfig = {
     loader: {
-        load: ['[tex]/ams', '[tex]/textmacros', '[tex]/unicode']
+        load: ['[tex]/ams', '[tex]/textmacros', '[tex]/unicode', '[tex]/mhchem']
     },
     tex: {
         packages: {
-            '[+]': ['ams', 'textmacros', 'unicode']
+            '[+]': ['ams', 'textmacros', 'unicode', 'mhchem']
         },
         inlineMath: [
             ['$', '$'],
@@ -24,7 +24,7 @@ export const mathJaxConfig = {
         processEnvironments: true,
         // Allow Unicode characters in math mode
         unicode: {
-            fonts: 'STIXGeneral, \'Arial Unicode MS\''
+            fonts: 'STIXGeneral, \'Arial Unicode MS\', \'Noto Serif Bengali\', \'Hind Siliguri\''
         }
     },
     svg: {
