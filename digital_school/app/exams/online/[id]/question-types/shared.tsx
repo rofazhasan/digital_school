@@ -29,10 +29,11 @@ export const ZoomableImage = ({ src, alt, className }: { src: string, alt: strin
 };
 
 export const mathJaxConfig = {
-    loader: { load: ["input/tex", "output/chtml"] },
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
         inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']]
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] }
     },
 };
 

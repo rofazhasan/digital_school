@@ -830,15 +830,16 @@ export default function ExamBuilderPage() {
               }));
             }
 
-            const shuffledAROptions = shuffleArray(optionsToShuffle);
-            processedQuestion = { ...processedQuestion, options: shuffledAROptions };
+            // Use options as-is (MUST NOT SHUFFLE AR)
+            const finalAROptions = optionsToShuffle;
+            processedQuestion = { ...processedQuestion, options: finalAROptions };
 
-            // Find new correct index
-            const newCorrectIndex = shuffledAROptions.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
-            if (newCorrectIndex !== -1) {
+            // Find correct index in final array
+            const finalCorrectIndex = finalAROptions.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+            if (finalCorrectIndex !== -1) {
               processedQuestion = {
                 ...processedQuestion,
-                correctOption: newCorrectIndex + 1 // Store as 1-based index
+                correctOption: finalCorrectIndex + 1 // Store as 1-based index
               };
             }
           }
@@ -1014,10 +1015,11 @@ export default function ExamBuilderPage() {
   }
 
   const mathJaxConfig = {
-    loader: { load: ["input/tex", "input/mml", "output/chtml"] },
+    loader: { load: ["input/tex", "input/mml", "output/chtml", "[tex]/mhchem"] },
     tex: {
-      inlineMath: [["$", "$"], ["\\(", "\\)"]],
-      displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      packages: { '[+]': ['ams', 'mhchem'] }
     },
     options: {
       enableEnrichment: false

@@ -17,12 +17,13 @@ import { MathJaxContext, MathJax } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
-const MATHJAX_CONFIG = {
-    loader: { load: ["input/tex", "output/chtml"] },
+const mathJaxConfig = {
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
-        inlineMath: [["$", "$"], ["\\(", "\\)"]],
-        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-    }
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] }
+    },
 };
 
 interface Question {
@@ -108,7 +109,7 @@ export default function PracPerfectPage() {
     )).filter(Boolean);
 
     return (
-        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
+        <MathJaxContext config={mathJaxConfig} version={3}>
             <div className="min-h-screen bg-background font-fancy">
                 {/* Header Section */}
                 <div className="bg-card border-b sticky top-0 z-30 shadow-sm">

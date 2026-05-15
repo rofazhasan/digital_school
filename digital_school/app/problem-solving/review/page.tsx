@@ -43,12 +43,13 @@ interface Question {
     userAnswer?: number | null; // Index of selected option
 }
 
-const MATHJAX_CONFIG = {
-    loader: { load: ["input/tex", "output/chtml"] },
+const mathJaxConfig = {
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
-        inlineMath: [["$", "$"], ["\\(", "\\)"]],
-        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-    }
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] }
+    },
 };
 
 export default function ReviewToSessionPort() {
@@ -323,7 +324,7 @@ export default function ReviewToSessionPort() {
     }
 
     return (
-        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
+        <MathJaxContext config={mathJaxConfig} version={3}>
             <div id="session-workspace" className={`h-screen w-full flex flex-col overflow-hidden relative font-sans ${isDark ? 'bg-slate-900' : 'bg-gray-50'}`}>
 
                 {/* 1. TOP BAR */}

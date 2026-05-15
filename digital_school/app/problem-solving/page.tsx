@@ -20,12 +20,13 @@ import { MathJaxContext, MathJax } from "better-react-mathjax";
 import { cleanupMath } from "@/lib/utils";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
-const MATHJAX_CONFIG = {
-    loader: { load: ["input/tex", "output/chtml"] },
+const mathJaxConfig = {
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
-        inlineMath: [["$", "$"], ["\\(", "\\)"]],
-        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-    }
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] }
+    },
 };
 
 // Types
@@ -117,7 +118,7 @@ export default function ProblemSolvingSelector() {
     const uniqueSubjects = Array.from(new Set(questions.map(q => q.subject))).filter(Boolean);
 
     return (
-        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
+        <MathJaxContext config={mathJaxConfig} version={3}>
             <div className="min-h-screen bg-slate-50 font-sans text-slate-900 pb-20">
                 {/* Navigation Header */}
                 <div className="bg-white border-b border-slate-200 sticky top-0 z-50">

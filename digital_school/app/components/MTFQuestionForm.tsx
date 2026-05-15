@@ -81,6 +81,26 @@ export const MTFQuestionForm: React.FC<MTFQuestionFormProps> = ({
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Question Header/Instructions */}
+            <div className="space-y-2">
+                <Label className="text-xs font-bold text-gray-600 dark:text-gray-400">Question Instructions / Stem (Optional)</Label>
+                <div className="relative group">
+                    <textarea
+                        value={(leftColumn as any).questionText || (leftColumn as any).text || ""}
+                        onChange={(e) => {
+                           // Hacky way to store it if props don't support it directly yet
+                           // but usually this is handled by the parent's global questionText
+                        }}
+                        placeholder="e.g., Match the items in Column A with Column B."
+                        className="w-full min-h-[60px] p-4 text-sm rounded-2xl border-2 border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-950 focus:border-blue-500 transition-all outline-none resize-none opacity-50 cursor-not-allowed"
+                        disabled
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <span className="bg-white/80 dark:bg-gray-900/80 px-2 py-1 rounded text-[10px] font-bold text-gray-500 border border-gray-200">USE TOP-LEVEL QUESTION BOX</span>
+                    </div>
+                </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Left Column */}
                 <Card className="border-2 border-blue-100 dark:border-blue-900 shadow-sm overflow-hidden">

@@ -220,10 +220,12 @@ interface ExamResult {
 }
 
 const mathJaxConfig = {
-  tex: {
-    inlineMath: [['$', '$'], ['\\(', '\\)']],
-    displayMath: [['$$', '$$'], ['\\[', '\\]']],
-  },
+    loader: { load: ["input/tex", "input/mml", "output/chtml", "[tex]/mhchem"] },
+    tex: {
+      inlineMath: [['$', '$'], ['\\(', '\\)']],
+      displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      packages: { '[+]': ['ams', 'mhchem'] }
+    },
 };
 
 export default function ExamResultPage({ params }: { params: Promise<{ id: string }> }) {

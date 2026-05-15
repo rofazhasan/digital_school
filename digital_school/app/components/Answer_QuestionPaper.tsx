@@ -512,7 +512,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-1 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Match the Columns (Solution):' : 'স্তম্ভদ্বয় মিল করো (সমাধান):'}</span>
+                            <span className="font-bold text-sm">
+                              {qNum}. {q.questionText || (isEn ? 'Match the Columns (Solution):' : 'স্তম্ভদ্বয় মিল করো (সমাধান):')}
+                            </span>
                             <span className="font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
 
@@ -955,6 +957,11 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
 
                                     {(part.subType === 'matching' || part.subType === 'mtf') && (
                                       <div className="mt-3 ml-4">
+                                        {(part.questionText || part.text) && (
+                                          <div className="mb-2 font-medium">
+                                            <UniversalMathJax dynamic>{part.questionText || part.text}</UniversalMathJax>
+                                          </div>
+                                        )}
                                         <div 
                                           className="grid gap-0 border border-black max-w-4xl mx-auto"
                                           style={{ gridTemplateColumns: `repeat(${[part.leftColumn, part.rightColumn, part.columnC, part.columnD].filter(c => Array.isArray(c) && c.length > 0).length}, 1fr)` }}

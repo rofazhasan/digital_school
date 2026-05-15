@@ -442,7 +442,9 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-1 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:'}</span>
+                            <span className="font-bold text-sm">
+                              {qNum}. {q.questionText || (isEn ? 'Match the left column with the right column:' : 'বাম স্তম্ভের সাথে ডান স্তম্ভ মিল কর:')}
+                            </span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="grid grid-cols-2 gap-4 border border-black p-2 ml-6">
@@ -934,6 +936,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
 
                                       {(part.subType === 'matching' || part.subType === 'mtf') && (
                                         <div className="mt-3 ml-4">
+                                          {(part.questionText || part.text) && (
+                                            <div className="mb-2 font-medium">
+                                              <UniversalMathJax dynamic>{part.questionText || part.text}</UniversalMathJax>
+                                            </div>
+                                          )}
                                           <div 
                                             className="grid gap-0 border-2 border-slate-800 max-w-4xl mx-auto rounded overflow-hidden"
                                             style={{ gridTemplateColumns: `repeat(${[part.leftColumn, part.rightColumn, part.columnC, part.columnD].filter(c => Array.isArray(c) && c.length > 0).length}, 1fr)` }}

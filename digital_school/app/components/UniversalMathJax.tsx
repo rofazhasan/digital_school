@@ -1,10 +1,8 @@
 "use client";
 
 import { MathJax } from "better-react-mathjax";
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { cleanupMath } from "@/lib/utils";
-
-import { parseDiagramsInText } from "@/utils/diagrams/inline-parser";
 
 declare global {
     interface Window {
@@ -20,32 +18,59 @@ interface UniversalMathJaxProps {
     dynamic?: boolean;
 }
 
+// Module-level SVG cache — persists across renders for the entire session
+const globalSvgCache: Record<string, string> = {};
+
+function hashString(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+        hash = ((hash << 5) - hash) + str.charCodeAt(i);
+        hash |= 0;
+    }
+    return Math.abs(hash).toString(36);
+}
+
 /**
- * Helper to extract \chemfig{} blocks and wrap them for TikZJax
+ * Extract \chemfig{} blocks and replace with:
+ *   - Cached inline SVG (if already rendered before)
+ *   - Temporary hidden iframe (first render; will postMessage the SVG back)
  */
-function processChemfig(text: string): { text: string, hasChemfig: boolean } {
-    if (!text.includes('\\chemfig')) return { text, hasChemfig: false };
-    
+function processChemfig(text: string, instanceId: string): { text: string, hasChemfig: boolean, formulaMap: Record<string, string> } {
+    if (!text.includes('\\chemfig') && !text.includes('\\tikz')) return { text, hasChemfig: false, formulaMap: {} };
+
     let result = '';
     let i = 0;
     let hasChemfig = false;
-    
+    let chemfigIndex = 0;
+    const formulaMap: Record<string, string> = {};
+
     while (i < text.length) {
-        const idx = text.indexOf('\\chemfig', i);
+        const chemIdx = text.indexOf('\\chemfig', i);
+        const tikzIdx = text.indexOf('\\tikz', i);
+        
+        let idx = -1;
+        let cmdLen = 0;
+        
+        if (chemIdx !== -1 && (tikzIdx === -1 || chemIdx < tikzIdx)) {
+            idx = chemIdx; cmdLen = 8;
+        } else if (tikzIdx !== -1) {
+            idx = tikzIdx; cmdLen = 5;
+        }
+
         if (idx === -1) {
             result += text.slice(i);
             break;
         }
-        
+
         result += text.slice(i, idx);
-        
-        let braceStart = text.indexOf('{', idx);
+
+        const braceStart = text.indexOf('{', idx);
         if (braceStart === -1) {
-            result += '\\chemfig';
-            i = idx + 8;
+            result += text.slice(idx, idx + cmdLen);
+            i = idx + cmdLen;
             continue;
         }
-        
+
         let braceCount = 1;
         let j = braceStart + 1;
         while (j < text.length && braceCount > 0) {
@@ -53,90 +78,160 @@ function processChemfig(text: string): { text: string, hasChemfig: boolean } {
             else if (text[j] === '}') braceCount--;
             j++;
         }
-        
+
         if (braceCount === 0) {
             hasChemfig = true;
             const chemfigContent = text.slice(idx, j);
-            const tikzScript = `<script type="text/tikz">\n\\usepackage{chemfig}\n\\begin{document}\n${chemfigContent}\n\\end{document}\n</script>`;
+            const chemfigHash = hashString(chemfigContent);
+            const chemfigId = `chemfig-${instanceId}-${chemfigIndex++}`;
+
+            // Strip surrounding math delimiters if chemfig was mistakenly wrapped in them
+            // We use a more robust regex approach here to handle optional whitespace
+            const openDelims = ['\\$\\$', '\\$', '\\\\\\[', '\\\\\\('];
+            const closeDelims = ['\\$\\$', '\\$', '\\\\\\]', '\\\\\\)'];
             
-            // Clean up surrounding math delimiters if users mistakenly wrap chemfig in math mode
-            if (result.endsWith('$$') && text.slice(j).startsWith('$$')) {
-                result = result.slice(0, -2);
-                j += 2;
-            } else if (result.endsWith('$') && text.slice(j).startsWith('$')) {
-                result = result.slice(0, -1);
-                j += 1;
-            } else if (result.endsWith('\\[') && text.slice(j).startsWith('\\]')) {
-                result = result.slice(0, -2);
-                j += 2;
-            } else if (result.endsWith('\\(') && text.slice(j).startsWith('\\)')) {
-                result = result.slice(0, -2);
-                j += 2;
+            let stripped = false;
+            for (let d = 0; d < openDelims.length; d++) {
+                const open = openDelims[d];
+                const close = closeDelims[d];
+                
+                const openRegex = new RegExp(`${open}\\s*$`);
+                const closeRegex = new RegExp(`^\\s*${close}`);
+                
+                if (openRegex.test(result) && closeRegex.test(text.slice(j))) {
+                    result = result.replace(openRegex, '');
+                    const closeMatch = text.slice(j).match(closeRegex);
+                    if (closeMatch) j += closeMatch[0].length;
+                    stripped = true;
+                    break;
+                }
             }
-            
-            result += tikzScript;
+
+            // Check if we have this in local storage for "Zero Delay"
+            if (!globalSvgCache[chemfigHash]) {
+                try {
+                    const saved = localStorage.getItem(`chemfig-svg-${chemfigHash}`);
+                    if (saved) globalSvgCache[chemfigHash] = saved;
+                } catch (e) {}
+            }
+
+            if (globalSvgCache[chemfigHash]) {
+                // If it's too large, it might be an error message
+                if (globalSvgCache[chemfigHash].length > 50000) {
+                    result += `<span class="chem-fallback" data-hash="${chemfigHash}">$${chemfigContent}$</span>`;
+                } else {
+                    result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
+                }
+            } else {
+                // Placeholder that will be replaced by the iframe rendering engine
+                result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(chemfigContent)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
+                formulaMap[chemfigId] = chemfigContent;
+            }
             i = j;
         } else {
-            result += text.slice(idx, braceStart + 1);
-            i = braceStart + 1;
+            result += text.slice(idx, idx + cmdLen);
+            i = idx + cmdLen;
         }
     }
-    
-    return { text: result, hasChemfig };
+
+    return { text: result, hasChemfig, formulaMap };
 }
 
-/**
- * Simplified UniversalMathJax component
- * TikZ/Chemfig support enabled via WebAssembly TikZJax
- */
-export const UniversalMathJax: React.FC<UniversalMathJaxProps> = ({ children, inline, dynamic }) => {
-    // If children isn't a string, fallback to standard MathJax
-    if (typeof children !== "string") {
-        return <MathJax inline={inline} dynamic={dynamic}>{children}</MathJax>;
-    }
+export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJaxProps) {
+    const [instanceId] = useState(() => Math.random().toString(36).substring(2, 9));
+    const [cacheVersion, setCacheVersion] = useState(0);
 
-    // Pre-process the content to normalize delimiters
-    let content = cleanupMath(children);
-    
-    // Parse chemfig
-    const { text: contentWithChemfig, hasChemfig } = processChemfig(content);
-    content = contentWithChemfig;
+    const rawText = typeof children === "string" ? children : "";
+    const cleanText = cleanupMath(rawText);
 
-    // Parse diagrams (##PRESET...## -> <svg>...</svg>)
-    const contentWithDiagrams = parseDiagramsInText(content);
+    const { text: processedText, hasChemfig, formulaMap } = useMemo(() => 
+        processChemfig(cleanText, instanceId), 
+        [cleanText, instanceId, cacheVersion]
+    );
 
-    // If diagrams or chemfig were found, we need to render HTML inside MathJax
-    // And ensure MathJax processes the math inside it
-    const mathRef = React.useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (!hasChemfig) return;
 
-    React.useEffect(() => {
-        if (typeof window === 'undefined') return;
+        const handleMessage = (e: MessageEvent) => {
+            if (!e.data || e.data.type !== 'resize-chemfig') return;
+
+            // Save SVG to cache and trigger re-render (swap iframe → inline SVG)
+            if (e.data.hash && e.data.svgContent && !globalSvgCache[e.data.hash]) {
+                globalSvgCache[e.data.hash] = e.data.svgContent;
+                // Persistent cache to LocalStorage for "Zero Delay" on next visit
+                try {
+                    localStorage.setItem(`chemfig-svg-${e.data.hash}`, e.data.svgContent);
+                } catch (err) {}
+                setCacheVersion(v => v + 1);
+            }
+
+            // Fallback: If rendering failed or is taking too long (signal from iframe)
+            if ((e.data.failed || e.data.slow) && e.data.hash) {
+                const rawChem = e.data.rawChem || '';
+                // NEW ALGORITHM: Syntax-aware Chemfig to mhchem converter
+                let formula = '';
+                
+                // Special case for aromatic rings like **6(------)
+                if (rawChem.includes('**6')) {
+                    formula = 'C6H6'; // Benzene fallback
+                } else if (rawChem.includes('**5')) {
+                    formula = 'C5H5';
+                } else {
+                    // Robust extraction of content between first { and last }
+                    const firstBrace = rawChem.indexOf('{');
+                    const lastBrace = rawChem.lastIndexOf('}');
+                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+                        formula = rawChem.slice(firstBrace + 1, lastBrace)
+                            .replace(/-\[([0-9]+)\]/g, '-') // Remove angle modifiers
+                            .replace(/=\[([0-9]+)\]/g, '=')
+                            .replace(/\(~\[([0-9]+)\]/g, '~')
+                            .replace(/\(([^)]+)\)/g, (match, p1) => {
+                                // Extract content from parens and remove nested modifiers
+                                return `(${p1.replace(/-\[([0-9]+)\]/g, '').replace(/=\[([0-9]+)\]/g, '')})`;
+                            });
+                    }
+                }
+                
+                if (formula) {
+                    // Further cleanup for mhchem
+                    formula = formula.replace(/\s+/g, '');
+                    const fallbackHtml = `<span class="chem-fallback" data-hash="${e.data.hash}">$\\ce{${formula}}$</span>`;
+                    globalSvgCache[e.data.hash] = fallbackHtml;
+                    setCacheVersion(v => v + 1);
+                }
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
         
-        // Trigger MathJax typeset
-        if (window.MathJax && window.MathJax.typesetPromise && mathRef.current) {
-            window.MathJax.typesetPromise([mathRef.current]).catch((err: any) => console.log('MathJax typeset failed: ' + err.message));
-        }
-        
-        // Trigger TikZJax parsing if chemfig was found
-        if (hasChemfig) {
-            // TikZJax hooks into DOMContentLoaded, so dispatching it forces a re-parse of dynamically added scripts
-            setTimeout(() => {
-                document.dispatchEvent(new Event('DOMContentLoaded'));
-            }, 100);
-        }
-    }, [content, contentWithDiagrams, hasChemfig]);
+        // Inject iframes for placeholders
+        Object.entries(formulaMap).forEach(([id, formula]) => {
+            const el = document.getElementById(id);
+            if (el && !el.querySelector('iframe')) {
+                const iframe = document.createElement('iframe');
+                iframe.src = `/chemfig.html?c=${encodeURIComponent(formula)}&id=${id}&hash=${hashString(formula)}`;
+                iframe.style.border = 'none';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.display = 'block';
+                el.appendChild(iframe);
+            }
+        });
 
-    // Safely apply pedagogical formatting (|| -> <br />, **bold**) 
-    // This is now handled within cleanupMath, but we must detect if HTML is present
-    const hasHtml = contentWithDiagrams.includes('<') && contentWithDiagrams.includes('>');
+        return () => window.removeEventListener('message', handleMessage);
+    }, [hasChemfig, formulaMap, cacheVersion]);
 
-    if (hasHtml || hasChemfig) {
+    if (inline) {
         return (
-            <MathJax inline={inline} dynamic={dynamic}>
-                <span ref={mathRef} dangerouslySetInnerHTML={{ __html: contentWithDiagrams }} />
+            <MathJax inline dynamic={dynamic}>
+                <span dangerouslySetInnerHTML={{ __html: processedText }} />
             </MathJax>
         );
     }
 
-    return <MathJax inline={inline} dynamic={dynamic}>{contentWithDiagrams}</MathJax>;
-};
+    return (
+        <MathJax dynamic={dynamic}>
+            <div dangerouslySetInnerHTML={{ __html: processedText }} />
+        </MathJax>
+    );
+}

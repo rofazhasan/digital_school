@@ -29,12 +29,13 @@ import { SmartBoardRef } from "@/app/components/SmartBoard";
 // The existing toolbar is in `app/components/SmartBoardToolbar`.
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
 
-const MATHJAX_CONFIG = {
-    loader: { load: ["input/tex", "output/chtml"] },
+const mathJaxConfig = {
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
-        inlineMath: [["$", "$"], ["\\(", "\\)"]],
-        displayMath: [["$$", "$$"], ["\\[", "\\]"]],
-    }
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] }
+    },
 };
 
 interface Question {
@@ -268,7 +269,7 @@ export default function PracPerfectSessionPage() {
     const result = sessionResults[currentIndex];
 
     return (
-        <MathJaxContext config={MATHJAX_CONFIG} version={3}>
+        <MathJaxContext config={mathJaxConfig} version={3}>
             <div className={`h-screen w-full flex flex-col overflow-hidden relative font-fancy ${isDark ? 'bg-background' : 'bg-background'}`}>
 
                 {/* 1. TOP BAR (Floating) */}

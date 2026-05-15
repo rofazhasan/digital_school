@@ -112,7 +112,7 @@ export default function PrintExamPage() {
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
-    loader: { load: ["input/tex", "input/mml", "output/chtml"] },
+    loader: { load: ["input/tex", "input/mml", "output/svg", "[tex]/mhchem"] },
     tex: {
       inlineMath: [['$', '$'], ['\\(', '\\)']],
       displayMath: [['$$', '$$'], ['\\[', '\\]']],

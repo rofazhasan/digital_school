@@ -38,7 +38,7 @@ import {
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
   Download, Save, AlertTriangle, LayoutDashboard, Info,
-  BarChart3
+  BarChart3, Lightbulb
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
@@ -569,10 +569,11 @@ export default function QuestionBankPage() {
   };
 
   const mathJaxConfig = {
-    loader: { load: ["input/tex", "output/chtml"] },
+    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
     tex: {
       inlineMath: [["$", "$"], ["\\(", "\\)"]],
       displayMath: [["$$", "$$"], ["\\[", "\\]"]],
+      packages: { '[+]': ['mhchem'] }
     }
   };
 
@@ -1089,6 +1090,21 @@ const QuestionCard: React.FC<{
             </div>
           )}
 
+          {/* MCQ Question Level Explanation (if any) */}
+          {(question.type === 'MCQ' || question.type === 'MC') && question.explanation && (
+            <div className="mt-3">
+              <div className="p-3.5 rounded-2xl bg-indigo-50/20 dark:bg-indigo-900/10 border border-indigo-100/50 dark:border-indigo-800/30">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <Lightbulb className="w-3 h-3 text-indigo-500" />
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700/80 dark:text-indigo-400/80">Question Explanation</p>
+                </div>
+                <div className="text-xs text-gray-700/90 dark:text-gray-300/90 leading-relaxed">
+                  <UniversalMathJax>{question.explanation}</UniversalMathJax>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* MC Options */}
           {question.type === 'MC' && (
             <div className="grid grid-cols-1 gap-2 mt-2">
@@ -1285,12 +1301,12 @@ const QuestionCard: React.FC<{
             </div>
           )}
 
-          {/* General Explanation for non-MCQ types */}
-          {(question.type === 'AR' || question.type === 'MTF' || question.type === 'INT') && question.explanation && (
+          {/* General Explanation for all types */}
+          {(question.type !== 'MCQ' && question.type !== 'MC') && question.explanation && (
             <div className="mt-3">
               <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-300 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
-                  <div className="w-1 h-3 bg-indigo-500 rounded-full"></div>
+                  <Lightbulb className="w-3 h-3 text-indigo-500" />
                   <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Explanation</p>
                 </div>
                 <div className="text-xs text-gray-700 dark:text-gray-300 font-medium leading-relaxed">
