@@ -125,6 +125,14 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
             }
         }
 
+        // Check if we have this in local storage for "Zero Delay"
+        if (!globalSvgCache[chemfigHash]) {
+            try {
+                const saved = localStorage.getItem(`chemfig-svg-v2-${chemfigHash}`);
+                if (saved) globalSvgCache[chemfigHash] = saved;
+            } catch (e) {}
+        }
+
         if (globalSvgCache[chemfigHash]) {
             result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
         } else {
@@ -163,7 +171,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
                 globalSvgCache[e.data.hash] = e.data.svgContent;
                 // Persistent cache to LocalStorage for "Zero Delay" on next visit
                 try {
-                    localStorage.setItem(`chemfig-svg-${e.data.hash}`, e.data.svgContent);
+                    localStorage.setItem(`chemfig-svg-v2-${e.data.hash}`, e.data.svgContent);
                 } catch (err) {}
                 setCacheVersion(v => v + 1);
             }

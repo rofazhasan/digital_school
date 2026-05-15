@@ -20,16 +20,16 @@
         if (rawChem) {
             const decoded = decodeURIComponent(rawChem);
             
-            // Ensure the command is properly wrapped for the renderer
-            let latex = decoded;
+            // Ensure the command is properly wrapped and cleaned
+            let latex = decoded.trim().replace(/\s+/g, ' ');
             if (!latex.includes('\\chemfig') && !latex.includes('\\tikz')) {
                 latex = `\\chemfig{${latex}}`;
             }
 
-            // Step 2: Use CodeCogs cloud bridge (Native Chemfig support found!)
-            const encodedLatex = encodeURIComponent(`\\inline\\bg_white ${latex}`);
-            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodedLatex}`;
-            const pngUrl = `https://latex.codecogs.com/png.latex?${encodedLatex}`;
+            // Step 2: Use CodeCogs cloud bridge (Native Chemfig support)
+            // Minimalist URL - No complex preambles or packages
+            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodeURIComponent(latex)}`;
+            const pngUrl = `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`;
             
             const img = new Image();
             img.onload = () => {
