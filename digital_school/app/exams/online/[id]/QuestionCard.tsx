@@ -215,7 +215,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                   return (
                     <MCOption
                       key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
-                      showResult={showResult} disabled={!!disabled} submitted={!!submitted}
+                      showResult={showResult} userAnswer={userAnswer} disabled={!!disabled} submitted={!!submitted}
                       fontSize={fontSize}
                       onSelect={(idx) => {
                         onAnswerChange((prev: any) => {

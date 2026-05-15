@@ -50,7 +50,7 @@ export const MCQOption = memo(({
     return (
         <button
             onClick={() => onSelect(label)}
-            disabled={disabled || submitted}
+            disabled={disabled || submitted || !!userAnswer}
             className={getStyles()}
         >
             <div className={`
@@ -97,6 +97,7 @@ export const MCOption = memo(({
     isSelected,
     isCorrect,
     showResult,
+    userAnswer,
     disabled,
     submitted,
     onSelect,
@@ -107,6 +108,7 @@ export const MCOption = memo(({
     isSelected: boolean;
     isCorrect: boolean;
     showResult: boolean;
+    userAnswer: any;
     disabled: boolean;
     submitted: boolean;
     onSelect: (index: number) => void;
@@ -132,7 +134,7 @@ export const MCOption = memo(({
     return (
         <button
             onClick={() => onSelect(index)}
-            disabled={disabled || submitted}
+            disabled={disabled || submitted || (typeof userAnswer === 'object' && userAnswer?.selectedOptions?.length > 0)}
             className={getStyles()}
         >
             <div className={`
