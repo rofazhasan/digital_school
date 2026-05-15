@@ -88,31 +88,6 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     }
   };
 
-  const handleAnswerChange = useCallback((value: any | ((prev: any) => any)) => {
-    if (disabled || !question) return;
-    setAnswers((prev: any) => {
-      const currentVal = prev[question.id];
-      const newVal = typeof value === 'function' ? value(currentVal) : value;
-      return {
-        ...prev,
-        [question.id]: newVal
-      };
-    });
-  }, [disabled, question?.id, setAnswers]);
-
-  const handleSubAnswerChange = useCallback((idx: number, value: any | ((prev: any) => any)) => {
-    if (disabled || !question) return;
-    setAnswers((prev: any) => {
-      const key = `${question.id}_sub_${idx}`;
-      const currentVal = prev[key];
-      const newVal = typeof value === 'function' ? value(currentVal) : value;
-      return {
-        ...prev,
-        [key]: newVal
-      };
-    });
-  }, [disabled, question?.id, setAnswers]);
-
   const handleMarkQuestion = useCallback(() => {
     if (!question) return;
     markQuestion(question.id, !navigation.marked[question.id]);
@@ -135,13 +110,13 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
       if (selectedIndex >= 0 && selectedIndex < options.length) {
         const opt = options[selectedIndex];
         const label = typeof opt === "object" && opt !== null ? (opt.text || String(opt)) : String(opt);
-        handleAnswerChange(label);
+        onAnswerChange(label);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [disabled, submitted, question, handleAnswerChange]);
+  }, [disabled, submitted, question, onAnswerChange]);
 
   if (!question) return <div className="p-8 text-center text-muted-foreground">Question not found</div>;
 
@@ -215,7 +190,11 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                   const isCorrect = opt.originalIndex !== undefined
                     ? Number(correctVal) === opt.originalIndex
                     : (correctVal === i || String(correctVal) === String(i) || (typeof opt === 'object' && opt.isCorrect));
-                  const isSelected = String(userAnswer).trim() === label.trim();
+                  
+                  // Fix: Handle both string answers and object-based answers for robustness
+                  const isSelected = typeof userAnswer === 'object' 
+                    ? (userAnswer?.selectedOption === label || userAnswer?.text === label)
+                    : String(userAnswer || "").trim() === label.trim();
                   return (
                     <MCQOption
                       key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
@@ -239,7 +218,7 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                       showResult={showResult} disabled={!!disabled} submitted={!!submitted}
                       fontSize={fontSize}
                       onSelect={(idx) => {
-                        handleAnswerChange((prev: any) => {
+                        onAnswerChange((prev: any) => {
                           const currentSelected = prev?.selectedOptions || [];
                           const isSelected = currentSelected.includes(idx);
                           const newSelection = isSelected
@@ -265,12 +244,13 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                 ].map((lbl, i) => {
                   const val = i + 1;
                   const isCorrect = Number(question.correctOption || question.correct) === val;
-                  const isSelected = (userAnswer?.selectedOption || userAnswer) === val;
+                  // Fix: Robust selection check for AR questions
+                  const isSelected = (userAnswer?.selectedOption === val || userAnswer === val || (typeof userAnswer === 'object' && userAnswer?.selectedOption === val));
                   return (
                     <MCQOption
                       key={i} index={i} option={lbl} isSelected={isSelected} isCorrect={isCorrect}
                       showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
-                      submitted={!!submitted} onSelect={() => handleAnswerChange({ selectedOption: val })}
+                      submitted={!!submitted} onSelect={() => onAnswerChange({ selectedOption: val })}
                       fontSize={fontSize}
                     />
                   );
