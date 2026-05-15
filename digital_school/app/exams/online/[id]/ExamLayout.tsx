@@ -846,8 +846,11 @@ export default function ExamLayout() {
                     <QuestionCard
                       questionIdx={navigation.current}
                       questionOverride={currentQuestion}
+                      answer={answers[currentQuestion?.id]}
+                      onAnswerChange={handleAnswerChange}
+                      onSubAnswerChange={handleSubAnswerChange}
                       disabled={isSubmitting}
-                      submitted={false} // Allow interaction even in practice
+                      submitted={false} 
                     />
                   </div>
                 );
