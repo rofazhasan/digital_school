@@ -136,7 +136,7 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
         if (globalSvgCache[chemfigHash]) {
             result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
         } else {
-            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(fullMatch)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
+            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(fullMatch)}" data-hash="${chemfigHash}"></span>`;
             formulaMap[chemfigId] = fullMatch;
         }
         i = j;
@@ -224,7 +224,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
                 iframe.style.border = 'none';
                 iframe.style.width = '100%';
                 iframe.style.height = '100%';
-                iframe.style.display = 'block';
+                iframe.style.display = 'inline-block';
                 el.appendChild(iframe);
             }
         });
@@ -242,7 +242,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
 
     return (
         <MathJax dynamic={dynamic}>
-            <div dangerouslySetInnerHTML={{ __html: processedText }} />
+            <div className="inline" dangerouslySetInnerHTML={{ __html: processedText }} />
         </MathJax>
     );
 }
