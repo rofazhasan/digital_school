@@ -403,8 +403,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
             </div>
           )}
 
+
         </CardContent>
-      </Card>
 
       <Suspense fallback={null}>
         {cameraTarget && (
@@ -417,6 +417,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
         )}
       </Suspense>
     </Card>
+  );
+});
 
 QuestionCard.displayName = 'QuestionCard';
 
