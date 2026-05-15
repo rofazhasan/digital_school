@@ -659,20 +659,22 @@ mjx-container svg text {
   max-width: 100%;
 }
 
-/* Default Molecule Size (Text-like) */
+/* Default Molecule Size (Text-like but readable) */
 .chemfig-inline svg {
   display: inline-block !important;
   vertical-align: middle !important;
   height: auto !important;
-  max-height: 1.8em !important; /* Professional text-aligned size */
+  max-height: 2.5em !important; /* Increased for better visibility of atoms */
+  min-height: 1.5em !important;
   width: auto !important;
   max-width: 100% !important;
 }
 
 /* Complex/Ring Structure Size (Significantly Larger) */
 .chemfig-complex svg {
-  max-height: 6em !important;
-  margin: 0.4rem 0;
+  max-height: 6.5em !important;
+  min-height: 3.5em !important;
+  margin: 0.6rem 0;
 }
 
 .chemfig-placeholder {

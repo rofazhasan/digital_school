@@ -133,8 +133,8 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
             } catch (e) {}
         }
 
-        // Adaptive sizing: Detect if it's a ring or complex structure
-        const isComplex = fullMatch.includes('*') || (fullMatch.match(/\[/g) || []).length > 2;
+        // Adaptive sizing: Detect if it's a ring, branch, or substituent
+        const isComplex = fullMatch.includes('*') || fullMatch.includes('[') || fullMatch.includes('(');
         const chemfigClass = isComplex ? 'chemfig-inline chemfig-complex' : 'chemfig-inline';
 
         if (globalSvgCache[chemfigHash]) {
