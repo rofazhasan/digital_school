@@ -655,7 +655,7 @@ mjx-container svg text {
   vertical-align: middle !important;
   align-items: center;
   justify-content: center;
-  margin: 0 0.4rem;
+  margin: 0.5rem 0.4rem;
   max-width: 100%;
 }
 
@@ -663,8 +663,8 @@ mjx-container svg text {
   display: inline-block !important;
   vertical-align: middle !important;
   height: auto !important;
-  max-height: 5em !important; /* Increased from 2.8em for "Medium Readable" look */
-  min-height: 1.5em !important;
+  max-height: 8em !important; /* Increased significantly for maximum readability */
+  min-height: 2em !important;
   width: auto !important;
   max-width: 100% !important;
   transition: transform 0.2s ease;
@@ -673,27 +673,27 @@ mjx-container svg text {
 .chemfig-placeholder {
   display: inline-block !important;
   vertical-align: middle !important;
-  min-width: 2.5rem !important;
-  min-height: 2.5rem !important;
+  min-width: 3rem !important;
+  min-height: 3rem !important;
   background: color-mix(in oklch, var(--primary) 5%, transparent);
   border-radius: var(--radius-sm);
-  margin: 0 0.4rem;
+  margin: 0.5rem 0.4rem;
   border: 1px dashed color-mix(in oklch, var(--primary) 10%, transparent);
 }
 
 .chem-fallback {
   font-family: var(--font-mono);
-  font-size: 0.9em;
+  font-size: 1.1em;
   color: var(--primary);
   background: color-mix(in oklch, var(--primary) 5%, transparent);
-  padding: 2px 6px;
+  padding: 4px 8px;
   border-radius: 4px;
 }
 
 /* Print specific adjustments for formal layout */
 @media print {
   .chemfig-inline svg {
-    max-height: 4.5em !important; /* Increased from 2.4em */
+    max-height: 6.5em !important; /* Increased for high-fidelity print */
   }
   .chemfig-placeholder {
     display: none !important;
