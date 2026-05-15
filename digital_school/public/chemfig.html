@@ -20,16 +20,21 @@
         if (rawChem) {
             const decoded = decodeURIComponent(rawChem);
             
-            // Step 1: Strip chemfig wrapper for cloud renderers
+            // Ensure the command is properly wrapped for the renderer
+            let latex = decoded;
+            if (!latex.includes('\\chemfig') && !latex.includes('\\tikz')) {
+                latex = `\\chemfig{${latex}}`;
+            }
+
             // Step 2: Use cloud bridge
             // QuickChart is more reliable for complex packages like chemfig
-            // We use a more complete preamble for QuickChart
-            const qcParams = encodeURIComponent(`\\usepackage{chemfig}\\usepackage{amsmath}\\bg_white ${decoded}`);
-            const quickChartUrl = `https://quickchart.io/latex?formula=${qcParams}`;
+            // Note: We use \bg_white and \usepackage{chemfig} for high fidelity
+            const preamble = `\\usepackage{chemfig}\\usepackage{amsmath}`;
+            const fullLatex = `${preamble}\\bg_white ${latex}`;
             
-            const ccParams = encodeURIComponent(`\\inline \\bg_white \\usepackage{chemfig} \\usepackage{amsmath} ${decoded}`);
-            const codecogsUrl = `https://latex.codecogs.com/svg.image?${ccParams}`;
-            const pngUrl = `https://latex.codecogs.com/png.latex?${ccParams}`;
+            const quickChartUrl = `https://quickchart.io/latex?formula=${encodeURIComponent(fullLatex)}`;
+            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodeURIComponent(`\\inline ${fullLatex}`)}`;
+            const pngUrl = `https://latex.codecogs.com/png.latex?${encodeURIComponent(`\\inline ${fullLatex}`)}`;
             
             const img = new Image();
             img.onload = () => {

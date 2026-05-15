@@ -128,8 +128,8 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
         if (globalSvgCache[chemfigHash]) {
             result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
         } else {
-            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(chemfigContent)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
-            formulaMap[chemfigId] = chemfigContent;
+            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(fullMatch)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
+            formulaMap[chemfigId] = fullMatch;
         }
         i = j;
     }
