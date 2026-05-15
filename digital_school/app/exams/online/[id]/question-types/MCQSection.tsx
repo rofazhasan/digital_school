@@ -134,7 +134,7 @@ export const MCOption = memo(({
     return (
         <button
             onClick={() => onSelect(index)}
-            disabled={disabled || submitted || (typeof userAnswer === 'object' && userAnswer?.selectedOptions?.length > 0)}
+            disabled={disabled || submitted || isSelected}
             className={getStyles()}
         >
             <div className={`

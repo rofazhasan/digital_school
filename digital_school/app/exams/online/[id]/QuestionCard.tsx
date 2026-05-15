@@ -220,10 +220,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                       onSelect={(idx) => {
                         onAnswerChange((prev: any) => {
                           const currentSelected = prev?.selectedOptions || [];
-                          const isSelected = currentSelected.includes(idx);
-                          const newSelection = isSelected
-                            ? currentSelected.filter((item: number) => item !== idx)
-                            : [...currentSelected, idx];
+                          if (currentSelected.includes(idx)) return prev; // Security check: should be disabled anyway
+                          const newSelection = [...currentSelected, idx];
                           return { ...prev, selectedOptions: newSelection };
                         });
                       }}
