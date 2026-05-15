@@ -48,7 +48,8 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
     markQuestion,
     setIsUploading,
     fontSize,
-    answers // Keep for sub-questions images in shared components if needed, but use passed prop for value
+    answers,
+    setAnswers
   } = useExamContext();
 
   const questions = exam.questions || [];

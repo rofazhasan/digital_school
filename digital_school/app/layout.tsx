@@ -129,7 +129,7 @@ export default function RootLayout({
         <link 
           rel="stylesheet" 
           href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" 
-          integrity="sha384-nAnRK6S51GV8H8IuVMDdIn6W2U7+3r4qF87G00c0vN9bS2h07WfWb2VbX4YvX5W1" 
+          integrity="sha384-nB0miv6/jRmo5UMMR1wu3Gz6NLsoTkbqJghGIsx//Rlm+ZU03BU6SQNC66uf4l5+" 
           crossOrigin="anonymous"
         />
         <script src="https://tikzjax.com/v1/tikzjax.js" async></script>
