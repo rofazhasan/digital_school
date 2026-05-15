@@ -35,6 +35,53 @@ function hashString(str: string): string {
  *   - Cached inline SVG (if already rendered before)
  *   - Temporary hidden iframe (first render; will postMessage the SVG back)
  */
+function extractNestedBraces(str: string): string {
+    if (str[0] !== '{') return '';
+    let braceCount = 1;
+    let j = 1;
+    while (j < str.length && braceCount > 0) {
+        if (str[j] === '{') braceCount++;
+        else if (str[j] === '}') braceCount--;
+        j++;
+    }
+    return braceCount === 0 ? str.slice(1, j - 1) : '';
+}
+
+function extractChemfig(text: string, startIdx: number): { content: string, fullMatch: string, endIdx: number } | null {
+    const chemfigStart = text.indexOf('\\chemfig', startIdx);
+    if (chemfigStart === -1) return null;
+
+    let searchIdx = chemfigStart + 8;
+    // Skip * if present
+    if (text[searchIdx] === '*') searchIdx++;
+    
+    // Skip optional arguments [...]
+    if (text[searchIdx] === '[') {
+        let bracketCount = 1;
+        searchIdx++;
+        while (searchIdx < text.length && bracketCount > 0) {
+            if (text[searchIdx] === '[') bracketCount++;
+            else if (text[searchIdx] === ']') bracketCount--;
+            searchIdx++;
+        }
+    }
+
+    // Find opening brace (with whitespace support)
+    while (searchIdx < text.length && (text[searchIdx] === ' ' || text[searchIdx] === '\t' || text[searchIdx] === '\n' || text[searchIdx] === '\r')) {
+        searchIdx++;
+    }
+
+    if (text[searchIdx] !== '{') return null;
+
+    const content = extractNestedBraces(text.slice(searchIdx));
+    if (!content) return null;
+
+    const endIdx = searchIdx + content.length + 2;
+    const fullMatch = text.slice(chemfigStart, endIdx);
+    
+    return { content, fullMatch, endIdx };
+}
+
 function processChemfig(text: string, instanceId: string): { text: string, hasChemfig: boolean, formulaMap: Record<string, string> } {
     if (!text.includes('\\chemfig') && !text.includes('\\tikz')) return { text, hasChemfig: false, formulaMap: {} };
 
@@ -45,94 +92,50 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
     const formulaMap: Record<string, string> = {};
 
     while (i < text.length) {
-        const chemIdx = text.indexOf('\\chemfig', i);
-        const tikzIdx = text.indexOf('\\tikz', i);
+        const match = extractChemfig(text, i);
         
-        let idx = -1;
-        let cmdLen = 0;
-        
-        if (chemIdx !== -1 && (tikzIdx === -1 || chemIdx < tikzIdx)) {
-            idx = chemIdx; cmdLen = 8;
-        } else if (tikzIdx !== -1) {
-            idx = tikzIdx; cmdLen = 5;
-        }
-
-        if (idx === -1) {
+        if (!match) {
             result += text.slice(i);
             break;
         }
 
-        result += text.slice(i, idx);
-
-        const braceStart = text.indexOf('{', idx);
-        if (braceStart === -1) {
-            result += text.slice(idx, idx + cmdLen);
-            i = idx + cmdLen;
-            continue;
-        }
-
-        let braceCount = 1;
-        let j = braceStart + 1;
-        while (j < text.length && braceCount > 0) {
-            if (text[j] === '{') braceCount++;
-            else if (text[j] === '}') braceCount--;
-            j++;
-        }
-
-        if (braceCount === 0) {
-            hasChemfig = true;
-            const chemfigContent = text.slice(idx, j);
-            const chemfigHash = hashString(chemfigContent);
-            const chemfigId = `chemfig-${instanceId}-${chemfigIndex++}`;
-
-            // Strip surrounding math delimiters if chemfig was mistakenly wrapped in them
-            // We use a more robust regex approach here to handle optional whitespace
-            const openDelims = ['\\$\\$', '\\$', '\\\\\\[', '\\\\\\('];
-            const closeDelims = ['\\$\\$', '\\$', '\\\\\\]', '\\\\\\)'];
+        result += text.slice(i, match.endIdx - match.fullMatch.length);
+        hasChemfig = true;
+        
+        const chemfigContent = match.content;
+        const fullMatch = match.fullMatch;
+        const chemfigHash = hashString(fullMatch);
+        const chemfigId = `chemfig-${instanceId}-${chemfigIndex++}`;
+        
+        let j = match.endIdx;
+        
+        // Strip surrounding math delimiters
+        const openDelims = ['\\$\\$', '\\$', '\\\\\\[', '\\\\\\('];
+        const closeDelims = ['\\$\\$', '\\$', '\\\\\\]', '\\\\\\)'];
+        
+        for (let d = 0; d < openDelims.length; d++) {
+            const openRegex = new RegExp(`${openDelims[d]}\\s*$`);
+            const closeRegex = new RegExp(`^\\s*${closeDelims[d]}`);
             
-            let stripped = false;
-            for (let d = 0; d < openDelims.length; d++) {
-                const open = openDelims[d];
-                const close = closeDelims[d];
-                
-                const openRegex = new RegExp(`${open}\\s*$`);
-                const closeRegex = new RegExp(`^\\s*${close}`);
-                
-                if (openRegex.test(result) && closeRegex.test(text.slice(j))) {
-                    result = result.replace(openRegex, '');
-                    const closeMatch = text.slice(j).match(closeRegex);
-                    if (closeMatch) j += closeMatch[0].length;
-                    stripped = true;
-                    break;
-                }
+            if (openRegex.test(result) && closeRegex.test(text.slice(j))) {
+                result = result.replace(openRegex, '');
+                const closeMatch = text.slice(j).match(closeRegex);
+                if (closeMatch) j += closeMatch[0].length;
+                break;
             }
-
-            // Check if we have this in local storage for "Zero Delay"
-            if (!globalSvgCache[chemfigHash]) {
-                try {
-                    const saved = localStorage.getItem(`chemfig-svg-${chemfigHash}`);
-                    if (saved) globalSvgCache[chemfigHash] = saved;
-                } catch (e) {}
-            }
-
-            if (globalSvgCache[chemfigHash]) {
-                // If it's too large, it might be an error message
-                if (globalSvgCache[chemfigHash].length > 50000) {
-                    result += `<span class="chem-fallback" data-hash="${chemfigHash}">$${chemfigContent}$</span>`;
-                } else {
-                    result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
-                }
-            } else {
-                // Placeholder that will be replaced by the iframe rendering engine
-                result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(chemfigContent)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
-                formulaMap[chemfigId] = chemfigContent;
-            }
-            i = j;
-        } else {
-            result += text.slice(idx, idx + cmdLen);
-            i = idx + cmdLen;
         }
+
+        if (globalSvgCache[chemfigHash]) {
+            result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
+        } else {
+            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(chemfigContent)}" data-hash="${chemfigHash}" style="display:inline-block; vertical-align:middle; min-width:40px; min-height:40px;"></span>`;
+            formulaMap[chemfigId] = chemfigContent;
+        }
+        i = j;
     }
+
+    // Safety: Ensure no raw \chemfig leaks to MathJax (causes red box "Invalid Equation")
+    result = result.replace(/\\chemfig/g, '\\text{\\chemfig}');
 
     return { text: result, hasChemfig, formulaMap };
 }

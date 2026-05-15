@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { useReactToPrint } from 'react-to-print';
 import { MathJaxContext } from 'better-react-mathjax';
 import { v4 as uuidv4 } from 'uuid';
+import { mathJaxConfig as globalMathJaxConfig } from '@/app/components/MathJaxConfig';
 import Head from 'next/head';
 
 // --- Component Imports (Assumed to be in these paths) ---
@@ -112,20 +113,13 @@ export default function PrintExamPage() {
 
   // --- MathJax Configuration ---
   const mathJaxConfig = {
-    loader: { load: ["input/tex", "input/mml", "output/svg", "[tex]/mhchem"] },
-    tex: {
-      inlineMath: [['$', '$'], ['\\(', '\\)']],
-      displayMath: [['$$', '$$'], ['\\[', '\\]']],
-      packages: { '[+]': ['ams'] }
-    },
-    options: {
-      enableEnrichment: false
-    },
+    ...globalMathJaxConfig,
     startup: {
-      pageReady: () => {
+      ready: () => {
         setIsMathJaxReady(true);
         (window as any).__IS_MATHJAX_READY = true;
-        return (window as any).MathJax.startup.defaultPageReady();
+        // @ts-ignore
+        return (window as any).MathJax.startup.defaultReady();
       }
     }
   };

@@ -28,14 +28,8 @@ export const ZoomableImage = ({ src, alt, className }: { src: string, alt: strin
     );
 };
 
-export const mathJaxConfig = {
-    loader: { load: ["input/tex", "output/chtml", "[tex]/mhchem"] },
-    tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']],
-        displayMath: [['$$', '$$'], ['\\[', '\\]']],
-        packages: { '[+]': ['mhchem'] }
-    },
-};
+import { mathJaxConfig as globalConfig } from "@/app/components/MathJaxConfig";
+export const mathJaxConfig = globalConfig;
 
 // Helper: Image Gallery + Upload Logic
 export const QuestionImageGallery = memo(({ qId, subIdx, answers, setAnswers, disabled, submitted, setIsUploading, onCaptureClick }: any) => {

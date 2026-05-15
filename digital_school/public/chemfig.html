@@ -21,32 +21,39 @@
             const decoded = decodeURIComponent(rawChem);
             
             // Step 1: Strip chemfig wrapper for cloud renderers
-            const chemMatch = decoded.match(/\\chemfig\s*\{([^}]+)\}/);
-            const formula = chemMatch ? chemMatch[1] : decoded;
-
-            // Step 2: Use cloud bridge (CodeCogs)
-            // We use svg.image primarily, then gif.latex/png as fallback
-            const svgUrl = `https://latex.codecogs.com/svg.image?\\inline&space;\\bg_white&space;\\usepackage{chemfig}&space;${encodeURIComponent(decoded)}`;
-            const pngUrl = `https://latex.codecogs.com/png.latex?\\inline&space;\\bg_white&space;\\usepackage{chemfig}&space;${encodeURIComponent(decoded)}`;
+            // Step 2: Use cloud bridge
+            // QuickChart is more reliable for complex packages like chemfig
+            // We use a more complete preamble for QuickChart
+            const qcParams = encodeURIComponent(`\\usepackage{chemfig}\\usepackage{amsmath}\\bg_white ${decoded}`);
+            const quickChartUrl = `https://quickchart.io/latex?formula=${qcParams}`;
+            
+            const ccParams = encodeURIComponent(`\\inline \\bg_white \\usepackage{chemfig} \\usepackage{amsmath} ${decoded}`);
+            const codecogsUrl = `https://latex.codecogs.com/svg.image?${ccParams}`;
+            const pngUrl = `https://latex.codecogs.com/png.latex?${ccParams}`;
             
             const img = new Image();
             img.onload = () => {
                 document.getElementById('status').style.display = 'none';
                 document.body.appendChild(img);
                 
-                // Fetch the actual SVG content if using svgUrl
-                if (img.src.includes('svg.image')) {
+                // Fetch the actual SVG content if using svg/quickchart for better quality and print fidelity
+                if (img.src.includes('svg.image') || img.src.includes('quickchart.io')) {
                     fetch(img.src)
                         .then(r => r.text())
                         .then(svg => {
-                            window.parent.postMessage({
-                                type: 'resize-chemfig',
-                                id: id,
-                                hash: hash,
-                                svgContent: svg
-                            }, '*');
+                            if (svg.includes('<svg') || svg.includes('<?xml')) {
+                                window.parent.postMessage({
+                                    type: 'resize-chemfig',
+                                    id: id,
+                                    hash: hash,
+                                    svgContent: svg
+                                }, '*');
+                            } else {
+                                throw new Error('Not an SVG');
+                            }
                         })
                         .catch(() => {
+                            // Fallback to the image element itself if fetch fails
                             window.parent.postMessage({
                                 type: 'resize-chemfig',
                                 id: id,
@@ -65,11 +72,14 @@
             };
  
             img.onerror = () => {
-                if (img.src === svgUrl) {
-                    console.log("SVG render failed, trying PNG...");
+                if (img.src === quickChartUrl) {
+                    console.warn("QuickChart failed, trying CodeCogs SVG...");
+                    img.src = codecogsUrl;
+                } else if (img.src === codecogsUrl) {
+                    console.warn("CodeCogs SVG failed, trying PNG...");
                     img.src = pngUrl;
                 } else {
-                    // Both failed, signal the parent to use the mhchem fallback
+                    // All cloud options failed, signal parent to use mhchem fallback
                     window.parent.postMessage({
                         type: 'resize-chemfig',
                         id: id,
@@ -77,11 +87,11 @@
                         failed: true,
                         rawChem: decoded
                     }, '*');
-                    document.getElementById('status').innerText = 'Rendering...';
                 }
             };
  
-            img.src = svgUrl;
+            // Start the chain
+            img.src = quickChartUrl;
         }
 
         // Timeout fallback
