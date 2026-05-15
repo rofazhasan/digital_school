@@ -26,23 +26,18 @@
                 latex = `\\chemfig{${latex}}`;
             }
 
-            // Step 2: Use cloud bridge
-            // QuickChart is more reliable for complex packages like chemfig
-            // Note: We use \bg_white and \usepackage{chemfig} for high fidelity
-            const preamble = `\\usepackage{chemfig}\\usepackage{amsmath}`;
-            const fullLatex = `${preamble}\\bg_white ${latex}`;
-            
-            const quickChartUrl = `https://quickchart.io/latex?formula=${encodeURIComponent(fullLatex)}`;
-            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodeURIComponent(`\\inline ${fullLatex}`)}`;
-            const pngUrl = `https://latex.codecogs.com/png.latex?${encodeURIComponent(`\\inline ${fullLatex}`)}`;
+            // Step 2: Use CodeCogs cloud bridge (Native Chemfig support found!)
+            const encodedLatex = encodeURIComponent(`\\inline\\bg_white ${latex}`);
+            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodedLatex}`;
+            const pngUrl = `https://latex.codecogs.com/png.latex?${encodedLatex}`;
             
             const img = new Image();
             img.onload = () => {
                 document.getElementById('status').style.display = 'none';
                 document.body.appendChild(img);
                 
-                // Fetch the actual SVG content if using svg/quickchart for better quality and print fidelity
-                if (img.src.includes('svg.image') || img.src.includes('quickchart.io')) {
+                // Fetch the actual SVG content for better quality and print fidelity
+                if (img.src.includes('svg.image')) {
                     fetch(img.src)
                         .then(r => r.text())
                         .then(svg => {
@@ -77,10 +72,7 @@
             };
  
             img.onerror = () => {
-                if (img.src === quickChartUrl) {
-                    console.warn("QuickChart failed, trying CodeCogs SVG...");
-                    img.src = codecogsUrl;
-                } else if (img.src === codecogsUrl) {
+                if (img.src === codecogsUrl) {
                     console.warn("CodeCogs SVG failed, trying PNG...");
                     img.src = pngUrl;
                 } else {
@@ -96,7 +88,7 @@
             };
  
             // Start the chain
-            img.src = quickChartUrl;
+            img.src = codecogsUrl;
         }
 
         // Timeout fallback
