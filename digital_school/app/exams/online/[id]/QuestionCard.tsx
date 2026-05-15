@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, memo, useEffect, lazy, Suspense } from "react";
-import { MathJaxContext } from "better-react-mathjax";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +18,7 @@ import { cn } from "@/lib/utils";
 import { compressImage } from "./performance-utils";
 
 // Sub-components
-import { ZoomableImage, mathJaxConfig, QuestionImageGallery } from "./question-types/shared";
+import { ZoomableImage, QuestionImageGallery } from "./question-types/shared";
 import { MCQOption, MCOption } from "./question-types/MCQSection";
 import { MTFGrid } from "./question-types/MTFSection";
 import { DebouncedTextarea, DebouncedInput } from "./question-types/SubjectiveSection";
@@ -30,6 +29,9 @@ import { IntNumericSection } from "./question-types/IntNumericSection";
 const CameraCapture = lazy(() => import("./CameraCapture"));
 
 interface QuestionCardProps {
+  answer: any;
+  onAnswerChange: (value: any) => void;
+  onSubAnswerChange: (idx: number, value: any) => void;
   disabled?: boolean;
   result?: any;
   submitted?: boolean;
@@ -39,15 +41,14 @@ interface QuestionCardProps {
   hideScore?: boolean;
 }
 
-const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) => {
+const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled, result, submitted, isMCQOnly, questionIdx, questionOverride, hideScore }: QuestionCardProps) => {
   const {
     exam,
-    answers,
-    setAnswers,
     navigation,
     markQuestion,
     setIsUploading,
-    fontSize
+    fontSize,
+    answers // Keep for sub-questions images in shared components if needed, but use passed prop for value
   } = useExamContext();
 
   const questions = exam.questions || [];
@@ -145,7 +146,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
 
   const type = (question.type || "").toLowerCase();
   const text = question.text || question.questionText || "(No text)";
-  const userAnswer = answers[question.id];
+  const userAnswer = answer;
   const showResult = submitted && result;
 
   const getTextSize = (base: string) => {
@@ -155,8 +156,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
   };
 
   return (
-    <MathJaxContext version={3} config={mathJaxConfig}>
-      <Card className="w-full max-w-3xl mx-auto shadow-sm border border-border bg-card rounded-2xl overflow-hidden font-exam-online">
+    <Card className="w-full max-w-3xl mx-auto shadow-sm border border-border bg-card rounded-2xl overflow-hidden font-exam-online">
         <CardContent className="p-6 md:p-8">
 
           {/* Header */}
@@ -219,7 +219,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
                     <MCQOption
                       key={i} index={i} option={opt} isSelected={isSelected} isCorrect={isCorrect}
                       showResult={showResult} userAnswer={userAnswer} disabled={!!disabled}
-                      submitted={!!submitted} onSelect={handleAnswerChange} fontSize={fontSize}
+                      submitted={!!submitted} onSelect={onAnswerChange} fontSize={fontSize}
                     />
                   );
                 })}
@@ -280,7 +280,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
             {type === "mtf" && (
               <MTFGrid
                 question={question} userAnswer={userAnswer} showResult={showResult} disabled={!!disabled}
-                onSelect={(l, r) => handleAnswerChange((prev: any) => ({ ...(prev || {}), [l]: r }))}
+                onSelect={(l, r) => onAnswerChange((prev: any) => ({ ...(prev || {}), [l]: r }))}
               />
             )}
 
@@ -290,7 +290,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
                   <div className="space-y-4 text-left">
                     <DebouncedTextarea
                       value={userAnswer || ""}
-                      onChange={handleAnswerChange}
+                      onChange={onAnswerChange}
                       disabled={!!disabled || !!submitted}
                       placeholder="Type your answer here..."
                     />
@@ -312,7 +312,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
                         {subQ.image && <div className="mb-4 text-left"><ZoomableImage src={subQ.image} alt="Sub" className="max-h-48 w-full rounded-xl border bg-card p-1" /></div>}
                         <DebouncedInput
                           value={answers[`${question.id}_sub_${idx}`] || ""}
-                          onChange={(val) => handleSubAnswerChange(idx, val)}
+                          onChange={(val) => onSubAnswerChange(idx, val)}
                           disabled={!!disabled || !!submitted}
                           placeholder="Short answer..."
                         />
@@ -364,7 +364,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
                             <MCQOption
                               key={oi} index={oi} option={opt} isSelected={isSelected} isCorrect={isCorrect}
                               showResult={showResult} userAnswer={subUserAnswer} disabled={!!disabled}
-                              submitted={!!submitted} onSelect={(val) => handleSubAnswerChange(idx, val)} fontSize={fontSize}
+                              submitted={!!submitted} onSelect={(val) => onSubAnswerChange(idx, val)} fontSize={fontSize}
                             />
                           );
                         })}
@@ -378,17 +378,17 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
             {(type === "int" || type === "numeric") && (
               <IntNumericSection
                 question={question} userAnswer={userAnswer}
-                disabled={!!disabled} submitted={!!submitted} onAnswerChange={handleAnswerChange}
+                disabled={!!disabled} submitted={!!submitted} onAnswerChange={onAnswerChange}
               />
             )}
 
             {type === "descriptive" && (
               <DescriptiveSection
                 question={question} userAnswer={userAnswer}
-                answers={answers} setAnswers={setAnswers}
+                answers={answers} setAnswers={() => {}} // Not needed for DescriptiveSection internal logic here
                 setIsUploading={setIsUploading}
                 onCaptureClick={(target: any) => setCameraTarget(target)}
-                disabled={!!disabled} submitted={!!submitted} onAnswerChange={handleAnswerChange}
+                disabled={!!disabled} submitted={!!submitted} onAnswerChange={onAnswerChange}
               />
             )}
           </div>
@@ -416,9 +416,7 @@ const QuestionCard = memo(({ disabled, result, submitted, isMCQOnly, questionIdx
           />
         )}
       </Suspense>
-    </MathJaxContext>
-  );
-});
+    </Card>
 
 QuestionCard.displayName = 'QuestionCard';
 

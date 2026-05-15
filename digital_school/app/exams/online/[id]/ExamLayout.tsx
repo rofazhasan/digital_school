@@ -158,11 +158,11 @@ export default function ExamLayout() {
   const {
     exam,
     patchExam,
-    answers, // Use live answers state
+    answers,
     navigation,
     navigateToQuestion,
     saveStatus,
-    isUploading, // Get from context
+    isUploading,
     warnings: contextWarnings,
     setWarnings: setContextWarnings,
     sortedQuestions,
@@ -172,8 +172,32 @@ export default function ExamLayout() {
     setActiveSection,
     hasObjective,
     hasCqSq,
-    fullSortedQuestions
+    fullSortedQuestions,
+    setAnswers
   } = useExamContext();
+
+  const questions = sortedQuestions || [];
+  const currentQuestion = questions[navigation.current];
+  const totalQuestions = questions.length;
+
+  const handleAnswerChange = useCallback((value: any | ((prev: any) => any)) => {
+    if (!currentQuestion) return;
+    setAnswers((prev: any) => {
+      const currentVal = prev[currentQuestion.id];
+      const newVal = typeof value === 'function' ? value(currentVal) : value;
+      return { ...prev, [currentQuestion.id]: newVal };
+    });
+  }, [currentQuestion?.id, setAnswers]);
+
+  const handleSubAnswerChange = useCallback((idx: number, value: any | ((prev: any) => any)) => {
+    if (!currentQuestion) return;
+    setAnswers((prev: any) => {
+      const key = `${currentQuestion.id}_sub_${idx}`;
+      const currentVal = prev[key];
+      const newVal = typeof value === 'function' ? value(currentVal) : value;
+      return { ...prev, [key]: newVal };
+    });
+  }, [currentQuestion?.id, setAnswers]);
 
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -189,9 +213,6 @@ export default function ExamLayout() {
   // Illusion Mode State
   const [illusionMode, setIllusionMode] = useState(false);
 
-  const questions = sortedQuestions || [];
-  const currentQuestion = questions[navigation.current];
-  const totalQuestions = questions.length;
   // Use live answers for count
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 

@@ -101,7 +101,21 @@ import { ThemeProvider } from "@/components/theme-provider";
 import MobileEnhancements from "@/components/MobileEnhancements";
 import MobileNavigationControls from "@/components/MobileNavigationControls";
 
-// ... existing imports
+import { MathJaxContext } from "better-react-mathjax";
+
+const mathJaxConfig = {
+  loader: { 
+    load: ["input/tex", "output/chtml", "output/svg", "[tex]/mhchem"] 
+  },
+  tex: {
+    inlineMath: [['$', '$'], ['\\(', '\\)']],
+    displayMath: [['$$', '$$'], ['\\[', '\\]']],
+    packages: { '[+]': ['mhchem', 'ams', 'base', 'extpfeil'] }
+  },
+  options: {
+    enableEnrichment: false,
+  },
+};
 
 export default function RootLayout({
   children,
@@ -122,20 +136,22 @@ export default function RootLayout({
           storageKey="ds-theme-preference"
           disableTransitionOnChange
         >
-          <ErrorBoundary>
-            <NavigationWrapper>
-              <MobileEnhancements />
-              <MobileNavigationControls />
-              <MaintenanceGuard>
-                <SessionGuard />
-                <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
-                  {children}
-                </div>
-                <AppFooter />
-                <Toaster />
-              </MaintenanceGuard>
-            </NavigationWrapper>
-          </ErrorBoundary>
+          <MathJaxContext version={3} config={mathJaxConfig}>
+            <ErrorBoundary>
+              <NavigationWrapper>
+                <MobileEnhancements />
+                <MobileNavigationControls />
+                <MaintenanceGuard>
+                  <SessionGuard />
+                  <div className="flex-grow flex flex-col relative w-full max-w-[100vw] animate-in fade-in duration-1000 ease-in-out">
+                    {children}
+                  </div>
+                  <AppFooter />
+                  <Toaster />
+                </MaintenanceGuard>
+              </NavigationWrapper>
+            </ErrorBoundary>
+          </MathJaxContext>
         </ThemeProvider>
       </body>
     </html>

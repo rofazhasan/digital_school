@@ -167,73 +167,72 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     useEffect(() => {
         if (!hasChemfig) return;
 
-        const handleMessage = (e: MessageEvent) => {
-            if (!e.data || e.data.type !== 'resize-chemfig') return;
+        const renderQueue = Object.entries(formulaMap);
+        if (renderQueue.length === 0) return;
 
-            // Save SVG to cache and trigger re-render (swap iframe → inline SVG)
-            if (e.data.hash && e.data.svgContent && !globalSvgCache[e.data.hash]) {
-                globalSvgCache[e.data.hash] = e.data.svgContent;
-                // Persistent cache to LocalStorage for "Zero Delay" on next visit
-                try {
-                    localStorage.setItem(`chemfig-svg-v2-${e.data.hash}`, e.data.svgContent);
-                } catch (err) {}
-                setCacheVersion(v => v + 1);
-            }
-
-            // Fallback: If rendering failed or is taking too long (signal from iframe)
-            if ((e.data.failed || e.data.slow) && e.data.hash) {
-                const rawChem = e.data.rawChem || '';
-                // NEW ALGORITHM: Syntax-aware Chemfig to mhchem converter
-                let formula = '';
-                
-                // Special case for aromatic rings like **6(------)
-                if (rawChem.includes('**6')) {
-                    formula = 'C6H6'; // Benzene fallback
-                } else if (rawChem.includes('**5')) {
-                    formula = 'C5H5';
-                } else {
-                    // Robust extraction of content between first { and last }
-                    const firstBrace = rawChem.indexOf('{');
-                    const lastBrace = rawChem.lastIndexOf('}');
-                    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-                        formula = rawChem.slice(firstBrace + 1, lastBrace)
-                            .replace(/-\[([0-9]+)\]/g, '-') // Remove angle modifiers
-                            .replace(/=\[([0-9]+)\]/g, '=')
-                            .replace(/\(~\[([0-9]+)\]/g, '~')
-                            .replace(/\(([^)]+)\)/g, (match, p1) => {
-                                // Extract content from parens and remove nested modifiers
-                                return `(${p1.replace(/-\[([0-9]+)\]/g, '').replace(/=\[([0-9]+)\]/g, '')})`;
-                            });
-                    }
-                }
-                
-                if (formula) {
-                    // Further cleanup for mhchem
-                    formula = formula.replace(/\s+/g, '');
-                    const fallbackHtml = `<span class="chem-fallback" data-hash="${e.data.hash}">$\\ce{${formula}}$</span>`;
-                    globalSvgCache[e.data.hash] = fallbackHtml;
-                    setCacheVersion(v => v + 1);
-                }
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-        
-        // Inject iframes for placeholders
-        Object.entries(formulaMap).forEach(([id, formula]) => {
+        renderQueue.forEach(async ([id, formula]) => {
             const el = document.getElementById(id);
-            if (el && !el.querySelector('iframe')) {
-                const iframe = document.createElement('iframe');
-                iframe.src = `/chemfig.html?c=${encodeURIComponent(formula)}&id=${id}&hash=${hashString(formula)}`;
-                iframe.style.border = 'none';
-                iframe.style.width = '100%';
-                iframe.style.height = '100%';
-                iframe.style.display = 'inline-block';
-                el.appendChild(iframe);
+            if (!el) return;
+
+            const chemfigHash = hashString(formula);
+            
+            // 1. Check Caches (Memory & LocalStorage already checked in useMemo, but double check for async safety)
+            if (globalSvgCache[chemfigHash]) {
+                el.innerHTML = globalSvgCache[chemfigHash];
+                el.classList.remove('chemfig-placeholder');
+                el.classList.add('chemfig-rendered');
+                return;
+            }
+
+            // 2. Fetch from Cloud bridge (Native Chemfig support)
+            // Properly wrap if needed
+            let latex = formula.trim().replace(/\s+/g, ' ');
+            if (!latex.includes('\\chemfig') && !latex.includes('\\tikz')) {
+                latex = `\\chemfig{${latex}}`;
+            }
+
+            const codecogsUrl = `https://latex.codecogs.com/svg.image?${encodeURIComponent(latex)}`;
+            const pngUrl = `https://latex.codecogs.com/png.latex?${encodeURIComponent(latex)}`;
+
+            const updateCacheAndRender = (content: string) => {
+                globalSvgCache[chemfigHash] = content;
+                try {
+                    localStorage.setItem(`chemfig-svg-v2-${chemfigHash}`, content);
+                } catch (e) {}
+                if (el) {
+                    el.innerHTML = content;
+                    el.classList.remove('chemfig-placeholder');
+                    el.classList.add('chemfig-rendered');
+                }
+                setCacheVersion(v => v + 1);
+            };
+
+            try {
+                const response = await fetch(codecogsUrl);
+                const svgContent = await response.text();
+
+                if (svgContent.includes('<svg') || svgContent.includes('<?xml')) {
+                    updateCacheAndRender(svgContent);
+                } else {
+                    throw new Error('Not an SVG');
+                }
+            } catch (err) {
+                // PNG Fallback
+                const img = new Image();
+                img.onload = () => updateCacheAndRender(img.outerHTML);
+                img.onerror = () => {
+                    // Final Fallback: mhchem
+                    let mFormula = formula.replace(/\\chemfig\*?(\[[^\]]*\])?\{|\}/g, '')
+                        .replace(/-\[([0-9]+)\]/g, '-')
+                        .replace(/=\[([0-9]+)\]/g, '=')
+                        .replace(/\s+/g, '');
+                    
+                    const fallbackHtml = `<span class="chem-fallback">$\\ce{${mFormula}}$</span>`;
+                    updateCacheAndRender(fallbackHtml);
+                };
+                img.src = pngUrl;
             }
         });
-
-        return () => window.removeEventListener('message', handleMessage);
     }, [hasChemfig, formulaMap, cacheVersion]);
 
     if (inline) {
