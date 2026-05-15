@@ -1,7 +1,8 @@
 "use client";
 
-import { MathJax } from "better-react-mathjax";
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
 import { cleanupMath } from "@/lib/utils";
 
 declare global {
@@ -235,17 +236,56 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
         });
     }, [hasChemfig, formulaMap, cacheVersion]);
 
+    // Pre-render standard math with KaTeX for Instant performance on mobile/low-ram
+    const renderedText = useMemo(() => {
+        let text = processedText;
+        
+        // Render Display Math $$...$$
+        text = text.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
+            try {
+                return katex.renderToString(math, { displayMode: true, throwOnError: false });
+            } catch (e) { return `$$${math}$$`; }
+        });
+
+        // Render Inline Math $...$
+        // Avoid matching $ in strings that are already processed (like SVG data)
+        // We only match $ that are not preceded by = or " (simple heuristic)
+        text = text.replace(/(?<![="])\$(.*?)\$/g, (_, math) => {
+            try {
+                return katex.renderToString(math, { displayMode: false, throwOnError: false });
+            } catch (e) { return `$${math}$`; }
+        });
+
+        return text;
+    }, [processedText]);
+
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss or complex chemfig fallbacks
+    useEffect(() => {
+        if (typeof window !== 'undefined' && window.MathJax && containerRef.current) {
+            // Only trigger if there's still unrendered math (contains \ or $)
+            if (renderedText.includes('\\') || renderedText.includes('$')) {
+                window.MathJax.typesetPromise([containerRef.current]).catch(() => {});
+            }
+        }
+    }, [renderedText, cacheVersion]);
+
     if (inline) {
         return (
-            <MathJax inline dynamic={dynamic}>
-                <span dangerouslySetInnerHTML={{ __html: processedText }} />
-            </MathJax>
+            <span 
+                ref={containerRef as any}
+                className="inline-block" 
+                dangerouslySetInnerHTML={{ __html: renderedText }} 
+            />
         );
     }
 
     return (
-        <MathJax dynamic={dynamic}>
-            <div className="inline" dangerouslySetInnerHTML={{ __html: processedText }} />
-        </MathJax>
+        <div 
+            ref={containerRef}
+            className="block" 
+            dangerouslySetInnerHTML={{ __html: renderedText }} 
+        />
     );
 }

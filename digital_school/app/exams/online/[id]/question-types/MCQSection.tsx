@@ -1,7 +1,6 @@
 "use client";
 
 import React, { memo } from "react";
-import { MathJax } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
 import { Check, X } from "lucide-react";
@@ -66,9 +65,7 @@ export const MCQOption = memo(({
 
             <div className={`flex-1 pt-1 ${textSizeClass} leading-relaxed font-medium text-foreground group-hover:text-primary transition-colors`}>
                 <div className="min-w-0 text-left">
-                    <MathJax inline dynamic>
-                        <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
-                    </MathJax>
+                    <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
                 </div>
                 {option?.image && (
                     <div className="mt-4">
@@ -147,9 +144,7 @@ export const MCOption = memo(({
                 <Check className={`w-4 h-4 md:w-5 md:h-5 ${isSelected || (showResult && isCorrect) ? 'scale-100' : 'scale-0'} transition-transform duration-200`} />
             </div>
             <div className={`flex-1 pt-0.5 ${textSizeClass} leading-relaxed font-medium text-foreground group-hover:text-primary transition-colors text-left`}>
-                <MathJax inline dynamic>
-                    <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
-                </MathJax>
+                <UniversalMathJax inline dynamic>{cleanupMath(label || "")}</UniversalMathJax>
             </div>
 
             {showResult && (

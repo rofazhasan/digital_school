@@ -126,6 +126,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <head>
         <link rel="stylesheet" type="text/css" href="https://tikzjax.com/v1/fonts.css" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" integrity="sha384-nAnRK6S51GV8H8IuVMDdIn6W2U7+3r4qF87G00c0vN9bS2h07WfWb2VbX4YvX5W1" crossorigin="anonymous">
         <script src="https://tikzjax.com/v1/tikzjax.js" async></script>
       </head>
       <body suppressHydrationWarning className={`${inter.variable} ${outfit.variable} ${jetbrainsMono.variable} ${tiroBangla.variable} ${hindSiliguri.variable} ${balooDa2.variable} font-sans antialiased overflow-x-hidden min-h-screen flex flex-col bg-background text-foreground`}>
