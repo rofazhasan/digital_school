@@ -50,7 +50,7 @@ export const MCQOption = memo(({
     return (
         <button
             onClick={() => onSelect(label)}
-            disabled={disabled || submitted || !!userAnswer}
+            disabled={disabled || submitted}
             className={getStyles()}
         >
             <div className={`
