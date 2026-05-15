@@ -133,10 +133,14 @@ function processChemfig(text: string, instanceId: string): { text: string, hasCh
             } catch (e) {}
         }
 
+        // Adaptive sizing: Detect if it's a ring or complex structure
+        const isComplex = fullMatch.includes('*') || (fullMatch.match(/\[/g) || []).length > 2;
+        const chemfigClass = isComplex ? 'chemfig-inline chemfig-complex' : 'chemfig-inline';
+
         if (globalSvgCache[chemfigHash]) {
-            result += `<span class="chemfig-inline" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
+            result += `<span class="${chemfigClass}" data-hash="${chemfigHash}">${globalSvgCache[chemfigHash]}</span>`;
         } else {
-            result += `<span id="${chemfigId}" class="chemfig-placeholder" data-chem="${encodeURIComponent(fullMatch)}" data-hash="${chemfigHash}"></span>`;
+            result += `<span id="${chemfigId}" class="chemfig-placeholder ${isComplex ? 'complex' : ''}" data-chem="${encodeURIComponent(fullMatch)}" data-hash="${chemfigHash}"></span>`;
             formulaMap[chemfigId] = fullMatch;
         }
         i = j;

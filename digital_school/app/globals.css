@@ -655,45 +655,57 @@ mjx-container svg text {
   vertical-align: middle !important;
   align-items: center;
   justify-content: center;
-  margin: 0.5rem 0.4rem;
+  margin: 0 0.2rem;
   max-width: 100%;
 }
 
+/* Default Molecule Size (Text-like) */
 .chemfig-inline svg {
   display: inline-block !important;
   vertical-align: middle !important;
   height: auto !important;
-  max-height: 8em !important; /* Increased significantly for maximum readability */
-  min-height: 2em !important;
+  max-height: 1.8em !important; /* Professional text-aligned size */
   width: auto !important;
   max-width: 100% !important;
-  transition: transform 0.2s ease;
+}
+
+/* Complex/Ring Structure Size (Significantly Larger) */
+.chemfig-complex svg {
+  max-height: 6em !important;
+  margin: 0.4rem 0;
 }
 
 .chemfig-placeholder {
   display: inline-block !important;
   vertical-align: middle !important;
-  min-width: 3rem !important;
-  min-height: 3rem !important;
+  min-width: 1.5rem !important;
+  min-height: 1.5rem !important;
   background: color-mix(in oklch, var(--primary) 5%, transparent);
   border-radius: var(--radius-sm);
-  margin: 0.5rem 0.4rem;
-  border: 1px dashed color-mix(in oklch, var(--primary) 10%, transparent);
+  margin: 0 0.2rem;
+}
+
+.chemfig-placeholder.complex {
+  min-width: 4rem !important;
+  min-height: 4rem !important;
 }
 
 .chem-fallback {
   font-family: var(--font-mono);
-  font-size: 1.1em;
+  font-size: 1em;
   color: var(--primary);
   background: color-mix(in oklch, var(--primary) 5%, transparent);
-  padding: 4px 8px;
+  padding: 2px 4px;
   border-radius: 4px;
 }
 
 /* Print specific adjustments for formal layout */
 @media print {
   .chemfig-inline svg {
-    max-height: 6.5em !important; /* Increased for high-fidelity print */
+    max-height: 1.6em !important;
+  }
+  .chemfig-complex svg {
+    max-height: 5.5em !important;
   }
   .chemfig-placeholder {
     display: none !important;
