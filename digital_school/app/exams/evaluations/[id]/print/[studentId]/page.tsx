@@ -81,6 +81,28 @@ export default function StudentScriptPrintPage({ params }: { params: Promise<{ i
         fetchData();
     }, [examId, studentId]);
 
+    // Check if MathJax is already loaded in parent context
+    useEffect(() => {
+        const checkMathJax = () => {
+            if (typeof window !== 'undefined' && (window as any).MathJax && (window as any).MathJax.startup) {
+                setIsMathJaxReady(true);
+                (window as any).__IS_MATHJAX_READY = true;
+                return true;
+            }
+            return false;
+        };
+
+        if (checkMathJax()) return;
+
+        const interval = setInterval(() => {
+            if (checkMathJax()) {
+                clearInterval(interval);
+            }
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, []);
+
     // @ts-ignore
     const handlePrint = useReactToPrint({
         contentRef: printRef,
