@@ -202,11 +202,14 @@ export default function ExamLayout() {
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [transitionState, setTransitionState] = useState<'objective_submitted' | 'cqsq_starting' | null>(null);
-  // Initialize instructions visibility based on whether exam has started
-  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
-  const [showInstructions, setShowInstructions] = useState(!hasStartedAny);
+  // Initialize instructions visibility based on whether the current active section has started
+  const hasCurrentSectionStarted = activeSection === 'objective'
+    ? exam.objectiveStatus !== 'PENDING'
+    : exam.cqSqStatus !== 'PENDING';
+  const [showInstructions, setShowInstructions] = useState(!hasCurrentSectionStarted);
   const [isStarting, setIsStarting] = useState(false);
 
+  const hasStartedAny = (exam.objectiveStatus !== 'PENDING' || exam.cqSqStatus !== 'PENDING');
   const inProgress = (exam.objectiveStatus === 'IN_PROGRESS' || exam.cqSqStatus === 'IN_PROGRESS');
   const isActuallyResuming = hasStartedAny && !exam.hasSubmitted;
 
@@ -217,7 +220,7 @@ export default function ExamLayout() {
   const answeredCount = Object.keys(answers || {}).filter(id => answers[id] && answers[id] !== "No answer provided").length;
 
   // ------------ PROCTORING INTEGRATION ------------
-  const [isExamActive, setIsExamActive] = useState(!!exam.startedAt && !showInstructions);
+  const [isExamActive, setIsExamActive] = useState(hasCurrentSectionStarted && !showInstructions);
   const [instituteSettings, setInstituteSettings] = useState<any>(null);
 
   useEffect(() => {
@@ -333,7 +336,11 @@ export default function ExamLayout() {
 
   // Check initial start state
   useEffect(() => {
-    if (exam.startedAt) {
+    const hasStartedCurrent = activeSection === 'objective'
+      ? exam.objectiveStatus !== 'PENDING'
+      : exam.cqSqStatus !== 'PENDING';
+
+    if (hasStartedCurrent && !showInstructions) {
       setIsExamActive(true);
       setKeepAwake(true);
       setBrightness(1.0);
@@ -342,7 +349,7 @@ export default function ExamLayout() {
       setKeepAwake(false);
       stopSpeech();
     };
-  }, [exam.objectiveStartedAt, exam.cqSqStartedAt]);
+  }, [exam.objectiveStartedAt, exam.cqSqStartedAt, showInstructions, activeSection, exam.objectiveStatus, exam.cqSqStatus]);
 
 
   const handleStartExam = async (sectionToStart: 'objective' | 'cqsq') => {
@@ -379,9 +386,9 @@ export default function ExamLayout() {
       // Record the time BEFORE awaiting anything else — closest to the true server time
       const startedNow = new Date().toISOString();
       if (sectionToStart === 'objective') {
-        patchExam({ objectiveStartedAt: startedNow, objectiveStatus: 'IN_PROGRESS' });
+        patchExam({ objectiveStartedAt: exam.objectiveStartedAt || startedNow, objectiveStatus: 'IN_PROGRESS' });
       } else if (sectionToStart === 'cqsq') {
-        patchExam({ cqSqStartedAt: startedNow, cqSqStatus: 'IN_PROGRESS' });
+        patchExam({ cqSqStartedAt: exam.cqSqStartedAt || startedNow, cqSqStatus: 'IN_PROGRESS' });
       }
 
       // 3. Update local state to show exam
