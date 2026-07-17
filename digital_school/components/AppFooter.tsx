@@ -43,7 +43,7 @@ export function AppFooter() {
         return null;
     }
 
-    const name = settings?.instituteName || "Elite Exam System";
+    const name = settings?.instituteName || process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
     const address = settings?.address || "123 Education Street, Dhaka, Bangladesh";
     const phone = settings?.phone || "+880 1234-567890";
     const email = settings?.email || "info@digitalschool.edu";

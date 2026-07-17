@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { validateSession } from '@/lib/auth';
 
 export const metadata: Metadata = {
-    title: "Super User Dashboard",
+    title: "SuperUser Dashboard",
     description: "Multi-institute management and system administration",
 };
 

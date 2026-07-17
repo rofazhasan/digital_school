@@ -52,7 +52,7 @@ const balooDa2 = { variable: '' };
 
 // --- Metadata ---
 export async function generateMetadata(): Promise<Metadata> {
-  let title = "Elite Exam System";
+  let title = process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
   try {
     const settings = await db.settings.findFirst({
       select: {
@@ -71,7 +71,7 @@ export async function generateMetadata(): Promise<Metadata> {
       instituteName = institute?.name;
     }
 
-    title = instituteName || "Elite Exam System";
+    title = instituteName || process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy";
   } catch (error) {
     console.warn("Failed to fetch settings for metadata:", error);
   }

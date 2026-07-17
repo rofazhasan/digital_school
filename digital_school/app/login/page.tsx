@@ -176,7 +176,7 @@ function LoginContent() {
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
                             <ShieldCheck className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-2xl font-bold tracking-tight">Elite Exam System</span>
+                        <span className="text-2xl font-bold tracking-tight">{process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy"}</span>
                     </motion.div>
 
                     <motion.div

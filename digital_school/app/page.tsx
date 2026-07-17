@@ -116,7 +116,7 @@ const HeroSection = () => {
                     className="shimmer-text text-4xl sm:text-6xl md:text-7xl font-bold tracking-tighter"
                     variants={itemVariants}
                 >
-                    Elite Exam System
+                    {process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy"}
                 </motion.h1>
                 <motion.p
                     className="mt-4 max-w-2xl text-lg md:text-xl text-muted-foreground"

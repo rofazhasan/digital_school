@@ -258,7 +258,7 @@ export default function SignupPage() {
                         <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
                             <Sparkles className="w-6 h-6 text-white" />
                         </div>
-                        <span className="text-2xl font-bold tracking-tight">Elite Exam System</span>
+                        <span className="text-2xl font-bold tracking-tight">{process.env.NEXT_PUBLIC_INSTITUTE_NAME || process.env.NEXT_PUBLIC_APP_NAME || "Rofaz Academy"}</span>
                     </motion.div>
 
                     <motion.div
