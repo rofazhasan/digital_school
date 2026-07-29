@@ -406,7 +406,7 @@ export default function ProblemSolvingSession() {
 
                 // 2. Render MathJax & TikZ in Hidden DOM
                 // Wait for scripts to process.
-                if ((window as any).MathJax) {
+                if (typeof (window as any).MathJax?.typesetPromise === 'function') {
                     await (window as any).MathJax.typesetPromise([wrapper]);
                 }
 

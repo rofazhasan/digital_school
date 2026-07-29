@@ -421,13 +421,19 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             <span className="ml-4 font-bold">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-6 grid grid-cols-2 gap-x-6 gap-y-2">
-                            {[
-                              { label: isEn ? 'a' : 'ক', text: isEn ? 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' },
-                              { label: isEn ? 'b' : 'খ', text: isEn ? 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' },
-                              { label: isEn ? 'c' : 'গ', text: isEn ? 'Assertion is true but Reason is false.' : 'Assertion সত্য কিন্তু Reason মিথ্যা।' },
-                              { label: isEn ? 'd' : 'ঘ', text: isEn ? 'Assertion is false but Reason is true.' : 'Assertion মিথ্যা কিন্তু Reason সত্য।' },
-                              { label: isEn ? 'e' : 'ঙ', text: isEn ? 'Both Assertion and Reason are false.' : 'Assertion ও Reason উভয়ই মিথ্যা।' }
-                            ].map((opt, oidx) => (
+                            {((q.options && q.options.length >= 2)
+                              ? q.options.map((opt: any, oidx: number) => ({
+                                  label: isEn ? MCQ_LABELS_EN[oidx] : MCQ_LABELS_BN[oidx],
+                                  text: typeof opt === 'string' ? opt : opt.text || ''
+                                }))
+                              : [
+                                  { label: isEn ? 'a' : 'ক', text: isEn ? 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' },
+                                  { label: isEn ? 'b' : 'খ', text: isEn ? 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.' : 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' },
+                                  { label: isEn ? 'c' : 'গ', text: isEn ? 'Assertion is true but Reason is false.' : 'Assertion সত্য কিন্তু Reason মিথ্যা।' },
+                                  { label: isEn ? 'd' : 'ঘ', text: isEn ? 'Assertion is false but Reason is true.' : 'Assertion মিথ্যা কিন্তু Reason সত্য।' },
+                                  { label: isEn ? 'e' : 'ঙ', text: isEn ? 'Both Assertion and Reason are false.' : 'Assertion ও Reason উভয়ই মিথ্যা।' }
+                                ]
+                            ).map((opt: any, oidx: number) => (
                               <div key={oidx} className="option-item flex items-start gap-1">
                                 <span className={`mcq-option-label flex-shrink-0 ${isEn && !hideOMR ? 'nazrul-omr-font' : ''}`}>{opt.label}</span>
                                 <span className="flex-1 text-[11px] leading-tight"><Text>{opt.text}</Text></span>

@@ -264,10 +264,10 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
 
     // Legacy/Complex MathJax Fallback: Only used for things KaTeX might miss or complex chemfig fallbacks
     useEffect(() => {
-        if (typeof window !== 'undefined' && window.MathJax && containerRef.current) {
+        if (typeof window !== 'undefined' && window.MathJax && typeof (window.MathJax as any).typesetPromise === 'function' && containerRef.current) {
             // Only trigger if there's still unrendered math (contains \ or $)
             if (renderedText.includes('\\') || renderedText.includes('$')) {
-                window.MathJax.typesetPromise([containerRef.current]).catch(() => {});
+                (window.MathJax as any).typesetPromise([containerRef.current]).catch(() => {});
             }
         }
     }, [renderedText, cacheVersion]);

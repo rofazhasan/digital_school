@@ -37,6 +37,38 @@ const MathText = ({ children }: { children: string }) => (
   </span>
 );
 
+const QUESTION_TYPE_LABELS_BN: Record<string, string> = {
+  MCQ: "বহুনির্বাচনী",
+  MC: "বহুপদী বহুনির্বাচনী",
+  CQ: "সৃজনশীল",
+  SQ: "সংক্ষিপ্ত প্রশ্ন",
+  AR: "দৃঢ়োক্তি-কারণ",
+  MTF: "মিলকরণ",
+  INT: "পূর্ণসংখ্যার উত্তর",
+  SMCQ: "উদ্দীপক বহুনির্বাচনী",
+  DESCRIPTIVE: "বর্ণনামূলক"
+};
+
+const QUESTION_TYPE_LABELS_EN: Record<string, string> = {
+  MCQ: "Multiple Choice",
+  MC: "Multiple Choice (MC)",
+  CQ: "Comprehension (CQ)",
+  SQ: "Short Answer",
+  AR: "Assertion-Reason",
+  MTF: "Matching",
+  INT: "Integer Answer",
+  SMCQ: "Stem MCQ",
+  DESCRIPTIVE: "Descriptive"
+};
+
+const getArOptions = (question: any, isBn: boolean) => [
+  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' : 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.', isCorrect: question.correctOption === 0 },
+  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' : 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.', isCorrect: question.correctOption === 1 },
+  { text: isBn ? 'Assertion সত্য কিন্তু Reason মিথ্যা।' : 'Assertion is true but Reason is false.', isCorrect: question.correctOption === 2 },
+  { text: isBn ? 'Assertion মিথ্যা কিন্তু Reason সত্য।' : 'Assertion is false but Reason is true.', isCorrect: question.correctOption === 3 },
+  { text: isBn ? 'Assertion ও Reason উভয়ই মিথ্যা।' : 'Both Assertion and Reason are false.', isCorrect: question.correctOption === 4 },
+];
+
 export default function SingleQuestionPageSheet({
   sheetInfo,
   questions = [],
@@ -64,7 +96,16 @@ export default function SingleQuestionPageSheet({
         const qNum = isBn ? toBengaliNumerals(idx + 1) : (idx + 1).toString();
         const questionMarks = question.customMarks !== undefined ? question.customMarks : (question.marks || (question.type === 'CQ' ? 10 : 1));
         const marksStr = isBn ? toBengaliNumerals(questionMarks) : questionMarks.toString();
-        const optionsList = question.options || [];
+        
+        const qTypeKey = (question.type || '').toUpperCase();
+        const typeLabel = isBn 
+          ? (QUESTION_TYPE_LABELS_BN[qTypeKey] || question.type || '')
+          : (QUESTION_TYPE_LABELS_EN[qTypeKey] || question.type || '');
+
+        const rawOptions = question.options || [];
+        const optionsList = (qTypeKey === 'AR' && (!rawOptions || rawOptions.length < 2))
+          ? getArOptions(question, isBn)
+          : rawOptions;
 
         return (
           <div
@@ -143,9 +184,16 @@ export default function SingleQuestionPageSheet({
               <div className="space-y-6" style={fontScaleStyle}>
                 {/* Question Header & Main Text */}
                 <div className="flex items-start gap-3">
-                  <span className="font-bold text-lg md:text-xl shrink-0 bg-black text-white px-3 py-1 rounded-md print:bg-black print:text-white">
-                    {isBn ? `প্রশ্ন ${qNum}` : `Q${qNum}`}
-                  </span>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 shrink-0">
+                    <span className="font-bold text-lg md:text-xl bg-black text-white px-3 py-1 rounded-md print:bg-black print:text-white">
+                      {isBn ? `প্রশ্ন ${qNum}` : `Q${qNum}`}
+                    </span>
+                    {typeLabel && (
+                      <span className="font-bold text-xs uppercase bg-gray-100 text-gray-900 border border-gray-400 px-2.5 py-1 rounded print:border-black print:bg-gray-100 print:text-black">
+                        {typeLabel}
+                      </span>
+                    )}
+                  </div>
                   <div className="font-medium text-base md:text-lg flex-1 leading-relaxed pt-0.5">
                     <MathText>{question.questionText || question.q || ""}</MathText>
                   </div>

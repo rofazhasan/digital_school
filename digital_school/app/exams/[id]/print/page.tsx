@@ -76,7 +76,7 @@ export default function PrintExamPage() {
   // Check if MathJax is already loaded in parent context
   useEffect(() => {
     const checkMathJax = () => {
-      if (typeof window !== 'undefined' && (window as any).MathJax && (window as any).MathJax.startup) {
+      if (typeof window !== 'undefined' && (window as any).MathJax && typeof (window as any).MathJax.typesetPromise === 'function') {
         setIsMathJaxReady(true);
         (window as any).__IS_MATHJAX_READY = true;
         return true;

@@ -69,7 +69,7 @@ export default function PrintSheetPage() {
   // Check MathJax Readiness
   useEffect(() => {
     const checkMathJax = () => {
-      if (typeof window !== 'undefined' && (window as any).MathJax && (window as any).MathJax.startup) {
+      if (typeof window !== 'undefined' && (window as any).MathJax && typeof (window as any).MathJax.typesetPromise === 'function') {
         setIsMathJaxReady(true);
         (window as any).__IS_MATHJAX_READY = true;
         return true;
