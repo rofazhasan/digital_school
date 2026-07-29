@@ -38,7 +38,7 @@ import {
   BookCopy, FilterX, BrainCircuit, ArrowRight, Sparkles,
   Bot, ChevronsUpDown, Check, Library, FileSpreadsheet,
   Download, Save, AlertTriangle, LayoutDashboard, Info,
-  BarChart3, Lightbulb
+  BarChart3, Lightbulb, Printer, MoveUp, MoveDown, Layers, Calendar, Clock, ShieldCheck, AlertCircle
 } from 'lucide-react';
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
@@ -128,6 +128,8 @@ type Question = {
   images?: string[];
   isForPractice?: boolean;
   explanation?: string | null;
+  customMarks?: number;
+  customNote?: string;
 };
 
 // Enhanced types for AI generated questions
@@ -327,7 +329,363 @@ export default function QuestionBankPage() {
   const [topicFilter, setTopicFilter] = useState("");
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
 
-  // Pagination State
+  // --- Sheet Maker State ---
+  const [sheetTitle, setSheetTitle] = useState("কাস্টম প্র্যাকটিস শীট");
+  const [sheetClassId, setSheetClassId] = useState("all");
+  const [sheetClassName, setSheetClassName] = useState("");
+  const [sheetSubject, setSheetSubject] = useState("");
+  const [sheetSchoolName, setSheetSchoolName] = useState("রফাজ একাডেমি");
+  const [sheetDuration, setSheetDuration] = useState("30");
+  const [sheetDate, setSheetDate] = useState(new Date().toISOString().split('T')[0]);
+  const [sheetQuestions, setSheetQuestions] = useState<Question[]>([]);
+  const [sheetLayoutMode, setSheetLayoutMode] = useState<'standard' | 'single'>('standard');
+  const [sheetShowSolution, setSheetShowSolution] = useState(false);
+
+  // Auto-Gen Modal state
+  const [isAutoGenModalOpen, setIsAutoGenModalOpen] = useState(false);
+  const [autoGenTargetMarks, setAutoGenTargetMarks] = useState(50);
+  const [autoGenEasyPct, setAutoGenEasyPct] = useState(30);
+  const [autoGenMedPct, setAutoGenMedPct] = useState(50);
+  const [autoGenHardPct, setAutoGenHardPct] = useState(20);
+
+  // Sheet Maker Question Discovery Filter state
+  const [sheetPoolSearch, setSheetPoolSearch] = useState("");
+  const [sheetPoolClass, setSheetPoolClass] = useState("all");
+  const [sheetPoolSubject, setSheetPoolSubject] = useState("all");
+  const [sheetPoolTopic, setSheetPoolTopic] = useState("");
+  const [sheetPoolDifficulty, setSheetPoolDifficulty] = useState("all");
+  const [sheetPoolType, setSheetPoolType] = useState("all");
+
+  const handleAddToSheet = useCallback((question: Question) => {
+    triggerHaptic(ImpactStyle.Light);
+    setSheetQuestions(prev => {
+      if (prev.some(q => q.id === question.id)) {
+        toast({ title: "Already added", description: "Question is already in the sheet." });
+        return prev;
+      }
+      toast({ title: "Question Added", description: "Added question to sheet." });
+      return [...prev, question];
+    });
+  }, [toast]);
+
+  const handleAddSelectedToSheet = useCallback(() => {
+    triggerHaptic(ImpactStyle.Medium);
+    const selectedList = questions.filter(q => selectedQuestions.has(q.id));
+    if (selectedList.length === 0) return;
+
+    setSheetQuestions(prev => {
+      const existingIds = new Set(prev.map(q => q.id));
+      const newItems = selectedList.filter(q => !existingIds.has(q.id));
+      return [...prev, ...newItems];
+    });
+
+    setActiveTab("sheet");
+    toast({
+      title: "Sheet Maker Updated",
+      description: `${selectedQuestions.size} questions added to Sheet Maker.`
+    });
+  }, [questions, selectedQuestions, toast]);
+
+  const handleRemoveFromSheet = (id: string) => {
+    triggerHaptic(ImpactStyle.Light);
+    setSheetQuestions(prev => prev.filter(q => q.id !== id));
+  };
+
+  const handleMoveSheetQuestion = (index: number, direction: 'up' | 'down') => {
+    triggerHaptic(ImpactStyle.Light);
+    setSheetQuestions(prev => {
+      const newArr = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newArr.length) return prev;
+      const temp = newArr[index];
+      newArr[index] = newArr[targetIndex];
+      newArr[targetIndex] = temp;
+      return newArr;
+    });
+  };
+
+  const handlePrintSheet = () => {
+    if (sheetQuestions.length === 0) {
+      toast({
+        variant: "destructive",
+        title: "No Questions Selected",
+        description: "Please add questions to the sheet before printing."
+      });
+      return;
+    }
+
+    const selectedClassObj = classes.find(c => c.id === sheetClassId);
+    const finalClassName = sheetClassName || (selectedClassObj ? selectedClassObj.name : "All Classes");
+
+    const printPayload = {
+      title: sheetTitle || "কাস্টম প্রশ্ন শীট",
+      schoolName: sheetSchoolName || "রফাজ একাডেমি",
+      className: finalClassName,
+      class: finalClassName,
+      subject: sheetSubject || (sheetQuestions[0]?.subject || ""),
+      date: sheetDate,
+      duration: sheetDuration,
+      totalMarks: sheetQuestions.reduce((acc, q) => acc + (q.customMarks !== undefined ? q.customMarks : (q.marks || (q.type === 'CQ' ? 10 : 1))), 0),
+      questions: sheetQuestions,
+      layoutMode: sheetLayoutMode,
+      showSolution: sheetShowSolution
+    };
+
+    localStorage.setItem('sheet_maker_print_data', JSON.stringify(printPayload));
+    window.open('/question-bank/sheet/print', '_blank');
+  };
+
+  // --- World-Class Sheet Maker Extra Actions ---
+  const [savedPresets, setSavedPresets] = useState<Array<{ id: string; name: string; date: string; data: any }>>([]);
+
+  // REAL-TIME SHEET QUALITY AUDITOR ALGORITHM (QA CHECKER)
+  const sheetQualityAudit = useMemo(() => {
+    const warnings: Array<{ type: 'danger' | 'warning' | 'info'; title: string; message: string }> = [];
+    let scoreTotal = 100;
+
+    if (sheetQuestions.length === 0) return { warnings: [], score: 100 };
+
+    // 1. Duplicate Question Check
+    const seenIds = new Set<string>();
+    const duplicates: string[] = [];
+    sheetQuestions.forEach(q => {
+      if (seenIds.has(q.id)) duplicates.push(q.id);
+      else seenIds.add(q.id);
+    });
+    if (duplicates.length > 0) {
+      warnings.push({
+        type: 'danger',
+        title: 'Duplicate Questions Detected',
+        message: `Found ${duplicates.length} duplicate questions in this sheet. Please remove duplicates.`
+      });
+      scoreTotal -= 25;
+    }
+
+    // 2. Difficulty Balance Audit
+    const total = sheetQuestions.length;
+    const easyPct = (sheetQuestions.filter(q => q.difficulty === 'EASY').length / total) * 100;
+    const hardPct = (sheetQuestions.filter(q => q.difficulty === 'HARD').length / total) * 100;
+
+    if (easyPct === 0) {
+      warnings.push({
+        type: 'warning',
+        title: 'No Easy Questions',
+        message: 'Sheet contains 0% Easy questions. Consider adding some easy warm-up questions.'
+      });
+      scoreTotal -= 10;
+    }
+    if (hardPct > 60) {
+      warnings.push({
+        type: 'warning',
+        title: 'High Difficulty Skew',
+        message: 'Over 60% of questions are rated Hard. The paper might be too challenging.'
+      });
+      scoreTotal -= 10;
+    }
+
+    // 3. Question Variety Audit
+    const typesSet = new Set(sheetQuestions.map(q => q.type));
+    if (total >= 8 && typesSet.size === 1) {
+      warnings.push({
+        type: 'info',
+        title: 'Single Question Type',
+        message: `All ${total} questions are of type "${Array.from(typesSet)[0]}". Consider mixing MCQs, CQs, and SQs.`
+      });
+      scoreTotal -= 5;
+    }
+
+    // 4. Missing Answers Audit (when Solution Mode is on)
+    if (sheetShowSolution) {
+      const missingAnswers = sheetQuestions.filter(q => (q.type === 'CQ' || q.type === 'DESCRIPTIVE' || q.type === 'SQ') && !q.modelAnswer && !q.explanation);
+      if (missingAnswers.length > 0) {
+        warnings.push({
+          type: 'warning',
+          title: 'Missing Model Answers',
+          message: `${missingAnswers.length} subjective questions lack model answers/explanations for print solution view.`
+        });
+        scoreTotal -= 15;
+      }
+    }
+
+    // 5. Total Marks & Duration Ratio Audit
+    const totalM = sheetQuestions.reduce((a, b) => a + (b.customMarks !== undefined ? b.customMarks : (b.marks || (b.type === 'CQ' ? 10 : 1))), 0);
+    const durMins = parseInt(sheetDuration) || 30;
+
+    if (totalM > 0 && durMins > 0) {
+      const minsPerMark = durMins / totalM;
+      if (minsPerMark < 0.5) {
+        warnings.push({
+          type: 'warning',
+          title: 'Insufficient Exam Time',
+        message: `Allocated duration (${durMins} mins) for ${totalM} marks allows less than 30 seconds per mark!`
+        });
+        scoreTotal -= 10;
+      }
+    }
+
+    return { warnings, score: Math.max(0, scoreTotal) };
+  }, [sheetQuestions, sheetShowSolution, sheetDuration]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('sheet_maker_presets');
+      if (stored) setSavedPresets(JSON.parse(stored));
+    } catch (e) {
+      console.error(e);
+    }
+  }, []);
+
+  const handleSaveSheetPreset = () => {
+    if (sheetQuestions.length === 0) {
+      toast({ variant: "destructive", title: "Cannot Save", description: "Sheet is empty." });
+      return;
+    }
+    const presetName = prompt("Enter a name for this sheet template:", sheetTitle || "My Sheet Template");
+    if (!presetName) return;
+
+    const newPreset = {
+      id: Date.now().toString(),
+      name: presetName,
+      date: new Date().toLocaleDateString(),
+      data: {
+        title: sheetTitle,
+        classId: sheetClassId,
+        className: sheetClassName,
+        subject: sheetSubject,
+        schoolName: sheetSchoolName,
+        duration: sheetDuration,
+        questions: sheetQuestions,
+        layoutMode: sheetLayoutMode,
+        showSolution: sheetShowSolution
+      }
+    };
+
+    const updated = [newPreset, ...savedPresets];
+    setSavedPresets(updated);
+    localStorage.setItem('sheet_maker_presets', JSON.stringify(updated));
+    toast({ title: "Template Saved", description: `Saved preset "${presetName}".` });
+  };
+
+  const handleLoadSheetPreset = (preset: any) => {
+    setSheetTitle(preset.data.title || "কাস্টম প্র্যাকটিস শীট");
+    setSheetClassId(preset.data.classId || "all");
+    setSheetClassName(preset.data.className || "");
+    setSheetSubject(preset.data.subject || "");
+    setSheetSchoolName(preset.data.schoolName || "রফাজ একাডেমি");
+    setSheetDuration(preset.data.duration || "30");
+    setSheetQuestions(preset.data.questions || []);
+    setSheetLayoutMode(preset.data.layoutMode || "standard");
+    setSheetShowSolution(preset.data.showSolution || false);
+    toast({ title: "Preset Loaded", description: `Loaded sheet "${preset.name}".` });
+  };
+
+  const handleDeleteSheetPreset = (id: string) => {
+    const updated = savedPresets.filter(p => p.id !== id);
+    setSavedPresets(updated);
+    localStorage.setItem('sheet_maker_presets', JSON.stringify(updated));
+    toast({ title: "Preset Deleted" });
+  };
+
+  const handleShuffleSheet = () => {
+    triggerHaptic(ImpactStyle.Medium);
+    setSheetQuestions(prev => {
+      const arr = [...prev];
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    });
+    toast({ title: "Questions Shuffled", description: "Randomized sheet question order." });
+  };
+
+  const handleSortSheet = (by: 'difficulty' | 'type' | 'marks') => {
+    triggerHaptic(ImpactStyle.Light);
+    setSheetQuestions(prev => {
+      const arr = [...prev];
+      if (by === 'difficulty') {
+        const diffRank: Record<string, number> = { EASY: 1, MEDIUM: 2, HARD: 3 };
+        arr.sort((a, b) => (diffRank[a.difficulty] || 0) - (diffRank[b.difficulty] || 0));
+      } else if (by === 'type') {
+        arr.sort((a, b) => a.type.localeCompare(b.type));
+      } else if (by === 'marks') {
+        arr.sort((a, b) => (a.marks || 1) - (b.marks || 1));
+      }
+      return arr;
+    });
+    toast({ title: "Sheet Sorted", description: `Sorted questions by ${by}.` });
+  };
+
+  // SMART TARGET MARKS & DIFFICULTY RATIO AUTO-GENERATOR ALGORITHM
+  const handleSmartTargetMarksAutoGenerate = (targetMarks: number, easyPct: number, medPct: number, hardPct: number) => {
+    triggerHaptic(ImpactStyle.Medium);
+    if (questions.length === 0) {
+      toast({ variant: "destructive", title: "Empty Pool", description: "No questions available to generate from." });
+      return;
+    }
+
+    const easyPool = [...questions.filter(q => q.difficulty === 'EASY')].sort(() => 0.5 - Math.random());
+    const medPool = [...questions.filter(q => q.difficulty === 'MEDIUM')].sort(() => 0.5 - Math.random());
+    const hardPool = [...questions.filter(q => q.difficulty === 'HARD')].sort(() => 0.5 - Math.random());
+
+    const targetEasyMarks = Math.round(targetMarks * (easyPct / 100));
+    const targetMedMarks = Math.round(targetMarks * (medPct / 100));
+    const targetHardMarks = Math.round(targetMarks * (hardPct / 100));
+
+    const selected: Question[] = [];
+    let currentMarks = 0;
+
+    const pickFromPool = (pool: Question[], targetSubMarks: number) => {
+      let subMarks = 0;
+      for (const q of pool) {
+        if (subMarks >= targetSubMarks) break;
+        const qMark = q.marks || (q.type === 'CQ' ? 10 : 1);
+        if (currentMarks + qMark <= targetMarks + 5) {
+          selected.push(q);
+          subMarks += qMark;
+          currentMarks += qMark;
+        }
+      }
+    };
+
+    pickFromPool(easyPool, targetEasyMarks);
+    pickFromPool(medPool, targetMedMarks);
+    pickFromPool(hardPool, targetHardMarks);
+
+    // Fill remaining if needed from all pools
+    if (currentMarks < targetMarks) {
+      const remainingPool = [...questions.filter(q => !selected.some(s => s.id === q.id))].sort(() => 0.5 - Math.random());
+      for (const q of remainingPool) {
+        if (currentMarks >= targetMarks) break;
+        const qMark = q.marks || (q.type === 'CQ' ? 10 : 1);
+        selected.push(q);
+        currentMarks += qMark;
+      }
+    }
+
+    setSheetQuestions(selected);
+    setIsAutoGenModalOpen(false);
+    toast({
+      title: "Smart Sheet Auto-Generated!",
+      description: `Generated sheet with ${selected.length} questions totaling ${currentMarks} marks.`
+    });
+  };
+
+  const handleExportSheetJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+      title: sheetTitle,
+      classId: sheetClassId,
+      subject: sheetSubject,
+      duration: sheetDuration,
+      questions: sheetQuestions
+    }, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `${sheetTitle || 'sheet'}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
+  };
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; // 3x4 grid fits nicely
 
@@ -711,6 +1069,14 @@ export default function QuestionBankPage() {
                     <TabsTrigger value="bulk" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all">
                       <FileSpreadsheet className="w-4 h-4 mr-2" /> Bulk Upload
                     </TabsTrigger>
+                    <TabsTrigger value="sheet" className="rounded-2xl px-6 py-2.5 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-700 data-[state=active]:shadow-sm transition-all text-indigo-600 dark:text-indigo-400 font-bold">
+                      <FileText className="w-4 h-4 mr-2" /> Sheet Maker
+                      {sheetQuestions.length > 0 && (
+                        <Badge className="ml-2 bg-indigo-600 text-white hover:bg-indigo-700 px-2 py-0.5 text-xs rounded-full">
+                          {sheetQuestions.length}
+                        </Badge>
+                      )}
+                    </TabsTrigger>
                   </TabsList>
                 </div>
 
@@ -822,6 +1188,15 @@ export default function QuestionBankPage() {
                               className="flex flex-wrap items-center gap-2"
                             >
                               <Button
+                                variant="default"
+                                size="sm"
+                                onClick={handleAddSelectedToSheet}
+                                className="h-9 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white shadow-md font-bold text-[10px] uppercase tracking-wider px-3"
+                              >
+                                <FileText className="h-3.5 w-3.5 mr-1.5" />
+                                Sheet Maker ({selectedQuestions.size})
+                              </Button>
+                              <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleBulkPractice(true)}
@@ -873,6 +1248,7 @@ export default function QuestionBankPage() {
                               isSelected={selectedQuestions.has(q.id)}
                               onSelect={() => toggleSelection(q.id)}
                               onTogglePractice={handleTogglePractice}
+                              onAddToSheet={handleAddToSheet}
                             />
                           ))}
                         </div>
@@ -949,6 +1325,621 @@ export default function QuestionBankPage() {
                 <TabsContent value="bulk" className="mt-4">
                   <BulkUpload onQuestionSaved={handleFormSave} />
                 </TabsContent>
+                <TabsContent value="sheet" className="mt-4 p-6">
+                  <div className="space-y-6">
+                    
+                    {/* Top Sheet Header Banner Card */}
+                    <Card className="p-6 bg-gradient-to-r from-indigo-950 via-slate-900 to-purple-950 text-white rounded-[2.5rem] shadow-2xl relative overflow-hidden border border-indigo-800/40">
+                      <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge className="bg-gradient-to-r from-amber-400 to-orange-500 text-slate-950 font-black text-xs uppercase px-3 py-1 rounded-full shadow-md">
+                              ⭐ World-Class Builder
+                            </Badge>
+                            <span className="text-xs text-indigo-200 font-medium">Next-Gen Question Paper & Worksheet Engine</span>
+                          </div>
+                          <h2 className="text-3xl font-black tracking-tight flex items-center gap-3">
+                            📋 Sheet Maker
+                          </h2>
+                          <p className="text-sm text-indigo-200/90 mt-1 max-w-2xl leading-relaxed">
+                            শ্রেণি, বিষয় ও প্রশ্নের ধরন সিলেক্ট করে প্রিমিয়াম প্রশ্ন শীট ও ওয়ার্কশীট তৈরি করুন। ওয়াটারমার্ক, OMR শীট, স্টুডেন্ট তথ্য ব্লক ও লেটেক্স ফন্ট সহ হাই-কোয়ালিটি প্রিন্ট নিন।
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-3 shrink-0">
+                          <Button
+                            onClick={handleSaveSheetPreset}
+                            variant="outline"
+                            className="bg-white/10 hover:bg-white/20 text-white border-white/20 font-bold px-4 py-6 rounded-2xl text-sm flex items-center gap-2 backdrop-blur-md"
+                          >
+                            <Save className="w-4 h-4" /> Save Template
+                          </Button>
+
+                          <Button
+                            onClick={handlePrintSheet}
+                            disabled={sheetQuestions.length === 0}
+                            className="bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 hover:from-emerald-600 hover:to-teal-600 text-white font-bold px-8 py-6 rounded-2xl shadow-xl hover:shadow-emerald-500/30 text-base flex items-center gap-2.5 transition-all transform hover:-translate-y-0.5"
+                          >
+                            <Printer className="w-5 h-5" />
+                            প্রিন্ট শীট / PDF ({sheetQuestions.length})
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Sheet Config Inputs Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-indigo-800/40 relative z-10">
+                        <div className="lg:col-span-2">
+                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                            Sheet Name / Title (শীটের নাম)
+                          </Label>
+                          <Input
+                            value={sheetTitle}
+                            onChange={(e) => setSheetTitle(e.target.value)}
+                            placeholder="e.g. পদার্থবিজ্ঞান অধ্যায় ১ টেস্ট শীট"
+                            className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white placeholder:text-gray-400 font-semibold"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                            Class (শ্রেণি)
+                          </Label>
+                          <Select value={sheetClassId} onValueChange={(val) => {
+                            setSheetClassId(val);
+                            const found = classes.find(c => c.id === val);
+                            if (found) setSheetClassName(found.name);
+                            else setSheetClassName("");
+                          }}>
+                            <SelectTrigger className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white">
+                              <SelectValue placeholder="Select Class" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                              <SelectItem value="all">All Classes</SelectItem>
+                              {classes.map(c => (
+                                <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                            Subject (বিষয়)
+                          </Label>
+                          <Input
+                            value={sheetSubject}
+                            onChange={(e) => setSheetSubject(e.target.value)}
+                            placeholder="e.g. Physics"
+                            className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                            Institution (প্রতিষ্ঠান)
+                          </Label>
+                          <Input
+                            value={sheetSchoolName}
+                            onChange={(e) => setSheetSchoolName(e.target.value)}
+                            placeholder="e.g. Rofaz Academy"
+                            className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                            Duration (সময়)
+                          </Label>
+                          <Input
+                            value={sheetDuration}
+                            onChange={(e) => setSheetDuration(e.target.value)}
+                            placeholder="e.g. 30 (Mins)"
+                            className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Print Settings Toggles (Print Layout Style & Solution Toggle) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-indigo-800/40 relative z-10">
+                        <div className="flex items-center gap-3 bg-slate-900/60 p-3 rounded-xl border border-indigo-800/40">
+                          <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
+                          <div className="flex-1">
+                            <Label className="text-xs font-bold text-white block">
+                              Print Layout Style (প্রিন্ট স্টাইল)
+                            </Label>
+                            <p className="text-[11px] text-indigo-200/80">
+                              Short page exam style or 1 question per page layout
+                            </p>
+                          </div>
+                          <div className="flex bg-slate-800 p-1 rounded-lg text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setSheetLayoutMode('standard')}
+                              className={`px-3 py-1 rounded-md font-bold transition-all ${sheetLayoutMode === 'standard' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300'}`}
+                            >
+                              স্ট্যান্ডার্ড
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSheetLayoutMode('single')}
+                              className={`px-3 py-1 rounded-md font-bold transition-all ${sheetLayoutMode === 'single' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300'}`}
+                            >
+                              ১ পেজে ১টি
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-indigo-800/40">
+                          <div className="flex items-center gap-3">
+                            <Sparkles className="w-5 h-5 text-amber-400 shrink-0" />
+                            <div>
+                              <Label htmlFor="sheet-solution-toggle" className="text-xs font-bold text-white block cursor-pointer">
+                                Include Solutions / Answer Keys (উত্তর সহ)
+                              </Label>
+                              <p className="text-[11px] text-indigo-200/80">
+                                Render model answers & explanations in print output
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            id="sheet-solution-toggle"
+                            checked={sheetShowSolution}
+                            onCheckedChange={setSheetShowSolution}
+                          />
+                        </div>
+                      </div>
+                    </Card>
+
+                    {/* LIVE SHEET ANALYTICS DASHBOARD WIDGET */}
+                    {sheetQuestions.length > 0 && (
+                      <Card className="p-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-[2rem] border border-indigo-800/30 shadow-lg space-y-4">
+                        <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-indigo-800/30 pb-4">
+                          <div className="flex items-center gap-3">
+                            <BarChart3 className="w-5 h-5 text-indigo-400" />
+                            <div>
+                              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                                Sheet Analytics & QA Quality Auditor
+                                <Badge className={`${sheetQualityAudit.score >= 80 ? 'bg-emerald-500' : sheetQualityAudit.score >= 60 ? 'bg-amber-500' : 'bg-rose-500'} text-white text-[10px] font-mono`}>
+                                  Score: {sheetQualityAudit.score}/100
+                                </Badge>
+                              </h3>
+                              <p className="text-xs text-indigo-200/70">Real-time statistics & quality validation algorithm</p>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-2 text-xs">
+                            <Badge className="bg-indigo-900/60 text-indigo-200 border border-indigo-700 px-3 py-1 font-mono">
+                              Total Questions: {sheetQuestions.length}
+                            </Badge>
+                            <Badge className="bg-emerald-900/60 text-emerald-200 border border-emerald-700 px-3 py-1 font-mono">
+                              Total Marks: {sheetQuestions.reduce((a, b) => a + (b.customMarks !== undefined ? b.customMarks : (b.marks || (b.type === 'CQ' ? 10 : 1))), 0)}
+                            </Badge>
+                            <Badge className="bg-purple-900/60 text-purple-200 border border-purple-700 px-3 py-1 font-mono">
+                              Est. Time: ~{Math.round(sheetQuestions.reduce((a, b) => a + (b.customMarks !== undefined ? b.customMarks : (b.marks || (b.type === 'CQ' ? 10 : 1))), 0) * 1.2)} Mins
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Quality Audit Warnings / Suggestions Panel */}
+                        {sheetQualityAudit.warnings.length > 0 && (
+                          <div className="space-y-2 bg-slate-950/60 p-3.5 rounded-xl border border-indigo-800/40 text-xs">
+                            <span className="font-bold text-amber-400 flex items-center gap-1.5 uppercase text-[11px]">
+                              <ShieldCheck className="w-4 h-4 text-amber-400" />
+                              Quality Audit Suggestions ({sheetQualityAudit.warnings.length}):
+                            </span>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-1">
+                              {sheetQualityAudit.warnings.map((w, idx) => (
+                                <div
+                                  key={idx}
+                                  className={`p-2.5 rounded-lg border flex items-start gap-2 ${
+                                    w.type === 'danger'
+                                      ? 'bg-rose-950/40 border-rose-800 text-rose-200'
+                                      : w.type === 'warning'
+                                      ? 'bg-amber-950/40 border-amber-800 text-amber-200'
+                                      : 'bg-indigo-950/40 border-indigo-800 text-indigo-200'
+                                  }`}
+                                >
+                                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                  <div>
+                                    <strong className="block text-[11px] font-bold">{w.title}</strong>
+                                    <p className="text-[11px] opacity-90">{w.message}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Difficulty Breakdown Bar */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs pt-2">
+                          <div>
+                            <div className="flex justify-between text-indigo-200 mb-1">
+                              <span>Easy Questions</span>
+                              <span className="font-bold">{sheetQuestions.filter(q => q.difficulty === 'EASY').length}</span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-emerald-500 h-full transition-all"
+                                style={{ width: `${sheetQuestions.length ? (sheetQuestions.filter(q => q.difficulty === 'EASY').length / sheetQuestions.length) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-indigo-200 mb-1">
+                              <span>Medium Questions</span>
+                              <span className="font-bold">{sheetQuestions.filter(q => q.difficulty === 'MEDIUM').length}</span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-amber-500 h-full transition-all"
+                                style={{ width: `${sheetQuestions.length ? (sheetQuestions.filter(q => q.difficulty === 'MEDIUM').length / sheetQuestions.length) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-indigo-200 mb-1">
+                              <span>Hard Questions</span>
+                              <span className="font-bold">{sheetQuestions.filter(q => q.difficulty === 'HARD').length}</span>
+                            </div>
+                            <div className="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                              <div
+                                className="bg-rose-500 h-full transition-all"
+                                style={{ width: `${sheetQuestions.length ? (sheetQuestions.filter(q => q.difficulty === 'HARD').length / sheetQuestions.length) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </Card>
+                    )}
+
+                    {/* ACTION TOOLBAR (SHUFFLE, SORT, AUTO-GEN, PRESETS, EXPORT) */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 dark:bg-gray-800/60 p-3 rounded-2xl border border-gray-200 dark:border-gray-700">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsAutoGenModalOpen(true)}
+                          className="h-8 text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/40 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100"
+                        >
+                          <Wand2 className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                          ⚡ Smart Auto-Generate
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleShuffleSheet}
+                          disabled={sheetQuestions.length < 2}
+                          className="h-8 text-xs font-bold"
+                        >
+                          <Sparkles className="w-3.5 h-3.5 mr-1 text-amber-500" />
+                          Shuffle Order
+                        </Button>
+
+                        <Select onValueChange={(val: any) => handleSortSheet(val)}>
+                          <SelectTrigger className="h-8 text-xs w-36 rounded-lg bg-white dark:bg-gray-800">
+                            <SelectValue placeholder="Sort Sheet By..." />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-lg text-xs">
+                            <SelectItem value="difficulty">Sort by Difficulty</SelectItem>
+                            <SelectItem value="type">Sort by Type</SelectItem>
+                            <SelectItem value="marks">Sort by Marks</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {savedPresets.length > 0 && (
+                          <Select onValueChange={(val) => {
+                            const found = savedPresets.find(p => p.id === val);
+                            if (found) handleLoadSheetPreset(found);
+                          }}>
+                            <SelectTrigger className="h-8 text-xs w-44 rounded-lg bg-white dark:bg-gray-800 border-indigo-200">
+                              <SelectValue placeholder={`Templates (${savedPresets.length})`} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-lg text-xs">
+                              {savedPresets.map(p => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {p.name} ({p.date})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleExportSheetJson}
+                          disabled={sheetQuestions.length === 0}
+                          className="h-8 text-xs font-bold"
+                        >
+                          <Download className="w-3.5 h-3.5 mr-1" />
+                          Export JSON
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Builder Workspace: Left Pool vs Right Sheet Basket */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                      
+                      {/* LEFT COLUMN: Question Pool & Discovery */}
+                      <div className="lg:col-span-6 space-y-4">
+                        <Card className="p-5 bg-gray-50/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700 rounded-[1.5rem]">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
+                              <Search className="w-4 h-4 text-indigo-600" />
+                              Select Questions (প্রশ্ন সিলেক্ট করুন)
+                            </h3>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const newQuestions = questions.filter(q => {
+                                  const matchesClass = sheetPoolClass === "all" || q.class?.id === sheetPoolClass;
+                                  const matchesSubject = sheetPoolSubject === "all" || q.subject === sheetPoolSubject;
+                                  return matchesClass && matchesSubject;
+                                });
+                                setSheetQuestions(prev => {
+                                  const existingIds = new Set(prev.map(i => i.id));
+                                  return [...prev, ...newQuestions.filter(i => !existingIds.has(i.id))];
+                                });
+                                toast({ title: "Questions Added", description: "Added all matching questions to sheet." });
+                              }}
+                              className="h-8 text-xs font-bold text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                            >
+                              + Add All Matching
+                            </Button>
+                          </div>
+
+                          {/* Filters */}
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-4">
+                            <div>
+                              <Label className="text-[10px] font-bold uppercase text-gray-500 block mb-1">Class Filter</Label>
+                              <Select value={sheetPoolClass} onValueChange={setSheetPoolClass}>
+                                <SelectTrigger className="h-9 text-xs rounded-xl bg-white dark:bg-gray-800">
+                                  <SelectValue placeholder="All Classes" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  <SelectItem value="all">All Classes</SelectItem>
+                                  {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label className="text-[10px] font-bold uppercase text-gray-500 block mb-1">Subject Filter</Label>
+                              <Select value={sheetPoolSubject} onValueChange={setSheetPoolSubject}>
+                                <SelectTrigger className="h-9 text-xs rounded-xl bg-white dark:bg-gray-800">
+                                  <SelectValue placeholder="All Subjects" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  <SelectItem value="all">All Subjects</SelectItem>
+                                  {uniqueSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div>
+                              <Label className="text-[10px] font-bold uppercase text-gray-500 block mb-1">Type Filter</Label>
+                              <Select value={sheetPoolType} onValueChange={setSheetPoolType}>
+                                <SelectTrigger className="h-9 text-xs rounded-xl bg-white dark:bg-gray-800">
+                                  <SelectValue placeholder="All Types" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-xl">
+                                  <SelectItem value="all">All Types</SelectItem>
+                                  <SelectItem value="MCQ">MCQ</SelectItem>
+                                  <SelectItem value="CQ">CQ</SelectItem>
+                                  <SelectItem value="SQ">SQ</SelectItem>
+                                  <SelectItem value="INT">INT</SelectItem>
+                                  <SelectItem value="AR">AR</SelectItem>
+                                  <SelectItem value="MTF">MTF</SelectItem>
+                                  <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+
+                          <div className="relative mb-4">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                            <Input
+                              placeholder="Search question text, topic..."
+                              value={sheetPoolSearch}
+                              onChange={e => setSheetPoolSearch(e.target.value)}
+                              className="pl-9 h-9 text-xs rounded-xl bg-white dark:bg-gray-800"
+                            />
+                          </div>
+
+                          {/* Question Pool Scroll List */}
+                          <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                            {questions.filter(q => {
+                              const matchesSearch = !sheetPoolSearch || q.questionText?.toLowerCase().includes(sheetPoolSearch.toLowerCase()) || q.topic?.toLowerCase().includes(sheetPoolSearch.toLowerCase());
+                              const matchesClass = sheetPoolClass === "all" || q.class?.id === sheetPoolClass;
+                              const matchesSubject = sheetPoolSubject === "all" || q.subject === sheetPoolSubject;
+                              const matchesType = sheetPoolType === "all" || q.type === sheetPoolType;
+                              return matchesSearch && matchesClass && matchesSubject && matchesType;
+                            }).map(q => {
+                              const isAdded = sheetQuestions.some(sq => sq.id === q.id);
+
+                              return (
+                                <div
+                                  key={q.id}
+                                  className={`p-3.5 rounded-xl border transition-all ${
+                                    isAdded
+                                      ? 'bg-indigo-50/50 border-indigo-200 dark:bg-indigo-950/30 dark:border-indigo-800'
+                                      : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-indigo-300'
+                                  }`}
+                                >
+                                  <div className="flex items-start justify-between gap-2 mb-1.5">
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <Badge variant="outline" className="text-[10px] font-bold uppercase px-2 py-0.5 border-indigo-200 text-indigo-700 dark:border-indigo-800 dark:text-indigo-400">
+                                        {q.type}
+                                      </Badge>
+                                      <Badge variant="secondary" className="text-[10px] px-2 py-0.5">
+                                        {q.subject}
+                                      </Badge>
+                                      {q.class?.name && (
+                                        <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                                          {q.class.name}
+                                        </Badge>
+                                      )}
+                                    </div>
+
+                                    <Button
+                                      size="sm"
+                                      variant={isAdded ? "secondary" : "default"}
+                                      disabled={isAdded}
+                                      onClick={() => handleAddToSheet(q)}
+                                      className={`h-7 px-3 text-xs font-bold rounded-lg shrink-0 ${
+                                        isAdded ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                                      }`}
+                                    >
+                                      {isAdded ? "✓ Added" : "+ Add"}
+                                    </Button>
+                                  </div>
+
+                                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-relaxed">
+                                    <UniversalMathJax inline dynamic>
+                                      {cleanupMath(q.questionText || "")}
+                                    </UniversalMathJax>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </Card>
+                      </div>
+
+                      {/* RIGHT COLUMN: Selected Sheet Questions (Basket) */}
+                      <div className="lg:col-span-6 space-y-4">
+                        <Card className="p-5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-[1.5rem] shadow-sm">
+                          <div className="flex items-center justify-between border-b pb-3 mb-4">
+                            <div>
+                              <h3 className="font-bold text-gray-900 dark:text-white text-base flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-emerald-600" />
+                                Sheet Questions ({sheetQuestions.length})
+                              </h3>
+                              <p className="text-xs text-gray-500 mt-0.5">
+                                Total Marks: <span className="font-bold text-indigo-600">{sheetQuestions.reduce((a, b) => a + (b.customMarks !== undefined ? b.customMarks : (b.marks || (b.type === 'CQ' ? 10 : 1))), 0)}</span>
+                              </p>
+                            </div>
+
+                            {sheetQuestions.length > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSheetQuestions([])}
+                                className="h-8 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                              >
+                                Clear Sheet
+                              </Button>
+                            )}
+                          </div>
+
+                          {sheetQuestions.length === 0 ? (
+                            <div className="text-center py-12 text-gray-400">
+                              <FileText className="w-12 h-12 mx-auto mb-2 opacity-40" />
+                              <p className="text-sm font-medium">কোন প্রশ্ন সিলেক্ট করা হয়নি</p>
+                              <p className="text-xs mt-1">বাম পাশের তালিকা থেকে প্রশ্ন যুক্ত করুন অথবা Browse ট্যাব থেকে সিলেক্ট করে "Sheet Maker" এ পাঠান।</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-4 max-h-[550px] overflow-y-auto pr-1">
+                              {sheetQuestions.map((q, idx) => (
+                                <div
+                                  key={`sheet-q-${q.id}-${idx}`}
+                                  className="p-4 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 space-y-3"
+                                >
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                      <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                                        {idx + 1}
+                                      </span>
+                                      <Badge className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-300 text-[10px] font-bold">
+                                        {q.type}
+                                      </Badge>
+                                      <Badge variant="outline" className="text-[10px] uppercase">
+                                        {q.difficulty}
+                                      </Badge>
+                                    </div>
+
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={idx === 0}
+                                        onClick={() => handleMoveSheetQuestion(idx, 'up')}
+                                        className="h-7 w-7 text-gray-500 hover:text-indigo-600"
+                                      >
+                                        <MoveUp className="w-3.5 h-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        disabled={idx === sheetQuestions.length - 1}
+                                        onClick={() => handleMoveSheetQuestion(idx, 'down')}
+                                        className="h-7 w-7 text-gray-500 hover:text-indigo-600"
+                                      >
+                                        <MoveDown className="w-3.5 h-3.5" />
+                                      </Button>
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => handleRemoveFromSheet(q.id)}
+                                        className="h-7 w-7 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </Button>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
+                                    <UniversalMathJax inline dynamic>
+                                      {cleanupMath(q.questionText || "")}
+                                    </UniversalMathJax>
+                                  </div>
+
+                                  {/* Custom Marks & Note Controls per question */}
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">Custom Marks:</span>
+                                      <Input
+                                        type="number"
+                                        min="1"
+                                        value={q.customMarks !== undefined ? q.customMarks : (q.marks || (q.type === 'CQ' ? 10 : 1))}
+                                        onChange={(e) => {
+                                          const val = Number(e.target.value);
+                                          setSheetQuestions(prev => prev.map((item, i) => i === idx ? { ...item, customMarks: val } : item));
+                                        }}
+                                        className="h-7 text-xs w-20 rounded-md bg-white dark:bg-gray-800"
+                                      />
+                                    </div>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] font-bold text-gray-500 uppercase shrink-0">Note:</span>
+                                      <Input
+                                        value={q.customNote || ""}
+                                        placeholder="e.g. চিত্র আবশ্যক"
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setSheetQuestions(prev => prev.map((item, i) => i === idx ? { ...item, customNote: val } : item));
+                                        }}
+                                        className="h-7 text-xs rounded-md bg-white dark:bg-gray-800"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </Card>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
               </Tabs>
             </CardContent>
           </Card>
@@ -962,6 +1953,104 @@ export default function QuestionBankPage() {
           </DialogContent>
         </Dialog>
         <CreateQuestionBankDialog isOpen={isCreateBankDialogOpen} onOpenChange={setIsCreateBankDialogOpen} onBankCreated={handleBankCreated} />
+
+        {/* SMART AUTO-GENERATE MODAL DIALOG */}
+        <Dialog open={isAutoGenModalOpen} onOpenChange={setIsAutoGenModalOpen}>
+          <DialogContent className="sm:max-w-md rounded-[2rem] p-6 bg-slate-900 text-white border border-indigo-800/40">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-bold flex items-center gap-2 text-white">
+                <Wand2 className="w-5 h-5 text-indigo-400" />
+                Smart Sheet Auto-Generator
+              </DialogTitle>
+              <DialogDescription className="text-xs text-indigo-200/80">
+                Set target marks and difficulty distribution. The algorithm auto-selects balanced questions from the pool.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5 py-4">
+              <div>
+                <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
+                  Target Total Marks (মোট নম্বর)
+                </Label>
+                <Input
+                  type="number"
+                  min="5"
+                  max="200"
+                  value={autoGenTargetMarks}
+                  onChange={(e) => setAutoGenTargetMarks(Number(e.target.value))}
+                  className="h-10 rounded-xl bg-slate-800 border-indigo-700 text-white font-bold"
+                />
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-indigo-800/40">
+                <Label className="text-xs font-bold text-indigo-200 uppercase block">
+                  Difficulty Distribution Ratio (%)
+                </Label>
+
+                <div>
+                  <div className="flex justify-between text-xs text-emerald-400 mb-1">
+                    <span>Easy Questions:</span>
+                    <span className="font-bold">{autoGenEasyPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={autoGenEasyPct}
+                    onChange={(e) => setAutoGenEasyPct(Number(e.target.value))}
+                    className="w-full accent-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-amber-400 mb-1">
+                    <span>Medium Questions:</span>
+                    <span className="font-bold">{autoGenMedPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={autoGenMedPct}
+                    onChange={(e) => setAutoGenMedPct(Number(e.target.value))}
+                    className="w-full accent-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-xs text-rose-400 mb-1">
+                    <span>Hard Questions:</span>
+                    <span className="font-bold">{autoGenHardPct}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={autoGenHardPct}
+                    onChange={(e) => setAutoGenHardPct(Number(e.target.value))}
+                    className="w-full accent-rose-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="ghost"
+                onClick={() => setIsAutoGenModalOpen(false)}
+                className="text-gray-300 hover:text-white"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => handleSmartTargetMarksAutoGenerate(autoGenTargetMarks, autoGenEasyPct, autoGenMedPct, autoGenHardPct)}
+                className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl px-6"
+              >
+                ⚡ Auto-Generate Sheet
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MathJaxContext>
   );
@@ -974,7 +2063,8 @@ const QuestionCard: React.FC<{
   isSelected?: boolean;
   onSelect?: () => void;
   onTogglePractice?: (id: string, current: boolean) => void;
-}> = ({ question, onEdit, onDelete, isSelected, onSelect, onTogglePractice }) => {
+  onAddToSheet?: (q: Question) => void;
+}> = ({ question, onEdit, onDelete, isSelected, onSelect, onTogglePractice, onAddToSheet }) => {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const difficultyColors: Record<Difficulty, string> = {
@@ -1756,6 +2846,17 @@ const QuestionCard: React.FC<{
           </div>
 
           <div className="flex items-center gap-1">
+            {onAddToSheet && (
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Add to Sheet"
+                className="h-9 w-9 rounded-xl p-0 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30"
+                onClick={() => onAddToSheet(question)}
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -5117,6 +6218,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         </Tabs>
       </Card>
     )}
+
   </>
   );
 };
