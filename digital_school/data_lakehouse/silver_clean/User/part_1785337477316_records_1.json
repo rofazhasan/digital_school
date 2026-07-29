@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "layer": "silver",
+    "tableName": "User",
+    "version": 1785337477316,
+    "timestamp": "2026-07-29T15:04:37.316Z",
+    "recordCount": 1
+  },
+  "data": [
+    {
+      "id": "user_demo_1",
+      "createdAt": "2026-07-29T15:04:37.273Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

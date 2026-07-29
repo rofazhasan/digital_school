@@ -240,19 +240,20 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
     const renderedText = useMemo(() => {
         let text = processedText;
         
-        // Render Display Math $$...$$
-        text = text.replace(/\$\$(.*?)\$\$/gs, (_, math) => {
+        // 1. Render Display Math $$...$$ or \[...\]
+        text = text.replace(/(\$\$|\\\[)([\s\S]*?)(?:\$\$|\\\])/g, (_, __, math) => {
             try {
-                return katex.renderToString(math, { displayMode: true, throwOnError: false });
+                return katex.renderToString(math.trim(), { displayMode: true, throwOnError: false, trust: true });
             } catch (e) { return `$$${math}$$`; }
         });
 
-        // Render Inline Math $...$
-        // Avoid matching $ in strings that are already processed (like SVG data)
-        // We only match $ that are not preceded by = or " (simple heuristic)
-        text = text.replace(/(?<![="])\$(.*?)\$/g, (_, math) => {
+        // 2. Render Inline Math $...$ or \(...\)
+        // Avoid matching $ inside attributes (e.g. data-hash="...")
+        text = text.replace(/(?:(?<![="])\$(.*?)\$|\\\(([\s\S]*?)\\\))/gs, (_, math1, math2) => {
+            const math = math1 ?? math2;
+            if (!math) return '';
             try {
-                return katex.renderToString(math, { displayMode: false, throwOnError: false });
+                return katex.renderToString(math.trim(), { displayMode: false, throwOnError: false, trust: true });
             } catch (e) { return `$${math}$`; }
         });
 

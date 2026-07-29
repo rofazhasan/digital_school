@@ -1,0 +1,13 @@
+{
+  "snapshotId": "snap_question_1785337781828",
+  "tableName": "Question",
+  "timestamp": "2026-07-29T15:09:41.827Z",
+  "recordCount": 1,
+  "records": [
+    {
+      "id": "question_demo_1",
+      "createdAt": "2026-07-29T15:09:41.827Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

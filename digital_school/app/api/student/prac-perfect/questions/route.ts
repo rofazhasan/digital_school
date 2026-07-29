@@ -63,10 +63,16 @@ export async function GET(request: NextRequest) {
                 difficulty: true,
                 marks: true,
                 options: true,
-                modelAnswer: true, // Used for answer checking
-                images: true, // For rendering diagrams
-                subQuestions: true, // For CQ sub-questions
-                // explanation: true, // Field does not exist in schema, omit for now or use another field if available
+                modelAnswer: true,
+                images: true,
+                subQuestions: true,
+                assertion: true,
+                reason: true,
+                correctOption: true,
+                leftColumn: true,
+                rightColumn: true,
+                matches: true,
+                explanation: true,
                 class: {
                     select: { name: true }
                 }

@@ -28,6 +28,10 @@ export async function GET(req: any) {
             ["Step 4", "For Class Name, you MUST pick from the dropdown (these match your system classes)."],
             ["Step 5", "Save and upload this file back to the system."],
             [""],
+            ["CRITICAL ANSWER FIELD GUIDE", "MUST READ: MODEL ANSWER VS EXPLANATION"],
+            ["Model Answer", "OFFICIAL ANSWER KEY: Required for INT (numeric answer, e.g., '42') and SQ (expected solution text). Also used for Sub X Model Answer in CQ & Descriptive. This is rendered as the correct answer in exams, result sheets, evaluations, and printed answer keys."],
+            ["Teacher Note / Explanation", "EXPLANATION & RATIONALE: Optional step-by-step reasoning or teacher notes explaining WHY the answer is correct. Used for MCQ, MC, AR, MTF, or as extra solution steps for INT/SQ."],
+            [""],
             ["FIELD GUIDE:", ""],
             ["Difficulty", "EASY, MEDIUM, HARD"],
             ["Marks", "Number only."],
@@ -35,16 +39,19 @@ export async function GET(req: any) {
         ];
 
         const objectiveGuide = [
-            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C')."],
-            ["INT (Integer)", "Fill 'Question Text' and 'Correct Answer' (numeric value)."],
-            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5)."],
-            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B')."],
-            ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer', and 'Sub X Explanation' for parts."],
+            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C'). Explanation is optional."],
+            ["INT (Integer)", "Fill 'Question Text' and 'Model Answer' (or 'Correct Answer') with the numeric value (e.g., 5 or 42). Use 'Teacher Note / Explanation' ONLY for solution steps."],
+            ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer' with the expected answer text. Use 'Teacher Note / Explanation' ONLY for optional teacher notes."],
+            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5). Explanation is optional teacher rationale."],
+            ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B'). Explanation is optional."],
+            ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer' (for part answer), and 'Sub X Explanation' (for part rationale)."],
             ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem). Use 'Sub X Text', 'Sub X Marks', 'Sub X Option A-D', and 'Sub X Correct Option' for parts."],
         ];
 
         const descriptiveGuide = [
             ["Sub X Type", "writing, fill_in, comprehension, comprehension_mcq, matching, rearranging, flowchart, interpreting_graph, label_diagram, true_false, error_correction, short_answer."],
+            ["Sub X Model Answer", "Fill the model answer / answer key for this sub-question part."],
+            ["Sub X Explanation", "Optional teacher note or step-by-step explanation for this sub-question part."],
             ["MATCHING (Simple)", "Use 'Sub X Questions' for Left (A|B|C) and 'Sub X Answers' for Right. 'Sub X Matches' for pairing (e.g., 1-A, 2-B)."],
             ["MATCHING (3/4-Way)", "Use 'Sub X Column C' (I|II|III) and 'Sub X Column D' (i|ii|iii). 'Sub X Matches' must include all parts (e.g., 1-A-I or 1-A-I-i)."],
             ["FILLING-IN", "Use 'Sub X Clue Type' (word_box, in_text, none). If word_box, use 'Sub X Word Box' (A|B|C). 'Sub X Passage' should use '___' for gaps. 'Sub X Answers' for keys."],
@@ -267,6 +274,18 @@ export async function GET(req: any) {
                 type: "MTF", className: sampleClass, subject: "GK", topic: "Capitals", difficulty: "MEDIUM", marks: 5,
                 questionText: "Match capitals:", l1: "France", l2: "Japan", ra: "Tokyo", rb: "Paris",
                 matches: "1-B, 2-A"
+            });
+            templateSheet.addRow({
+                type: "INT", className: sampleClass, subject: "Mathematics", topic: "Algebra", difficulty: "EASY", marks: 2,
+                questionText: "Find the value of x if 2x + 4 = 10.",
+                modelAnswer: "3",
+                explanation: "2x = 10 - 4 => 2x = 6 => x = 3."
+            });
+            templateSheet.addRow({
+                type: "SQ", className: sampleClass, subject: "ICT", topic: "Hardware", difficulty: "MEDIUM", marks: 3,
+                questionText: "What is CPU?",
+                modelAnswer: "CPU (Central Processing Unit) is the main component of a computer that performs instructions and calculations.",
+                explanation: "Often referred to as the brain of the computer."
             });
             // SAMPLE CQ
             templateSheet.addRow({

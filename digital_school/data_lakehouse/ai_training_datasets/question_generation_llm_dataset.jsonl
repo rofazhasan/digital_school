@@ -1,0 +1,1 @@
+{"prompt":"Generate a MCQ question on subject Physics, topic Gauss Law.","completion":{"questionText":"What is Gauss Law of electric flux for a closed surface with charge Q?","modelAnswer":"Total electric flux through a closed surface is equal to 1/e0 times total enclosed charge.","marks":5}}

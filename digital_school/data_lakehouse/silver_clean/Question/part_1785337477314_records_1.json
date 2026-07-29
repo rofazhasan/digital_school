@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "layer": "silver",
+    "tableName": "Question",
+    "version": 1785337477314,
+    "timestamp": "2026-07-29T15:04:37.314Z",
+    "recordCount": 1
+  },
+  "data": [
+    {
+      "id": "question_demo_1",
+      "createdAt": "2026-07-29T15:04:37.273Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

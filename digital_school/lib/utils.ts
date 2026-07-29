@@ -146,39 +146,47 @@ export function applyFormatting(text: string | null | undefined): string {
 export function cleanupMath(text: string | null | undefined): string {
   if (!text) return "";
 
-  // 1. Normalize LaTeX delimiters to inline ($) for consistent processing
-  // This must be done FIRST so we have a single delimiter to split by
+  // 1. Normalize brackets: \[...\] -> $$...$$ and \(...\) -> $...$
   let normalized = text
-    .replace(/\$\$/g, '$')
-    .replace(/\\\[/g, '$').replace(/\\\]/g, '$')
+    .replace(/\\\[/g, '$$').replace(/\\\]/g, '$$')
     .replace(/\\\(/g, '$').replace(/\\\)/g, '$');
 
-  // 2. Split by $ to isolate math from text
-  // Even indices are text, odd indices are math
-  const parts = normalized.split('$');
-  const processedParts = parts.map((part, index) => {
-    // Even index: It's regular text, apply formatting
-    if (index % 2 === 0) {
-      return applyFormatting(part);
+  // 2. Process display math ($$...$$) first, then inline math ($...$)
+  // We use regex split to separate math blocks from plain text
+  const parts = normalized.split(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
+
+  const processedParts = parts.map((part) => {
+    if (!part) return "";
+
+    // If it's a display math block $$...$$
+    if (part.startsWith('$$') && part.endsWith('$$') && part.length >= 4) {
+      let innerMath = part.slice(2, -2);
+      innerMath = innerMath.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
+        const before = fullString.slice(0, offset);
+        if (/\\text\s*\{$/.test(before)) return match;
+        return `\\text{${match}}`;
+      });
+      return `$$${innerMath}$$`;
     }
-    // Odd index: It's math content, DO NOT apply bold/italic/poetry formatting
-    // But we still apply the internal cleanup logic like \text{} for Bangla
-    let mathContent = part;
-    
-    // Wrap Bangla Unicode characters (U+0980 to U+09FF) in \text{}
-    mathContent = mathContent.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
-      const before = fullString.slice(0, offset);
-      if (/\\text\s*\{$/.test(before)) return match;
-      return `\\text{${match}}`;
-    });
-    
-    return mathContent;
+
+    // If it's an inline math block $...$
+    if (part.startsWith('$') && part.endsWith('$') && part.length >= 2) {
+      let innerMath = part.slice(1, -1);
+      innerMath = innerMath.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (match: string, banglaText: string, offset: number, fullString: string) => {
+        const before = fullString.slice(0, offset);
+        if (/\\text\s*\{$/.test(before)) return match;
+        return `\\text{${match}}`;
+      });
+      return `$${innerMath}$`;
+    }
+
+    // Plain text segment: apply standard formatting
+    return applyFormatting(part);
   });
 
-  // 3. Join back with $ delimiters
-  let processed = processedParts.join('$');
+  let processed = processedParts.join('');
 
-  // 4. Fallback for Bangla text in explicit tables
+  // Fallback for Bangla text in explicit LaTeX tables
   const tableRegex = /\\begin{(array|tabular|table)}([\s\S]*?)\\end{\1}/g;
   processed = processed.replace(tableRegex, (match) => {
     return match.replace(/([\u0980-\u09FF]+(?:\s+[\u0980-\u09FF]+)*)/g, (m: string, banglaText: string, offset: number, fullString: string) => {

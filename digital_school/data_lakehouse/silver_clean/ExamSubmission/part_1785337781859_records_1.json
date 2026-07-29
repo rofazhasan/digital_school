@@ -1,0 +1,16 @@
+{
+  "metadata": {
+    "layer": "silver",
+    "tableName": "ExamSubmission",
+    "version": 1785337781859,
+    "timestamp": "2026-07-29T15:09:41.859Z",
+    "recordCount": 1
+  },
+  "data": [
+    {
+      "id": "examsubmission_demo_1",
+      "createdAt": "2026-07-29T15:09:41.827Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

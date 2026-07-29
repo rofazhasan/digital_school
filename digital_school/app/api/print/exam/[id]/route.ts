@@ -195,7 +195,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     }));
 
     const int = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'INT' || (q.type || "").toUpperCase() === 'NUMERIC').map((q: any) => {
-      const modelAnswer = q.modelAnswer || q.correctAnswer || q.correct || q.answer || '0';
+      const modelAnswer = q.modelAnswer || q.correctAnswer || q.correct || q.answer || q.explanation || '0';
       return {
         ...q,
         q: q.questionText,

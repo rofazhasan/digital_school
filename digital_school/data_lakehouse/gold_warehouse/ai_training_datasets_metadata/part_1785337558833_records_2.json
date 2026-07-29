@@ -1,0 +1,25 @@
+{
+  "metadata": {
+    "layer": "gold",
+    "tableName": "ai_training_datasets_metadata",
+    "version": 1785337558833,
+    "timestamp": "2026-07-29T15:05:58.833Z",
+    "recordCount": 2
+  },
+  "data": [
+    {
+      "datasetName": "Question Generation LLM Fine-Tuning Dataset",
+      "recordCount": 1,
+      "filePath": "/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/data_lakehouse/ai_training_datasets/question_generation_llm_dataset.jsonl",
+      "format": "jsonl",
+      "piiRedacted": true
+    },
+    {
+      "datasetName": "Socratic Chat Tutoring RLHF Dataset",
+      "recordCount": 1,
+      "filePath": "/Users/md.rofazhasanrafiu/coding/digital_school/digital_school/data_lakehouse/ai_training_datasets/chat_socratic_tutoring_dataset.jsonl",
+      "format": "jsonl",
+      "piiRedacted": true
+    }
+  ]
+}

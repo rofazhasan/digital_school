@@ -1,0 +1,13 @@
+{
+  "snapshotId": "snap_user_1785337477273",
+  "tableName": "User",
+  "timestamp": "2026-07-29T15:04:37.273Z",
+  "recordCount": 1,
+  "records": [
+    {
+      "id": "user_demo_1",
+      "createdAt": "2026-07-29T15:04:37.273Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

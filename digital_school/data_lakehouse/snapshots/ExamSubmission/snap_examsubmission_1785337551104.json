@@ -1,0 +1,13 @@
+{
+  "snapshotId": "snap_examsubmission_1785337551104",
+  "tableName": "ExamSubmission",
+  "timestamp": "2026-07-29T15:05:51.104Z",
+  "recordCount": 1,
+  "records": [
+    {
+      "id": "examsubmission_demo_1",
+      "createdAt": "2026-07-29T15:05:51.104Z",
+      "status": "snapshot_demo"
+    }
+  ]
+}

@@ -1235,7 +1235,7 @@ const QuestionCard: React.FC<{
           )}
 
           {/* SQ Model Answer */}
-          {question.type === 'SQ' && question.modelAnswer && (
+          {question.type === 'SQ' && (question.modelAnswer || question.explanation) && (
             <div className="mt-3">
               <div className="p-4 rounded-2xl bg-indigo-50/30 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 group-hover:border-indigo-300 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
@@ -1243,14 +1243,14 @@ const QuestionCard: React.FC<{
                   <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-400">Model Answer</p>
                 </div>
                 <div className="text-sm text-gray-800 dark:text-gray-200 font-medium leading-relaxed">
-                  <UniversalMathJax>{question.modelAnswer}</UniversalMathJax>
+                  <UniversalMathJax>{question.modelAnswer || question.explanation}</UniversalMathJax>
                 </div>
               </div>
             </div>
           )}
 
           {/* INT Answer */}
-          {question.type === 'INT' && question.modelAnswer && (
+          {question.type === 'INT' && (question.modelAnswer || question.explanation) && (
             <div className="mt-3">
               <div className="p-4 rounded-2xl bg-purple-50/30 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-800 group-hover:border-purple-300 transition-colors">
                 <div className="flex items-center gap-2 mb-2">
@@ -1258,7 +1258,7 @@ const QuestionCard: React.FC<{
                   <p className="text-[10px] font-black uppercase tracking-wider text-purple-700 dark:text-purple-400">Correct Answer</p>
                 </div>
                 <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">
-                  {question.modelAnswer}
+                  {question.modelAnswer || question.explanation}
                 </div>
               </div>
             </div>
@@ -4729,6 +4729,14 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
               <CardDescription className="max-w-md mx-auto">
                 Upload an Excel file (.xlsx) or paste JSON data to add questions in bulk.
               </CardDescription>
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3.5 text-left space-y-1 text-xs text-amber-900 dark:text-amber-200 max-w-lg">
+                <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
+                  <Info className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Template Field Notice: Model Answer vs Explanation</span>
+                </div>
+                <p>• <strong>Model Answer:</strong> Official answer key (<strong>Required for INT & SQ</strong>). Rendered as correct answer in exams, evaluation, results & print keys.</p>
+                <p>• <strong>Teacher Note / Explanation:</strong> Optional step-by-step reasoning explaining why the answer is correct.</p>
+              </div>
             </div>
 
             <div className="w-full max-w-md space-y-4">
@@ -4757,7 +4765,7 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                     >
                       <Download className="h-5 w-5 text-indigo-600" />
                       <div className="text-xs font-bold">Objective Template</div>
-                      <div className="text-[10px] text-gray-400 font-normal">MCQ, CQ, MTF, etc.</div>
+                      <div className="text-[10px] text-gray-400 font-normal">MCQ, INT, SQ, CQ, MTF</div>
                     </Button>
                     <Button 
                       variant="outline" 
@@ -4840,8 +4848,9 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                     <TableHead>Question Type</TableHead>
                     <TableHead className="w-[180px]">Class</TableHead>
                     <TableHead>Subject</TableHead>
-                    <TableHead className="w-[300px]">Question Text</TableHead>
-                    <TableHead className="w-[200px]">Explanation</TableHead>
+                    <TableHead className="w-[280px]">Question Text</TableHead>
+                    <TableHead className="w-[180px]">Model Answer</TableHead>
+                    <TableHead className="w-[180px]">Explanation</TableHead>
                     <TableHead className="w-[150px]">Rendered Preview</TableHead>
                     <TableHead className="w-[50px]">Marks</TableHead>
                     <TableHead className="text-right">Action</TableHead>
@@ -4898,10 +4907,18 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
                       </TableCell>
                       <TableCell>
                         <Textarea
+                          value={row.data.modelAnswer || ""}
+                          onChange={(e) => handleEditRow(index, 'modelAnswer', e.target.value)}
+                          className="min-h-[80px] text-xs font-mono border-indigo-200 dark:border-indigo-800 focus:border-indigo-500"
+                          placeholder={row.data.type === 'INT' ? "Numeric answer (e.g. 42)" : row.data.type === 'SQ' ? "Sample solution text..." : "Model answer..."}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Textarea
                           value={row.data.explanation || ""}
                           onChange={(e) => handleEditRow(index, 'explanation', e.target.value)}
                           className="min-h-[80px] text-xs font-mono"
-                          placeholder="Add explanation..."
+                          placeholder="Teacher rationale..."
                         />
                       </TableCell>
                       <TableCell>

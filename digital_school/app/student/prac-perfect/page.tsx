@@ -29,7 +29,7 @@ const mathJaxConfig = {
 interface Question {
     id: string;
     questionText: string;
-    type: 'MCQ' | 'CQ' | 'SQ';
+    type: 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE' | 'SMCQ';
     subject: string;
     topic?: string;
     difficulty: string;
@@ -166,12 +166,18 @@ export default function PracPerfectPage() {
                                         </SelectContent>
                                     </Select>
                                     <Select value={filterType} onValueChange={setFilterType}>
-                                        <SelectTrigger className="w-[120px]"><SelectValue placeholder="Type" /></SelectTrigger>
+                                        <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All Types</SelectItem>
-                                            <SelectItem value="MCQ">MCQ</SelectItem>
-                                            <SelectItem value="CQ">CQ</SelectItem>
-                                            <SelectItem value="SQ">SQ</SelectItem>
+                                            <SelectItem value="MCQ">MCQ (Single)</SelectItem>
+                                            <SelectItem value="MC">MC (Multiple)</SelectItem>
+                                            <SelectItem value="INT">INT (Numeric)</SelectItem>
+                                            <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                                            <SelectItem value="MTF">MTF (Matching)</SelectItem>
+                                            <SelectItem value="CQ">CQ (Creative)</SelectItem>
+                                            <SelectItem value="SQ">SQ (Short)</SelectItem>
+                                            <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                            <SelectItem value="SMCQ">SMCQ (Scenario)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <Select

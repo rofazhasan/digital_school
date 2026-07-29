@@ -29,7 +29,11 @@
     "seed:test": "tsx scripts/seed-test-data.ts",
     "cap:sync": "npx cap sync android",
     "cap:open": "npx cap open android",
-    "cap:build": "npm run build && npm run cap:sync"
+    "cap:build": "npm run build && npm run cap:sync",
+    "de:all": "npx tsx scripts/data-engineering-manager.ts all",
+    "de:snapshot": "npx tsx scripts/data-engineering-manager.ts snapshot",
+    "de:warehouse": "npx tsx scripts/data-engineering-manager.ts warehouse",
+    "de:ai-build": "npx tsx scripts/data-engineering-manager.ts ai-build"
   },
   "dependencies": {
     "@capacitor-community/keep-awake": "8.0.0",

@@ -1291,9 +1291,9 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         id: q.id,
         q: q.questionText,
         marks: q.marks,
-        answer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || 0,
-        correctAnswer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || 0,
-        modelAnswer: (q as any).modelAnswer || (q as any).correctAnswer || (q as any).answer || (q as any).correct || 0
+        answer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || (q as any).explanation || 0,
+        correctAnswer: (q as any).correctAnswer || (q as any).modelAnswer || (q as any).answer || (q as any).correct || (q as any).explanation || 0,
+        modelAnswer: (q as any).modelAnswer || (q as any).correctAnswer || (q as any).answer || (q as any).correct || (q as any).explanation || 0
       })),
       cq: result.questions.filter(q => q.type?.toUpperCase() === 'CQ').map(q => ({
         id: q.id,
@@ -1305,7 +1305,7 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         id: q.id,
         questionText: q.questionText,
         marks: q.marks,
-        modelAnswer: q.modelAnswer
+        modelAnswer: q.modelAnswer || q.explanation
       })),
       smcq: result.questions.filter(q => q.type?.toUpperCase() === 'SMCQ').map(q => ({
         id: q.id,

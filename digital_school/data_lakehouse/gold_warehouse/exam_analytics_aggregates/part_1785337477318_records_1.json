@@ -1,0 +1,18 @@
+{
+  "metadata": {
+    "layer": "gold",
+    "tableName": "exam_analytics_aggregates",
+    "version": 1785337477318,
+    "timestamp": "2026-07-29T15:04:37.318Z",
+    "recordCount": 1
+  },
+  "data": [
+    {
+      "examId": "e1",
+      "examName": "Physics Midterm 2026",
+      "totalSubmissions": 2,
+      "averageScore": 21.5,
+      "passRatePercentage": 100
+    }
+  ]
+}

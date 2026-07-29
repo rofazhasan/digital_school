@@ -1,0 +1,29 @@
+{
+  "metadata": {
+    "layer": "gold",
+    "tableName": "subject_difficulty_metrics",
+    "version": 1785337554833,
+    "timestamp": "2026-07-29T15:05:54.833Z",
+    "recordCount": 3
+  },
+  "data": [
+    {
+      "subject": "Physics",
+      "totalQuestions": 2,
+      "averageMarks": 4.5,
+      "difficultyRating": "Moderate"
+    },
+    {
+      "subject": "Chemistry",
+      "totalQuestions": 1,
+      "averageMarks": 3,
+      "difficultyRating": "Easy"
+    },
+    {
+      "subject": "Mathematics",
+      "totalQuestions": 1,
+      "averageMarks": 8,
+      "difficultyRating": "Hard"
+    }
+  ]
+}

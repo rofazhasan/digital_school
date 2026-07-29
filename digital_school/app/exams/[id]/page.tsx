@@ -1372,8 +1372,8 @@ export default function ExamBuilderPage() {
                               ))}
                             </div>
                           )}
-                          {q.type === 'SQ' && q.modelAnswer && (
-                            <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> {q.modelAnswer}</div>
+                          {q.type === 'SQ' && (q.modelAnswer || q.explanation) && (
+                            <div className="mt-2 pt-2 border-t"><span className="font-semibold text-xs mb-1">Answer:</span> {q.modelAnswer || q.explanation}</div>
                           )}
                           {q.type === 'SMCQ' && (q.subQuestions || q.sub_questions) && (
                             <div className="mt-3 space-y-4 ml-6 border-l-2 border-blue-100 dark:border-blue-900 pl-4">

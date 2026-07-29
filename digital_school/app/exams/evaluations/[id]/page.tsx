@@ -1928,7 +1928,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
       }
 
       if (type === 'int' || type === 'numeric') {
-        const rawCorrect = (question as any).correctAnswer ?? question.modelAnswer ?? question.correct ?? (question as any).answer ?? '0';
+        const rawCorrect = (question as any).correctAnswer ?? question.modelAnswer ?? question.correct ?? (question as any).answer ?? (question as any).explanation ?? '0';
         const correctVal = parseInt(String(rawCorrect).trim()) || 0;
         const studentVal = parseInt(String(answer?.answer ?? 0).trim()) || 0;
 

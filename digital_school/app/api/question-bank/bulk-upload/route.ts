@@ -26,9 +26,8 @@ async function validateAndMapRow(row: any, classes: any[]) {
         difficulty,
         marks: n(getValue(row, ["Marks", "Mark"])),
         questionText: s(getValue(row, ["Question Text", "Question", "Title"])),
-        modelAnswer: s(getValue(row, ["Model Answer", "Answer"])),
-
-        explanation: s(getValue(row, ["Explanation", "Rationale", "Exp", "Solution", "Explaination"])),
+        modelAnswer: s(getValue(row, ["Model Answer", "ModelAnswer", "Answer", "Correct Answer"])),
+        explanation: s(getValue(row, ["Teacher Note / Explanation", "Explanation", "Rationale", "Exp", "Solution", "Explaination"])),
         classId: null,
         options: [],
         subQuestions: [],
@@ -105,9 +104,15 @@ async function validateAndMapRow(row: any, classes: any[]) {
 
             data.options = optionsList;
         } else if (data.type === 'INT') {
-            const ansStr = s(getValue(row, ["Correct Answer", "Answer", "Result"]));
+            const ansStr = data.modelAnswer || s(getValue(row, ["Correct Answer", "Answer", "Result"])) || data.explanation;
+            if (!ansStr) throw new Error("INT question requires a numeric Model Answer / Correct Answer");
             const ans = n(ansStr);
             data.modelAnswer = ans.toString();
+        } else if (data.type === 'SQ') {
+            if (!data.modelAnswer && data.explanation) {
+                data.modelAnswer = data.explanation;
+            }
+            if (!data.modelAnswer) throw new Error("SQ question requires a Model Answer");
         } else if (data.type === 'AR') {
             data.assertion = s(getValue(row, ["Assertion", "Statement A", "A"]));
             data.reason = s(getValue(row, ["Reason", "Statement R", "R"]));

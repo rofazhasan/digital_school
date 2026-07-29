@@ -396,10 +396,12 @@ mjx-container {
   outline: none;
 }
 
-/* Fix Bangla font breaking in MathJax content */
+/* Fix Bangla font breaking in MathJax & KaTeX content */
 mjx-utext,
 mjx-utext *,
 .mjx-utext,
+.katex .mtext,
+.katex .text,
 [id^="MathJax-Element"] .mtext,
 .MathJax .mtext,
 mjx-container svg text {
