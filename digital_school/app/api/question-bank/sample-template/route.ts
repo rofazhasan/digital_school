@@ -194,6 +194,11 @@ export async function GET(req: any) {
         
         templateSheet.columns = finalColumns;
 
+        const getColumnByKey = (key: string) => {
+            const exists = finalColumns.some((col: any) => col.key === key);
+            return exists ? templateSheet.getColumn(key) : null;
+        };
+
         // Header Styling & Data Validation
         const headerRow = templateSheet.getRow(1);
         headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -209,14 +214,14 @@ export async function GET(req: any) {
         const typeFormula = mode === 'objective' ? '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ"' : mode === 'descriptive' ? '"DESCRIPTIVE"' : '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"';
 
         // Apply column-level validation + styles
-        const typeCol = templateSheet.getColumn('type');
+        const typeCol = getColumnByKey('type');
         if (typeCol) typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
         
-        const diffCol = templateSheet.getColumn('difficulty');
+        const diffCol = getColumnByKey('difficulty');
         if (diffCol) diffCol.dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
         
         if (classNames.length > 0) {
-            const classCol = templateSheet.getColumn('className');
+            const classCol = getColumnByKey('className');
             if (classCol) {
                 classCol.dataValidation = {
                     type: 'list',
@@ -229,21 +234,21 @@ export async function GET(req: any) {
         // Apply validations and styling for sub-columns (both Objective objSub and Descriptive s prefixes)
         for (let i = 1; i <= 10; i++) {
             // Objective Sub-columns styling
-            const objSubMarks = templateSheet.getColumn(`objSub${i}Marks`);
+            const objSubMarks = getColumnByKey(`objSub${i}Marks`);
             if (objSubMarks && objSubMarks.number > 0) {
                 const cell = headerRow.getCell(objSubMarks.number);
                 if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
             }
 
             // Descriptive Sub-columns validations & styling
-            const descTypeCol = templateSheet.getColumn(`s${i}Type`);
+            const descTypeCol = getColumnByKey(`s${i}Type`);
             if (descTypeCol && descTypeCol.number > 0) {
                 descTypeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
                 const cell = headerRow.getCell(descTypeCol.number);
                 if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
             }
             
-            const descChartCol = templateSheet.getColumn(`s${i}ChartType`);
+            const descChartCol = getColumnByKey(`s${i}ChartType`);
             if (descChartCol && descChartCol.number > 0) {
                 descChartCol.dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
             }
