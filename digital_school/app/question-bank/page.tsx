@@ -1489,7 +1489,7 @@ export default function QuestionBankPage() {
                                 onClick={() => setSheetSingleStyle('split')}
                                 className={`px-2.5 py-1 rounded-md font-bold transition-all ${sheetSingleStyle === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300'}`}
                               >
-                                📖 স্প্লিট (ডানে খাতা/ডিজিটাল প্যাড)
+                                📖 স্প্লিট ল্যান্ডস্কেপ (ডানে উত্তর খাতা)
                               </button>
                               <button
                                 type="button"

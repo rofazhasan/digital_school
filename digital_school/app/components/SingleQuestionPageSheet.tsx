@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useState } from 'react';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from '@/lib/utils';
 import { toBengaliNumerals } from '@/utils/numeralConverter';
@@ -71,247 +71,48 @@ const getArOptions = (question: any, isBn: boolean) => [
 ];
 
 /**
- * BEST ALGORITHM: Adaptive Workspace Height Calculator
- * Computes optimal canvas/workspace height based on paper size, question length & sub-questions
+ * Adaptive Workspace Line Counter Algorithm
+ * Computes optimal line count for workspace notebook lines
  */
-const calculateAdaptiveWorkspaceHeight = (question: any, paperSize: string, isSplit: boolean): number => {
-  const basePageHeight = paperSize === 'legal' ? 1000 : paperSize === 'letter' ? 820 : 880;
+const calculateAdaptiveLineCount = (question: any, isSplit: boolean): number => {
   const qTextLen = (question.questionText || question.q || '').length;
   const subCount = (question.subQuestions || question.sub_questions || question.parts || []).length;
   const optCount = (question.options || []).length;
 
-  const estimatedContentHeight = 120 + (qTextLen / 40) * 18 + subCount * 55 + optCount * 28;
-
   if (isSplit) {
-    // In side-by-side split mode, right column occupies full page
-    return Math.max(520, Math.min(850, basePageHeight - 180));
+    return Math.max(12, 22 - Math.floor((qTextLen / 100) + subCount * 2));
   } else {
-    // In vertical flow mode, dynamically scale remaining space
-    const remaining = basePageHeight - estimatedContentHeight - 160;
-    return Math.max(420, Math.min(800, remaining));
+    return Math.max(10, 18 - Math.floor((qTextLen / 80) + subCount * 2 + optCount));
   }
 };
 
 /**
- * Digital Annotation Canvas Component with Fullscreen Expansion & Ruled Notebook Background
+ * Clean Ruled Notebook Workspace Component (No Digital Pad, Pure Notebook Paper Style)
  */
-const DigitalAnnotationCanvas: React.FC<{ isBn: boolean; height?: number; title?: string }> = ({ isBn, height = 450, title }) => {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [color, setColor] = useState('#1e40af'); // Default blue ink
-  const [lineWidth, setLineWidth] = useState(2);
-  const [tool, setTool] = useState<'pen' | 'eraser'>('pen');
-  const [hasDrawn, setHasDrawn] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  const drawBackgroundLines = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Fill white canvas
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Red left margin line
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.35)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(35, 0);
-    ctx.lineTo(35, canvas.height);
-    ctx.stroke();
-
-    // Blue horizontal ruled notebook lines
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
-    ctx.lineWidth = 1;
-    const step = 28;
-    for (let y = step; y < canvas.height; y += step) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(canvas.width, y);
-      ctx.stroke();
-    }
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const parent = canvas.parentElement;
-      const width = isFullscreen ? window.innerWidth - 40 : (parent ? parent.clientWidth : 600);
-      const targetHeight = isFullscreen ? window.innerHeight - 120 : height;
-      canvas.width = width || 600;
-      canvas.height = targetHeight;
-      drawBackgroundLines();
-    }
-  }, [drawBackgroundLines, height, isFullscreen]);
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    setIsDrawing(true);
-    setHasDrawn(true);
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-
-    ctx.lineWidth = tool === 'eraser' ? lineWidth * 6 : lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = tool === 'eraser' ? '#ffffff' : color;
-
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
-  };
-
-  const clearCanvas = () => {
-    drawBackgroundLines();
-    setHasDrawn(false);
-  };
-
-  const downloadCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const link = document.createElement('a');
-    link.download = `student-solution-annotation-${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  };
-
-  const canvasContent = (
-    <div className={`w-full border-2 border-indigo-300 dark:border-indigo-800 rounded-xl overflow-hidden bg-white shadow-sm print:border-gray-400 ${isFullscreen ? 'fixed inset-4 z-50 shadow-2xl flex flex-col' : ''}`}>
-      {/* Canvas Interactive Controls (Hidden during print) */}
-      <div className="bg-slate-900 text-white p-2.5 flex flex-wrap items-center justify-between gap-2 text-xs select-none print:hidden shrink-0">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <span className="font-bold text-indigo-300 flex items-center gap-1">
-            ✏️ {title || (isBn ? "ডিজিটাল খাতা ও নোট" : "Digital Scratchpad")}
-          </span>
-
-          {/* Tools */}
-          <div className="flex items-center bg-slate-800 rounded-lg p-0.5 border border-slate-700">
-            <button
-              type="button"
-              onClick={() => setTool('pen')}
-              className={`px-2 py-1 rounded font-bold transition-all ${tool === 'pen' ? 'bg-indigo-600 text-white' : 'text-slate-300'}`}
-            >
-              🖊️ {isBn ? "কলম" : "Pen"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setTool('eraser')}
-              className={`px-2 py-1 rounded font-bold transition-all ${tool === 'eraser' ? 'bg-indigo-600 text-white' : 'text-slate-300'}`}
-            >
-              🧹 {isBn ? "রাবার" : "Eraser"}
-            </button>
-          </div>
-
-          {/* Color Palette */}
-          {tool === 'pen' && (
-            <div className="flex items-center gap-1.5 bg-slate-800 p-1 rounded-lg border border-slate-700">
-              {['#000000', '#1e40af', '#dc2626', '#15803d', '#7c3aed'].map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`w-4.5 h-4.5 rounded-full border border-white/40 transition-transform ${color === c ? 'ring-2 ring-white scale-110' : 'opacity-80'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Line Width */}
-          <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
-            <span>{isBn ? "পুরুত্ব:" : "Size:"}</span>
-            <input
-              type="range"
-              min="1"
-              max="8"
-              value={lineWidth}
-              onChange={(e) => setLineWidth(Number(e.target.value))}
-              className="w-14 accent-indigo-500"
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Fullscreen Expansion Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="px-2.5 py-1 rounded bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-[11px] font-bold transition-colors"
-          >
-            {isFullscreen ? "↙️ " + (isBn ? "ছোট করুন" : "Exit Fullscreen") : "🔍 " + (isBn ? "ফুলস্ক্রিন প্যাড" : "Fullscreen Pad")}
-          </button>
-
-          <button
-            type="button"
-            onClick={clearCanvas}
-            className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-rose-300 text-[11px] font-bold transition-colors"
-          >
-            🗑️ {isBn ? "মুছে ফেলুন" : "Clear"}
-          </button>
-
-          {hasDrawn && (
-            <button
-              type="button"
-              onClick={downloadCanvas}
-              className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold transition-colors"
-            >
-              💾 {isBn ? "সেভ করুন" : "Save PNG"}
-            </button>
-          )}
-        </div>
+const RuledNotebookWorkspace: React.FC<{ isBn: boolean; lineCount?: number; marksStr: string; title?: string }> = ({
+  isBn,
+  lineCount = 14,
+  marksStr,
+  title
+}) => {
+  return (
+    <div className="w-full border-2 border-indigo-200 dark:border-indigo-800 rounded-xl bg-white shadow-sm overflow-hidden p-4 relative print:border-gray-400">
+      <div className="flex justify-between items-center border-b pb-2 mb-3">
+        <span className="text-xs font-bold text-gray-800 flex items-center gap-1.5 print:text-black">
+          📝 {title || (isBn ? "উত্তর প্রদান ও সমাধানের স্থান" : "Answer & Solution Workspace")}
+        </span>
+        <span className="text-xs font-bold border border-black px-2.5 py-0.5 rounded bg-gray-50 print:bg-white print:text-black">
+          {isBn ? `প্রাপ্ত নম্বর: ______ / ${marksStr}` : `Score: ______ / ${marksStr}`}
+        </span>
       </div>
 
-      {/* The Canvas itself */}
-      <canvas
-        ref={canvasRef}
-        onMouseDown={startDrawing}
-        onMouseMove={draw}
-        onMouseUp={stopDrawing}
-        onMouseLeave={stopDrawing}
-        onTouchStart={startDrawing}
-        onTouchMove={draw}
-        onTouchEnd={stopDrawing}
-        className="w-full touch-none cursor-crosshair bg-white flex-1"
-        style={{ height: isFullscreen ? 'calc(100vh - 120px)' : `${height}px` }}
-      />
+      {/* Ruled Notebook Paper Area with Red Margin */}
+      <div className="relative w-full border-l-2 border-red-400/80 pl-4 py-1 space-y-7 min-h-[280px]">
+        {Array.from({ length: lineCount }).map((_, i) => (
+          <div key={i} className="border-b border-blue-200/90 w-full print:border-gray-300" />
+        ))}
+      </div>
     </div>
-  );
-
-  return (
-    <>
-      {canvasContent}
-      {isFullscreen && (
-        <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40 print:hidden" 
-          onClick={() => setIsFullscreen(false)} 
-        />
-      )}
-    </>
   );
 };
 
@@ -347,7 +148,7 @@ export default function SingleQuestionPageSheet({
     }));
   };
 
-  // Bengali Font Family matching QuestionPaper.tsx
+  // Authentic Bengali Font Family matching QuestionPaper.tsx
   const bengaliFontFamily = "'ExamFont', 'Noto Serif Bengali', Kalpurush, 'Hind Siliguri', Georgia, serif";
   const englishFontFamily = "'Bookman Old Style', 'Georgia', serif";
 
@@ -357,7 +158,9 @@ export default function SingleQuestionPageSheet({
     lineHeight: 1.6
   };
 
-  const pageMinHeight = paperSize === 'legal' ? 'min-h-[355mm]' : paperSize === 'letter' ? 'min-h-[279mm]' : 'min-h-[297mm]';
+  const pageMinHeight = singleStyle === 'split' 
+    ? 'min-h-[210mm]' // Landscape height
+    : (paperSize === 'legal' ? 'min-h-[355mm]' : paperSize === 'letter' ? 'min-h-[279mm]' : 'min-h-[297mm]');
 
   return (
     <div 
@@ -380,14 +183,13 @@ export default function SingleQuestionPageSheet({
           ? getArOptions(question, isBn)
           : rawOptions;
 
-        // Dynamic Adaptive Workspace Height Algorithm
-        const adaptiveHeight = calculateAdaptiveWorkspaceHeight(question, paperSize, singleStyle === 'split');
+        const lineCount = calculateAdaptiveLineCount(question, singleStyle === 'split');
         const numExtraPages = extraPages[qId] || 0;
 
         return (
           <React.Fragment key={qId}>
             <div
-              className={`w-full ${pageMinHeight} p-6 md:p-10 bg-white border border-gray-200 print:border-none print:p-4 mb-8 print:mb-0 relative flex flex-col justify-between overflow-hidden`}
+              className={`w-full ${pageMinHeight} p-6 md:p-8 bg-white border border-gray-200 print:border-none print:p-3 mb-8 print:mb-0 relative flex flex-col justify-between overflow-hidden`}
               style={{ pageBreakAfter: 'always', breakAfter: 'page' }}
             >
               {/* WATERMARK OVERLAY */}
@@ -401,17 +203,17 @@ export default function SingleQuestionPageSheet({
 
               {/* Top Sheet Header Banner */}
               <div className="relative z-10">
-                <div className="border-b-2 border-black pb-3 mb-4 text-center">
+                <div className="border-b-2 border-black pb-2 mb-4 text-center">
                   {sheetInfo.schoolName && (
                     <h1 className="text-xl md:text-2xl font-bold tracking-tight mb-1">
                       {sheetInfo.schoolName}
                     </h1>
                   )}
-                  <h2 className="text-lg md:text-xl font-semibold text-gray-800 print:text-black mb-2">
+                  <h2 className="text-lg md:text-xl font-semibold text-gray-800 print:text-black mb-1.5">
                     {sheetInfo.title || (isBn ? "প্রশ্ন শীট" : "Question Sheet")}
                   </h2>
 
-                  <div className="flex flex-wrap justify-between items-center text-xs md:text-sm font-medium text-gray-700 print:text-black px-2 mt-2">
+                  <div className="flex flex-wrap justify-between items-center text-xs md:text-sm font-medium text-gray-700 print:text-black px-2 mt-1">
                     <span>
                       <strong>{isBn ? "শ্রেণি: " : "Class: "}</strong>
                       {sheetInfo.class || "—"}
@@ -433,7 +235,7 @@ export default function SingleQuestionPageSheet({
 
                 {/* STUDENT EXAM HEADER BLOCK (If Enabled) */}
                 {showStudentHeader && (
-                  <div className="border border-black rounded-lg p-3 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-semibold print:text-black">
+                  <div className="border border-black rounded-lg p-2.5 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-semibold print:text-black">
                     <div className="border-b border-dashed border-gray-400 pb-1">
                       <span className="text-gray-500 print:text-black">{isBn ? "পরীক্ষার্থীর নাম: " : "Name: "}</span>
                     </div>
@@ -452,18 +254,18 @@ export default function SingleQuestionPageSheet({
 
                 {/* TEACHER CUSTOM NOTE PER QUESTION */}
                 {question.customNote && (
-                  <div className="mb-4 p-3 bg-amber-50 border-l-4 border-amber-500 rounded text-xs text-amber-900 print:bg-gray-100 print:border-black font-medium">
+                  <div className="mb-3 p-2.5 bg-amber-50 border-l-4 border-amber-500 rounded text-xs text-amber-900 print:bg-gray-100 print:border-black font-medium">
                     <strong>💡 {isBn ? "বিশেষ নির্দেশাবলি: " : "Note: "}</strong> {question.customNote}
                   </div>
                 )}
 
                 {/* ------------------- LAYOUT RENDERER ------------------- */}
                 {singleStyle === 'split' ? (
-                  /* OPTION 2: SIDE-BY-SIDE SPLIT VIEW (Left Question, Right Answer & Digital Annotation Pad) */
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start" style={fontScaleStyle}>
+                  /* OPTION 2: SIDE-BY-SIDE SPLIT LANDSCAPE VIEW (Strict 50/50 Side-by-Side in Screen & Print) */
+                  <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 items-start w-full" style={fontScaleStyle}>
                     
-                    {/* LEFT COLUMN: Question & Stem (5 Columns = 42%) */}
-                    <div className="lg:col-span-5 space-y-4 border-r-0 lg:border-r border-gray-200 lg:pr-4 print:border-gray-400">
+                    {/* LEFT COLUMN: Question & Stem (50% Width) */}
+                    <div className="space-y-4 border-r-0 md:border-r print:border-r border-gray-300 md:pr-5 print:pr-5">
                       <div className="flex items-start gap-2">
                         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
                           <span className="font-bold text-base md:text-lg bg-black text-white px-2.5 py-0.5 rounded print:bg-black print:text-white">
@@ -606,23 +408,13 @@ export default function SingleQuestionPageSheet({
                       )}
                     </div>
 
-                    {/* RIGHT COLUMN: Answer & Digital Annotation Canvas Pad (7 Columns = 58%) */}
-                    <div className="lg:col-span-7 space-y-3">
-                      <div className="flex justify-between items-center border-b pb-2">
-                        <h3 className="font-bold text-xs md:text-sm text-gray-800 print:text-black flex items-center gap-1.5">
-                          <span>✍️</span>
-                          <span>{isBn ? "উত্তর প্রদান ও ডিজিটাল অ্যানোটেশন খাতা" : "Answer & Digital Workspace"}</span>
-                        </h3>
-                        <div className="text-xs font-bold border border-black px-2.5 py-0.5 rounded bg-gray-50 print:bg-white">
-                          {isBn ? `প্রাপ্ত নম্বর: ______ / ${marksStr}` : `Score: ______ / ${marksStr}`}
-                        </div>
-                      </div>
-
-                      {/* Interactive Digital Canvas Pad with Dynamic Adaptive Height */}
-                      <DigitalAnnotationCanvas 
+                    {/* RIGHT COLUMN: Clean Ruled Notebook Answer Space (50% Width) */}
+                    <div className="space-y-3">
+                      <RuledNotebookWorkspace 
                         isBn={isBn} 
-                        height={adaptiveHeight} 
-                        title={isBn ? `প্রশ্ন ${qNum} এর উত্তর স্থান` : `Workspace Q${qNum}`} 
+                        lineCount={lineCount} 
+                        marksStr={marksStr} 
+                        title={isBn ? `প্রশ্ন ${qNum} এর উত্তর ও সমাধান স্থান` : `Workspace Q${qNum}`}
                       />
 
                       {/* Controls to Add Extra Working Page */}
@@ -845,7 +637,7 @@ export default function SingleQuestionPageSheet({
                       </div>
                     )}
 
-                    {/* BOTTOM WORKSPACE & DIGITAL ANNOTATION CANVAS */}
+                    {/* BOTTOM WORKSPACE */}
                     <div className="mt-6 space-y-3">
                       {showAnswers ? (
                         <div className="p-6 border-2 border-green-600 rounded-xl bg-green-50/50 print:bg-white print:border-black space-y-3">
@@ -872,14 +664,11 @@ export default function SingleQuestionPageSheet({
                         </div>
                       ) : (
                         <div className="space-y-3">
-                          <div className="flex justify-between items-center text-xs font-bold text-gray-500 uppercase border-b pb-1">
-                            <span>✍️ {isBn ? "সমাধান ও নোট অ্যানোটেশন খাতা" : "Solution & Annotation Workspace"}</span>
-                            <span>{isBn ? `নম্বর: ______ / ${marksStr}` : `Marks: ______ / ${marksStr}`}</span>
-                          </div>
-                          <DigitalAnnotationCanvas 
+                          <RuledNotebookWorkspace 
                             isBn={isBn} 
-                            height={adaptiveHeight} 
-                            title={isBn ? `প্রশ্ন ${qNum} এর উত্তর স্থান` : `Workspace Q${qNum}`} 
+                            lineCount={lineCount} 
+                            marksStr={marksStr} 
+                            title={isBn ? `প্রশ্ন ${qNum} এর উত্তর ও সমাধান স্থান` : `Workspace Q${qNum}`} 
                           />
                           
                           {/* Controls to Add Extra Working Page */}
@@ -929,7 +718,7 @@ export default function SingleQuestionPageSheet({
             {Array.from({ length: numExtraPages }).map((_, extraIdx) => (
               <div
                 key={`${qId}-extra-${extraIdx}`}
-                className={`w-full ${pageMinHeight} p-6 md:p-10 bg-white border border-gray-200 print:border-none print:p-4 mb-8 print:mb-0 relative flex flex-col justify-between overflow-hidden`}
+                className={`w-full ${pageMinHeight} p-6 md:p-8 bg-white border border-gray-200 print:border-none print:p-3 mb-8 print:mb-0 relative flex flex-col justify-between overflow-hidden`}
                 style={{ pageBreakAfter: 'always', breakAfter: 'page' }}
               >
                 {/* Header for Extra Page */}
@@ -943,11 +732,12 @@ export default function SingleQuestionPageSheet({
                   <span>{sheetInfo.title}</span>
                 </div>
 
-                {/* Extra Full Page Digital Canvas Pad */}
+                {/* Extra Full Page Ruled Notebook Workspace */}
                 <div className="flex-1 space-y-2 my-2">
-                  <DigitalAnnotationCanvas 
+                  <RuledNotebookWorkspace 
                     isBn={isBn} 
-                    height={720} 
+                    lineCount={20} 
+                    marksStr={marksStr} 
                     title={isBn ? `প্রশ্ন ${qNum} - অতিরিক্ত উত্তর পৃষ্ঠা (${extraIdx + 1})` : `Q${qNum} - Extended Answer Page ${extraIdx + 1}`} 
                   />
                 </div>

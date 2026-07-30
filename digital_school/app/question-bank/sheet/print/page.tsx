@@ -89,11 +89,16 @@ export default function PrintSheetPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const printPageStyle = (layoutMode === 'single' && singleStyle === 'split')
+    ? `@page { size: landscape; margin: 8mm; } @media print { body { -webkit-print-color-adjust: exact; } }`
+    : `@page { size: auto; margin: 8mm; } @media print { body { -webkit-print-color-adjust: exact; } }`;
+
   // React to Print handler
   // @ts-ignore: react-to-print typing issue
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: sheetData?.title || "sheet-print",
+    pageStyle: printPageStyle,
     onBeforeGetContent: async () => {
       setIsPrinting(true);
       if (isMathJaxReady) return;
@@ -283,7 +288,7 @@ export default function PrintSheetPage() {
                       onClick={() => setSingleStyle('split')}
                       className={`flex-1 py-1 px-2 rounded font-bold text-[11px] transition-all ${singleStyle === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
                     >
-                      📖 স্প্লিট (ডানে খাতা/ডিজিটাল প্যাড)
+                      📖 স্প্লিট ল্যান্ডস্কেপ (ডানে উত্তর খাতা)
                     </button>
                     <button
                       onClick={() => setSingleStyle('vertical')}
