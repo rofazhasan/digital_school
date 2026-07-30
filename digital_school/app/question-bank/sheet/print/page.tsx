@@ -8,7 +8,7 @@ import Head from 'next/head';
 
 import QuestionPaper from '@/app/components/QuestionPaper';
 import AnswerQuestionPaper from '@/app/components/Answer_QuestionPaper';
-import SingleQuestionPageSheet from '@/app/components/SingleQuestionPageSheet';
+import SingleQuestionPageSheet, { normalizeQuestionData } from '@/app/components/SingleQuestionPageSheet';
 import OMRSheet from '@/app/components/OMRSheet';
 import "@/app/exams/[id]/print/print.css";
 
@@ -157,19 +157,22 @@ export default function PrintSheetPage() {
     );
   }
 
+  // Normalize all questions to resolve model answers, explanations, and subquestions
+  const normalizedQuestionsList = (sheetData?.questions || []).map((q: any) => normalizeQuestionData(q));
+
   // Organize questions for QuestionPaper / AnswerQuestionPaper standard view
-  const objectiveQuestions = sheetData.questions.filter((q: any) => ['MCQ', 'MC', 'INT', 'AR', 'SMCQ', 'MTF'].includes(q.type));
+  const objectiveQuestions = normalizedQuestionsList.filter((q: any) => ['MCQ', 'MC', 'INT', 'AR', 'SMCQ', 'MTF'].includes(q.type));
 
   const formattedQuestions = {
-    mcq: sheetData.questions.filter((q: any) => q.type === 'MCQ' || q.type === 'MC'),
-    mc: sheetData.questions.filter((q: any) => q.type === 'MC'),
-    int: sheetData.questions.filter((q: any) => q.type === 'INT'),
-    ar: sheetData.questions.filter((q: any) => q.type === 'AR'),
-    cq: sheetData.questions.filter((q: any) => q.type === 'CQ'),
-    sq: sheetData.questions.filter((q: any) => q.type === 'SQ'),
-    mtf: sheetData.questions.filter((q: any) => q.type === 'MTF'),
-    descriptive: sheetData.questions.filter((q: any) => q.type === 'DESCRIPTIVE'),
-    smcq: sheetData.questions.filter((q: any) => q.type === 'SMCQ'),
+    mcq: normalizedQuestionsList.filter((q: any) => q.type === 'MCQ' || q.type === 'MC'),
+    mc: normalizedQuestionsList.filter((q: any) => q.type === 'MC'),
+    int: normalizedQuestionsList.filter((q: any) => q.type === 'INT'),
+    ar: normalizedQuestionsList.filter((q: any) => q.type === 'AR'),
+    cq: normalizedQuestionsList.filter((q: any) => q.type === 'CQ'),
+    sq: normalizedQuestionsList.filter((q: any) => q.type === 'SQ'),
+    mtf: normalizedQuestionsList.filter((q: any) => q.type === 'MTF'),
+    descriptive: normalizedQuestionsList.filter((q: any) => q.type === 'DESCRIPTIVE'),
+    smcq: normalizedQuestionsList.filter((q: any) => q.type === 'SMCQ'),
     allObjective: objectiveQuestions
   };
 
@@ -461,7 +464,7 @@ export default function PrintSheetPage() {
           ) : (
             <SingleQuestionPageSheet
               sheetInfo={examInfo}
-              questions={sheetData.questions}
+              questions={normalizedQuestionsList}
               showAnswers={showAnswers}
               fontSize={objectiveFontSize}
               language={language}

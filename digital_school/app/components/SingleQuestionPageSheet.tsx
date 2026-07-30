@@ -71,7 +71,7 @@ const getArOptions = (isBn: boolean) => [
 ];
 
 /**
- * BEST ALGORITHM: Universal Safe Question Normalizer
+ * BEST ALGORITHM: Universal Safe Question Normalizer with Robust Model Answer & Explanation Resolver
  * Normalizes all question types (CQ, MCQ, AR, MTF, INT, SQ) into clean structure
  */
 export function normalizeQuestionData(q: any) {
@@ -90,19 +90,26 @@ export function normalizeQuestionData(q: any) {
       reason: '',
       integerAnswer: undefined,
       modelAnswer: '',
-      explanation: ''
+      explanation: '',
+      correctAnswer: '',
+      matches: {}
     };
   }
 
+  // 1. Question Text & Type
   const questionText = q.questionText || q.question || q.q || q.stem || "";
   const type = (q.type || 'MCQ').toUpperCase();
 
+  // 2. Assertion & Reason (AR)
   let assertion = q.assertion || "";
   let reason = q.reason || "";
+
+  // 3. Integer Answer (INT)
   let integerAnswer = q.integerAnswer !== undefined 
     ? q.integerAnswer 
     : (q.correctAnswer !== undefined ? q.correctAnswer : (q.answer !== undefined ? q.answer : q.correctOption));
 
+  // 4. Options
   let options: any[] = [];
   if (Array.isArray(q.options)) {
     options = q.options;
@@ -131,17 +138,45 @@ export function normalizeQuestionData(q: any) {
     ].filter(o => Boolean(o.text));
   }
 
+  // 5. Sub-Questions (CQ / Descriptive)
   let subQuestions: any[] = [];
   const rawSub = q.subQuestions || q.sub_questions || q.parts || q.subquestions;
   if (Array.isArray(rawSub)) {
-    subQuestions = rawSub;
+    subQuestions = rawSub.map((sub: any) => {
+      const qText = sub.questionText || sub.question || sub.text || "";
+      const mAns = sub.modelAnswer || sub.model_answer || sub.answer || sub.solution || sub.correctAnswer || "";
+      const exp = sub.explanation || sub.expl || sub.hint || sub.note || "";
+      return {
+        ...sub,
+        questionText: qText,
+        question: qText,
+        modelAnswer: mAns,
+        answer: mAns,
+        explanation: exp
+      };
+    });
   } else if (typeof rawSub === 'string') {
     try {
       const parsed = JSON.parse(rawSub);
-      if (Array.isArray(parsed)) subQuestions = parsed;
+      if (Array.isArray(parsed)) {
+        subQuestions = parsed.map((sub: any) => {
+          const qText = sub.questionText || sub.question || sub.text || "";
+          const mAns = sub.modelAnswer || sub.model_answer || sub.answer || sub.solution || sub.correctAnswer || "";
+          const exp = sub.explanation || sub.expl || sub.hint || sub.note || "";
+          return {
+            ...sub,
+            questionText: qText,
+            question: qText,
+            modelAnswer: mAns,
+            answer: mAns,
+            explanation: exp
+          };
+        });
+      }
     } catch (e) {}
   }
 
+  // 6. Matching Columns (MTF Two Side)
   let leftColumn: any[] = [];
   let rightColumn: any[] = [];
   const rawLeft = q.leftColumn || q.left_column || q.left || (q.options && q.options.leftColumn);
@@ -157,6 +192,7 @@ export function normalizeQuestionData(q: any) {
     try { const p = JSON.parse(rawRight); if (Array.isArray(p)) rightColumn = p; } catch (e) {}
   }
 
+  // 7. Images
   let images: string[] = [];
   if (Array.isArray(q.images)) images = q.images;
   else if (typeof q.images === 'string') {
@@ -167,6 +203,57 @@ export function normalizeQuestionData(q: any) {
     } catch (e) {
       if (q.images.startsWith('http') || q.images.startsWith('data:')) images = [q.images];
     }
+  }
+
+  // 8. Model Answer & Explanation Resolvers with All Possible Field Aliases
+  let modelAnswer = q.modelAnswer || q.model_answer || q.answer || q.solution || q.correctAnswer || q.correctOptionText || "";
+  let explanation = q.explanation || q.expl || q.hint || q.note || q.solutionExplanation || "";
+
+  if (q.options && typeof q.options === 'object' && !Array.isArray(q.options)) {
+    if (!modelAnswer && q.options.modelAnswer) modelAnswer = q.options.modelAnswer;
+    if (!modelAnswer && q.options.answer) modelAnswer = q.options.answer;
+    if (!modelAnswer && q.options.solution) modelAnswer = q.options.solution;
+    if (!explanation && q.options.explanation) explanation = q.options.explanation;
+    if (!explanation && q.options.expl) explanation = q.options.expl;
+    if (!explanation && q.options.hint) explanation = q.options.hint;
+  }
+
+  // Fallback 1: Auto-generate Model Answer for MCQ / INT / MTF / CQ if empty
+  if (!modelAnswer) {
+    if (type === 'MCQ' || type === 'MC' || type === 'SMCQ') {
+      const correctIdx = options.findIndex((o: any) => o.isCorrect || q.correctOption === options.indexOf(o));
+      if (correctIdx !== -1) {
+        const labels = ['(ক)', '(খ)', '(গ)', '(ঘ)'];
+        const text = typeof options[correctIdx] === 'string' ? options[correctIdx] : (options[correctIdx].text || '');
+        modelAnswer = `${labels[correctIdx] || ''} ${text}`.trim();
+      } else if (q.correctAnswer) {
+        modelAnswer = `উত্তর: ${q.correctAnswer}`;
+      }
+    } else if (type === 'INT' && integerAnswer !== undefined) {
+      modelAnswer = `সঠিক পূর্ণসংখ্যার উত্তর: ${integerAnswer}`;
+    } else if (type === 'MTF' && leftColumn.length > 0) {
+      const matches = q.matches || {};
+      const pairs = leftColumn.map((item: any, i: number) => {
+        const rId = matches[item.id];
+        const rIdx = rightColumn.findIndex((r: any) => r.id === rId);
+        const rLabel = rIdx !== -1 ? String.fromCharCode(65 + rIdx) : '?';
+        return `(${i + 1} → ${rLabel})`;
+      });
+      if (pairs.length > 0) modelAnswer = pairs.join(', ');
+    } else if ((type === 'CQ' || type === 'DESCRIPTIVE') && subQuestions.length > 0) {
+      const subAns = subQuestions
+        .filter((s: any) => Boolean(s.modelAnswer))
+        .map((s: any, i: number) => `(${['ক', 'খ', 'গ', 'ঘ'][i] || i + 1}) ${s.modelAnswer}`);
+      if (subAns.length > 0) modelAnswer = subAns.join('\n');
+    }
+  }
+
+  // Fallback 2: Aggregate sub-question explanations into main explanation if main is empty
+  if (!explanation && subQuestions.length > 0) {
+    const subExpls = subQuestions
+      .filter((s: any) => Boolean(s.explanation))
+      .map((s: any, i: number) => `(${['ক', 'খ', 'গ', 'ঘ'][i] || i + 1}) ${s.explanation}`);
+    if (subExpls.length > 0) explanation = subExpls.join('\n');
   }
 
   return {
@@ -187,8 +274,10 @@ export function normalizeQuestionData(q: any) {
     leftColumn,
     rightColumn,
     images,
-    modelAnswer: q.modelAnswer || q.answer || q.solution,
-    explanation: q.explanation || q.hint
+    modelAnswer,
+    explanation,
+    correctAnswer: q.correctAnswer || modelAnswer,
+    matches: q.matches
   };
 }
 
@@ -349,7 +438,7 @@ export default function SingleQuestionPageSheet({
                     </h1>
                   )}
                   <h2 className="text-lg md:text-xl font-semibold text-gray-800 print:text-black mb-1">
-                    {sheetInfo.title || (isBn ? "প্রশ্ন শীট" : "Question Sheet")}
+                    {sheetInfo.title || (isBn ? "প্রশ্ন শীট" : "Question Sheet")} {showAnswers ? (isBn ? "(উত্তরপত্র ও সমাধান)" : "(Answer & Solution Key)") : ""}
                   </h2>
 
                   <div className="flex flex-wrap justify-between items-center text-xs md:text-sm font-medium text-gray-700 print:text-black px-2 mt-1">
@@ -565,70 +654,119 @@ export default function SingleQuestionPageSheet({
                       </div>
                     </div>
 
-                    {/* RIGHT COLUMN: Clean Ruled Notebook Answer Space */}
+                    {/* RIGHT COLUMN: Clean Ruled Notebook Workspace OR Solution Key */}
                     <div className="flex flex-col justify-between h-full space-y-3">
-                      <div className="flex-1 flex flex-col">
-                        <RuledNotebookWorkspace 
-                          isBn={isBn} 
-                          lineCount={lineCount} 
-                          marksStr={marksStr} 
-                          title={isBn ? `প্রশ্ন ${qNum} এর উত্তর ও সমাধান স্থান` : `Workspace Q${qNum}`}
-                          fullHeight={true}
-                        />
-                      </div>
+                      {showAnswers ? (
+                        /* TEACHER SOLUTION & ANSWER KEY VIEW (100% Height Box) */
+                        <div className="w-full border-2 border-emerald-600 rounded-xl bg-emerald-50/40 p-4 shadow-sm h-full flex flex-col justify-between overflow-y-auto print:bg-white print:border-black">
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center border-b border-emerald-200 print:border-black pb-2 mb-2">
+                              <span className="text-xs font-bold text-emerald-900 print:text-black flex items-center gap-1.5">
+                                💡 {isBn ? `প্রশ্ন ${qNum} এর উত্তর ও বিস্তারিত সমাধান` : `Q${qNum} Model Answer & Solution`}
+                              </span>
+                              <span className="text-[10px] font-bold uppercase bg-emerald-600 text-white px-2 py-0.5 rounded print:bg-black">
+                                {isBn ? "উত্তরপত্র" : "Answer Key"}
+                              </span>
+                            </div>
 
-                      {/* Controls to Add Extra Working Page */}
-                      <div className="flex items-center justify-between text-xs pt-1 print:hidden select-none shrink-0">
-                        <span className="text-gray-500 font-medium">
-                          {numExtraPages > 0 && (
-                            <span className="text-indigo-600 font-bold mr-2">
-                              ✓ {isBn ? `অতিরিক্ত পৃষ্ঠা যুক্ত আছে: ${numExtraPages}টি` : `Extra pages added: ${numExtraPages}`}
-                            </span>
-                          )}
-                        </span>
-                        <div className="flex gap-2">
-                          {numExtraPages > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleRemoveExtraPage(qId)}
-                              className="px-2.5 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold transition-colors"
-                            >
-                              ➖ {isBn ? "পৃষ্ঠা সরান" : "Remove Page"}
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => toggleAddExtraPage(qId)}
-                            className="px-3 py-1 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold transition-colors flex items-center gap-1"
-                          >
-                            ➕ {isBn ? "অতিরিক্ত উত্তর পৃষ্ঠা যুক্ত করুন" : "Add Extra Working Page"}
-                          </button>
-                        </div>
-                      </div>
+                            {/* Sub-Questions Answers Breakdown (CQ / Descriptive) */}
+                            {question.subQuestions && question.subQuestions.length > 0 && (
+                              <div className="space-y-2">
+                                <h4 className="text-[11px] font-bold text-emerald-900 print:text-black uppercase">
+                                  {isBn ? "উপ-প্রশ্নের উত্তরসমূহ:" : "Sub-Question Answers:"}
+                                </h4>
+                                {question.subQuestions.map((sub: any, subIdx: number) => {
+                                  const subLabel = subLabels[subIdx] || `${subIdx + 1}`;
+                                  return (
+                                    <div key={subIdx} className="p-2.5 border border-emerald-200 rounded-lg bg-white print:border-gray-400 space-y-1 text-xs">
+                                      <div className="font-bold text-xs text-indigo-900 print:text-black flex items-start gap-1">
+                                        <span>({subLabel})</span>
+                                        <MathText>{sub.questionText || ""}</MathText>
+                                      </div>
+                                      <div className="text-gray-900 print:text-black pl-3 border-l-2 border-emerald-500">
+                                        <strong className="text-[10px] uppercase font-bold text-emerald-800 print:text-black mr-1">
+                                          {isBn ? "উত্তর:" : "Answer:"}
+                                        </strong>
+                                        <MathText>{sub.modelAnswer || (isBn ? "সঠিক সমাধান যুক্ত করা আছে।" : "Solution provided.")}</MathText>
+                                      </div>
+                                      {sub.explanation && (
+                                        <div className="text-gray-800 print:text-black pl-3 border-l-2 border-blue-400 pt-0.5 text-[11px]">
+                                          <strong className="text-[10px] uppercase font-bold text-blue-800 print:text-black mr-1">
+                                            {isBn ? "ব্যাখ্যা:" : "Explanation:"}
+                                          </strong>
+                                          <MathText>{sub.explanation}</MathText>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
 
-                      {/* Model Answer Box if showAnswers is TRUE */}
-                      {showAnswers && (question.modelAnswer || question.explanation) && (
-                        <div className="p-3 border-2 border-green-600 rounded-xl bg-green-50/50 print:bg-white print:border-black space-y-1.5 text-xs shrink-0">
-                          <div className="flex items-center gap-1.5 font-bold text-sm text-green-900 print:text-black border-b border-green-200 print:border-black pb-1">
-                            <span>💡</span>
-                            <span>{isBn ? "মডেল উত্তর ও ব্যাখ্যা:" : "Model Answer & Solution:"}</span>
+                            {/* Main Model Answer Block */}
+                            {question.modelAnswer && (!question.subQuestions || question.subQuestions.length === 0) && (
+                              <div className="p-3 border border-emerald-300 rounded-lg bg-white print:border-black text-xs space-y-1">
+                                <strong className="block text-[10px] uppercase font-bold text-emerald-800 print:text-black">
+                                  {isBn ? "সঠিক মডেল উত্তর:" : "Model Answer:"}
+                                </strong>
+                                <MathText>{question.modelAnswer}</MathText>
+                              </div>
+                            )}
+
+                            {/* Detailed Explanation Block */}
+                            {question.explanation && (!question.subQuestions || question.subQuestions.length === 0) && (
+                              <div className="p-3 border border-blue-200 rounded-lg bg-blue-50/50 print:bg-white print:border-black text-xs space-y-1">
+                                <strong className="block text-[10px] uppercase font-bold text-blue-800 print:text-black">
+                                  {isBn ? "বিস্তারিত ব্যাখ্যা:" : "Detailed Explanation:"}
+                                </strong>
+                                <MathText>{question.explanation}</MathText>
+                              </div>
+                            )}
                           </div>
-                          {question.modelAnswer && (
-                            <div>
-                              <strong className="block text-[10px] uppercase font-bold text-green-700 print:text-black">
-                                {isBn ? "উত্তর:" : "Answer:"}
-                              </strong>
-                              <MathText>{question.modelAnswer}</MathText>
+
+                          <div className="text-[10px] text-gray-500 print:text-black border-t border-emerald-200 print:border-black pt-1 mt-2 text-right">
+                            {isBn ? "রোফাজ একাডেমি (Rofaz Academy) অফিসিয়াল সলিউশন কি" : "Official Solution Key"}
+                          </div>
+                        </div>
+                      ) : (
+                        /* STUDENT RULED WORKSPACE VIEW */
+                        <div className="flex-1 flex flex-col justify-between h-full space-y-3">
+                          <RuledNotebookWorkspace 
+                            isBn={isBn} 
+                            lineCount={lineCount} 
+                            marksStr={marksStr} 
+                            title={isBn ? `প্রশ্ন ${qNum} এর উত্তর ও সমাধান স্থান` : `Workspace Q${qNum}`}
+                            fullHeight={true}
+                          />
+
+                          {/* Controls to Add Extra Working Page */}
+                          <div className="flex items-center justify-between text-xs pt-1 print:hidden select-none shrink-0">
+                            <span className="text-gray-500 font-medium">
+                              {numExtraPages > 0 && (
+                                <span className="text-indigo-600 font-bold mr-2">
+                                  ✓ {isBn ? `অতিরিক্ত পৃষ্ঠা যুক্ত আছে: ${numExtraPages}টি` : `Extra pages added: ${numExtraPages}`}
+                                </span>
+                              )}
+                            </span>
+                            <div className="flex gap-2">
+                              {numExtraPages > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRemoveExtraPage(qId)}
+                                  className="px-2.5 py-1 rounded bg-rose-100 hover:bg-rose-200 text-rose-800 font-bold transition-colors"
+                                >
+                                  ➖ {isBn ? "পৃষ্ঠা সরান" : "Remove Page"}
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => toggleAddExtraPage(qId)}
+                                className="px-3 py-1 rounded bg-indigo-100 hover:bg-indigo-200 text-indigo-900 font-bold transition-colors flex items-center gap-1"
+                              >
+                                ➕ {isBn ? "অতিরিক্ত উত্তর পৃষ্ঠা যুক্ত করুন" : "Add Extra Working Page"}
+                              </button>
                             </div>
-                          )}
-                          {question.explanation && (
-                            <div className="pt-1 border-t border-green-200 print:border-gray-300">
-                              <strong className="block text-[10px] uppercase font-bold text-green-700 print:text-black">
-                                {isBn ? "ব্যাখ্যা:" : "Explanation:"}
-                              </strong>
-                              <MathText>{question.explanation}</MathText>
-                            </div>
-                          )}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -744,6 +882,24 @@ export default function SingleQuestionPageSheet({
                                     </span>
                                   )}
                                 </div>
+
+                                {/* Sub Question Model Answer when showAnswers is true */}
+                                {showAnswers && (sub.modelAnswer || sub.explanation) && (
+                                  <div className="p-2.5 border-l-4 border-emerald-600 bg-emerald-50/60 print:bg-white print:border-black text-xs space-y-1">
+                                    {sub.modelAnswer && (
+                                      <div>
+                                        <strong className="text-emerald-800 print:text-black font-bold uppercase text-[10px] mr-1">{isBn ? "উত্তর:" : "Answer:"}</strong>
+                                        <MathText>{sub.modelAnswer}</MathText>
+                                      </div>
+                                    )}
+                                    {sub.explanation && (
+                                      <div className="pt-0.5 text-blue-900 print:text-black">
+                                        <strong className="text-blue-800 print:text-black font-bold uppercase text-[10px] mr-1">{isBn ? "ব্যাখ্যা:" : "Explanation:"}</strong>
+                                        <MathText>{sub.explanation}</MathText>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
 
                                 {/* Chart */}
                                 {sub.chartConfig && (
