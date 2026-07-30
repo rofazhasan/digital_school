@@ -62,13 +62,135 @@ const QUESTION_TYPE_LABELS_EN: Record<string, string> = {
   DESCRIPTIVE: "Descriptive"
 };
 
-const getArOptions = (question: any, isBn: boolean) => [
-  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' : 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.', isCorrect: question.correctOption === 0 },
-  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' : 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.', isCorrect: question.correctOption === 1 },
-  { text: isBn ? 'Assertion সত্য কিন্তু Reason মিথ্যা।' : 'Assertion is true but Reason is false.', isCorrect: question.correctOption === 2 },
-  { text: isBn ? 'Assertion মিথ্যা কিন্তু Reason সত্য।' : 'Assertion is false but Reason is true.', isCorrect: question.correctOption === 3 },
-  { text: isBn ? 'Assertion ও Reason উভয়ই মিথ্যা।' : 'Both Assertion and Reason are false.', isCorrect: question.correctOption === 4 },
+const getArOptions = (isBn: boolean) => [
+  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য এবং Reason হলো Assertion এর সঠিক ব্যাখ্যা।' : 'Both Assertion and Reason are true, and Reason is the correct explanation of Assertion.', isCorrect: false },
+  { text: isBn ? 'Assertion ও Reason উভয়ই সত্য কিন্তু Reason হলো Assertion এর সঠিক ব্যাখ্যা নয়।' : 'Both Assertion and Reason are true, but Reason is not the correct explanation of Assertion.', isCorrect: false },
+  { text: isBn ? 'Assertion সত্য কিন্তু Reason মিথ্যা।' : 'Assertion is true but Reason is false.', isCorrect: false },
+  { text: isBn ? 'Assertion মিথ্যা কিন্তু Reason সত্য।' : 'Assertion is false but Reason is true.', isCorrect: false },
+  { text: isBn ? 'Assertion ও Reason উভয়ই মিথ্যা।' : 'Both Assertion and Reason are false.', isCorrect: false },
 ];
+
+/**
+ * BEST ALGORITHM: Universal Safe Question Normalizer
+ * Normalizes all question types (CQ, MCQ, AR, MTF, INT, SQ) into clean structure
+ */
+export function normalizeQuestionData(q: any) {
+  if (!q) {
+    return {
+      id: '',
+      questionText: '',
+      type: 'MCQ',
+      marks: 1,
+      options: [],
+      subQuestions: [],
+      leftColumn: [],
+      rightColumn: [],
+      images: [],
+      assertion: '',
+      reason: '',
+      integerAnswer: undefined,
+      modelAnswer: '',
+      explanation: ''
+    };
+  }
+
+  const questionText = q.questionText || q.question || q.q || q.stem || "";
+  const type = (q.type || 'MCQ').toUpperCase();
+
+  let assertion = q.assertion || "";
+  let reason = q.reason || "";
+  let integerAnswer = q.integerAnswer !== undefined 
+    ? q.integerAnswer 
+    : (q.correctAnswer !== undefined ? q.correctAnswer : (q.answer !== undefined ? q.answer : q.correctOption));
+
+  let options: any[] = [];
+  if (Array.isArray(q.options)) {
+    options = q.options;
+  } else if (typeof q.options === 'string') {
+    try {
+      const parsed = JSON.parse(q.options);
+      if (Array.isArray(parsed)) options = parsed;
+      else if (parsed && typeof parsed === 'object') {
+        if (parsed.options && Array.isArray(parsed.options)) options = parsed.options;
+        if (!assertion && parsed.assertion) assertion = parsed.assertion;
+        if (!reason && parsed.reason) reason = parsed.reason;
+        if (integerAnswer === undefined && parsed.integerAnswer !== undefined) integerAnswer = parsed.integerAnswer;
+      }
+    } catch (e) {}
+  } else if (q.options && typeof q.options === 'object') {
+    if (Array.isArray(q.options.options)) options = q.options.options;
+    if (!assertion && q.options.assertion) assertion = q.options.assertion;
+    if (!reason && q.options.reason) reason = q.options.reason;
+    if (integerAnswer === undefined && q.options.integerAnswer !== undefined) integerAnswer = q.options.integerAnswer;
+  } else if (q.optionA || q.optionB || q.optionC || q.optionD) {
+    options = [
+      { label: 'ক', text: q.optionA, isCorrect: q.correctOption === 0 || q.correctAnswer === 'A' },
+      { label: 'খ', text: q.optionB, isCorrect: q.correctOption === 1 || q.correctAnswer === 'B' },
+      { label: 'গ', text: q.optionC, isCorrect: q.correctOption === 2 || q.correctAnswer === 'C' },
+      { label: 'ঘ', text: q.optionD, isCorrect: q.correctOption === 3 || q.correctAnswer === 'D' },
+    ].filter(o => Boolean(o.text));
+  }
+
+  let subQuestions: any[] = [];
+  const rawSub = q.subQuestions || q.sub_questions || q.parts || q.subquestions;
+  if (Array.isArray(rawSub)) {
+    subQuestions = rawSub;
+  } else if (typeof rawSub === 'string') {
+    try {
+      const parsed = JSON.parse(rawSub);
+      if (Array.isArray(parsed)) subQuestions = parsed;
+    } catch (e) {}
+  }
+
+  let leftColumn: any[] = [];
+  let rightColumn: any[] = [];
+  const rawLeft = q.leftColumn || q.left_column || q.left || (q.options && q.options.leftColumn);
+  const rawRight = q.rightColumn || q.right_column || q.right || (q.options && q.options.rightColumn);
+
+  if (Array.isArray(rawLeft)) leftColumn = rawLeft;
+  else if (typeof rawLeft === 'string') {
+    try { const p = JSON.parse(rawLeft); if (Array.isArray(p)) leftColumn = p; } catch (e) {}
+  }
+
+  if (Array.isArray(rawRight)) rightColumn = rawRight;
+  else if (typeof rawRight === 'string') {
+    try { const p = JSON.parse(rawRight); if (Array.isArray(p)) rightColumn = p; } catch (e) {}
+  }
+
+  let images: string[] = [];
+  if (Array.isArray(q.images)) images = q.images;
+  else if (typeof q.images === 'string') {
+    try {
+      const p = JSON.parse(q.images);
+      if (Array.isArray(p)) images = p;
+      else if (typeof p === 'string') images = [p];
+    } catch (e) {
+      if (q.images.startsWith('http') || q.images.startsWith('data:')) images = [q.images];
+    }
+  }
+
+  return {
+    id: q.id || String(Math.random()),
+    questionText,
+    type,
+    subject: q.subject,
+    marks: q.marks || (type === 'CQ' ? 10 : 1),
+    customMarks: q.customMarks,
+    customNote: q.customNote,
+    difficulty: q.difficulty,
+    topic: q.topic,
+    assertion,
+    reason,
+    integerAnswer,
+    options,
+    subQuestions,
+    leftColumn,
+    rightColumn,
+    images,
+    modelAnswer: q.modelAnswer || q.answer || q.solution,
+    explanation: q.explanation || q.hint
+  };
+}
 
 /**
  * Adaptive Workspace Line Counter Algorithm
@@ -161,7 +283,7 @@ export default function SingleQuestionPageSheet({
   };
 
   const pageMinHeight = singleStyle === 'split' 
-    ? 'min-h-[195mm] print:h-[195mm]' // Full landscape height
+    ? 'min-h-[195mm] print:h-[195mm]' 
     : (paperSize === 'legal' ? 'min-h-[345mm]' : paperSize === 'letter' ? 'min-h-[269mm]' : 'min-h-[287mm]');
 
   return (
@@ -183,10 +305,12 @@ export default function SingleQuestionPageSheet({
         }
       ` }} />
 
-      {questions.map((question: any, idx: number) => {
+      {questions.map((rawQuestion: any, idx: number) => {
+        // Universal Normalization
+        const question = normalizeQuestionData(rawQuestion);
         const qId = question.id || `single-q-${idx}`;
         const qNum = isBn ? toBengaliNumerals(idx + 1) : (idx + 1).toString();
-        const questionMarks = question.customMarks !== undefined ? question.customMarks : (question.marks || (question.type === 'CQ' ? 10 : 1));
+        const questionMarks = question.customMarks !== undefined ? question.customMarks : question.marks;
         const marksStr = isBn ? toBengaliNumerals(questionMarks) : questionMarks.toString();
         
         const qTypeKey = (question.type || '').toUpperCase();
@@ -194,10 +318,9 @@ export default function SingleQuestionPageSheet({
           ? (QUESTION_TYPE_LABELS_BN[qTypeKey] || question.type || '')
           : (QUESTION_TYPE_LABELS_EN[qTypeKey] || question.type || '');
 
-        const rawOptions = question.options || [];
-        const optionsList = (qTypeKey === 'AR' && (!rawOptions || rawOptions.length < 2))
-          ? getArOptions(question, isBn)
-          : rawOptions;
+        const optionsList = (qTypeKey === 'AR' && (!question.options || question.options.length < 2))
+          ? getArOptions(isBn)
+          : question.options;
 
         const lineCount = calculateAdaptiveLineCount(question, singleStyle === 'split');
         const numExtraPages = extraPages[qId] || 0;
@@ -279,7 +402,7 @@ export default function SingleQuestionPageSheet({
               {/* ------------------- MAIN LAYOUT RENDERER ------------------- */}
               <div className="relative z-10 flex-1 my-2 flex flex-col justify-between">
                 {singleStyle === 'split' ? (
-                  /* OPTION 2: SIDE-BY-SIDE SPLIT LANDSCAPE VIEW (Strict 50/50 Side-by-Side with 100% Height Expansion) */
+                  /* OPTION 2: SIDE-BY-SIDE SPLIT LANDSCAPE VIEW */
                   <div className="grid grid-cols-1 md:grid-cols-2 print:grid-cols-2 gap-6 items-stretch w-full flex-1" style={fontScaleStyle}>
                     
                     {/* LEFT COLUMN: Question & Stem (50% Width) */}
@@ -303,11 +426,11 @@ export default function SingleQuestionPageSheet({
 
                         {/* Question Text */}
                         <div className="font-medium text-base md:text-lg leading-relaxed pt-1 text-gray-900 print:text-black">
-                          <MathText>{question.questionText || question.q || ""}</MathText>
+                          <MathText>{question.questionText}</MathText>
                         </div>
 
                         {/* Assertion & Reason (AR Type) */}
-                        {qTypeKey === 'AR' && (
+                        {qTypeKey === 'AR' && (question.assertion || question.reason) && (
                           <div className="space-y-1.5 p-3 bg-gray-50 border border-gray-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
                             {question.assertion && (
                               <p className="font-medium">
@@ -324,12 +447,22 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* Options List */}
+                        {/* Integer Answer Box (INT Type) */}
+                        {qTypeKey === 'INT' && question.integerAnswer !== undefined && question.integerAnswer !== null && (
+                          <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-900 print:bg-gray-100 print:border-black">
+                            <span>{isBn ? "সঠিক পূর্ণসংখ্যার উত্তর: " : "Integer Answer: "}</span>
+                            <span className="font-mono text-sm bg-white border border-indigo-400 px-2 py-0.5 rounded ml-1 print:border-black">
+                              {question.integerAnswer}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Options List (MCQ / MC / AR / SMCQ) */}
                         {optionsList.length > 0 && (
                           <div className="space-y-2 mt-3">
                             {optionsList.map((opt: any, optIdx: number) => {
                               const optLabel = mcqLabels[optIdx] || `${optIdx + 1}`;
-                              const isCorrect = opt.isCorrect || question.correctOption === optIdx;
+                              const isCorrect = opt.isCorrect || rawQuestion.correctOption === optIdx;
 
                               return (
                                 <div
@@ -357,9 +490,9 @@ export default function SingleQuestionPageSheet({
                         )}
 
                         {/* Sub Questions (CQ / Descriptive) */}
-                        {(question.subQuestions || question.sub_questions || question.parts) && (
+                        {question.subQuestions && question.subQuestions.length > 0 && (
                           <div className="space-y-2.5 mt-3">
-                            {(question.subQuestions || question.sub_questions || question.parts).map((sub: any, subIdx: number) => {
+                            {question.subQuestions.map((sub: any, subIdx: number) => {
                               const subLabel = subLabels[subIdx] || `${subIdx + 1}`;
                               const subMarks = sub.marks ? (isBn ? toBengaliNumerals(sub.marks) : sub.marks) : '';
 
@@ -399,19 +532,23 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
-                        {/* Matching Columns (MTF Type) */}
-                        {qTypeKey === 'MTF' && question.leftColumn && question.rightColumn && (
+                        {/* Matching Columns (MTF Two Side Type) */}
+                        {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || question.rightColumn.length > 0) && (
                           <div className="grid grid-cols-2 gap-2 border p-3 rounded-lg my-2 text-xs">
                             <div>
                               <h4 className="font-bold border-b pb-1 mb-1">{isBn ? "কলাম A" : "Column A"}</h4>
                               {question.leftColumn.map((item: any, i: number) => (
-                                <div key={i} className="py-0.5"><strong>({i + 1})</strong> <MathText>{item.text}</MathText></div>
+                                <div key={i} className="py-0.5">
+                                  <strong>({i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
+                                </div>
                               ))}
                             </div>
                             <div>
                               <h4 className="font-bold border-b pb-1 mb-1">{isBn ? "কলাম B" : "Column B"}</h4>
                               {question.rightColumn.map((item: any, i: number) => (
-                                <div key={i} className="py-0.5"><strong>({mcqLabels[i] || i + 1})</strong> <MathText>{item.text}</MathText></div>
+                                <div key={i} className="py-0.5">
+                                  <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -428,7 +565,7 @@ export default function SingleQuestionPageSheet({
                       </div>
                     </div>
 
-                    {/* RIGHT COLUMN: Clean Ruled Notebook Answer Space (Expands Full Height 50% Width) */}
+                    {/* RIGHT COLUMN: Clean Ruled Notebook Answer Space */}
                     <div className="flex flex-col justify-between h-full space-y-3">
                       <div className="flex-1 flex flex-col">
                         <RuledNotebookWorkspace 
@@ -497,7 +634,7 @@ export default function SingleQuestionPageSheet({
                     </div>
                   </div>
                 ) : (
-                  /* OPTION 1: VERTICAL LAYOUT (Question Top, Answer Workspace Bottom) */
+                  /* OPTION 1: VERTICAL LAYOUT */
                   <div className="space-y-5 flex-1 flex flex-col justify-between" style={fontScaleStyle}>
                     <div className="space-y-4">
                       {/* Question Header & Main Text */}
@@ -513,7 +650,7 @@ export default function SingleQuestionPageSheet({
                           )}
                         </div>
                         <div className="font-medium text-base md:text-lg flex-1 leading-relaxed pt-0.5">
-                          <MathText>{question.questionText || question.q || ""}</MathText>
+                          <MathText>{question.questionText}</MathText>
                         </div>
                         <span className="text-sm font-semibold border border-black px-2.5 py-1 rounded shrink-0">
                           [{marksStr} {isBn ? "নম্বর" : "Marks"}]
@@ -521,7 +658,7 @@ export default function SingleQuestionPageSheet({
                       </div>
 
                       {/* Assertion & Reason (AR Type) */}
-                      {qTypeKey === 'AR' && (
+                      {qTypeKey === 'AR' && (question.assertion || question.reason) && (
                         <div className="ml-6 space-y-2 p-4 bg-gray-50 border border-gray-200 rounded-lg print:bg-transparent print:border-gray-400">
                           {question.assertion && (
                             <p className="font-medium">
@@ -538,12 +675,22 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
+                      {/* Integer Answer Box (INT Type) */}
+                      {qTypeKey === 'INT' && question.integerAnswer !== undefined && question.integerAnswer !== null && (
+                        <div className="ml-6 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-xs font-bold text-indigo-900 print:bg-gray-100 print:border-black">
+                          <span>{isBn ? "সঠিক পূর্ণসংখ্যার উত্তর: " : "Integer Answer: "}</span>
+                          <span className="font-mono text-sm bg-white border border-indigo-400 px-2 py-0.5 rounded ml-1 print:border-black">
+                            {question.integerAnswer}
+                          </span>
+                        </div>
+                      )}
+
                       {/* Options List */}
                       {optionsList.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pl-4 mt-3">
                           {optionsList.map((opt: any, optIdx: number) => {
                             const optLabel = mcqLabels[optIdx] || `${optIdx + 1}`;
-                            const isCorrect = opt.isCorrect || question.correctOption === optIdx;
+                            const isCorrect = opt.isCorrect || rawQuestion.correctOption === optIdx;
 
                             return (
                               <div
@@ -576,9 +723,9 @@ export default function SingleQuestionPageSheet({
                       )}
 
                       {/* Sub Questions (CQ / Descriptive) */}
-                      {(question.subQuestions || question.sub_questions || question.parts) && (
+                      {question.subQuestions && question.subQuestions.length > 0 && (
                         <div className="space-y-3 pl-4 mt-4">
-                          {(question.subQuestions || question.sub_questions || question.parts).map((sub: any, subIdx: number) => {
+                          {question.subQuestions.map((sub: any, subIdx: number) => {
                             const subLabel = subLabels[subIdx] || `${subIdx + 1}`;
                             const subMarks = sub.marks ? (isBn ? toBengaliNumerals(sub.marks) : sub.marks) : '';
 
@@ -618,14 +765,14 @@ export default function SingleQuestionPageSheet({
                         </div>
                       )}
 
-                      {/* Matching Columns (MTF Type) */}
-                      {qTypeKey === 'MTF' && question.leftColumn && question.rightColumn && (
+                      {/* Matching Columns (MTF Two Side Type) */}
+                      {qTypeKey === 'MTF' && (question.leftColumn.length > 0 || question.rightColumn.length > 0) && (
                         <div className="grid grid-cols-2 gap-4 border p-4 rounded-lg my-3">
                           <div>
                             <h4 className="font-bold text-sm border-b pb-1 mb-2">{isBn ? "কলাম A" : "Column A"}</h4>
                             {question.leftColumn.map((item: any, i: number) => (
                               <div key={i} className="text-sm py-1">
-                                <strong>({i + 1})</strong> <MathText>{item.text}</MathText>
+                                <strong>({i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
                               </div>
                             ))}
                           </div>
@@ -633,7 +780,7 @@ export default function SingleQuestionPageSheet({
                             <h4 className="font-bold text-sm border-b pb-1 mb-2">{isBn ? "কলাম B" : "Column B"}</h4>
                             {question.rightColumn.map((item: any, i: number) => (
                               <div key={i} className="text-sm py-1">
-                                <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{item.text}</MathText>
+                                <strong>({mcqLabels[i] || i + 1})</strong> <MathText>{typeof item === 'string' ? item : item.text || ""}</MathText>
                               </div>
                             ))}
                           </div>
@@ -720,7 +867,7 @@ export default function SingleQuestionPageSheet({
                 )}
               </div>
 
-              {/* Bottom Page Footer - Strictly locked to bottom margin */}
+              {/* Bottom Page Footer */}
               <div className="relative z-10 border-t border-gray-300 pt-2.5 text-xs text-gray-500 print:text-gray-700 flex justify-between items-center mt-3 shrink-0">
                 <span>{sheetInfo.title}</span>
                 <span>{isBn ? "পৃষ্ঠা " : "Page "}{qNum} / {isBn ? toBengaliNumerals(questions.length) : questions.length}</span>

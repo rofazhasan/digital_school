@@ -43,6 +43,7 @@ import {
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import { Capacitor } from "@capacitor/core";
+import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet";
 
 
 // --- Types ---
@@ -304,6 +305,82 @@ import { addDays, isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 import { cleanupMath } from "@/lib/utils";
+
+const SheetQuestionItemPreview = React.memo(({ question: rawQ }: { question: any }) => {
+  const q = useMemo(() => normalizeQuestionData(rawQ), [rawQ]);
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="font-medium text-gray-800 dark:text-gray-200 leading-relaxed">
+        <UniversalMathJax inline dynamic>
+          {cleanupMath(q.questionText)}
+        </UniversalMathJax>
+      </div>
+
+      {/* AR Type (Assertion & Reason) */}
+      {q.type === 'AR' && (q.assertion || q.reason) && (
+        <div className="p-2 bg-indigo-950/20 border border-indigo-800/40 rounded text-[11px] space-y-1">
+          {q.assertion && (
+            <p><strong>Assertion:</strong> <UniversalMathJax inline dynamic>{cleanupMath(q.assertion)}</UniversalMathJax></p>
+          )}
+          {q.reason && (
+            <p><strong>Reason:</strong> <UniversalMathJax inline dynamic>{cleanupMath(q.reason)}</UniversalMathJax></p>
+          )}
+        </div>
+      )}
+
+      {/* INT Type (Integer Answer) */}
+      {q.type === 'INT' && q.integerAnswer !== undefined && (
+        <div className="p-1.5 bg-indigo-950/20 border border-indigo-800/40 rounded text-[11px] font-bold text-indigo-300">
+          Integer Answer: <span className="font-mono bg-slate-800 px-1.5 py-0.5 rounded text-white">{q.integerAnswer}</span>
+        </div>
+      )}
+
+      {/* MCQ / MC Options Preview */}
+      {q.options && q.options.length > 0 && (
+        <div className="grid grid-cols-2 gap-1.5 pt-1 text-[11px] text-gray-600 dark:text-gray-300">
+          {q.options.slice(0, 4).map((opt: any, i: number) => (
+            <div key={i} className="truncate">
+              <span className="font-bold text-indigo-500 mr-1">({['ক', 'খ', 'গ', 'ঘ'][i] || i + 1})</span>
+              <UniversalMathJax inline dynamic>{cleanupMath(typeof opt === 'string' ? opt : opt.text || '')}</UniversalMathJax>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* CQ / Descriptive Sub-Questions Preview */}
+      {q.subQuestions && q.subQuestions.length > 0 && (
+        <div className="space-y-1 pt-1.5 border-t border-gray-200/50 dark:border-gray-700/50 text-[11px]">
+          {q.subQuestions.map((sub: any, i: number) => (
+            <div key={i} className="text-gray-700 dark:text-gray-300">
+              <span className="font-bold text-indigo-400 mr-1">({['ক', 'খ', 'গ', 'ঘ'][i] || i + 1})</span>
+              <UniversalMathJax inline dynamic>{cleanupMath(sub.question || sub.questionText || '')}</UniversalMathJax>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* MTF Matching Columns Two Side Preview */}
+      {q.type === 'MTF' && (q.leftColumn.length > 0 || q.rightColumn.length > 0) && (
+        <div className="grid grid-cols-2 gap-2 p-2 bg-slate-900/40 border border-indigo-800/40 rounded text-[10px]">
+          <div>
+            <strong className="block border-b border-indigo-800/40 pb-0.5 mb-1 text-indigo-300">Column A</strong>
+            {q.leftColumn.slice(0, 3).map((item: any, i: number) => (
+              <div key={i} className="truncate">({i + 1}) <UniversalMathJax inline dynamic>{cleanupMath(typeof item === 'string' ? item : item.text || '')}</UniversalMathJax></div>
+            ))}
+          </div>
+          <div>
+            <strong className="block border-b border-indigo-800/40 pb-0.5 mb-1 text-indigo-300">Column B</strong>
+            {q.rightColumn.slice(0, 3).map((item: any, i: number) => (
+              <div key={i} className="truncate">({['ক', 'খ', 'গ'][i] || i + 1}) <UniversalMathJax inline dynamic>{cleanupMath(typeof item === 'string' ? item : item.text || '')}</UniversalMathJax></div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+SheetQuestionItemPreview.displayName = "SheetQuestionItemPreview";
 
 // --- Main Page Component ---
 export default function QuestionBankPage() {
@@ -1867,11 +1944,8 @@ export default function QuestionBankPage() {
                                     </Button>
                                   </div>
 
-                                  <div className="text-xs font-medium text-gray-800 dark:text-gray-200 line-clamp-2 leading-relaxed">
-                                    <UniversalMathJax inline dynamic>
-                                      {cleanupMath(q.questionText || "")}
-                                    </UniversalMathJax>
-                                  </div>
+                                  {/* Rich Safe Preview: Question Text, Sub-questions, Options, MTF Two Side, AR, INT */}
+                                  <SheetQuestionItemPreview question={q} />
                                 </div>
                               );
                             })}
@@ -1961,11 +2035,8 @@ export default function QuestionBankPage() {
                                     </div>
                                   </div>
 
-                                  <div className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed font-medium">
-                                    <UniversalMathJax inline dynamic>
-                                      {cleanupMath(q.questionText || "")}
-                                    </UniversalMathJax>
-                                  </div>
+                                  {/* Rich Safe Preview: Question Text, Sub-questions, Options, MTF Two Side, AR, INT */}
+                                  <SheetQuestionItemPreview question={q} />
 
                                   {/* Custom Marks & Note Controls per question */}
                                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-gray-200/60 dark:border-gray-700/60 text-xs">
