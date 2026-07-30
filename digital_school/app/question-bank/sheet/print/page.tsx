@@ -175,7 +175,7 @@ export default function PrintSheetPage() {
 
   const examInfo = {
     title: sheetData.title || "কাস্টম প্রশ্ন শীট",
-    schoolName: sheetData.schoolName || "রফাজ একাডেমি",
+    schoolName: sheetData.schoolName || "রোফাজ একাডেমি (Rofaz Academy)",
     schoolAddress: sheetData.schoolAddress || "",
     class: sheetData.className || sheetData.class || "",
     subject: sheetData.subject || "",

@@ -710,7 +710,7 @@ export default function SingleQuestionPageSheet({
               <div className="relative z-10 border-t border-gray-300 pt-3 text-xs text-gray-500 print:text-gray-700 flex justify-between items-center mt-6">
                 <span>{sheetInfo.title}</span>
                 <span>{isBn ? "পৃষ্ঠা " : "Page "}{qNum} / {isBn ? toBengaliNumerals(questions.length) : questions.length}</span>
-                <span>{isBn ? "রফাজ একাডেমি ওয়ার্ল্ড ক্লাস শীট মেকার" : "Rofaz Academy Sheet Maker"}</span>
+                <span>{isBn ? "রোফাজ একাডেমি (Rofaz Academy) ওয়ার্ল্ড ক্লাস শীট মেকার" : "Rofaz Academy Sheet Maker"}</span>
               </div>
             </div>
 
@@ -746,7 +746,7 @@ export default function SingleQuestionPageSheet({
                 <div className="border-t border-gray-300 pt-3 text-xs text-gray-500 flex justify-between items-center mt-4">
                   <span>{isBn ? "অতিরিক্ত উত্তর খাতা" : "Extended Answer Sheet"}</span>
                   <span>{isBn ? `প্রশ্ন ${qNum} (পৃষ্ঠা ${extraIdx + 2})` : `Q${qNum} (Page ${extraIdx + 2})`}</span>
-                  <span>{isBn ? "রফাজ একাডেমি" : "Rofaz Academy"}</span>
+                  <span>{isBn ? "রোফাজ একাডেমি (Rofaz Academy)" : "Rofaz Academy"}</span>
                 </div>
               </div>
             ))}

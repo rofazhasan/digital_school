@@ -333,7 +333,7 @@ export default function QuestionBankPage() {
   const [sheetClassId, setSheetClassId] = useState("all");
   const [sheetClassName, setSheetClassName] = useState("");
   const [sheetSubject, setSheetSubject] = useState("");
-  const [sheetSchoolName, setSheetSchoolName] = useState("রফাজ একাডেমি");
+  const [sheetSchoolName, setSheetSchoolName] = useState("রোফাজ একাডেমি (Rofaz Academy)");
   const [sheetDuration, setSheetDuration] = useState("30");
   const [sheetDate, setSheetDate] = useState(new Date().toISOString().split('T')[0]);
   const [sheetQuestions, setSheetQuestions] = useState<Question[]>([]);
@@ -342,14 +342,14 @@ export default function QuestionBankPage() {
   const [sheetShowSolution, setSheetShowSolution] = useState(false);
 
   // Helper: Auto-generate sheet title with Subject, Class, Institution (Rofaz Academy), Date, and Time
-  const generateAutoSheetName = useCallback((subj?: string, clsName?: string, instName: string = "রফাজ একাডেমি") => {
+  const generateAutoSheetName = useCallback((subj?: string, clsName?: string, instName: string = "রোফাজ একাডেমি (Rofaz Academy)") => {
     const now = new Date();
     const dateStr = now.toLocaleDateString('bn-BD', { day: '2-digit', month: '2-digit', year: 'numeric' });
     const timeStr = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
 
     const subjectPart = subj || (sheetQuestions[0]?.subject) || "কাস্টম প্রশ্ন শীট";
     const classPart = (clsName && clsName !== "All Classes" && clsName !== "") ? ` • ${clsName}` : "";
-    const instPart = instName || "রফাজ একাডেমি";
+    const instPart = instName || "রোফাজ একাডেমি (Rofaz Academy)";
 
     return `${subjectPart}${classPart} - ${instPart} (${dateStr}, ${timeStr})`;
   }, [sheetQuestions]);
@@ -431,7 +431,7 @@ export default function QuestionBankPage() {
 
     const selectedClassObj = classes.find(c => c.id === sheetClassId);
     const finalClassName = sheetClassName || (selectedClassObj ? selectedClassObj.name : "সকল শ্রেণি");
-    const finalSchoolName = sheetSchoolName || "রফাজ একাডেমি";
+    const finalSchoolName = sheetSchoolName || "রোফাজ একাডেমি (Rofaz Academy)";
 
     const autoTitle = generateAutoSheetName(
       sheetSubject || sheetQuestions[0]?.subject,
@@ -598,7 +598,7 @@ export default function QuestionBankPage() {
     setSheetClassId(preset.data.classId || "all");
     setSheetClassName(preset.data.className || "");
     setSheetSubject(preset.data.subject || "");
-    setSheetSchoolName(preset.data.schoolName || "রফাজ একাডেমি");
+    setSheetSchoolName(preset.data.schoolName || "রোফাজ একাডেমি (Rofaz Academy)");
     setSheetDuration(preset.data.duration || "30");
     setSheetQuestions(preset.data.questions || []);
     setSheetLayoutMode(preset.data.layoutMode || "standard");
