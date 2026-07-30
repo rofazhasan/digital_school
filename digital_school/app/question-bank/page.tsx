@@ -330,7 +330,6 @@ export default function QuestionBankPage() {
   const [selectedQuestions, setSelectedQuestions] = useState<Set<string>>(new Set());
 
   // --- Sheet Maker State ---
-  const [sheetTitle, setSheetTitle] = useState("কাস্টম প্র্যাকটিস শীট");
   const [sheetClassId, setSheetClassId] = useState("all");
   const [sheetClassName, setSheetClassName] = useState("");
   const [sheetSubject, setSheetSubject] = useState("");
@@ -341,6 +340,21 @@ export default function QuestionBankPage() {
   const [sheetLayoutMode, setSheetLayoutMode] = useState<'standard' | 'single'>('standard');
   const [sheetSingleStyle, setSheetSingleStyle] = useState<'vertical' | 'split'>('split');
   const [sheetShowSolution, setSheetShowSolution] = useState(false);
+
+  // Helper: Auto-generate sheet title with Subject, Class, Institution (Rofaz Academy), Date, and Time
+  const generateAutoSheetName = useCallback((subj?: string, clsName?: string, instName: string = "রফাজ একাডেমি") => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('bn-BD', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('bn-BD', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    const subjectPart = subj || (sheetQuestions[0]?.subject) || "কাস্টম প্রশ্ন শীট";
+    const classPart = (clsName && clsName !== "All Classes" && clsName !== "") ? ` • ${clsName}` : "";
+    const instPart = instName || "রফাজ একাডেমি";
+
+    return `${subjectPart}${classPart} - ${instPart} (${dateStr}, ${timeStr})`;
+  }, [sheetQuestions]);
+
+  const [sheetTitle, setSheetTitle] = useState("");
 
   // Auto-Gen Modal state
   const [isAutoGenModalOpen, setIsAutoGenModalOpen] = useState(false);
@@ -416,14 +430,25 @@ export default function QuestionBankPage() {
     }
 
     const selectedClassObj = classes.find(c => c.id === sheetClassId);
-    const finalClassName = sheetClassName || (selectedClassObj ? selectedClassObj.name : "All Classes");
+    const finalClassName = sheetClassName || (selectedClassObj ? selectedClassObj.name : "সকল শ্রেণি");
+    const finalSchoolName = sheetSchoolName || "রফাজ একাডেমি";
+
+    const autoTitle = generateAutoSheetName(
+      sheetSubject || sheetQuestions[0]?.subject,
+      finalClassName,
+      finalSchoolName
+    );
+
+    const finalTitle = (sheetTitle && sheetTitle.trim() !== "" && sheetTitle !== "কাস্টম প্র্যাকটিস শীট")
+      ? sheetTitle
+      : autoTitle;
 
     const printPayload = {
-      title: sheetTitle || "কাস্টম প্রশ্ন শীট",
-      schoolName: sheetSchoolName || "রফাজ একাডেমি",
+      title: finalTitle,
+      schoolName: finalSchoolName,
       className: finalClassName,
       class: finalClassName,
-      subject: sheetSubject || (sheetQuestions[0]?.subject || ""),
+      subject: sheetSubject || (sheetQuestions[0]?.subject || "সাধারণ"),
       date: sheetDate,
       duration: sheetDuration,
       totalMarks: sheetQuestions.reduce((acc, q) => acc + (q.customMarks !== undefined ? q.customMarks : (q.marks || (q.type === 'CQ' ? 10 : 1))), 0),
@@ -1373,13 +1398,22 @@ export default function QuestionBankPage() {
                       {/* Sheet Config Inputs Grid */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-6 pt-6 border-t border-indigo-800/40 relative z-10">
                         <div className="lg:col-span-2">
-                          <Label className="text-xs font-bold text-indigo-200 uppercase block mb-1.5">
-                            Sheet Name / Title (শীটের নাম)
-                          </Label>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <Label className="text-xs font-bold text-indigo-200 uppercase block">
+                              Sheet Name / Title (শীটের নাম)
+                            </Label>
+                            <button
+                              type="button"
+                              onClick={() => setSheetTitle(generateAutoSheetName(sheetSubject, sheetClassName, sheetSchoolName))}
+                              className="text-[11px] font-bold text-amber-300 hover:text-amber-200 flex items-center gap-1 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/40 transition-all"
+                            >
+                              ⚡ অটো নাম জেনারেট
+                            </button>
+                          </div>
                           <Input
                             value={sheetTitle}
                             onChange={(e) => setSheetTitle(e.target.value)}
-                            placeholder="e.g. পদার্থবিজ্ঞান অধ্যায় ১ টেস্ট শীট"
+                            placeholder={generateAutoSheetName(sheetSubject, sheetClassName, sheetSchoolName)}
                             className="h-10 rounded-xl bg-slate-900/80 border-indigo-800/60 text-white placeholder:text-gray-400 font-semibold"
                           />
                         </div>
