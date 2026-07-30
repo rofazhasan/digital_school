@@ -29,7 +29,8 @@ export default function PrintSheetPage() {
   const [isMathJaxReady, setIsMathJaxReady] = useState(false);
   const [showAnswers, setShowAnswers] = useState(false);
   const [layoutMode, setLayoutMode] = useState<'standard' | 'single'>('standard');
-  const [paperSize, setPaperSize] = useState<'a4' | 'legal' | 'letter'>('a4');
+  const [paperSize, setPaperSize] = useState<'a4' | 'legal' | 'letter'>(sheetData?.paperSize || 'a4');
+  const [singleStyle, setSingleStyle] = useState<'vertical' | 'split'>(sheetData?.singleStyle || 'split');
   const [objectiveFontSize, setObjectiveFontSize] = useState(100);
   const [cqSqFontSize, setCqSqFontSize] = useState(100);
   const [showDate, setShowDate] = useState(true);
@@ -273,6 +274,27 @@ export default function PrintSheetPage() {
                 </div>
               </div>
 
+              {/* 1-Page Layout Sub-Style (Split vs Vertical) */}
+              {layoutMode === 'single' && (
+                <div>
+                  <Label className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 block mb-1">১-পেজ লেআউট স্টাইল</Label>
+                  <div className="flex bg-indigo-50 dark:bg-slate-800 p-1 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                    <button
+                      onClick={() => setSingleStyle('split')}
+                      className={`flex-1 py-1 px-2 rounded font-bold text-[11px] transition-all ${singleStyle === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                      📖 স্প্লিট (ডানে খাতা/ডিজিটাল প্যাড)
+                    </button>
+                    <button
+                      onClick={() => setSingleStyle('vertical')}
+                      className={`flex-1 py-1 px-2 rounded font-bold text-[11px] transition-all ${singleStyle === 'vertical' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-600 dark:text-gray-300'}`}
+                    >
+                      📄 উল্লম্ব (নিচে খাতা)
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Paper Size */}
               <div>
                 <Label className="text-[10px] font-bold text-gray-500 block mb-1">পেপারের সাইজ</Label>
@@ -427,6 +449,7 @@ export default function PrintSheetPage() {
               showStudentHeader={showStudentHeader}
               watermarkText={watermarkText}
               paperSize={paperSize}
+              singleStyle={singleStyle}
             />
           )}
 

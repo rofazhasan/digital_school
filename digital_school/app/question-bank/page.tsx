@@ -339,6 +339,7 @@ export default function QuestionBankPage() {
   const [sheetDate, setSheetDate] = useState(new Date().toISOString().split('T')[0]);
   const [sheetQuestions, setSheetQuestions] = useState<Question[]>([]);
   const [sheetLayoutMode, setSheetLayoutMode] = useState<'standard' | 'single'>('standard');
+  const [sheetSingleStyle, setSheetSingleStyle] = useState<'vertical' | 'split'>('split');
   const [sheetShowSolution, setSheetShowSolution] = useState(false);
 
   // Auto-Gen Modal state
@@ -428,6 +429,7 @@ export default function QuestionBankPage() {
       totalMarks: sheetQuestions.reduce((acc, q) => acc + (q.customMarks !== undefined ? q.customMarks : (q.marks || (q.type === 'CQ' ? 10 : 1))), 0),
       questions: sheetQuestions,
       layoutMode: sheetLayoutMode,
+      singleStyle: sheetSingleStyle,
       showSolution: sheetShowSolution
     };
 
@@ -1470,6 +1472,35 @@ export default function QuestionBankPage() {
                             </button>
                           </div>
                         </div>
+
+                        {sheetLayoutMode === 'single' && (
+                          <div className="flex items-center justify-between bg-indigo-950/40 p-3 rounded-xl border border-indigo-700/50">
+                            <div>
+                              <Label className="text-xs font-bold text-indigo-200 block">
+                                1-Page Layout Sub-Style (১ পেজে ১টির ধরন)
+                              </Label>
+                              <p className="text-[11px] text-indigo-300/80">
+                                Side-by-side split workspace or vertical layout
+                              </p>
+                            </div>
+                            <div className="flex bg-slate-800 p-1 rounded-lg text-xs">
+                              <button
+                                type="button"
+                                onClick={() => setSheetSingleStyle('split')}
+                                className={`px-2.5 py-1 rounded-md font-bold transition-all ${sheetSingleStyle === 'split' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300'}`}
+                              >
+                                📖 স্প্লিট (ডানে খাতা/ডিজিটাল প্যাড)
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setSheetSingleStyle('vertical')}
+                                className={`px-2.5 py-1 rounded-md font-bold transition-all ${sheetSingleStyle === 'vertical' ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-300'}`}
+                              >
+                                📄 উল্লম্ব (নিচে খাতা)
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         <div className="flex items-center justify-between bg-slate-900/60 p-3 rounded-xl border border-indigo-800/40">
                           <div className="flex items-center gap-3">
