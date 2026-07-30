@@ -387,8 +387,22 @@ export default function PrintSheetPage() {
           </span>
         </div>
 
+        {/* DYNAMIC AUTO-LANDSCAPE PRINT CSS */}
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media print {
+            @page {
+              size: ${layoutMode === 'single' && singleStyle === 'split' ? 'landscape' : 'portrait'};
+              margin: 5mm;
+            }
+            body {
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+          }
+        ` }} />
+
         {/* PRINTABLE CONTENT AREA */}
-        <div ref={printRef} className="relative z-10 max-w-5xl mx-auto my-6 print:m-0 print:max-w-none">
+        <div ref={printRef} className={`relative z-10 mx-auto my-6 print:m-0 print:max-w-none print:w-full ${layoutMode === 'single' && singleStyle === 'split' ? 'max-w-[1400px]' : 'max-w-5xl'}`}>
           
           {/* WATERMARK OVERLAY FOR STANDARD PRINT MODE */}
           {watermarkText && layoutMode === 'standard' && (
