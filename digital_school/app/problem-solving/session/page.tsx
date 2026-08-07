@@ -88,7 +88,8 @@ export default function ProblemSolvingSession() {
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
     // Teacher Per-Question Timer State
-    const [timerSetting, setTimerSetting] = useState<string>("off"); // "off" | "1" | "2" | "3" | "5" | "10"
+    const [timerSetting, setTimerSetting] = useState<string>("off");
+    const [timerDurationSeconds, setTimerDurationSeconds] = useState<number>(0);
     const [questionTimerSeconds, setQuestionTimerSeconds] = useState<number>(0);
     const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
     const [isTimerExpired, setIsTimerExpired] = useState<boolean>(false);
@@ -128,12 +129,12 @@ export default function ProblemSolvingSession() {
 
     // Reset question timer state on index or setting change
     useEffect(() => {
-        if (timerSetting !== "off") {
-            setQuestionTimerSeconds(parseInt(timerSetting) * 60);
+        if (timerSetting !== "off" && timerDurationSeconds > 0) {
+            setQuestionTimerSeconds(timerDurationSeconds);
             setIsTimerRunning(false);
             setIsTimerExpired(false);
         }
-    }, [currentIndex, timerSetting]);
+    }, [currentIndex, timerSetting, timerDurationSeconds]);
 
     // Initialize
     useEffect(() => {
@@ -146,13 +147,20 @@ export default function ProblemSolvingSession() {
 
                 const savedTimerSecsStr = localStorage.getItem("problem-solving-timer-seconds");
                 const savedTimerStr = localStorage.getItem("problem-solving-timer") || "off";
-                const customSecs = savedTimerSecsStr ? parseInt(savedTimerSecsStr) : (savedTimerStr !== "off" ? parseInt(savedTimerStr) * 60 : 0);
+                let customSecs = 0;
+                if (savedTimerSecsStr && !isNaN(parseInt(savedTimerSecsStr))) {
+                    customSecs = parseInt(savedTimerSecsStr);
+                } else if (savedTimerStr !== "off" && !isNaN(parseInt(savedTimerStr))) {
+                    customSecs = parseInt(savedTimerStr) * 60;
+                }
 
                 if (customSecs > 0) {
                     setTimerSetting(`${customSecs}s`);
+                    setTimerDurationSeconds(customSecs);
                     setQuestionTimerSeconds(customSecs);
                 } else {
                     setTimerSetting("off");
+                    setTimerDurationSeconds(0);
                 }
 
                 const res = await fetch('/api/questions');
@@ -164,16 +172,44 @@ export default function ProblemSolvingSession() {
                 const processQ = (q: Question) => {
                     let updatedQ = { ...q };
 
-                    // 1. MCQ, MC, SMCQ Option Shuffling & Answer Letter Mapping
-                    if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ') && Array.isArray(q.options) && q.options.length > 0) {
-                        const optionsWithIndex = q.options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
+                    // 1. Resolve correctness and map options for MCQ, MC, SMCQ, AR BEFORE shuffling
+                    if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ' || q.type === 'AR') && Array.isArray(q.options) && q.options.length > 0) {
+                        let dbCorrectIdx = -1;
+                        const foundIdx = q.options.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+                        if (foundIdx !== -1) {
+                            dbCorrectIdx = foundIdx;
+                        } else if ((q as any).correctOption !== undefined && (q as any).correctOption !== null) {
+                            const num = Number((q as any).correctOption);
+                            dbCorrectIdx = num > 0 && num <= q.options.length ? num - 1 : num;
+                        } else if (q.correctAnswer || q.modelAnswer) {
+                            const str = (q.correctAnswer || q.modelAnswer || "").trim().toUpperCase();
+                            const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
+                            if (letterMap[str] !== undefined) {
+                                dbCorrectIdx = letterMap[str];
+                            } else {
+                                const num = parseInt(str);
+                                if (!isNaN(num)) dbCorrectIdx = num;
+                            }
+                        }
+
+                        const optionsWithIndex = q.options.map((opt: any, idx: number) => {
+                            const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
+                            const isOptCorrect = optObj.isCorrect !== undefined
+                                ? (optObj.isCorrect === true || String(optObj.isCorrect) === 'true')
+                                : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : false);
+                            return {
+                                ...optObj,
+                                originalIndex: idx,
+                                isCorrect: isOptCorrect
+                            };
+                        });
+
                         const shuffledOptions = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
                         updatedQ.options = shuffledOptions;
 
+                        // Recalculate correctAnswer string (e.g. A, B, C...) based on new shuffled order
                         const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
-                            if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
-                                acc.push(idx);
-                            }
+                            if (opt.isCorrect === true) acc.push(idx);
                             return acc;
                         }, []);
                         if (correctIndices.length > 0) {
@@ -181,8 +217,8 @@ export default function ProblemSolvingSession() {
                         }
                     }
 
-                    // 2. AR Questions: Ensure 4 options exist with correctness mapping
-                    if (q.type === 'AR') {
+                    // 2. AR Questions: Ensure 4 options exist with correctness mapping if empty
+                    if (q.type === 'AR' && (!Array.isArray(updatedQ.options) || updatedQ.options.length === 0)) {
                         const defaultAROptions = [
                             { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
                             { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
@@ -190,21 +226,16 @@ export default function ProblemSolvingSession() {
                             { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
                         ];
 
-                        let arOpts = (Array.isArray(q.options) && q.options.length > 0) ? q.options : defaultAROptions;
                         let correctIdx = -1;
-                        if (q.correctOption) {
-                            correctIdx = Number(q.correctOption) - 1;
-                        } else {
-                            correctIdx = arOpts.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+                        if ((q as any).correctOption) {
+                            correctIdx = Number((q as any).correctOption) - 1;
                         }
 
-                        arOpts = arOpts.map((opt: any, idx: number) => ({
+                        updatedQ.options = defaultAROptions.map((opt: any, idx: number) => ({
                             ...opt,
                             originalIndex: idx,
-                            isCorrect: correctIdx >= 0 ? idx === correctIdx : Boolean(opt.isCorrect)
+                            isCorrect: correctIdx >= 0 ? idx === correctIdx : false
                         }));
-
-                        updatedQ.options = arOpts;
                     }
 
                     // 3. MTF Column Shuffling
