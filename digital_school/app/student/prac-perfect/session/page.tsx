@@ -790,19 +790,96 @@ export default function PracPerfectSessionPage() {
                                                     </span>
                                                 </div>
 
-                                                {/* Correct Answer Summary Badge */}
-                                                {(!isCorrect || result === 'unanswered') && ['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && (
-                                                    <Badge className="bg-green-600 text-white border-white border-2 font-black px-4 py-1.5 shadow-md">
-                                                        Correct: {(() => {
-                                                            const correctIdx = currentQ.options?.findIndex((o: any) => o.isCorrect) ?? -1;
-                                                            return correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : "?";
+                                            </div>
+
+                                            {/* CORRECT ANSWER BOX FOR ALL QUESTION TYPES */}
+                                            <div className="mb-3 p-3.5 rounded-xl bg-background/80 border border-primary/20 shadow-sm font-fancy">
+                                                <div className="text-xs font-black uppercase tracking-wider text-primary mb-2 flex items-center gap-1.5">
+                                                    <CheckCircle className="w-4 h-4 text-emerald-500" /> Correct Answer:
+                                                </div>
+
+                                                {/* MCQ / SMCQ / AR */}
+                                                {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && (
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                                            Option {(() => {
+                                                                const correctIdx = currentQ.options?.findIndex((o: any) => o.isCorrect) ?? -1;
+                                                                return correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : "?";
+                                                            })()}
+                                                        </Badge>
+                                                        {(() => {
+                                                            const correctOpt = currentQ.options?.find((o: any) => o.isCorrect);
+                                                            return correctOpt?.text ? (
+                                                                <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(correctOpt.text)}</UniversalMathJax>
+                                                                </span>
+                                                            ) : null;
                                                         })()}
-                                                    </Badge>
+                                                    </div>
                                                 )}
-                                                {(!isCorrect || result === 'unanswered') && currentQ.type === 'INT' && currentQ.modelAnswer && (
-                                                    <Badge className="bg-green-600 text-white border-white border-2 font-black px-4 py-1.5 shadow-md">
-                                                        Correct Answer: {currentQ.modelAnswer}
-                                                    </Badge>
+
+                                                {/* MC (Multiple Choice Checkboxes) */}
+                                                {currentQ.type === 'MC' && (
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <Badge className="bg-emerald-600 text-white font-black px-3 py-1 text-sm shadow">
+                                                            Options: {(() => {
+                                                                const correctIndices = currentQ.options
+                                                                    ?.map((o: any, idx: number) => o.isCorrect ? String.fromCharCode(65 + idx) : null)
+                                                                    .filter(Boolean) ?? [];
+                                                                return correctIndices.length > 0 ? correctIndices.join(', ') : "All Selected";
+                                                            })()}
+                                                        </Badge>
+                                                    </div>
+                                                )}
+
+                                                {/* INT (Numerical Answer) */}
+                                                {currentQ.type === 'INT' && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                                            Numerical Answer: {String((currentQ as any).integerAnswer ?? currentQ.correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
+                                                        </Badge>
+                                                    </div>
+                                                )}
+
+                                                {/* MTF (Matching Column Pairs) */}
+                                                {currentQ.type === 'MTF' && currentQ.leftColumn && (
+                                                    <div className="flex flex-wrap gap-2 pt-1">
+                                                        {currentQ.leftColumn.map((leftItem: any, i: number) => {
+                                                            let rightLabel = '?';
+                                                            let rightText = '';
+
+                                                            if (currentQ.matches && currentQ.matches[leftItem.id]) {
+                                                                const rId = currentQ.matches[leftItem.id];
+                                                                const rIdx = currentQ.rightColumn?.findIndex((r: any) => r.id === rId);
+                                                                if (rIdx !== undefined && rIdx !== -1) {
+                                                                    rightLabel = String.fromCharCode(65 + rIdx);
+                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                }
+                                                            } else if (leftItem.originalIndex !== undefined && currentQ.rightColumn) {
+                                                                const rIdx = currentQ.rightColumn.findIndex((r: any) => r.originalIndex === leftItem.originalIndex);
+                                                                if (rIdx !== -1) {
+                                                                    rightLabel = String.fromCharCode(65 + rIdx);
+                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                }
+                                                            } else if (currentQ.rightColumn && currentQ.rightColumn[i]) {
+                                                                rightLabel = String.fromCharCode(65 + i);
+                                                                rightText = currentQ.rightColumn[i]?.text || '';
+                                                            }
+
+                                                            return (
+                                                                <Badge key={leftItem.id || i} variant="outline" className="bg-emerald-50 dark:bg-emerald-950/60 border-emerald-300 text-emerald-800 dark:text-emerald-200 text-xs font-bold py-1 px-2.5">
+                                                                    ({i + 1}) → ({rightLabel}){rightText ? `: ${rightText}` : ''}
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                {/* CQ / SQ / DESCRIPTIVE Model Answer */}
+                                                {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && currentQ.modelAnswer && (
+                                                    <div className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                                                        <UniversalMathJax dynamic>{cleanupMath(currentQ.modelAnswer)}</UniversalMathJax>
+                                                    </div>
                                                 )}
                                             </div>
 

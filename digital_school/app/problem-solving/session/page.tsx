@@ -1069,23 +1069,41 @@ export default function ProblemSolvingSession() {
                                             {currentQ.type === 'INT' && (
                                                 <div className="mb-3">
                                                     <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                        Correct Numerical Answer: {(currentQ as any).integerAnswer !== undefined ? (currentQ as any).integerAnswer : (currentQ.modelAnswer || (currentQ as any).correctAnswer || "See explanation")}
+                                                        Correct Numerical Answer: {String((currentQ as any).integerAnswer ?? currentQ.correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
                                                     </Badge>
                                                 </div>
                                             )}
 
                                             {/* MTF (Matching Column) Answer Badges */}
-                                            {currentQ.type === 'MTF' && currentQ.leftColumn && currentQ.matches && (
+                                            {currentQ.type === 'MTF' && currentQ.leftColumn && (
                                                 <div className="mb-3 space-y-1">
                                                     <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Correct Matches:</div>
                                                     <div className="flex flex-wrap gap-2">
-                                                        {currentQ.leftColumn.map((item, i) => {
-                                                            const rId = currentQ.matches?.[item.id];
-                                                            const rIdx = currentQ.rightColumn?.findIndex(r => r.id === rId);
-                                                            const label = rIdx !== undefined && rIdx !== -1 ? String.fromCharCode(65 + rIdx) : '?';
+                                                        {currentQ.leftColumn.map((leftItem: any, i: number) => {
+                                                            let rightLabel = '?';
+                                                            let rightText = '';
+
+                                                            if (currentQ.matches && currentQ.matches[leftItem.id]) {
+                                                                const rId = currentQ.matches[leftItem.id];
+                                                                const rIdx = currentQ.rightColumn?.findIndex((r: any) => r.id === rId);
+                                                                if (rIdx !== undefined && rIdx !== -1) {
+                                                                    rightLabel = String.fromCharCode(65 + rIdx);
+                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                }
+                                                            } else if (leftItem.originalIndex !== undefined && currentQ.rightColumn) {
+                                                                const rIdx = currentQ.rightColumn.findIndex((r: any) => r.originalIndex === leftItem.originalIndex);
+                                                                if (rIdx !== -1) {
+                                                                    rightLabel = String.fromCharCode(65 + rIdx);
+                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                }
+                                                            } else if (currentQ.rightColumn && currentQ.rightColumn[i]) {
+                                                                rightLabel = String.fromCharCode(65 + i);
+                                                                rightText = currentQ.rightColumn[i]?.text || '';
+                                                            }
+
                                                             return (
-                                                                <Badge key={item.id} variant="outline" className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300 font-bold text-xs">
-                                                                    ({i + 1} → {label})
+                                                                <Badge key={leftItem.id || i} variant="outline" className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300 font-bold text-xs">
+                                                                    ({i + 1} → {rightLabel}){rightText ? `: ${rightText}` : ''}
                                                                 </Badge>
                                                             );
                                                         })}
