@@ -63,7 +63,11 @@ export default function ProblemSolvingSelector() {
     const [filterTopic, setFilterTopic] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [timerMinutes, setTimerMinutes] = useState<string>("3"); // "off" | "1" | "2" | "3" | "5" | "10"
+    
+    // Custom Minutes & Seconds Timer Config
+    const [timerEnabled, setTimerEnabled] = useState<boolean>(true);
+    const [timerMinutesInput, setTimerMinutesInput] = useState<number>(3);
+    const [timerSecondsInput, setTimerSecondsInput] = useState<number>(0);
 
     const [availableClasses, setAvailableClasses] = useState<any[]>([]);
 
@@ -115,8 +119,10 @@ export default function ProblemSolvingSelector() {
 
     const startSession = () => {
         if (selectedIds.size === 0) return;
+        const totalSecs = timerEnabled ? (Math.max(0, timerMinutesInput) * 60 + Math.max(0, timerSecondsInput)) : 0;
         localStorage.setItem("problem-solving-session", JSON.stringify(Array.from(selectedIds)));
-        localStorage.setItem("problem-solving-timer", timerMinutes);
+        localStorage.setItem("problem-solving-timer-seconds", totalSecs.toString());
+        localStorage.setItem("problem-solving-timer", timerEnabled ? `${timerMinutesInput}m ${timerSecondsInput}s` : "off");
         router.push("/problem-solving/session");
     };
 
@@ -409,33 +415,69 @@ export default function ProblemSolvingSelector() {
                                             <span className="text-2xl font-black text-indigo-600">{selectedIds.size}</span>
                                         </div>
 
-                                        {/* Timer Configuration Setting */}
-                                        <div className="mb-6 space-y-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                        {/* Custom Per-Question Timer Configuration Setting */}
+                                        <div className="mb-6 space-y-3 p-3.5 bg-indigo-50/50 rounded-xl border border-indigo-100">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
                                                     <Clock className="w-3.5 h-3.5 text-indigo-600" /> Per-Question Timer
                                                 </span>
-                                                <Badge variant="outline" className="text-[10px] bg-white text-indigo-700 font-semibold border-indigo-200">
-                                                    {timerMinutes === 'off' ? 'Disabled' : `${timerMinutes} min / Q`}
+                                                <Badge variant="outline" className={`text-[10px] font-bold ${timerEnabled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                                                    {timerEnabled ? `${timerMinutesInput}m ${timerSecondsInput}s` : 'Off'}
                                                 </Badge>
                                             </div>
-                                            <Select value={timerMinutes} onValueChange={setTimerMinutes}>
-                                                <SelectTrigger className="w-full bg-white border-indigo-200 text-sm h-10 rounded-lg">
-                                                    <SelectValue placeholder="Select Timer" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="off">No Timer (Manual Pace)</SelectItem>
-                                                    <SelectItem value="1">1 Minute per question</SelectItem>
-                                                    <SelectItem value="2">2 Minutes per question</SelectItem>
-                                                    <SelectItem value="3">3 Minutes per question (Default)</SelectItem>
-                                                    <SelectItem value="5">5 Minutes per question</SelectItem>
-                                                    <SelectItem value="10">10 Minutes per question</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-[11px] text-slate-500 leading-tight">
-                                                {timerMinutes === 'off'
-                                                    ? 'Teacher controls timer manually during class presentation.'
-                                                    : `Timer counts down ${timerMinutes} mins per question. Alerts when time is up.`}
+
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={timerEnabled ? "default" : "outline"}
+                                                    onClick={() => setTimerEnabled(true)}
+                                                    className="h-8 text-xs flex-1 font-semibold"
+                                                >
+                                                    Timer On
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant={!timerEnabled ? "default" : "outline"}
+                                                    onClick={() => setTimerEnabled(false)}
+                                                    className="h-8 text-xs flex-1 font-semibold"
+                                                >
+                                                    Timer Off
+                                                </Button>
+                                            </div>
+
+                                            {timerEnabled && (
+                                                <div className="grid grid-cols-2 gap-2 pt-1 animate-in fade-in slide-in-from-top-1">
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase text-indigo-900/70 mb-1 block">Minutes</label>
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            max={59}
+                                                            value={timerMinutesInput}
+                                                            onChange={(e) => setTimerMinutesInput(Math.max(0, parseInt(e.target.value) || 0))}
+                                                            className="h-9 bg-white border-indigo-200 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="text-[10px] font-bold uppercase text-indigo-900/70 mb-1 block">Seconds</label>
+                                                        <Input
+                                                            type="number"
+                                                            min={0}
+                                                            max={59}
+                                                            value={timerSecondsInput}
+                                                            onChange={(e) => setTimerSecondsInput(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                                                            className="h-9 bg-white border-indigo-200 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <p className="text-[11px] text-slate-500 leading-tight pt-1">
+                                                {timerEnabled
+                                                    ? `Each question timer is set to ${timerMinutesInput} minute(s) ${timerSecondsInput} second(s).`
+                                                    : 'Self-paced session without per-question countdown timer.'}
                                             </p>
                                         </div>
 

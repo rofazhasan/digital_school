@@ -30,6 +30,13 @@
   font-feature-settings: "cv05", "cv11", "ss01";
 }
 
+/* Authentic Print Exam Font (matching /exams/[id]/print) */
+.font-exam-paper {
+  font-family: 'ExamFont', 'Noto Serif Bengali', 'Bookman Old Style', 'Book Antiqua', 'Georgia', serif !important;
+  line-height: 1.6 !important;
+  letter-spacing: 0.01em !important;
+}
+
 @layer base {
 
   h1,

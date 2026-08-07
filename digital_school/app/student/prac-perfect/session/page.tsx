@@ -95,10 +95,15 @@ export default function PracPerfectSessionPage() {
             document.title = "Practice Session || Student | Digital School";
 
             const storedIds = localStorage.getItem("prac-perfect-session");
-            const savedTimer = localStorage.getItem("prac-perfect-timer") || "off";
-            setTimerSetting(savedTimer);
-            if (savedTimer !== "off") {
-                setQuestionTimerSeconds(parseInt(savedTimer) * 60);
+            const savedTimerSecsStr = localStorage.getItem("prac-perfect-timer-seconds");
+            const savedTimerStr = localStorage.getItem("prac-perfect-timer") || "off";
+            const customSecs = savedTimerSecsStr ? parseInt(savedTimerSecsStr) : (savedTimerStr !== "off" ? parseInt(savedTimerStr) * 60 : 0);
+
+            if (customSecs > 0) {
+                setTimerSetting(`${customSecs}s`);
+                setQuestionTimerSeconds(customSecs);
+            } else {
+                setTimerSetting("off");
             }
 
             if (!storedIds) {
@@ -125,11 +130,12 @@ export default function PracPerfectSessionPage() {
                     shuffle(rawQuestions);
 
                     const processedQuestions = rawQuestions.map(q => {
-                        // Options processing for MCQ, MC, SMCQ, AR
-                        if (Array.isArray(q.options) && q.options.length > 0) {
-                            let correctIdx = -1;
-                            const dbCorrectIdx = q.options.findIndex((o: any) => o.isCorrect === true);
+                        let updatedQ = { ...q };
 
+                        // 1. MCQ, MC, SMCQ Option Shuffling & Answer Mapping
+                        if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ') && Array.isArray(q.options) && q.options.length > 0) {
+                            let correctIdx = -1;
+                            const dbCorrectIdx = q.options.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
                             if (dbCorrectIdx !== -1) {
                                 correctIdx = dbCorrectIdx;
                             } else if (q.modelAnswer) {
@@ -152,17 +158,52 @@ export default function PracPerfectSessionPage() {
 
                             const optionsWithIndex = processedOptions.map((opt: any, idx: number) => ({ ...opt, originalIndex: idx }));
                             shuffle(optionsWithIndex);
-                            return { ...q, options: optionsWithIndex };
+                            updatedQ.options = optionsWithIndex;
+
+                            // Recalculate correctAnswer string (e.g. A, B, C...)
+                            const correctIndices = optionsWithIndex.reduce((acc: number[], opt: any, idx: number) => {
+                                if (opt.isCorrect === true) acc.push(idx);
+                                return acc;
+                            }, []);
+                            if (correctIndices.length > 0) {
+                                updatedQ.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                            }
                         }
 
-                        // MTF Processing: Shuffle Right Column if present
+                        // 2. AR Questions: Ensure 4 options exist with correctness mapping
+                        if (q.type === 'AR') {
+                            const defaultAROptions = [
+                                { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+                                { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+                                { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+                                { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
+                            ];
+
+                            let arOpts = (Array.isArray(q.options) && q.options.length > 0) ? q.options : defaultAROptions;
+                            let correctIdx = -1;
+                            if (q.correctOption) {
+                                correctIdx = Number(q.correctOption) - 1;
+                            } else {
+                                correctIdx = arOpts.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+                            }
+
+                            arOpts = arOpts.map((opt: any, idx: number) => ({
+                                ...opt,
+                                originalIndex: idx,
+                                isCorrect: correctIdx >= 0 ? idx === correctIdx : Boolean(opt.isCorrect)
+                            }));
+
+                            updatedQ.options = arOpts;
+                        }
+
+                        // 3. MTF Column Shuffling
                         if (q.type === 'MTF' && Array.isArray(q.rightColumn)) {
                             const rightWithIndex = q.rightColumn.map((item: any, idx: number) => ({ ...item, originalIndex: idx }));
                             shuffle(rightWithIndex);
-                            return { ...q, rightColumn: rightWithIndex };
+                            updatedQ.rightColumn = rightWithIndex;
                         }
 
-                        return q;
+                        return updatedQ;
                     });
 
                     setQuestions(processedQuestions);
@@ -191,7 +232,8 @@ export default function PracPerfectSessionPage() {
             if (e.key === 'ArrowRight') {
                 handleNext();
             } else if (e.key === 'ArrowLeft') {
-                if (currentIndex > 0) setCurrentIndex(c => c - 1);
+                // If timer is enabled, student CANNOT go backward! Only forward navigation allowed.
+                if (timerSetting === "off" && currentIndex > 0) setCurrentIndex(c => c - 1);
             } else if (e.key === 'Enter') {
                 if (!isChecked && canCheckAnswer()) {
                     handleCheckAnswer();
@@ -203,7 +245,7 @@ export default function PracPerfectSessionPage() {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [currentIndex, isChecked, userAnswers, questions]);
+    }, [currentIndex, isChecked, userAnswers, questions, timerSetting]);
 
     // Reset check state on question index change
     useEffect(() => {
@@ -211,7 +253,10 @@ export default function PracPerfectSessionPage() {
         setIsCorrect(false);
 
         if (timerSetting !== "off") {
-            setQuestionTimerSeconds(parseInt(timerSetting) * 60);
+            const savedTimerSecsStr = localStorage.getItem("prac-perfect-timer-seconds");
+            if (savedTimerSecsStr) {
+                setQuestionTimerSeconds(parseInt(savedTimerSecsStr));
+            }
         }
 
         if (questionContainerRef.current) {
@@ -403,7 +448,7 @@ export default function PracPerfectSessionPage() {
                         className="absolute top-20 left-4 md:left-10 w-[95vw] md:w-[600px] lg:w-[900px] xl:w-[1100px] 2xl:w-[1200px] max-h-[calc(100vh-160px)] z-40 overflow-y-auto custom-scrollbar transition-all duration-300 scroll-smooth"
                     >
                         <Card className={`prac-perfect-glass shadow-2xl border-0 ring-1 ring-border ${isDark ? 'bg-background/80 text-foreground' : 'bg-card/80 text-foreground'} transition-all duration-500`}>
-                            <div className="p-6 space-y-6">
+                            <div className="p-6 space-y-6 font-exam-paper">
                                 {/* Header / Tags */}
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex flex-wrap gap-2">
@@ -857,7 +902,7 @@ export default function PracPerfectSessionPage() {
                     boardRef={boardRef}
                     currentIndex={currentIndex}
                     totalQuestions={questions.length}
-                    onPrev={() => currentIndex > 0 && setCurrentIndex(c => c - 1)}
+                    onPrev={() => timerSetting === "off" && currentIndex > 0 && setCurrentIndex(c => c - 1)}
                     onNext={handleNext}
                     bgMode={boardBackground}
                     onNavigateBg={() => {

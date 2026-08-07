@@ -144,44 +144,86 @@ export default function ProblemSolvingSession() {
                 const isReview = params.get('mode') === 'review';
                 const storedIds = localStorage.getItem(isReview ? "review-session-data" : "problem-solving-session");
 
-                const savedTimer = localStorage.getItem("problem-solving-timer") || "off";
-                setTimerSetting(savedTimer);
-                if (savedTimer !== "off") {
-                    setQuestionTimerSeconds(parseInt(savedTimer) * 60);
+                const savedTimerSecsStr = localStorage.getItem("problem-solving-timer-seconds");
+                const savedTimerStr = localStorage.getItem("problem-solving-timer") || "off";
+                const customSecs = savedTimerSecsStr ? parseInt(savedTimerSecsStr) : (savedTimerStr !== "off" ? parseInt(savedTimerStr) * 60 : 0);
+
+                if (customSecs > 0) {
+                    setTimerSetting(`${customSecs}s`);
+                    setQuestionTimerSeconds(customSecs);
+                } else {
+                    setTimerSetting("off");
                 }
 
                 const res = await fetch('/api/questions');
                 const data = await res.json();
 
                 let sessionQuestions: Question[] = [];
-                // Check if stored data is IDs (legacy/selector) or Full Objects (Review Mode)
                 const storedData = storedIds ? JSON.parse(storedIds) : [];
+
+                const processQ = (q: Question) => {
+                    let updatedQ = { ...q };
+
+                    // 1. MCQ, MC, SMCQ Option Shuffling & Answer Letter Mapping
+                    if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ') && Array.isArray(q.options) && q.options.length > 0) {
+                        const optionsWithIndex = q.options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
+                        const shuffledOptions = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
+                        updatedQ.options = shuffledOptions;
+
+                        const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+                            if (opt.isCorrect === true || String(opt.isCorrect) === 'true') {
+                                acc.push(idx);
+                            }
+                            return acc;
+                        }, []);
+                        if (correctIndices.length > 0) {
+                            updatedQ.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                        }
+                    }
+
+                    // 2. AR Questions: Ensure 4 options exist with correctness mapping
+                    if (q.type === 'AR') {
+                        const defaultAROptions = [
+                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+                            { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+                            { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+                            { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
+                        ];
+
+                        let arOpts = (Array.isArray(q.options) && q.options.length > 0) ? q.options : defaultAROptions;
+                        let correctIdx = -1;
+                        if (q.correctOption) {
+                            correctIdx = Number(q.correctOption) - 1;
+                        } else {
+                            correctIdx = arOpts.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+                        }
+
+                        arOpts = arOpts.map((opt: any, idx: number) => ({
+                            ...opt,
+                            originalIndex: idx,
+                            isCorrect: correctIdx >= 0 ? idx === correctIdx : Boolean(opt.isCorrect)
+                        }));
+
+                        updatedQ.options = arOpts;
+                    }
+
+                    // 3. MTF Column Shuffling
+                    if (q.type === 'MTF' && Array.isArray(q.rightColumn) && q.rightColumn.length > 0) {
+                        const rightWithIndex = q.rightColumn.map((item, idx) => ({ ...item, originalIndex: idx }));
+                        updatedQ.rightColumn = isReview ? rightWithIndex : shuffleArray(rightWithIndex);
+                    }
+
+                    return updatedQ;
+                };
 
                 if (Array.isArray(storedData) && storedData.length > 0) {
                     if (typeof storedData[0] === 'string') {
-                        // IDs only (Selector Mode)
                         const ids = storedData as string[];
                         sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
-
-                        // Shuffle for fresh session (only if not review)
                         if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
-                        sessionQuestions = sessionQuestions.map((q: Question) => {
-                            let updatedQ = { ...q };
-                            if (q.type === 'MCQ' && q.options && q.options.length > 0) {
-                                const optionsWithIndex = q.options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
-                                updatedQ.options = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
-                            }
-                            if (q.type === 'MTF' && q.rightColumn && q.rightColumn.length > 0) {
-                                const rightWithIndex = q.rightColumn.map((item, idx) => ({ ...item, originalIndex: idx }));
-                                updatedQ.rightColumn = isReview ? rightWithIndex : shuffleArray(rightWithIndex);
-                            }
-                            return updatedQ;
-                        });
-
+                        sessionQuestions = sessionQuestions.map((q: Question) => processQ(q));
                     } else {
-                        // Full Objects (Review/Export Mode)
-                        // Verify they match our schema or merge with API data if needed
-                        sessionQuestions = storedData as Question[];
+                        sessionQuestions = (storedData as Question[]).map(q => processQ(q));
 
                         // Extract Exam Name if available
                         if ((storedData as any).examName) {
@@ -692,8 +734,8 @@ export default function ProblemSolvingSession() {
                                     </div>
                                 </div>
 
-                                <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    {/* Assertion-Reason Special Layout */}
+                                <div className="p-6 overflow-y-auto max-h-[calc(100vh-280px)] space-y-6 custom-scrollbar font-exam-paper">
+                                    {/* Question Text / Assertion-Reasoning Special Layout */}
                                     {currentQ.type === 'AR' && (
                                         <div className="p-4 mb-4 rounded-xl border-2 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/50 space-y-3">
                                             <div>

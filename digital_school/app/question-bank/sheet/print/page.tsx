@@ -37,6 +37,7 @@ export default function PrintSheetPage() {
   const [showStudentHeader, setShowStudentHeader] = useState(false);
   const [watermarkText, setWatermarkText] = useState("");
   const [showOMR, setShowOMR] = useState(false);
+  const [isShuffled, setIsShuffled] = useState(false);
 
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +67,68 @@ export default function PrintSheetPage() {
       setIsLoading(false);
     }
   }, []);
+
+  // Shuffle Options & Remap Answers (matching /exams/[id] set generator)
+  const shuffleOptionsAndMapAnswers = (questions: any[]) => {
+    const shuffleArray = (arr: any[]) => {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    };
+
+    return questions.map((q: any) => {
+      let processed = { ...q };
+
+      // 1. MCQ, MC, SMCQ Option Shuffling & Answer Key Remapping
+      if ((q.type === 'MCQ' || q.type === 'MC' || q.type === 'SMCQ') && Array.isArray(q.options) && q.options.length > 0) {
+        const shuffledOptions = shuffleArray(q.options);
+        processed.options = shuffledOptions;
+
+        const correctIndices = shuffledOptions.reduce((acc: number[], opt: any, idx: number) => {
+          if (opt.isCorrect === true || String(opt.isCorrect) === 'true') acc.push(idx);
+          return acc;
+        }, []);
+        if (correctIndices.length > 0) {
+          processed.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+        }
+      }
+
+      // 2. AR Questions: Ensure 4 options with correctness mapping
+      if (q.type === 'AR') {
+        const defaultAROptions = [
+          { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক এবং R হলো A এর সঠিক ব্যাখ্যা", isCorrect: false },
+          { text: "Assertion (A) ও Reason (R) উভয়ই সঠিক কিন্তু R হলো A এর সঠিক ব্যাখ্যা নয়", isCorrect: false },
+          { text: "Assertion (A) সঠিক কিন্তু Reason (R) মিথ্যা", isCorrect: false },
+          { text: "Assertion (A) মিথ্যা কিন্তু Reason (R) সঠিক", isCorrect: false }
+        ];
+
+        let arOpts = (Array.isArray(q.options) && q.options.length > 0) ? q.options : defaultAROptions;
+        let correctIdx = -1;
+        if (q.correctOption) {
+          correctIdx = Number(q.correctOption) - 1;
+        } else {
+          correctIdx = arOpts.findIndex((o: any) => o.isCorrect === true || String(o.isCorrect) === 'true');
+        }
+
+        arOpts = arOpts.map((opt: any, idx: number) => ({
+          ...opt,
+          isCorrect: correctIdx >= 0 ? idx === correctIdx : Boolean(opt.isCorrect)
+        }));
+
+        processed.options = arOpts;
+      }
+
+      // 3. MTF Column Shuffling
+      if (q.type === 'MTF' && Array.isArray(q.rightColumn) && q.rightColumn.length > 0) {
+        processed.rightColumn = shuffleArray(q.rightColumn);
+      }
+
+      return processed;
+    });
+  };
 
   // Check MathJax Readiness
   useEffect(() => {
@@ -158,7 +221,11 @@ export default function PrintSheetPage() {
   }
 
   // Normalize all questions to resolve model answers, explanations, and subquestions
-  const normalizedQuestionsList = (sheetData?.questions || []).map((q: any) => normalizeQuestionData(q));
+  let normalizedQuestionsList = (sheetData?.questions || []).map((q: any) => normalizeQuestionData(q));
+
+  if (isShuffled) {
+    normalizedQuestionsList = shuffleOptionsAndMapAnswers(normalizedQuestionsList);
+  }
 
   // Organize questions for QuestionPaper / AnswerQuestionPaper standard view
   const objectiveQuestions = normalizedQuestionsList.filter((q: any) => ['MCQ', 'MC', 'INT', 'AR', 'SMCQ', 'MTF'].includes(q.type));
@@ -243,6 +310,16 @@ export default function PrintSheetPage() {
                     English
                   </button>
                 </div>
+
+                {/* Shuffle Options Button */}
+                <Button
+                  variant="outline"
+                  onClick={() => setIsShuffled(!isShuffled)}
+                  className={`font-bold px-4 py-2 rounded-xl border flex items-center gap-2 text-xs transition-all ${isShuffled ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-indigo-700 border-indigo-200 hover:bg-indigo-50 dark:bg-gray-800 dark:text-indigo-300'}`}
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${isShuffled ? 'animate-spin-slow' : ''}`} />
+                  {isShuffled ? (language === 'bn' ? 'অপশন শুফলিং অন' : 'Shuffled Options') : (language === 'bn' ? 'অপশন শুফল করুন' : 'Shuffle Options')}
+                </Button>
 
                 {/* Print Button */}
                 <Button
