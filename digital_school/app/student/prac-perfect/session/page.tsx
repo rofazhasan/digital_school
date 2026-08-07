@@ -6,13 +6,14 @@ import dynamic from "next/dynamic";
 import {
     Clock, ArrowLeft, CheckCircle, XCircle, AlertCircle,
     ChevronLeft, ChevronRight, RotateCcw, Flag, ArrowRight, Eye, Sparkles,
-    Check, Square, CheckSquare
+    Check, Square, CheckSquare, ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { toast } from "sonner";
 import { MathJaxContext } from "better-react-mathjax";
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
@@ -666,51 +667,98 @@ export default function PracPerfectSessionPage() {
 
                                 {/* Type 4: Match The Following (MTF) */}
                                 {currentQ.type === 'MTF' && Array.isArray(currentQ.leftColumn) && Array.isArray(currentQ.rightColumn) && (
-                                    <div className="space-y-4 mt-6">
-                                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">
+                                    <div className="space-y-6 mt-6">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                             Match each item in Column A with Column B:
                                         </div>
-                                        <div className="space-y-3">
+
+                                        {/* Column B Reference Cards with Full LaTeX Math Support */}
+                                        <div className="p-4 rounded-xl bg-muted/30 border border-border space-y-2 font-fancy">
+                                            <div className="text-xs font-bold uppercase tracking-wider text-primary mb-2">Column B Options:</div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {currentQ.rightColumn.map((rightItem: any, rIdx: number) => (
+                                                    <div key={rightItem.id || rIdx} className="p-2.5 rounded-lg bg-card border border-border flex items-start gap-2.5 text-sm">
+                                                        <Badge variant="outline" className="bg-primary/10 text-primary font-bold shrink-0">
+                                                            ({String.fromCharCode(65 + rIdx)})
+                                                        </Badge>
+                                                        <div className="flex-1 font-medium leading-normal">
+                                                            <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Interactive Match Selector Rows with LaTeX Rendering */}
+                                        <div className="space-y-3 font-fancy">
                                             {currentQ.leftColumn.map((leftItem: any, idx: number) => {
                                                 const matchesMap: Record<string, string> = currentAns || {};
                                                 const selectedRightId = matchesMap[leftItem.id] || "";
                                                 const correctRightId = currentQ.matches?.[leftItem.id];
                                                 const isMatchCorrect = selectedRightId && correctRightId && selectedRightId === correctRightId;
+                                                const selectedRightItem = currentQ.rightColumn.find((r: any) => r.id === selectedRightId);
+                                                const selectedRightIdx = currentQ.rightColumn.findIndex((r: any) => r.id === selectedRightId);
 
                                                 return (
-                                                    <div key={leftItem.id} className={`p-4 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isChecked ? (isMatchCorrect ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500') : 'bg-card border-border'}`}>
+                                                    <div key={leftItem.id || idx} className={`p-4 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isChecked ? (isMatchCorrect ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500') : 'bg-card border-border'}`}>
                                                         <div className="flex items-center gap-3 flex-1">
-                                                            <span className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs">
+                                                            <span className="w-7 h-7 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs shrink-0">
                                                                 {idx + 1}
                                                             </span>
                                                             <div className="font-medium text-sm">
-                                                                <UniversalMathJax inline dynamic>{leftItem.text}</UniversalMathJax>
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(leftItem.text)}</UniversalMathJax>
                                                             </div>
                                                         </div>
-                                                        <div className="w-full md:w-64">
-                                                            <Select
-                                                                value={selectedRightId}
-                                                                onValueChange={(val) => {
-                                                                    if (!isChecked) {
-                                                                        setUserAnswers({
-                                                                            ...userAnswers,
-                                                                            [currentIndex]: { ...matchesMap, [leftItem.id]: val }
-                                                                        });
-                                                                    }
-                                                                }}
-                                                                disabled={isChecked}
-                                                            >
-                                                                <SelectTrigger className="w-full">
-                                                                    <SelectValue placeholder="Select Match..." />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {currentQ.rightColumn.map((rightItem: any, rIdx: number) => (
-                                                                        <SelectItem key={rightItem.id} value={rightItem.id}>
-                                                                            {String.fromCharCode(65 + rIdx)}. {rightItem.text}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                        <div className="w-full md:w-72">
+                                                            <Popover>
+                                                                <PopoverTrigger asChild disabled={isChecked}>
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        className={`w-full justify-between h-auto py-2.5 px-3 text-left font-normal border-2 ${isChecked ? (isMatchCorrect ? 'border-green-500 bg-green-50/50 dark:bg-green-950/30' : 'border-red-500 bg-red-50/50 dark:bg-red-950/30') : 'border-border bg-card'}`}
+                                                                    >
+                                                                        {selectedRightItem ? (
+                                                                            <span className="flex items-center gap-2 overflow-hidden">
+                                                                                <Badge className="bg-primary text-primary-foreground font-bold shrink-0">
+                                                                                    ({selectedRightIdx !== -1 ? String.fromCharCode(65 + selectedRightIdx) : '?'})
+                                                                                </Badge>
+                                                                                <span className="text-sm font-semibold truncate">
+                                                                                    <UniversalMathJax inline dynamic>{cleanupMath(selectedRightItem.text)}</UniversalMathJax>
+                                                                                </span>
+                                                                            </span>
+                                                                        ) : (
+                                                                            <span className="text-muted-foreground text-xs font-semibold">Select Match for ({idx + 1})...</span>
+                                                                        )}
+                                                                        <ChevronDown className="w-4 h-4 opacity-50 shrink-0 ml-2" />
+                                                                    </Button>
+                                                                </PopoverTrigger>
+                                                                <PopoverContent className="w-72 p-1.5 space-y-1 z-[100] font-fancy" align="end">
+                                                                    {currentQ.rightColumn.map((rightItem: any, rIdx: number) => {
+                                                                        const isSelected = selectedRightId === rightItem.id;
+                                                                        return (
+                                                                            <button
+                                                                                key={rightItem.id || rIdx}
+                                                                                type="button"
+                                                                                onClick={() => {
+                                                                                    if (!isChecked) {
+                                                                                        setUserAnswers({
+                                                                                            ...userAnswers,
+                                                                                            [currentIndex]: { ...matchesMap, [leftItem.id]: rightItem.id }
+                                                                                        });
+                                                                                    }
+                                                                                }}
+                                                                                className={`w-full text-left p-2.5 rounded-lg text-sm flex items-start gap-2.5 transition-all ${isSelected ? 'bg-primary text-primary-foreground font-semibold' : 'hover:bg-accent text-foreground'}`}
+                                                                            >
+                                                                                <span className={`px-2 py-0.5 rounded text-xs font-bold shrink-0 ${isSelected ? 'bg-primary-foreground text-primary' : 'bg-muted text-muted-foreground'}`}>
+                                                                                    ({String.fromCharCode(65 + rIdx)})
+                                                                                </span>
+                                                                                <div className="flex-1 font-medium leading-snug">
+                                                                                    <UniversalMathJax inline dynamic>{cleanupMath(rightItem.text)}</UniversalMathJax>
+                                                                                </div>
+                                                                            </button>
+                                                                        );
+                                                                    })}
+                                                                </PopoverContent>
+                                                            </Popover>
                                                         </div>
                                                     </div>
                                                 );
