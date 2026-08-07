@@ -85,12 +85,22 @@ export default function PracPerfectSessionPage() {
     // Overlay State
     const [showQuestion, setShowQuestion] = useState(true);
 
+    // Per-Question Timer State (Student Mode: Auto-starts, Non-pausable, Auto-advances)
+    const [timerSetting, setTimerSetting] = useState<string>("off"); // "off" | "1" | "2" | "3" | "5" | "10"
+    const [questionTimerSeconds, setQuestionTimerSeconds] = useState<number>(0);
+
     // Initialize
     useEffect(() => {
         const loadSession = async () => {
             document.title = "Practice Session || Student | Digital School";
 
             const storedIds = localStorage.getItem("prac-perfect-session");
+            const savedTimer = localStorage.getItem("prac-perfect-timer") || "off";
+            setTimerSetting(savedTimer);
+            if (savedTimer !== "off") {
+                setQuestionTimerSeconds(parseInt(savedTimer) * 60);
+            }
+
             if (!storedIds) {
                 toast.error("No active session found");
                 router.push("/student/prac-perfect");
@@ -200,10 +210,34 @@ export default function PracPerfectSessionPage() {
         setIsChecked(false);
         setIsCorrect(false);
 
+        if (timerSetting !== "off") {
+            setQuestionTimerSeconds(parseInt(timerSetting) * 60);
+        }
+
         if (questionContainerRef.current) {
             questionContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    }, [currentIndex]);
+    }, [currentIndex, timerSetting]);
+
+    // Student Per-Question Timer Countdown (Auto-starts, Non-pausable, Auto-advances)
+    useEffect(() => {
+        if (timerSetting === "off" || loading || showSummary) return;
+
+        const interval = setInterval(() => {
+            setQuestionTimerSeconds(prev => {
+                if (prev <= 1) {
+                    toast.error("Time's Up! Moving to next question...");
+                    setTimeout(() => {
+                        handleNext();
+                    }, 500);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [timerSetting, loading, currentIndex, showSummary]);
 
     const formatTime = (sec: number) => {
         const h = Math.floor(sec / 3600);
@@ -329,10 +363,22 @@ export default function PracPerfectSessionPage() {
                     </div>
 
                     <div className="pointer-events-auto bg-card/90 backdrop-blur shadow-sm px-4 py-2 rounded-full border border-border flex items-center gap-4 text-sm font-medium tabular-nums text-foreground">
-                        <div className="flex items-center gap-2">
-                            <Clock className="w-4 h-4 text-indigo-500" />
-                            {formatTime(elapsedTime)}
-                        </div>
+                        {timerSetting !== "off" ? (
+                            <div className="flex items-center gap-2">
+                                <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-sm font-bold shadow-inner transition-colors ${questionTimerSeconds <= 10 ? 'bg-red-500 text-white animate-pulse' : 'bg-indigo-600 text-white'}`}>
+                                    <Clock className="w-4 h-4" />
+                                    <span>{formatTime(questionTimerSeconds)}</span>
+                                </div>
+                                <Badge variant="outline" className="text-[10px] bg-card text-indigo-600 dark:text-indigo-300 font-bold border-indigo-200 dark:border-indigo-800">
+                                    Auto Next
+                                </Badge>
+                            </div>
+                        ) : (
+                            <div className="flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-indigo-500" />
+                                {formatTime(elapsedTime)}
+                            </div>
+                        )}
                         <div className="w-px h-4 bg-border"></div>
                         <div className="flex items-center gap-2">
                             <CheckCircle className="w-4 h-4 text-green-500" />

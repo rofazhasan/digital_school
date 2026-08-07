@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed, Star
+    LogOut, ChevronLeft, ChevronRight, Maximize2, Minimize2, MousePointer2, Eraser, Move, Palette, Save, Undo, Redo, Share2, FileDown, Layers, Layout, Video, Mic, Share, Settings, PenTool, User, X, Eye, Square, Circle, Triangle, Minus, Sun, Moon, Grid3X3, ArrowRight, Printer, Clock, CheckCircle, XCircle, ZoomIn, ZoomOut, Highlighter, Ruler, Box, BarChart2, CircleDashed, Star, Play, Pause, RotateCcw, CheckSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MathJaxContext, MathJax } from "better-react-mathjax";
 import dynamic from "next/dynamic";
 import { toast } from "sonner";
@@ -20,9 +22,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import { SmartBoardRef, exportPathsToImage } from "@/app/components/SmartBoard";
 const SmartBoard = dynamic(() => import("@/app/components/SmartBoard"), { ssr: false });
 const SmartBoardToolbar = dynamic(() => import("@/app/components/SmartBoardToolbar").then(mod => mod.SmartBoardToolbar), { ssr: false });
-// Removed top-level imports for optimization
-// import html2canvas from 'html2canvas';
-// import jsPDF from 'jspdf';
 import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 
 
@@ -30,19 +29,23 @@ import { UniversalMathJax } from "@/app/components/UniversalMathJax";
 interface Question {
     id: string;
     questionText: string;
-    type: 'MCQ' | 'CQ' | 'SQ';
+    type: 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE' | 'SMCQ';
     subject: string;
     topic?: string;
     difficulty: string;
     marks: number;
     options?: { text: string; isCorrect: boolean; explanation?: string; originalIndex?: number }[];
     modelAnswer?: string;
+    explanation?: string;
+    images?: string[];
     subQuestions?: any[];
+    assertion?: string;
+    reason?: string;
+    leftColumn?: { id: string; text: string; originalIndex?: number }[];
     rightColumn?: { id: string; text: string; originalIndex?: number }[];
     matches?: Record<string, string>;
-    // Review Mode Fields
     status?: 'correct' | 'wrong' | 'unanswered';
-    userAnswer?: number | null; // Index of selected option
+    userAnswer?: any;
 }
 
 const mathJaxConfig = {
@@ -79,11 +82,16 @@ export default function ProblemSolvingSession() {
     const [showAnswer, setShowAnswer] = useState(false);
     const [showOverlay, setShowOverlay] = useState(true);
 
-    // MCQ State
+    // Question Answer & Interaction State
+    const [userAnswers, setUserAnswers] = useState<Record<number, any>>({});
     const [selectedOption, setSelectedOption] = useState<number | null>(null);
     const [isAnswerChecked, setIsAnswerChecked] = useState(false);
 
-
+    // Teacher Per-Question Timer State
+    const [timerSetting, setTimerSetting] = useState<string>("off"); // "off" | "1" | "2" | "3" | "5" | "10"
+    const [questionTimerSeconds, setQuestionTimerSeconds] = useState<number>(0);
+    const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
+    const [isTimerExpired, setIsTimerExpired] = useState<boolean>(false);
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
@@ -101,6 +109,32 @@ export default function ProblemSolvingSession() {
         return newArr;
     };
 
+    // Timer Countdown Effect
+    useEffect(() => {
+        if (timerSetting === "off" || !isTimerRunning) return;
+        const interval = setInterval(() => {
+            setQuestionTimerSeconds(prev => {
+                if (prev <= 1) {
+                    setIsTimerRunning(false);
+                    setIsTimerExpired(true);
+                    toast.error("Time's Up for this question!");
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [isTimerRunning, timerSetting]);
+
+    // Reset question timer state on index or setting change
+    useEffect(() => {
+        if (timerSetting !== "off") {
+            setQuestionTimerSeconds(parseInt(timerSetting) * 60);
+            setIsTimerRunning(false);
+            setIsTimerExpired(false);
+        }
+    }, [currentIndex, timerSetting]);
+
     // Initialize
     useEffect(() => {
         const initSession = async () => {
@@ -109,6 +143,12 @@ export default function ProblemSolvingSession() {
                 const params = new URLSearchParams(window.location.search);
                 const isReview = params.get('mode') === 'review';
                 const storedIds = localStorage.getItem(isReview ? "review-session-data" : "problem-solving-session");
+
+                const savedTimer = localStorage.getItem("problem-solving-timer") || "off";
+                setTimerSetting(savedTimer);
+                if (savedTimer !== "off") {
+                    setQuestionTimerSeconds(parseInt(savedTimer) * 60);
+                }
 
                 const res = await fetch('/api/questions');
                 const data = await res.json();
@@ -120,22 +160,22 @@ export default function ProblemSolvingSession() {
                 if (Array.isArray(storedData) && storedData.length > 0) {
                     if (typeof storedData[0] === 'string') {
                         // IDs only (Selector Mode)
-                        // If ids exist, can filter. For now just load all or check logic.
                         const ids = storedData as string[];
                         sessionQuestions = data.questions.filter((q: Question) => ids.includes(q.id));
 
                         // Shuffle for fresh session (only if not review)
                         if (!isReview) sessionQuestions = shuffleArray(sessionQuestions);
                         sessionQuestions = sessionQuestions.map((q: Question) => {
+                            let updatedQ = { ...q };
                             if (q.type === 'MCQ' && q.options && q.options.length > 0) {
-                                // Add originalIndex before shuffling
                                 const optionsWithIndex = q.options.map((opt, idx) => ({ ...opt, originalIndex: idx }));
-                                return {
-                                    ...q,
-                                    options: isReview ? optionsWithIndex : shuffleArray(optionsWithIndex)
-                                };
+                                updatedQ.options = isReview ? optionsWithIndex : shuffleArray(optionsWithIndex);
                             }
-                            return q;
+                            if (q.type === 'MTF' && q.rightColumn && q.rightColumn.length > 0) {
+                                const rightWithIndex = q.rightColumn.map((item, idx) => ({ ...item, originalIndex: idx }));
+                                updatedQ.rightColumn = isReview ? rightWithIndex : shuffleArray(rightWithIndex);
+                            }
+                            return updatedQ;
                         });
 
                     } else {
@@ -560,11 +600,32 @@ export default function ProblemSolvingSession() {
                                 <span className="text-sm font-bold text-green-800">{examName || "Session Mode"}</span>
                             </div>
                             <div className="w-px h-4 bg-gray-300"></div>
-                            {/* Clock Component */}
-                            <div className="flex items-center gap-2 text-muted-foreground font-medium font-mono text-sm bg-muted px-2 py-1 rounded">
-                                <Clock className="w-3.5 h-3.5" />
-                                <LiveClock />
-                            </div>
+                            {/* Clock / Timer Component */}
+                            {timerSetting !== "off" ? (
+                                <div className="flex items-center gap-2">
+                                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full font-mono text-sm font-bold shadow-inner ${isTimerExpired ? 'bg-red-500 text-white animate-pulse' : (isTimerRunning ? 'bg-indigo-600 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300')}`}>
+                                        <Clock className="w-4 h-4" />
+                                        <span>{isTimerExpired ? "Time's Up!" : formatTime(questionTimerSeconds)}</span>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setIsTimerRunning(!isTimerRunning)}
+                                        className="h-7 text-xs px-2.5 rounded-full border-indigo-200 hover:bg-indigo-50 font-semibold"
+                                    >
+                                        {isTimerRunning ? (
+                                            <><Pause className="w-3.5 h-3.5 mr-1 text-indigo-600" /> Pause</>
+                                        ) : (
+                                            <><Play className="w-3.5 h-3.5 mr-1 text-indigo-600 fill-indigo-600" /> Start Timer</>
+                                        )}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-2 text-muted-foreground font-medium font-mono text-sm bg-muted px-2 py-1 rounded">
+                                    <Clock className="w-3.5 h-3.5" />
+                                    <LiveClock />
+                                </div>
+                            )}
                             <div className="w-px h-4 bg-gray-300"></div>
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium text-gray-600">
@@ -632,81 +693,92 @@ export default function ProblemSolvingSession() {
                                 </div>
 
                                 <div className={`p-6 relative custom-scrollbar ${annotationMode ? 'overflow-hidden' : 'overflow-y-auto'}`}>
-                                    <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
-                                        <UniversalMathJax inline dynamic>
-                                            {cleanupMath(currentQ.questionText)}
-                                        </UniversalMathJax>
-                                    </h3>
+                                    {/* Assertion-Reason Special Layout */}
+                                    {currentQ.type === 'AR' && (
+                                        <div className="p-4 mb-4 rounded-xl border-2 bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-200 dark:border-indigo-800/50 space-y-3">
+                                            <div>
+                                                <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Assertion (A)</div>
+                                                <div className="text-base font-medium">
+                                                    <UniversalMathJax dynamic>{currentQ.assertion || currentQ.questionText}</UniversalMathJax>
+                                                </div>
+                                            </div>
+                                            {currentQ.reason && (
+                                                <div className="pt-2 border-t border-indigo-200/60 dark:border-indigo-800/40">
+                                                    <div className="font-bold text-xs text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-1">Reason (R)</div>
+                                                    <div className="text-base font-medium">
+                                                        <UniversalMathJax dynamic>{currentQ.reason}</UniversalMathJax>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
-                                    <div className="mt-8 space-y-4">
-                                        {currentQ.type === 'MCQ' && currentQ.options && (
+                                    {currentQ.type !== 'AR' && (
+                                        <h3 className={`text-xl font-medium leading-relaxed max-w-3xl ${isDark ? 'text-indigo-50 font-semibold' : 'text-slate-800'}`}>
+                                            <UniversalMathJax inline dynamic>
+                                                {cleanupMath(currentQ.questionText)}
+                                            </UniversalMathJax>
+                                        </h3>
+                                    )}
+
+                                    <div className="mt-6 space-y-4">
+                                        {/* Type 1: MCQ, SMCQ, AR (Single Option Choice) */}
+                                        {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (
                                             <div className="grid gap-3">
                                                 {currentQ.options.map((opt, idx) => {
                                                     const isSelected = selectedOption === idx;
                                                     const isCorrect = opt.isCorrect;
 
-                                                    // Review Mode Logic
-                                                    const reviewStatus = currentQ.status; // 'correct' | 'wrong' | 'unanswered'
-                                                    const isUserSelected = currentQ.userAnswer === idx; // Use loose equality just in case string/number mixup, but strictly typed here
+                                                    const reviewStatus = currentQ.status;
+                                                    const isUserSelected = currentQ.userAnswer === idx;
 
-                                                    // Base Style
                                                     let statusClass = isDark
                                                         ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
                                                         : "border-border bg-card shadow-sm hover:shadow-md hover:border-primary/20";
 
-                                                    // Interaction State (Standard)
                                                     if (isSelected) {
                                                         statusClass = isDark
                                                             ? "bg-indigo-900/40 border-indigo-500/30 ring-1 ring-indigo-500/30"
                                                             : "bg-primary/10 border-primary/20 ring-1 ring-primary/20";
                                                     }
 
-                                                    // REVEAL LOGIC (Standard or Review)
-                                                    // Show solution if: 
-                                                    // 1. isAnswerChecked is true (User clicked Check Answer)
-                                                    // 2. OR Review Mode AND The *User's Choice* was Correct (Auto-reveal if they got it right)
                                                     const shouldReveal = isAnswerChecked || (reviewStatus === 'correct');
 
                                                     if (shouldReveal) {
-                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30" : "bg-green-500/10 border-green-500/20 ring-1 ring-green-500/20";
+                                                        if (isCorrect) statusClass = isDark ? "bg-green-900/30 border-green-500/30 text-green-300 font-bold" : "bg-green-500/10 border-green-500/20 ring-1 ring-green-500/20 text-green-900 font-bold";
                                                         else if (isSelected) statusClass = isDark ? "bg-red-900/30 border-red-500/30 opacity-60" : "bg-red-500/10 border-red-500/20 ring-1 ring-red-500/20 opacity-60";
                                                         else statusClass = isDark ? "bg-slate-800/20 opacity-50" : "bg-muted/30 opacity-50";
-                                                    }
-                                                    // Review Mode: WRONG Answer State (Before Reveal)
-                                                    // If user got it wrong, show their WRONG selection in RED immediately, but keep Correct hidden.
-                                                    else if (reviewStatus === 'wrong' && isUserSelected) {
+                                                    } else if (reviewStatus === 'wrong' && isUserSelected) {
                                                         statusClass = isDark ? "bg-red-900/40 border-red-500/50 ring-1 ring-red-500/50" : "bg-red-100 border-red-400 ring-1 ring-red-400";
-                                                    }
-                                                    // Review Mode: Unselected or 'Hidden Correct' options
-                                                    else if (reviewStatus) {
-                                                        statusClass = isDark ? "opacity-60" : "opacity-60 grayscale";
                                                     }
 
                                                     return (
                                                         <div
                                                             key={idx}
                                                             onClick={(e) => {
-                                                                if (annotationMode || reviewStatus) return; // Disable changing answer
-                                                                if (!shouldReveal) setSelectedOption(idx);
+                                                                if (annotationMode || reviewStatus) return;
+                                                                if (!shouldReveal) {
+                                                                    setSelectedOption(idx);
+                                                                    setUserAnswers({ ...userAnswers, [currentIndex]: idx });
+                                                                }
                                                             }}
                                                             className={`
-                                                  p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
-                                                  ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
-                                                  ${annotationMode ? 'cursor-crosshair' : ''}
-                                                  ${statusClass}
-                                              `}
+                                                                p-4 rounded-xl border-2 transition-all duration-200 flex items-start gap-4 group
+                                                                ${annotationMode || reviewStatus ? '' : 'cursor-pointer'}
+                                                                ${annotationMode ? 'cursor-crosshair' : ''}
+                                                                ${statusClass}
+                                                            `}
                                                         >
                                                             <div className={`
-                                                  shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
-                                                  ${isSelected || (reviewStatus && isUserSelected) ? 'bg-primary text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-muted text-muted-foreground')}
-                                                  ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
-                                                  ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
-                                                  ${(!shouldReveal && reviewStatus === 'wrong' && isUserSelected) ? '!bg-red-500 !text-white' : ''}
-                                              `}>
+                                                                shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all
+                                                                ${isSelected || (reviewStatus && isUserSelected) ? 'bg-primary text-white' : (isDark ? 'bg-slate-700 text-slate-300' : 'bg-muted text-muted-foreground')}
+                                                                ${shouldReveal && isCorrect ? '!bg-green-500 !text-white' : ''}
+                                                                ${shouldReveal && isSelected && !isCorrect ? '!bg-red-500 !text-white' : ''}
+                                                            `}>
                                                                 {String.fromCharCode(65 + idx)}
                                                             </div>
                                                             <div className="flex-1">
-                                                                <span className={`text-lg w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
+                                                                <span className={`text-base w-full ${isDark ? 'text-gray-100' : 'text-foreground'}`}>
                                                                     <UniversalMathJax inline dynamic>
                                                                         {cleanupMath(opt.text)}
                                                                     </UniversalMathJax>
@@ -718,8 +790,135 @@ export default function ProblemSolvingSession() {
                                             </div>
                                         )}
 
-                                        {currentQ.type === 'CQ' && Array.isArray(currentQ.subQuestions) && (
-                                            <div className="space-y-6 mt-4">
+                                        {/* Type 2: MC (Multiple Correct Checkboxes) */}
+                                        {currentQ.type === 'MC' && currentQ.options && (
+                                            <div className="space-y-3">
+                                                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                                                    Select all correct options:
+                                                </div>
+                                                <div className="grid gap-3">
+                                                    {currentQ.options.map((opt, idx) => {
+                                                        const currentAns = userAnswers[currentIndex];
+                                                        const selectedIndices: number[] = Array.isArray(currentAns) ? currentAns : [];
+                                                        const isSelected = selectedIndices.includes(idx);
+                                                        const isCorrect = opt.isCorrect;
+
+                                                        let statusClass = isDark
+                                                            ? "border-slate-700 bg-slate-800/50 hover:bg-slate-800"
+                                                            : "border-border bg-card shadow-sm hover:shadow-md";
+
+                                                        if (isAnswerChecked) {
+                                                            if (isSelected && isCorrect) statusClass = "bg-green-500/20 border-green-500 text-green-900 font-bold";
+                                                            else if (isSelected && !isCorrect) statusClass = "bg-red-500/20 border-red-500 text-red-900 opacity-60";
+                                                            else if (isCorrect) statusClass = "bg-green-500/10 border-green-500/50 text-green-700 font-semibold";
+                                                            else statusClass = "opacity-40";
+                                                        } else if (isSelected) {
+                                                            statusClass = "bg-primary/10 border-primary text-primary";
+                                                        }
+
+                                                        return (
+                                                            <div
+                                                                key={idx}
+                                                                onClick={() => {
+                                                                    if (isAnswerChecked) return;
+                                                                    const newSet = new Set(selectedIndices);
+                                                                    if (newSet.has(idx)) newSet.delete(idx);
+                                                                    else newSet.add(idx);
+                                                                    setUserAnswers({ ...userAnswers, [currentIndex]: Array.from(newSet) });
+                                                                }}
+                                                                className={`p-4 rounded-xl border-2 transition-all cursor-pointer flex items-start gap-4 ${statusClass}`}
+                                                            >
+                                                                <div className={`shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center text-sm font-bold ${isSelected ? 'bg-primary border-primary text-white' : 'bg-muted border-border'}`}>
+                                                                    {isSelected ? <CheckSquare className="w-5 h-5" /> : <Square className="w-5 h-5 text-slate-400" />}
+                                                                </div>
+                                                                <div className="flex-1 text-base font-medium">
+                                                                    <UniversalMathJax inline dynamic>{cleanupMath(opt.text)}</UniversalMathJax>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Type 3: INT (Numerical Input) */}
+                                        {currentQ.type === 'INT' && (
+                                            <div className="p-4 rounded-xl bg-muted/40 border border-border space-y-3">
+                                                <label className="block text-sm font-bold text-foreground">
+                                                    Numerical Answer:
+                                                </label>
+                                                <Input
+                                                    type="text"
+                                                    value={userAnswers[currentIndex] || ""}
+                                                    onChange={(e) => !isAnswerChecked && setUserAnswers({ ...userAnswers, [currentIndex]: e.target.value })}
+                                                    placeholder="Enter number (e.g. 42 or 3.14)"
+                                                    disabled={isAnswerChecked}
+                                                    className="text-lg font-bold h-12 bg-card border-border"
+                                                />
+                                                {isAnswerChecked && currentQ.modelAnswer && (
+                                                    <div className="text-sm font-bold text-emerald-600">
+                                                        Correct Answer: {currentQ.modelAnswer}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Type 4: MTF (Matching) */}
+                                        {currentQ.type === 'MTF' && Array.isArray(currentQ.leftColumn) && Array.isArray(currentQ.rightColumn) && (
+                                            <div className="space-y-3">
+                                                <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                                    Match Column A with Column B:
+                                                </div>
+                                                {currentQ.leftColumn.map((leftItem, idx) => {
+                                                    const matchesMap: Record<string, string> = userAnswers[currentIndex] || {};
+                                                    const selectedRightId = matchesMap[leftItem.id] || "";
+                                                    const correctRightId = currentQ.matches?.[leftItem.id];
+                                                    const isMatchCorrect = selectedRightId && correctRightId && selectedRightId === correctRightId;
+
+                                                    return (
+                                                        <div key={leftItem.id} className={`p-3 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-3 ${isAnswerChecked ? (isMatchCorrect ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500') : 'bg-card border-border'}`}>
+                                                            <div className="flex items-center gap-2 flex-1">
+                                                                <span className="w-6 h-6 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center text-xs">
+                                                                    {idx + 1}
+                                                                </span>
+                                                                <div className="font-medium text-sm">
+                                                                    <UniversalMathJax inline dynamic>{leftItem.text}</UniversalMathJax>
+                                                                </div>
+                                                            </div>
+                                                            <div className="w-full md:w-56">
+                                                                <Select
+                                                                    value={selectedRightId}
+                                                                    onValueChange={(val) => {
+                                                                        if (!isAnswerChecked) {
+                                                                            setUserAnswers({
+                                                                                ...userAnswers,
+                                                                                [currentIndex]: { ...matchesMap, [leftItem.id]: val }
+                                                                            });
+                                                                        }
+                                                                    }}
+                                                                    disabled={isAnswerChecked}
+                                                                >
+                                                                    <SelectTrigger className="w-full bg-white border-border text-xs h-9 rounded-lg">
+                                                                        <SelectValue placeholder="Select Match..." />
+                                                                    </SelectTrigger>
+                                                                    <SelectContent>
+                                                                        {currentQ.rightColumn.map((rightItem, rIdx) => (
+                                                                            <SelectItem key={rightItem.id} value={rightItem.id}>
+                                                                                {String.fromCharCode(65 + rIdx)}. {rightItem.text}
+                                                                            </SelectItem>
+                                                                        ))}
+                                                                    </SelectContent>
+                                                                </Select>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+
+                                        {/* Type 5: CQ, SQ, DESCRIPTIVE Sub Questions */}
+                                        {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && Array.isArray(currentQ.subQuestions) && (
+                                            <div className="space-y-4">
                                                 {currentQ.subQuestions.map((sub: any, idx: number) => (
                                                     <div key={idx} className={`p-4 rounded-xl border-2 transition-all ${isDark ? 'bg-slate-800/40 border-slate-700' : 'bg-slate-50 border-slate-100'}`}>
                                                         <div className="flex gap-3 items-start">
@@ -732,7 +931,7 @@ export default function ProblemSolvingSession() {
                                                         {(isAnswerChecked || currentQ.status === 'correct') && (sub.answer || sub.modelAnswer) && (
                                                             <div className="mt-3 pt-3 border-t border-indigo-500/10 animate-in fade-in slide-in-from-top-1">
                                                                 <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-500 mb-1">Model Answer</div>
-                                                                <div className="text-sm font-fancy text-emerald-600 dark:text-emerald-400 italic">
+                                                                <div className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold italic">
                                                                     <UniversalMathJax dynamic>{sub.answer || sub.modelAnswer}</UniversalMathJax>
                                                                 </div>
                                                             </div>
@@ -743,14 +942,13 @@ export default function ProblemSolvingSession() {
                                         )}
                                     </div>
 
-                                    {/* Check Answer Button: Show if NOT revealed yet */}
-                                    {(!isAnswerChecked && currentQ.status !== 'correct') && (currentQ.type === 'MCQ' || currentQ.type === 'CQ' || currentQ.type === 'SQ') && (
+                                    {/* Check Answer Button */}
+                                    {(!isAnswerChecked && currentQ.status !== 'correct') && (
                                         <Button
                                             onClick={() => setIsAnswerChecked(true)}
-                                            disabled={currentQ.type === 'MCQ' && selectedOption === null && !currentQ.status}
-                                            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700"
+                                            className="w-full mt-6 bg-indigo-600 hover:bg-indigo-700 font-bold"
                                         >
-                                            {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? "Reveal Model Answer" : (currentQ.status ? "Show Correct Answer" : "Check Answer")}
+                                            {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) ? "Reveal Model Answer & Explanation" : "Check Answer & Reveal Explanation"}
                                         </Button>
                                     )}
 

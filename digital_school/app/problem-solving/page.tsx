@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-    Search, Filter, PlusCircle, CheckCircle,
+    Search, Filter, PlusCircle, CheckCircle, Clock,
     Play, BookOpen, Layers, Target, ArrowRight, Loader2, X,
     Sparkles, BrainCircuit, LayoutGrid, List as ListIcon, GraduationCap
 } from "lucide-react";
@@ -34,9 +34,9 @@ const mathJaxConfig = {
 interface Question {
     id: string;
     questionText: string;
-    type: 'MCQ' | 'CQ' | 'SQ';
+    type: 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'DESCRIPTIVE' | 'SMCQ';
     subject: string;
-    topic?: string; // Added topic
+    topic?: string;
     class: { name: string };
     difficulty: string;
     marks: number;
@@ -56,12 +56,14 @@ export default function ProblemSolvingSelector() {
         { label: "Exams", href: "/exams", icon: GraduationCap },
     ];
 
-    // Filters
+    // Filters & Timer Config
     const [filterClass, setFilterClass] = useState<string>("all");
     const [filterSubject, setFilterSubject] = useState<string>("all");
     const [filterType, setFilterType] = useState<string>("all");
+    const [filterTopic, setFilterTopic] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [timerMinutes, setTimerMinutes] = useState<string>("3"); // "off" | "1" | "2" | "3" | "5" | "10"
 
     const [availableClasses, setAvailableClasses] = useState<any[]>([]);
 
@@ -92,8 +94,10 @@ export default function ProblemSolvingSelector() {
         const matchClass = filterClass === "all" || q.class?.name === filterClass;
         const matchSubject = filterSubject === "all" || q.subject === filterSubject;
         const matchType = filterType === "all" || q.type === filterType;
-        const matchSearch = q.questionText.toLowerCase().includes(searchTerm.toLowerCase());
-        return matchClass && matchSubject && matchType && matchSearch;
+        const matchTopic = filterTopic === "all" || q.topic === filterTopic;
+        const matchSearch = q.questionText.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            q.topic?.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchClass && matchSubject && matchType && matchTopic && matchSearch;
     });
 
     const toggleSelection = (id: string) => {
@@ -112,10 +116,16 @@ export default function ProblemSolvingSelector() {
     const startSession = () => {
         if (selectedIds.size === 0) return;
         localStorage.setItem("problem-solving-session", JSON.stringify(Array.from(selectedIds)));
+        localStorage.setItem("problem-solving-timer", timerMinutes);
         router.push("/problem-solving/session");
     };
 
     const uniqueSubjects = Array.from(new Set(questions.map(q => q.subject))).filter(Boolean);
+    const uniqueTopics = Array.from(new Set(
+        questions
+            .filter(q => filterSubject === "all" || q.subject === filterSubject)
+            .map(q => q.topic)
+    )).filter(Boolean);
 
     return (
         <MathJaxContext config={mathJaxConfig} version={3}>
@@ -212,7 +222,7 @@ export default function ProblemSolvingSelector() {
 
                                 <div className="flex items-center gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
                                     <Select value={filterClass} onValueChange={setFilterClass}>
-                                        <SelectTrigger className="w-[140px] h-11 border-slate-200 bg-slate-50 rounded-lg">
+                                        <SelectTrigger className="w-[130px] h-11 border-slate-200 bg-slate-50 rounded-lg">
                                             <SelectValue placeholder="Class" />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -224,13 +234,42 @@ export default function ProblemSolvingSelector() {
                                     </Select>
 
                                     <Select value={filterSubject} onValueChange={setFilterSubject}>
-                                        <SelectTrigger className="w-[140px] h-11 border-slate-200 bg-slate-50 rounded-lg">
+                                        <SelectTrigger className="w-[130px] h-11 border-slate-200 bg-slate-50 rounded-lg">
                                             <SelectValue placeholder="Subject" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">All Subjects</SelectItem>
                                             {uniqueSubjects.map((s) => (
                                                 <SelectItem key={s} value={s}>{s}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+
+                                    <Select value={filterType} onValueChange={setFilterType}>
+                                        <SelectTrigger className="w-[140px] h-11 border-slate-200 bg-slate-50 rounded-lg">
+                                            <SelectValue placeholder="Type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Types</SelectItem>
+                                            <SelectItem value="MCQ">MCQ (Single)</SelectItem>
+                                            <SelectItem value="MC">MC (Multiple)</SelectItem>
+                                            <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                                            <SelectItem value="MTF">MTF (Matching)</SelectItem>
+                                            <SelectItem value="INT">INT (Numeric)</SelectItem>
+                                            <SelectItem value="CQ">CQ (Creative)</SelectItem>
+                                            <SelectItem value="SQ">SQ (Short)</SelectItem>
+                                            <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+
+                                    <Select value={filterTopic} onValueChange={setFilterTopic}>
+                                        <SelectTrigger className="w-[140px] h-11 border-slate-200 bg-slate-50 rounded-lg">
+                                            <SelectValue placeholder="Topic" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Topics</SelectItem>
+                                            {uniqueTopics.map((t) => (
+                                                <SelectItem key={t} value={t!}>{t}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
@@ -365,19 +404,49 @@ export default function ProblemSolvingSelector() {
                                         <h3 className="text-lg font-bold text-slate-800 mb-1">Your Session</h3>
                                         <p className="text-sm text-slate-500 mb-6">Review your selected questions before starting.</p>
 
-                                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl mb-6 border border-slate-100">
-                                            <span className="text-slate-600 font-medium">Questions selected</span>
+                                        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl mb-4 border border-slate-100">
+                                            <span className="text-slate-600 font-medium text-sm">Questions selected</span>
                                             <span className="text-2xl font-black text-indigo-600">{selectedIds.size}</span>
                                         </div>
 
-                                        <div className="space-y-3 mb-8">
-                                            {['MCQ', 'CQ', 'SQ'].map(type => {
+                                        {/* Timer Configuration Setting */}
+                                        <div className="mb-6 space-y-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 flex items-center gap-1.5">
+                                                    <Clock className="w-3.5 h-3.5 text-indigo-600" /> Per-Question Timer
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px] bg-white text-indigo-700 font-semibold border-indigo-200">
+                                                    {timerMinutes === 'off' ? 'Disabled' : `${timerMinutes} min / Q`}
+                                                </Badge>
+                                            </div>
+                                            <Select value={timerMinutes} onValueChange={setTimerMinutes}>
+                                                <SelectTrigger className="w-full bg-white border-indigo-200 text-sm h-10 rounded-lg">
+                                                    <SelectValue placeholder="Select Timer" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="off">No Timer (Manual Pace)</SelectItem>
+                                                    <SelectItem value="1">1 Minute per question</SelectItem>
+                                                    <SelectItem value="2">2 Minutes per question</SelectItem>
+                                                    <SelectItem value="3">3 Minutes per question (Default)</SelectItem>
+                                                    <SelectItem value="5">5 Minutes per question</SelectItem>
+                                                    <SelectItem value="10">10 Minutes per question</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[11px] text-slate-500 leading-tight">
+                                                {timerMinutes === 'off'
+                                                    ? 'Teacher controls timer manually during class presentation.'
+                                                    : `Timer counts down ${timerMinutes} mins per question. Alerts when time is up.`}
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2 mb-6 max-h-36 overflow-y-auto custom-scrollbar pr-1">
+                                            {['MCQ', 'MC', 'AR', 'MTF', 'INT', 'CQ', 'SQ', 'DESCRIPTIVE'].map(type => {
                                                 const count = questions.filter(q => selectedIds.has(q.id) && q.type === type).length;
                                                 if (count === 0) return null;
                                                 return (
-                                                    <div key={type} className="flex justify-between items-center text-sm">
-                                                        <span className="text-slate-500">{type}</span>
-                                                        <div className="flex-1 border-b border-dotted border-slate-300 mx-2 relative top-1"></div>
+                                                    <div key={type} className="flex justify-between items-center text-xs">
+                                                        <span className="text-slate-500 font-medium">{type}</span>
+                                                        <div className="flex-1 border-b border-dotted border-slate-300 mx-2 relative top-0.5"></div>
                                                         <span className="font-semibold text-slate-700">{count}</span>
                                                     </div>
                                                 );
@@ -386,7 +455,7 @@ export default function ProblemSolvingSelector() {
 
                                         <Button
                                             size="lg"
-                                            className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 border-0 shadow-lg shadow-indigo-200 transition-all hover:scale-[1.02]"
+                                            className="w-full bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 border-0 shadow-lg shadow-indigo-200 transition-all hover:scale-[1.02] font-semibold"
                                             onClick={startSession}
                                             disabled={selectedIds.size === 0}
                                         >

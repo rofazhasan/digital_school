@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
-    Search, Filter, Play, BookOpen, LayoutGrid, List as ListIcon,
+    Search, Filter, Play, BookOpen, LayoutGrid, List as ListIcon, Clock,
     Sparkles, ArrowRight, Loader2, CheckCircle, GraduationCap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -43,12 +43,13 @@ export default function PracPerfectPage() {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-    // Filters
+    // Filters & Timer
     const [filterSubject, setFilterSubject] = useState<string>("all");
     const [filterType, setFilterType] = useState<string>("all");
     const [filterTopic, setFilterTopic] = useState<string>("all");
     const [searchTerm, setSearchTerm] = useState("");
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+    const [timerMinutes, setTimerMinutes] = useState<string>("3"); // "off" | "1" | "2" | "3" | "5" | "10"
 
     // Fetch data
     useEffect(() => {
@@ -98,6 +99,7 @@ export default function PracPerfectPage() {
     const startSession = () => {
         if (selectedIds.size === 0) return;
         localStorage.setItem("prac-perfect-session", JSON.stringify(Array.from(selectedIds)));
+        localStorage.setItem("prac-perfect-timer", timerMinutes);
         router.push("/student/prac-perfect/session");
     };
 
@@ -256,15 +258,45 @@ export default function PracPerfectPage() {
                             <div className="sticky top-28 space-y-4">
                                 <div className="bg-card rounded-xl shadow-lg border border-border p-6">
                                     <h3 className="font-bold text-lg mb-1">Your Session</h3>
-                                    <p className="text-xs text-slate-500 mb-4">Ready to practice?</p>
+                                    <p className="text-xs text-muted-foreground mb-4">Ready to practice?</p>
 
                                     <div className="bg-muted rounded-lg p-4 mb-4 flex justify-between items-center">
-                                        <span className="text-foreground font-medium">Selected</span>
+                                        <span className="text-foreground font-medium">Questions Selected</span>
                                         <span className="text-2xl font-bold text-primary">{selectedIds.size}</span>
                                     </div>
 
+                                    {/* Timer Selector */}
+                                    <div className="mb-6 space-y-2 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold uppercase tracking-wider text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                                                <Clock className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" /> Per-Question Timer
+                                            </span>
+                                            <Badge variant="outline" className="text-[10px] bg-card text-indigo-700 dark:text-indigo-300 font-semibold border-indigo-200 dark:border-indigo-800">
+                                                {timerMinutes === 'off' ? 'Disabled' : `${timerMinutes} min / Q`}
+                                            </Badge>
+                                        </div>
+                                        <Select value={timerMinutes} onValueChange={setTimerMinutes}>
+                                            <SelectTrigger className="w-full bg-card border-indigo-200 dark:border-indigo-800 text-sm h-10 rounded-lg">
+                                                <SelectValue placeholder="Select Timer" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="off">No Timer (Manual Pace)</SelectItem>
+                                                <SelectItem value="1">1 Minute per question</SelectItem>
+                                                <SelectItem value="2">2 Minutes per question</SelectItem>
+                                                <SelectItem value="3">3 Minutes per question (Default)</SelectItem>
+                                                <SelectItem value="5">5 Minutes per question</SelectItem>
+                                                <SelectItem value="10">10 Minutes per question</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                        <p className="text-[11px] text-muted-foreground leading-tight">
+                                            {timerMinutes === 'off'
+                                                ? 'Self-paced practice without timer countdown.'
+                                                : `Timer auto-counts down ${timerMinutes} mins per question & advances automatically.`}
+                                        </p>
+                                    </div>
+
                                     <Button
-                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200"
+                                        className="w-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-200 font-bold"
                                         size="lg"
                                         disabled={selectedIds.size === 0}
                                         onClick={startSession}
