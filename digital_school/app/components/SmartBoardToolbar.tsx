@@ -145,21 +145,21 @@ export const SmartBoardToolbar: React.FC<SmartBoardToolbarProps> = ({
         <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-end gap-2 no-print"
+            className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-end gap-1.5 no-print max-w-[95vw]"
         >
-            {/* Main Dock */}
-            <div className="bg-white/95 backdrop-blur-xl border border-gray-200/50 shadow-2xl shadow-indigo-900/10 rounded-2xl p-2 flex items-center gap-2">
+            {/* Main Dock - Compact & Sleek Capsule */}
+            <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-gray-200/60 dark:border-slate-800 shadow-xl shadow-indigo-900/10 rounded-full px-2 py-1 flex items-center gap-1 overflow-x-auto custom-scrollbar">
 
                 {/* 1. Navigation Group */}
-                <div className="flex items-center gap-1 pr-2 border-r border-gray-200">
-                    <Button variant="ghost" size="icon" onClick={onPrev} disabled={currentIndex === 0} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100">
-                        <ChevronLeft className="w-5 h-5" />
+                <div className="flex items-center gap-0.5 pr-1.5 border-r border-gray-200 dark:border-slate-800">
+                    <Button variant="ghost" size="icon" onClick={onPrev} disabled={currentIndex === 0} className="w-7 h-7 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800">
+                        <ChevronLeft className="w-4 h-4" />
                     </Button>
-                    <span className="text-xs font-mono font-medium text-gray-400 min-w-[3ch] text-center">
+                    <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 min-w-[2.5ch] text-center">
                         {currentIndex + 1}
                     </span>
-                    <Button variant="ghost" size="icon" onClick={onNext} disabled={currentIndex === totalQuestions - 1} className="w-8 h-8 rounded-full text-gray-500 hover:bg-gray-100">
-                        <ChevronRight className="w-5 h-5" />
+                    <Button variant="ghost" size="icon" onClick={onNext} disabled={currentIndex === totalQuestions - 1} className="w-7 h-7 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800">
+                        <ChevronRight className="w-4 h-4" />
                     </Button>
                 </div>
 
@@ -353,7 +353,7 @@ const ToolButton = ({ isActive, onClick, icon, tooltip }: { isActive: boolean, o
         variant={isActive ? "default" : "ghost"}
         size="icon"
         onClick={onClick}
-        className={`rounded-xl w-10 h-10 transition-all ${isActive ? 'bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-200 text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+        className={`rounded-lg w-8 h-8 transition-all ${isActive ? 'bg-indigo-600 hover:bg-indigo-700 shadow text-white' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-800'}`}
         title={tooltip}
     >
         {icon}

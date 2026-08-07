@@ -994,23 +994,110 @@ export default function ProblemSolvingSession() {
                                         </Button>
                                     )}
 
-                                    {(isAnswerChecked || currentQ.status === 'correct') && (currentQ.options?.some(o => o.isCorrect && o.explanation) || currentQ.modelAnswer) && (
-                                        <div className={`mt-6 p-4 rounded-xl border ${isDark ? 'bg-indigo-900/20 border-indigo-500/20' : 'bg-indigo-50 border-indigo-100'}`}>
-                                            <h4 className="font-bold text-indigo-500 flex items-center gap-2">
-                                                <Star className="w-4 h-4" /> {currentQ.type === 'CQ' || currentQ.type === 'SQ' ? 'Model Answer' : 'Explanation'}
-                                            </h4>
-                                            <div className="prose dark:prose-invert max-w-none text-muted-foreground text-sm">
-                                                <UniversalMathJax dynamic>
-                                                    {cleanupMath(renderDynamicExplanation(
-                                                        currentQ.type === 'MCQ'
-                                                            ? (currentQ.options?.find(o => o.isCorrect)?.explanation || "No explanation provided.")
-                                                            : (currentQ.modelAnswer || "No model answer provided."),
-                                                        currentQ.options,
-                                                        currentQ.type,
-                                                        currentQ.rightColumn
-                                                    ))}
-                                                </UniversalMathJax>
+                                     {/* ANSWER & EXPLANATION REVEAL BLOCK FOR ALL QUESTION TYPES */}
+                                    {(isAnswerChecked || currentQ.status === 'correct') && (
+                                        <div className={`mt-6 p-5 rounded-2xl border-2 shadow-xl animate-in fade-in slide-in-from-top-2 ${isDark ? 'bg-indigo-950/40 border-indigo-500/30 text-indigo-200' : 'bg-indigo-50/80 border-indigo-200 text-indigo-950'}`}>
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <CheckCircle className="w-5 h-5 text-emerald-500" />
+                                                <span className="font-bold text-base">Answer & Explanation Details</span>
                                             </div>
+
+                                            {/* MCQ / SMCQ / AR Correct Answer Badge */}
+                                            {['MCQ', 'SMCQ', 'AR'].includes(currentQ.type) && currentQ.options && (() => {
+                                                const correctOpt = currentQ.options.find(o => o.isCorrect);
+                                                const correctIdx = currentQ.options.findIndex(o => o.isCorrect);
+                                                return (
+                                                    <div className="mb-3">
+                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                                            Correct Answer: Option {correctIdx !== -1 ? String.fromCharCode(65 + correctIdx) : 'A'}
+                                                        </Badge>
+                                                        {correctOpt?.text && (
+                                                            <div className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                                                                <UniversalMathJax inline dynamic>{cleanupMath(correctOpt.text)}</UniversalMathJax>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* MC (Multiple Correct Checkboxes) Badges */}
+                                            {currentQ.type === 'MC' && currentQ.options && (() => {
+                                                const correctIndices = currentQ.options
+                                                    .map((o, idx) => o.isCorrect ? String.fromCharCode(65 + idx) : null)
+                                                    .filter(Boolean);
+                                                return (
+                                                    <div className="mb-3">
+                                                        <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                                            Correct Options: {correctIndices.join(', ') || 'All Selected'}
+                                                        </Badge>
+                                                    </div>
+                                                );
+                                            })()}
+
+                                            {/* INT (Numerical Input) Answer Badge */}
+                                            {currentQ.type === 'INT' && (
+                                                <div className="mb-3">
+                                                    <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
+                                                        Correct Numerical Answer: {(currentQ as any).integerAnswer !== undefined ? (currentQ as any).integerAnswer : (currentQ.modelAnswer || (currentQ as any).correctAnswer || "See explanation")}
+                                                    </Badge>
+                                                </div>
+                                            )}
+
+                                            {/* MTF (Matching Column) Answer Badges */}
+                                            {currentQ.type === 'MTF' && currentQ.leftColumn && currentQ.matches && (
+                                                <div className="mb-3 space-y-1">
+                                                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Correct Matches:</div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {currentQ.leftColumn.map((item, i) => {
+                                                            const rId = currentQ.matches?.[item.id];
+                                                            const rIdx = currentQ.rightColumn?.findIndex(r => r.id === rId);
+                                                            const label = rIdx !== undefined && rIdx !== -1 ? String.fromCharCode(65 + rIdx) : '?';
+                                                            return (
+                                                                <Badge key={item.id} variant="outline" className="bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 border-emerald-300 font-bold text-xs">
+                                                                    ({i + 1} → {label})
+                                                                </Badge>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* CQ / SQ / DESCRIPTIVE Model Answer */}
+                                            {['CQ', 'SQ', 'DESCRIPTIVE'].includes(currentQ.type) && currentQ.modelAnswer && (
+                                                <div className="mb-3 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20">
+                                                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-600 mb-1">Model Answer / Solution:</div>
+                                                    <div className="text-sm font-medium text-emerald-900 dark:text-emerald-200">
+                                                        <UniversalMathJax dynamic>{cleanupMath(currentQ.modelAnswer)}</UniversalMathJax>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Explanation Text */}
+                                            {(() => {
+                                                const expText = currentQ.explanation
+                                                    || currentQ.options?.find(o => o.isCorrect && o.explanation)?.explanation
+                                                    || currentQ.modelAnswer;
+
+                                                if (!expText) return null;
+
+                                                return (
+                                                    <div className="pt-3 border-t border-indigo-200/50 dark:border-indigo-800/50">
+                                                        <h4 className="font-bold text-xs uppercase tracking-wider text-indigo-500 mb-1 flex items-center gap-1.5">
+                                                            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" /> Explanation / Notes
+                                                        </h4>
+                                                        <div className="text-sm leading-relaxed text-slate-700 dark:text-slate-200">
+                                                            <UniversalMathJax dynamic>
+                                                                {cleanupMath(renderDynamicExplanation(
+                                                                    expText,
+                                                                    currentQ.options,
+                                                                    currentQ.type,
+                                                                    currentQ.rightColumn
+                                                                ))}
+                                                            </UniversalMathJax>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })()}
                                         </div>
                                     )}
                                 </div>
