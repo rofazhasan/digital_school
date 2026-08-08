@@ -361,33 +361,37 @@ model OMRTemplateDefinition {
 }
 
 model OMRScan {
-  id              String             @id @default(cuid())
-  scanUuid        String             @unique
-  qrCode          String?
-  templateId      String
-  templateVersion Int                @default(1)
-  examId          String
-  examSetId       String?
-  studentId       String?
-  rollNumber      String?
-  registrationNo  String?
-  detectedSet     String?
-  totalScore      Float              @default(0)
-  maxScore        Float              @default(0)
-  rawAnswers      Json?
+  id               String              @id @default(cuid())
+  scanUuid         String              @unique
+  qrCode           String?
+  templateId       String
+  templateVersion  Int                 @default(1)
+  examId           String
+  examSetId        String?
+  studentId        String?
+  rollNumber       String?
+  registrationNo   String?
+  detectedSet      String?
+  totalScore       Float               @default(0)
+  maxScore         Float               @default(0)
+  rawAnswers       Json?
   evaluatedAnswers Json?
-  confidenceScore Float              @default(0)
-  qualityScore    Float              @default(0)
-  status          String             @default("PENDING")
-  isAuthoritative Boolean            @default(false)
-  scanSessionId   String?
-  createdById     String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  quality         OMRScanQuality?
-  answers         OMRScanAnswer[]
-  corrections     OMRCorrectionLog[]
+  confidenceScore  Float               @default(0)
+  qualityScore     Float               @default(0)
+  status           String              @default("PENDING")
+  isAuthoritative  Boolean             @default(false)
+  scanSessionId    String?
+  createdById      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  quality          OMRScanQuality?
+  answers          OMRScanAnswer[]
+  corrections      OMRCorrectionLog[]
+  session          OMRScanSession?     @relation("SessionScans", fields: [scanSessionId], references: [id])
 
+  @@index([scanSessionId])
+  @@index([examId])
+  @@index([studentId])
   @@map("omr_scans")
 }
 
@@ -506,12 +510,14 @@ model Result {
   sqMarks          Float           @default(0)
   examId           String
   studentId        String
+  omrScanId        String?         // Link to OMRScan for OMR-sourced results
   exam             Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
   examSubmission   ExamSubmission? @relation(fields: [examSubmissionId], references: [id], onDelete: Cascade)
   student          StudentProfile  @relation(fields: [studentId], references: [id])
 
   @@unique([studentId, examId])
   @@index([examId])
+  @@index([omrScanId])
   @@map("results")
 }
 
@@ -615,16 +621,23 @@ model OMRScanSession {
   id             String     @id @default(cuid())
   sessionName    String
   examinerId     String
+  examId         String?    // Which exam this session is for
+  status         String     @default("OPEN") // OPEN | CLOSED | PUBLISHED
   filesUploaded  String[]
   failedFiles    String[]
   totalFiles     Int        @default(0)
   processedFiles Int        @default(0)
   isCompleted    Boolean    @default(false)
   completedAt    DateTime?
+  publishedAt    DateTime?
+  publishedCount Int        @default(0)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   omrSheets      OMRSheet[]
+  scans          OMRScan[]  @relation("SessionScans")
 
+  @@index([examId])
+  @@index([status])
   @@map("omr_scan_sessions")
 }
 

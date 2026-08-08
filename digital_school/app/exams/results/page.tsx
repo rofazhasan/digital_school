@@ -86,6 +86,7 @@ interface Result {
   percentage?: number;
   isPublished: boolean;
   publishedAt?: string;
+  omrScanId?: string | null; // OMR-sourced results link to their scan
   student: {
     id: string;
     roll: string;
@@ -674,15 +675,27 @@ export default function ExamResultsPage() {
                               </div>
                             </div>
 
-                            <Button
-                              onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
-                              className="w-full bg-white text-indigo-600 hover:bg-slate-50 font-bold transition-transform active:scale-95 shadow-lg shadow-indigo-900/20"
-                            >
-                              View Full Review <Eye className="w-4 h-4 ml-2" />
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      ) : null}
+                              <Button
+                                onClick={() => router.push(`/exams/results/${examResult.exam.id}`)}
+                                className="w-full bg-white text-indigo-600 hover:bg-slate-50 font-bold transition-transform active:scale-95 shadow-lg shadow-indigo-900/20"
+                              >
+                                View Full Review <Eye className="w-4 h-4 ml-2" />
+                              </Button>
+
+                              {/* OMR Marksheet Download — only shown for OMR-scanned results */}
+                              {myResult.omrScanId && (
+                                <a
+                                  href={`/api/omr/certificate/${myResult.omrScanId}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center justify-center gap-2 w-full mt-2 py-2.5 px-4 rounded-lg bg-white/10 text-white text-sm font-semibold border border-white/20 hover:bg-white/20 transition-all"
+                                >
+                                  <FileText className="w-4 h-4" /> Download OMR Marksheet
+                                </a>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ) : null}
 
                       {/* Performance Insights Card */}
                       <Card className="bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10 shadow-sm backdrop-blur-xl hidden md:block">

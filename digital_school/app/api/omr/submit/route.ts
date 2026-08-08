@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { writeOMRResult } from '@/lib/omr/result-writer';
 
 export async function POST(req: NextRequest) {
   try {
@@ -211,11 +212,39 @@ export async function POST(req: NextRequest) {
       }
     });
 
+    // 5. Phase 3-A: Write authoritative Result to the production results table
+    let resultInfo: { resultId: string; grade: string; percentage: number; total: number; isNew: boolean } | null = null;
+    if (resolvedStudentId && !reviewRequired) {
+      try {
+        const writerOutput = await writeOMRResult(
+          {
+            scanId: newScan.id,
+            studentId: resolvedStudentId,
+            examId,
+            totalScore,
+            maxScore: maxMarks,
+          },
+          prisma
+        );
+        resultInfo = {
+          resultId: writerOutput.resultId,
+          grade: writerOutput.grade,
+          percentage: writerOutput.percentage,
+          total: writerOutput.total,
+          isNew: writerOutput.isNew,
+        };
+      } catch (resultErr: any) {
+        // Non-fatal: log but don't fail the scan submission
+        console.error('[OMR Submit] Result write error:', resultErr?.message);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       scanId: newScan.id,
       scanUuid,
       reviewRequired,
+      result: resultInfo,
       score: {
         totalScore,
         maxScore: maxMarks,
@@ -229,3 +258,4 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
