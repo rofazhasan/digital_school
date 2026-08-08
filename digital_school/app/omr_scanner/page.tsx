@@ -1,689 +1,358 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import {
-    Loader2,
-    Upload,
-    RefreshCw,
-    CheckCircle,
-    AlertTriangle,
-    ScanLine,
-    FileText,
-    Zap,
-    ShieldCheck,
-    Eye,
-    ChevronRight,
-    Camera
-} from "lucide-react";
-import { toast } from "sonner";
-import { db } from "@/lib/dexie-db";
-import { useLiveQuery } from "dexie-react-hooks";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
+import { Camera, RefreshCw, CheckCircle2, AlertTriangle, XCircle, ArrowLeft, Layers, ShieldCheck, Eye, Upload } from 'lucide-react';
+import { detectCornerMarkers } from '@/lib/omr/marker-detector';
+import { warpPerspectiveImage, CornerQuad } from '@/lib/omr/perspective-warp';
+import { generateTemplateGeometry, CANONICAL_WIDTH, CANONICAL_HEIGHT } from '@/lib/omr/geometry-template';
+import { DigitBubbleReader } from '@/lib/omr/digit-bubble-reader';
+import { QuestionClassifier } from '@/lib/omr/question-classifier';
+import { evaluateImageQuality, QualityMetrics } from '@/lib/omr/quality-engine';
+import { AutoCaptureManager } from '@/lib/omr/auto-capture';
+import { OMRSyncEngine } from '@/lib/omr/sync-engine';
+import { v4 as uuidv4 } from 'uuid';
 
-interface OMRResult {
-    roll: string;
-    registration: string;
-    set: string;
-    answers: Record<string, { option: string; confidence: number }>;
-    confidence: number;
-    quality?: { sharpness: number; brightness: number };
-    qrData?: { examId: string; setId: string; studentId?: string };
-    grading?: { score: number; examName: string; details: any[] };
-    conflicts?: any[];
-    markers?: any;
-    sections?: any;
+interface BatchScanItem {
+  id: string;
+  scanUuid: string;
+  timestamp: string;
+  rollNumber: string;
+  registrationNo: string;
+  score: number;
+  maxScore: number;
+  status: 'SUCCESS' | 'REVIEW' | 'FAILED';
+  qualityPassed: boolean;
 }
 
-export default function OMRScannerPage() {
-    const [activeTab, setActiveTab] = useState("camera");
-    const [isProcessing, setIsProcessing] = useState(false);
-    const [scanResult, setScanResult] = useState<any>(null);
-    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [isEngineReady, setIsEngineReady] = useState(false);
-    const [markersFound, setMarkersFound] = useState(0);
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [selectedExamId, setSelectedExamId] = useState<string | null>(null);
-    const [qualityMetrics, setQualityMetrics] = useState<any>(null);
+export default function ProductionOMRScannerPage() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    const videoRef = useRef<HTMLVideoElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const overlayRef = useRef<HTMLCanvasElement>(null);
-    const workerRef = useRef<Worker | null>(null);
-    const [cameraActive, setCameraActive] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [debugMode, setDebugMode] = useState(false);
+  const [quality, setQuality] = useState<QualityMetrics | null>(null);
+  const [autoCaptureProgress, setAutoCaptureProgress] = useState(0);
+  const [batchList, setBatchList] = useState<BatchScanItem[]>([]);
+  const [examId, setExamId] = useState<string>('demo-exam-1');
 
-    const [processingQueue, setProcessingQueue] = useState<File[]>([]);
-    const [queueIndex, setQueueIndex] = useState(0);
-    const [sessionScans, setSessionScans] = useState<OMRResult[]>([]);
-    const [sessionStats, setSessionStats] = useState({ total: 0, successful: 0, doubtful: 0, conflicts: 0 });
+  const autoCaptureManagerRef = useRef(new AutoCaptureManager());
 
-    const pendingExams = useLiveQuery(() => db.exams.toArray());
+  useEffect(() => {
+    OMRSyncEngine.initAutoSync();
+  }, []);
 
-    const syncOfflineData = useCallback(async () => {
-        setIsSyncing(true);
-        try {
-            const res = await fetch('/api/omr/sync');
-            const data = await res.json();
-            await db.exams.clear();
-            await db.exams.bulkAdd(data);
-            toast.success("Offline Exams Synced!");
-        } catch (error) {
-            toast.error("Sync failed");
-        } finally {
-            setIsSyncing(false);
-        }
-    }, []);
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }
+      });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+        setIsCameraActive(true);
+      }
+    } catch (err) {
+      console.error('Camera access error:', err);
+    }
+  };
 
-    const drawOverlay = useCallback((markers: any, sections: any = null) => {
-        if (!overlayRef.current || !videoRef.current) return;
-        const canvas = overlayRef.current;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      setIsCameraActive(false);
+    }
+  };
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (!markers) return;
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-        // Custom visualization for "Top Notch" feel
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#10b981';
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        // Visual indicator logic here...
-    }, []);
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      await processImageFile(file);
+    }
+  };
 
-    const handleSubmitScan = useCallback(async (data: OMRResult) => {
-        if (isSyncing) return;
-        setIsSyncing(true);
-        try {
-            const response = await fetch('/api/omr/submit', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    examId: data.qrData?.examId,
-                    setId: data.qrData?.setId,
-                    studentId: data.qrData?.studentId,
-                    roll: data.roll,
-                    registration: data.registration,
-                    answers: data.answers,
-                    score: data.grading?.score,
-                    confidence: data.confidence
-                })
-            });
-            const result = await response.json();
-            if (result.success) {
-                toast.success("Result Synced to Evaluation System!", {
-                    icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
-                });
-            }
-        } catch (e) {
-            console.error("Submission failed:", e);
-        } finally {
-            setIsSyncing(false);
-        }
-    }, [isSyncing]);
+  const processImageFile = async (file: File) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.src = url;
 
-    const processBatchFile = useCallback((file: File) => {
-        const img = new Image();
-        img.src = URL.createObjectURL(file);
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0);
-            const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
-            if (imageData) {
-                setIsProcessing(true);
-                const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
-                const template = selectedExam?.templateJson || null;
-                workerRef.current?.postMessage({ type: 'process', imageData, template });
-            }
-        };
-    }, [pendingExams, selectedExamId]);
+    await new Promise(resolve => (img.onload = resolve));
 
-    const handleWorkerResult = useCallback(async (result: any) => {
-        setIsProcessing(false);
-        if (result.type === 'searching') {
-            setMarkersFound(result.markersFound);
-            drawOverlay(null);
-        } else if (result.type === 'success') {
-            const data = result.data as OMRResult;
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-            if (data.qrData && data.qrData.setId && selectedExamId !== data.qrData.setId) {
-                setSelectedExamId(data.qrData.setId);
-                toast.success(`Exam Identified: ${data.qrData.examId}`, {
-                    icon: <FileText className="w-4 h-4 text-primary" />
-                });
-            }
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-            setScanResult(data);
-            setQualityMetrics(data.quality);
-            setMarkersFound(4);
-            drawOverlay(data.markers, data.sections);
+    processScanFrame(imgData.data, canvas.width, canvas.height);
+  };
 
-            // --- SESSION LOGGING ---
-            setSessionScans(prev => [data, ...prev]);
-            setSessionStats(prev => ({
-                total: prev.total + 1,
-                successful: prev.successful + (data.confidence > 0.95 ? 1 : 0),
-                doubtful: prev.doubtful + (data.confidence <= 0.95 && data.confidence > 0.70 ? 1 : 0),
-                conflicts: prev.conflicts + (data.conflicts && data.conflicts.length > 0 ? 1 : 0)
-            }));
+  const processScanFrame = async (
+    data: Uint8Array | Uint8ClampedArray,
+    width: number,
+    height: number
+  ) => {
+    // 1. Marker Detection
+    const markerResult = detectCornerMarkers(data, width, height);
 
-            if (data.confidence > 0.95 && data.qrData) {
-                await handleSubmitScan(data);
-            }
+    // 2. Quality Evaluation
+    const qualityEval = evaluateImageQuality(data, width, height, markerResult.confidence);
+    setQuality(qualityEval);
 
-            if (queueIndex + 1 < processingQueue.length) {
-                const nextIdx = queueIndex + 1;
-                setQueueIndex(nextIdx);
-                toast.info(`Processing Batch: ${nextIdx + 1} of ${processingQueue.length}`);
-                processBatchFile(processingQueue[nextIdx]);
-            } else if (processingQueue.length > 1) {
-                toast.success(`Batch Complete: ${processingQueue.length} sheets processed`);
-                setProcessingQueue([]);
-            }
+    if (!markerResult.isValid || !markerResult.quad) {
+      return;
+    }
 
-            if (data.confidence > 0.98) {
-                toast.success("Sheet Analyzed with 100% Precision", {
-                    icon: <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                });
-            }
-        }
-    }, [selectedExamId, queueIndex, processingQueue, handleSubmitScan, drawOverlay, processBatchFile]);
+    // 3. Perspective Warp into Canonical Space (2480x3508)
+    const dstQuad: CornerQuad = {
+      tl: { x: 145, y: 145 },
+      tr: { x: 2335, y: 145 },
+      bl: { x: 145, y: 3363 },
+      br: { x: 2335, y: 3363 }
+    };
 
-    const processLoop = useCallback(() => {
-        if (!cameraActive || !videoRef.current || !canvasRef.current || !workerRef.current || !isEngineReady) return;
-
-        const video = videoRef.current;
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext('2d', { alpha: false });
-
-        if (ctx && video.readyState === video.HAVE_ENOUGH_DATA) {
-            canvas.width = 1000;
-            canvas.height = (video.videoHeight / video.videoWidth) * 1000;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const selectedExam = pendingExams?.find(e => e.id === selectedExamId);
-            const template = selectedExam?.templateJson || null;
-
-            workerRef.current.postMessage({
-                type: 'process',
-                imageData: imageData,
-                template: template
-            }, [imageData.data.buffer]);
-        }
-        setTimeout(() => requestAnimationFrame(processLoop), 200);
-    }, [cameraActive, isEngineReady, pendingExams, selectedExamId]);
-
-    const startCamera = useCallback(async () => {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({
-                video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }
-            });
-            if (videoRef.current) {
-                videoRef.current.srcObject = stream;
-                setCameraActive(true);
-                requestAnimationFrame(processLoop);
-            }
-        } catch (err) {
-            toast.error("Camera access denied.");
-        }
-    }, [processLoop]);
-
-    const stopCamera = useCallback(() => {
-        if (videoRef.current && videoRef.current.srcObject) {
-            (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-            videoRef.current.srcObject = null;
-        }
-        setCameraActive(false);
-    }, []);
-
-    const exportToCSV = useCallback(() => {
-        if (sessionScans.length === 0) return;
-
-        const headers = ["Roll", "Registration", "Set", "Score", "Accuracy", "Status"];
-        const rows = sessionScans.map(s => [
-            s.roll,
-            s.registration,
-            s.set,
-            s.grading?.score || 0,
-            (s.confidence * 100).toFixed(1) + "%",
-            s.conflicts && s.conflicts.length > 0 ? "CONFLICT" : (s.confidence > 0.95 ? "OK" : "DOUBTFUL")
-        ]);
-
-        const csvContent = "data:text/csv;charset=utf-8,"
-            + headers.join(",") + "\n"
-            + rows.map(e => e.join(",")).join("\n");
-
-        const encodedUri = encodeURI(csvContent);
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `omr_session_${new Date().getTime()}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        toast.success("Session Data Exported!");
-    }, [sessionScans]);
-
-    const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0 && workerRef.current) {
-            const files = Array.from(e.target.files);
-            setProcessingQueue(files);
-            setQueueIndex(0);
-            processBatchFile(files[0]);
-        }
-    }, [processBatchFile]);
-
-    // --- Engine Initialization ---
-    useEffect(() => {
-        const worker = new Worker(new URL('../../public/workers/omr-engine.worker.js', import.meta.url));
-        worker.onmessage = (e) => {
-            if (e.data.type === 'ready') {
-                setIsEngineReady(true);
-                toast.success("AI OMR Engine Initialized", {
-                    icon: <Zap className="w-4 h-4 text-yellow-500" />
-                });
-            } else if (e.data.type === 'result') {
-                handleWorkerResult(e.data.result);
-            }
-        };
-        workerRef.current = worker;
-        return () => worker.terminate();
-    }, [handleWorkerResult]);
-
-    return (
-        <div className="relative min-h-screen bg-[#050505] text-white selection:bg-primary/30 selection:text-white overflow-x-hidden font-exam-online">
-            {/* --- IMMERSIVE BACKGROUND --- */}
-            <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-                <div className="aurora-bg absolute inset-0 opacity-40" />
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/20 rounded-full blur-[120px] animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-indigo-500/20 rounded-full blur-[120px] animate-pulse" style={{ animationDelay: '2s' }} />
-            </div>
-
-            <div className="container relative z-10 mx-auto px-4 py-8 max-w-6xl">
-                {/* --- HEADER --- */}
-                <motion.div
-                    initial={{ opacity: 0, y: -20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-12"
-                >
-                    <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="h-10 w-10 bg-primary/20 border border-primary/40 rounded-xl flex items-center justify-center backdrop-blur-md shadow-glow">
-                                <Zap className="w-6 h-6 text-primary" />
-                            </div>
-                            <h1 className="text-4xl font-black tracking-tight bg-gradient-to-r from-white via-white to-white/40 bg-clip-text text-transparent">AI OMR SCANNER</h1>
-                        </div>
-                        <p className="text-white/50 font-medium tracking-wide flex items-center gap-2">
-                            <ShieldCheck className="w-4 h-4 text-emerald-500" /> Professional Grade • Bulk Supported • 100% Precision
-                        </p>
-                    </div>
-
-                    {/* BULK STATS HUD */}
-                    {sessionStats.total > 0 && (
-                        <div className="flex flex-wrap gap-4 glass-heavy p-4 rounded-3xl border-white/5 shadow-2xl">
-                            <div className="flex flex-col px-4 border-r border-white/10">
-                                <span className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1">Total Scanned</span>
-                                <span className="text-xl font-black text-white">{sessionStats.total}</span>
-                            </div>
-                            <div className="flex flex-col px-4 border-r border-white/10 text-emerald-500">
-                                <span className="text-[10px] font-black text-emerald-500/50 uppercase tracking-widest mb-1">Successful</span>
-                                <span className="text-xl font-black">{sessionStats.successful}</span>
-                            </div>
-                            <div className="flex flex-col px-4 border-r border-white/10 text-yellow-500">
-                                <span className="text-[10px] font-black text-yellow-500/50 uppercase tracking-widest mb-1">Doubtful</span>
-                                <span className="text-xl font-black">{sessionStats.doubtful}</span>
-                            </div>
-                            <div className="flex flex-col px-4 text-red-500">
-                                <span className="text-[10px] font-black text-red-500/50 uppercase tracking-widest mb-1">Conflicts</span>
-                                <span className="text-xl font-black">{sessionStats.conflicts}</span>
-                            </div>
-                        </div>
-                    )}
-
-                    <div className="flex items-center gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={exportToCSV}
-                            disabled={sessionScans.length === 0}
-                            className="glass border-white/10 hover:bg-white/10 text-white rounded-xl px-6 h-12"
-                        >
-                            <Upload className="w-4 h-4 mr-2 rotate-180" />
-                            Export CSV
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={syncOfflineData}
-                            disabled={isSyncing}
-                            className="glass border-white/10 hover:bg-white/10 text-white rounded-xl px-6 h-12"
-                        >
-                            {isSyncing ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                            Sync Engine
-                        </Button>
-                        <Button
-                            onClick={() => { setScanResult(null); setQualityMetrics(null); if (activeTab === 'camera') startCamera(); }}
-                            className="bg-primary hover:bg-primary/80 text-white border-0 shadow-glow rounded-xl px-8 h-12 font-bold"
-                        >
-                            <RefreshCw className="w-4 h-4 mr-2" /> Reset
-                        </Button>
-                    </div>
-                </motion.div>
-
-                {/* --- MAIN GRID --- */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-
-                    {/* LEFT: SCANNER HUD (7 Cols) */}
-                    <div className="lg:col-span-7 space-y-6">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="relative group rounded-3xl overflow-hidden border border-white/10 shadow-2xl bg-black"
-                        >
-                            {/* HUD Overlays */}
-                            <div className="absolute inset-x-8 top-8 z-30 flex justify-between pointer-events-none">
-                                <div className="flex items-center gap-3">
-                                    <div className="glass px-4 py-2 rounded-2xl flex items-center gap-3">
-                                        <div className={`w-2 h-2 rounded-full ${isEngineReady ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Engine: {isEngineReady ? 'Active' : 'Offline'}</span>
-                                    </div>
-                                    <div className="glass px-4 py-2 rounded-2xl flex items-center gap-2">
-                                        <Eye className="w-3 h-3 text-primary" />
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-white/70">Markers:</span>
-                                        <span className={`text-[10px] font-black ${markersFound === 4 ? 'text-emerald-500' : 'text-yellow-500'}`}>{markersFound}/4</span>
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="glass-heavy px-4 py-2 rounded-2xl">
-                                        <div className="flex items-center gap-2">
-                                            <div className={`w-2 h-2 rounded-full ${selectedExamId ? 'bg-primary' : 'bg-white/10'}`} />
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-white/50">
-                                                {selectedExamId ? `Template: ${selectedExamId.slice(0, 8)}...` : 'Waiting for QR ID...'}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Center Guideline & Stability */}
-                            <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-                                <div className="w-[65%] h-[85%] border-2 border-primary/20 border-dashed rounded-[40px] flex flex-col items-center justify-center relative">
-                                    <div className="scanner-line animate-scanner" />
-
-                                    {/* Stability Guide */}
-                                    <div className="absolute top-8 flex flex-col items-center">
-                                        <div className="flex gap-1 mb-1">
-                                            {[1, 2, 3, 4, 5].map(i => (
-                                                <div key={i} className={`w-3 h-1 rounded-full ${markersFound >= 4 ? 'bg-emerald-500' : 'bg-white/10'}`} />
-                                            ))}
-                                        </div>
-                                        <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Alignment Stability</span>
-                                    </div>
-
-                                    {markersFound < 4 && !isProcessing && (
-                                        <motion.div
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="glass-heavy px-8 py-4 rounded-3xl border-primary/30 flex flex-col items-center gap-2 text-center"
-                                        >
-                                            <ScanLine className="w-8 h-8 text-primary animate-pulse" />
-                                            <h3 className="text-sm font-black uppercase tracking-widest">Target markers</h3>
-                                            <p className="text-[10px] text-white/40">Hold steady for AI optimization</p>
-                                        </motion.div>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Quality HUD (Bottom) */}
-                            {qualityMetrics && (
-                                <div className="absolute inset-x-8 bottom-8 z-30 flex justify-between pointer-events-none">
-                                    <div className="glass px-4 py-2 rounded-2xl flex items-center gap-4">
-                                        <div className="flex flex-col">
-                                            <span className="text-[8px] font-black uppercase text-white/40 mb-1">Sharpness</span>
-                                            <div className="w-20 bg-white/10 h-1 rounded-full overflow-hidden">
-                                                <div className="bg-emerald-500 h-full transition-all duration-500" style={{ width: `${Math.min(100, qualityMetrics.sharpness / 2)}%` }} />
-                                            </div>
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <span className="text-[8px] font-black uppercase text-white/40 mb-1">Luminance</span>
-                                            <div className="w-20 bg-white/10 h-1 rounded-full overflow-hidden">
-                                                <div className="bg-yellow-500 h-full transition-all duration-500" style={{ width: `${(qualityMetrics.brightness / 255) * 100}%` }} />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {scanResult && (
-                                        <div className="glass px-6 py-2 rounded-2xl border-emerald-500/30 flex items-center gap-2">
-                                            <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                            <span className="text-xs font-black uppercase tracking-tighter italic">Accuracy: {(scanResult.confidence * 100).toFixed(1)}%</span>
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-
-                            {/* TAB CONTENT */}
-                            <div className="h-[600px] w-full bg-neutral-900 flex items-center justify-center p-0">
-                                {activeTab === 'camera' && (
-                                    <div className="relative w-full h-full">
-                                        <video ref={videoRef} className="absolute inset-0 w-full h-full object-cover opacity-80" autoPlay playsInline muted />
-                                        <canvas ref={overlayRef} className="absolute inset-0 w-full h-full object-cover z-20 pointer-events-none" width={1280} height={720} />
-                                        <canvas ref={canvasRef} className="hidden" />
-                                    </div>
-                                )}
-
-                                {activeTab === 'upload' && (
-                                    <div className="p-12 text-center w-full">
-                                        {previewUrl ? (
-                                            <img src={previewUrl} alt="Preview" className="mx-auto rounded-3xl max-h-[450px] shadow-2xl border border-white/10" />
-                                        ) : (
-                                            <label className="flex flex-col items-center justify-center w-full h-[450px] border-2 border-dashed border-white/10 rounded-[40px] cursor-pointer hover:bg-white/5 transition-all group">
-                                                <div className="bg-primary/20 p-6 rounded-full mb-6 group-hover:scale-110 transition-transform">
-                                                    <Upload className="w-12 h-12 text-primary" />
-                                                </div>
-                                                <h3 className="text-xl font-bold mb-2">Upload OMR Asset</h3>
-                                                <p className="text-white/40 text-sm">Supports high-res JPG, PNG or OMR-PDF</p>
-                                                <Input type="file" className="hidden" accept="image/*,application/pdf" multiple onChange={handleFileUpload} />
-                                            </label>
-                                        )}
-                                    </div>
-                                )}
-
-                                {isProcessing && (
-                                    <div className="absolute inset-0 bg-black/60 backdrop-blur-md z-50 flex flex-col items-center justify-center">
-                                        <div className="relative">
-                                            <div className="w-24 h-24 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                            <div className="absolute inset-0 flex items-center justify-center">
-                                                <Zap className="w-8 h-8 text-primary animate-pulse" />
-                                            </div>
-                                        </div>
-                                        <p className="mt-8 text-lg font-black uppercase tracking-[0.3em] overflow-hidden whitespace-nowrap border-r-2 border-primary pr-2 animate-typing">AI PROCESSING...</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Tab Switcher (Floating Bottom) */}
-                            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40">
-                                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); if (v === 'camera') startCamera(); else stopCamera(); }} className="glass-heavy p-1 rounded-2xl">
-                                    <TabsList className="bg-transparent border-none">
-                                        <TabsTrigger value="camera" className="rounded-xl px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Camera</TabsTrigger>
-                                        <TabsTrigger value="upload" className="rounded-xl px-6 data-[state=active]:bg-primary data-[state=active]:text-white">Upload</TabsTrigger>
-                                    </TabsList>
-                                </Tabs>
-                            </div>
-                        </motion.div>
-                    </div>
-
-                    {/* RIGHT: REAL-TIME ANALYTICS (5 Cols) */}
-                    <div className="lg:col-span-12 xl:col-span-5">
-                        <Tabs defaultValue="current" className="w-full">
-                            <TabsList className="glass mb-6 w-full p-1 rounded-2xl">
-                                <TabsTrigger value="current" className="flex-1 rounded-xl data-[state=active]:bg-primary">Current Detail</TabsTrigger>
-                                <TabsTrigger value="history" className="flex-1 rounded-xl data-[state=active]:bg-primary">
-                                    Session History
-                                    {sessionScans.length > 0 && <Badge className="ml-2 bg-white/20">{sessionScans.length}</Badge>}
-                                </TabsTrigger>
-                            </TabsList>
-
-                            <TabsContent value="current" className="space-y-6 mt-0">
-                                <AnimatePresence mode="wait">
-                                    {!scanResult ? (
-                                        <motion.div
-                                            key="empty"
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            className="glass-card rounded-[40px] p-12 text-center h-full flex flex-col items-center justify-center min-h-[500px]"
-                                        >
-                                            <div className="w-24 h-24 bg-white/5 rounded-full flex items-center justify-center mb-6">
-                                                <FileText className="w-10 h-10 text-white/20" />
-                                            </div>
-                                            <h3 className="text-2xl font-black mb-2">Ready for Insights</h3>
-                                            <p className="text-white/40 max-w-xs mx-auto">Once a sheet is successfully scanned, the AI analysis report will appear here in real-time.</p>
-                                        </motion.div>
-                                    ) : (
-                                        <motion.div
-                                            key="result"
-                                            initial={{ opacity: 0, x: 20 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            className="space-y-6"
-                                        >
-                                            {/* Primary Score Card */}
-                                            <div className="glass-heavy rounded-[40px] p-8 border-primary/20 relative overflow-hidden">
-                                                <div className="relative z-10 flex flex-col sm:flex-row justify-between gap-6">
-                                                    <div>
-                                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Verified Assessment</p>
-                                                        <h3 className="text-4xl font-black text-white">{scanResult.grading?.examName || "OMR DATA SCAN"}</h3>
-                                                        <p className="text-white/50 text-sm mt-1">Student verified via offline database registry.</p>
-                                                    </div>
-                                                    <div className="bg-white/5 backdrop-blur-md rounded-3xl p-6 text-center border border-white/10 min-w-[140px]">
-                                                        <p className="text-[40px] font-black leading-none text-primary italic">
-                                                            {scanResult.grading?.score?.toFixed(1) || "0.0"}
-                                                        </p>
-                                                        <p className="text-[10px] uppercase font-black text-white/40 tracking-widest mt-2">Final Score</p>
-                                                    </div>
-                                                </div>
-                                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[80px] -mr-16 -mt-16" />
-                                            </div>
-
-                                            {/* Identification Matrix */}
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'ROLL') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Roll Identifier</span>
-                                                        {scanResult.conflicts?.some((c: any) => c.type === 'ROLL') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                                                    </div>
-                                                    <p className="text-2xl font-black tracking-tighter text-white">{scanResult.roll || "000000"}</p>
-                                                </div>
-                                                <div className={`glass-card p-6 rounded-3xl border ${scanResult.conflicts?.some((c: any) => c.type === 'REG') ? 'border-red-500/50 bg-red-500/5' : 'border-white/5'}`}>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <span className="text-[8px] font-black uppercase text-white/30 tracking-widest">Registration</span>
-                                                        {scanResult.conflicts?.some((c: any) => c.type === 'REG') && <AlertTriangle className="w-3 h-3 text-red-500" />}
-                                                    </div>
-                                                    <p className="text-2xl font-black tracking-tighter text-white">{scanResult.registration || "000000"}</p>
-                                                </div>
-                                            </div>
-
-                                            {/* Answer Matrix */}
-                                            <div className="glass-card rounded-[40px] p-6 max-h-[500px] flex flex-col">
-                                                <div className="flex justify-between items-center mb-6">
-                                                    <h4 className="text-sm font-black uppercase tracking-widest">Answer Fidelity Report</h4>
-                                                    <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">100 ITEMS</Badge>
-                                                </div>
-                                                <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-2">
-                                                    <div className="grid grid-cols-4 gap-2">
-                                                        {Array.from({ length: 100 }).map((_, i) => {
-                                                            const qNum = i + 1;
-                                                            const res = scanResult.answers[qNum];
-                                                            const ans = typeof res === 'object' ? res.option : res;
-                                                            const confidence = typeof res === 'object' ? res.confidence : 1.0;
-                                                            const conflict = scanResult.conflicts?.find((c: any) => c.qId == qNum && c.type === 'MCQ');
-                                                            const grade = scanResult.grading?.details.find((d: any) => d.q === qNum);
-
-                                                            let stateColor = "text-white/40";
-                                                            let bgCircle = "bg-white/5";
-                                                            if (conflict) {
-                                                                stateColor = "text-red-500";
-                                                                bgCircle = "bg-red-500 shadow-glow shadow-red-500/20";
-                                                            } else if (ans) {
-                                                                if (confidence < 0.90) {
-                                                                    stateColor = "text-yellow-500";
-                                                                    bgCircle = "bg-yellow-500/20 border border-yellow-500/50";
-                                                                } else {
-                                                                    stateColor = "text-emerald-500";
-                                                                    bgCircle = "bg-emerald-500 shadow-glow shadow-emerald-500/20";
-                                                                }
-
-                                                                if (grade && grade.status === 'wrong') {
-                                                                    stateColor = "text-rose-400";
-                                                                    bgCircle = "bg-rose-400";
-                                                                }
-                                                            }
-
-                                                            return (
-                                                                <div key={qNum} className={`flex flex-col items-center bg-white/[0.02] p-2 rounded-2xl border transition-all ${confidence < 0.90 && ans ? 'border-yellow-500/30' : 'border-white/5'}`}>
-                                                                    <span className="text-[8px] font-black text-white/20 mb-1">{qNum}</span>
-                                                                    <div className={`w-8 h-8 rounded-full ${bgCircle} flex items-center justify-center text-xs font-black ${stateColor}`}>
-                                                                        {ans || "—"}
-                                                                    </div>
-                                                                    {confidence < 0.90 && ans && <span className="text-[6px] font-bold text-yellow-500 mt-1 uppercase">Doubtful</span>}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </TabsContent>
-
-                            <TabsContent value="history" className="mt-0">
-                                <div className="glass-card rounded-[40px] p-6 h-[720px] flex flex-col">
-                                    <div className="flex justify-between items-center mb-6">
-                                        <h4 className="text-sm font-black uppercase tracking-widest">Session Scan History</h4>
-                                        <Badge variant="outline" className="text-[10px] border-white/10 text-white/50">{sessionScans.length} SHEETS</Badge>
-                                    </div>
-                                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                                        {sessionScans.length === 0 ? (
-                                            <div className="h-full flex flex-col items-center justify-center text-center opacity-20">
-                                                <RefreshCw className="w-12 h-12 mb-4 animate-spin-slow" />
-                                                <p className="text-sm font-bold">No scans in this session yet</p>
-                                            </div>
-                                        ) : (
-                                            sessionScans.map((scan, idx) => (
-                                                <motion.button
-                                                    initial={{ opacity: 0, x: -10 }}
-                                                    animate={{ opacity: 1, x: 0 }}
-                                                    transition={{ delay: idx * 0.05 }}
-                                                    key={idx}
-                                                    onClick={() => { setScanResult(scan); setQualityMetrics(scan.quality); }}
-                                                    className={`w-full text-left p-4 rounded-3xl border transition-all group flex items-center justify-between ${scanResult === scan ? 'bg-primary/20 border-primary/50' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
-                                                >
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black ${scan.confidence > 0.95 ? 'bg-emerald-500/20 text-emerald-500' : 'bg-yellow-500/20 text-yellow-500'}`}>
-                                                            {scan.grading?.score?.toFixed(1) || "0.0"}
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs font-black text-white">Roll: {scan.roll}</p>
-                                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                                                                {scan.conflicts?.length ? 'Conflict Detected' : `${(scan.confidence * 100).toFixed(0)}% Confidence`}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <ChevronRight className={`w-4 h-4 transition-transform ${scanResult === scan ? 'text-primary' : 'text-white/20 group-hover:translate-x-1'}`} />
-                                                </motion.button>
-                                            ))
-                                        )}
-                                    </div>
-                                </div>
-                            </TabsContent>
-                        </Tabs>
-                    </div>
-
-                </div>
-            </div>
-        </div>
+    const warped = warpPerspectiveImage(
+      data,
+      width,
+      height,
+      markerResult.quad,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      dstQuad
     );
+
+    // 4. Geometry Lookup
+    const geometry = generateTemplateGeometry('C_11_12', 1);
+
+    // 5. Extract Roll & Reg Number
+    const rollRes = DigitBubbleReader.readMatrix(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.roll.columns,
+      geometry.roll.cells
+    );
+
+    const regRes = DigitBubbleReader.readMatrix(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.registration.columns,
+      geometry.registration.cells
+    );
+
+    // 6. Extract Answers (100 Questions)
+    const ansRes = QuestionClassifier.classifyQuestions(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.answers.questionCount,
+      geometry.answers.cells
+    );
+
+    // 7. Save Scan Record to Offline Dexie Storage & Trigger Sync
+    const scanUuid = uuidv4();
+    const status = (ansRes.stats.ambiguousCount > 0 || !rollRes.isComplete) ? 'REVIEW' : 'SUCCESS';
+
+    const newItem: BatchScanItem = {
+      id: scanUuid,
+      scanUuid,
+      timestamp: new Date().toLocaleTimeString(),
+      rollNumber: rollRes.value,
+      registrationNo: regRes.value,
+      score: ansRes.stats.oneSelectedCount,
+      maxScore: 100,
+      status,
+      qualityPassed: qualityEval.isQualityPassed
+    };
+
+    setBatchList(prev => [newItem, ...prev]);
+
+    await OMRSyncEngine.saveScanLocally({
+      scanUuid,
+      templateId: geometry.templateId,
+      templateVersion: geometry.version,
+      examId,
+      rollNumber: rollRes.value,
+      registrationNo: regRes.value,
+      rawAnswers: ansRes.answers,
+      confidenceScore: ansRes.overallConfidence,
+      qualityScore: qualityEval.isQualityPassed ? 1.0 : 0.6,
+      status: status === 'REVIEW' ? 'REVIEW_REQUIRED' : 'PENDING'
+    });
+
+    // Auto sync
+    OMRSyncEngine.syncPendingScans().catch(console.error);
+  };
+
+  const counts = {
+    scanned: batchList.length,
+    pending: batchList.filter(b => b.status === 'SUCCESS').length,
+    review: batchList.filter(b => b.status === 'REVIEW').length,
+    failed: batchList.filter(b => b.status === 'FAILED').length
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6 font-sans">
+      {/* Top Bar */}
+      <div className="max-w-7xl mx-auto mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <div className="flex items-center gap-3">
+            <Link href="/admin/omr/review" className="p-2 bg-slate-900 hover:bg-slate-800 text-slate-400 rounded-lg">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <h1 className="text-3xl font-black tracking-tight text-white">PRODUCTION OMR SCANNER V2</h1>
+          </div>
+          <p className="text-slate-400 text-sm mt-1">
+            Offline-first high-speed batch scanner for Rofaz Academy template C(11,12).
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setDebugMode(!debugMode)}
+            className={`px-4 py-2 rounded-lg text-xs font-bold border transition-colors ${
+              debugMode ? 'bg-indigo-950 text-indigo-400 border-indigo-700' : 'bg-slate-900 text-slate-400 border-slate-800'
+            }`}
+          >
+            Debug Overlay: {debugMode ? 'ON' : 'OFF'}
+          </button>
+
+          <Link
+            href="/admin/omr/review"
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-slate-200 text-xs font-bold rounded-lg border border-slate-700"
+          >
+            Review Studio ({counts.review})
+          </Link>
+        </div>
+      </div>
+
+      {/* Main Grid */}
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left Column: Live Camera & Scanner View */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
+          <div className="relative bg-slate-900 border-2 border-slate-800 rounded-2xl overflow-hidden min-h-[420px] flex items-center justify-center">
+            {isCameraActive ? (
+              <video ref={videoRef} className="w-full h-full object-cover" />
+            ) : (
+              <div className="flex flex-col items-center justify-center text-center p-12">
+                <Camera className="w-16 h-16 text-slate-600 mb-4" />
+                <p className="text-slate-400 text-sm mb-6 max-w-sm">
+                  Click "Start Camera Scanner" or upload OMR sheet photos to begin high-speed batch processing.
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={startCamera}
+                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    <Camera className="w-5 h-5" /> Start Camera Scanner
+                  </button>
+
+                  <label className="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-sm rounded-xl cursor-pointer flex items-center gap-2 border border-slate-700">
+                    <Upload className="w-5 h-5" /> Upload Photo / Batch
+                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} className="hidden" />
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Quality Feedback Banner */}
+            {quality && (
+              <div className="absolute top-4 left-4 right-4 bg-slate-950/80 backdrop-blur-md border border-slate-800 p-3 rounded-xl flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full ${
+                      quality.isQualityPassed ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
+                    }`}
+                  />
+                  <span className="font-semibold text-slate-200">
+                    {quality.userInstructions.join(' | ')}
+                  </span>
+                </div>
+
+                <div className="font-mono text-slate-400">
+                  Blur: {Math.round(quality.blurScore)} | Conf: {(quality.markerConfidence * 100).toFixed(0)}%
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Column: Batch Counters & Scan Queue */}
+        <div className="lg:col-span-5 flex flex-col gap-6">
+          {/* Counters */}
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-white">{counts.scanned}</div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Scanned</div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-emerald-400">{counts.pending}</div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Pending</div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-amber-400">{counts.review}</div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Review</div>
+            </div>
+            <div className="bg-slate-900 border border-slate-800 p-3 rounded-xl text-center">
+              <div className="text-xl font-black text-rose-400">{counts.failed}</div>
+              <div className="text-[10px] text-slate-400 font-semibold uppercase">Failed</div>
+            </div>
+          </div>
+
+          {/* Batch Log */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col gap-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Batch Scan Log (Instant Next-Sheet Flow)
+            </h2>
+
+            <div className="divide-y divide-slate-800 max-h-[480px] overflow-y-auto">
+              {batchList.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs">
+                  No papers scanned in this session yet.
+                </div>
+              ) : (
+                batchList.map(item => (
+                  <div key={item.id} className="py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {item.status === 'SUCCESS' ? (
+                        <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                      ) : item.status === 'REVIEW' ? (
+                        <AlertTriangle className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                      ) : (
+                        <XCircle className="w-5 h-5 text-rose-400 flex-shrink-0" />
+                      )}
+
+                      <div>
+                        <div className="text-xs font-bold text-white">
+                          Roll: {item.rollNumber || 'Unassigned'}
+                        </div>
+                        <div className="text-[10px] text-slate-400 font-mono">
+                          Reg: {item.registrationNo || 'N/A'} • {item.timestamp}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <div className="text-xs font-black text-emerald-400">
+                        {item.score} / {item.maxScore}
+                      </div>
+                      <span className="text-[9px] font-bold text-slate-500 uppercase">{item.status}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

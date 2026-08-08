@@ -1,103 +1,147 @@
-
 import { NextRequest, NextResponse } from 'next/server';
-import { processOMR } from '@/lib/omr-processing';
-import { safeDatabaseOperation, createApiResponse } from '@/lib/db-utils';
-import { DatabaseClient } from '@/lib/db';
+import { Jimp, JimpInstance } from 'jimp';
+import jsQR from 'jsqr';
+import { detectCornerMarkers } from '@/lib/omr/marker-detector';
+import { warpPerspectiveImage, CornerQuad } from '@/lib/omr/perspective-warp';
+import { generateTemplateGeometry, CANONICAL_WIDTH, CANONICAL_HEIGHT } from '@/lib/omr/geometry-template';
+import { DigitBubbleReader } from '@/lib/omr/digit-bubble-reader';
+import { QuestionClassifier } from '@/lib/omr/question-classifier';
+import { evaluateImageQuality } from '@/lib/omr/quality-engine';
+import { prisma } from '@/lib/prisma';
 
 export async function POST(req: NextRequest) {
-    try {
-        const formData = await req.formData();
-        const file = formData.get('file') as File;
+  try {
+    const formData = await req.formData();
+    const file = formData.get('file') as File | null;
 
-        if (!file) {
-            return createApiResponse(null, "No file uploaded", 400);
-        }
-
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const mimeType = file.type;
-
-        // Process OMR
-        const result = await processOMR(buffer, mimeType);
-
-        if (result.error) {
-            return createApiResponse(null, result.error, 422);
-        }
-
-        // Auto-Grade if Set ID is found
-        if (result.set && result.answers) {
-            try {
-                // Try to fetch exam ID from QR, or rely on active context if passed?
-                // For now, we assume QR contained examId/setId
-                // format: { examId: "...", setId: "...", set: "A" }
-
-                const qr = result.qrData;
-                if (qr && qr.examId && qr.setId) {
-                    // Perform Grading via DB
-                    const grade = await safeDatabaseOperation(async () => {
-                        const db = await DatabaseClient.getInstance();
-                        const examSet = await db.examSet.findUnique({
-                            where: { id: qr.setId },
-                            include: { exam: true }
-                        });
-
-                        if (!examSet) throw new Error("Exam Set not found");
-
-                        let score = 0;
-                        let total = 0;
-                        const details: any[] = [];
-
-                        // Parse MCQ Data
-                        const questions = examSet.questionsJson as any[];
-                        if (questions && Array.isArray(questions)) {
-                            // Map OMR qNum to Array index (Assuming linear 1..N)
-                            // OMR is 1-indexed
-
-                            questions.forEach((q, idx) => {
-                                if (q.type !== 'MCQ') return; // Only grade MCQ
-
-                                const qNum = idx + 1; // Assuming Order matches OMR Row 1, 2, 3...
-                                // Or does OMR have explicit Q nums? 
-                                // The OMR logic assumes standard 1..100 flow.
-
-                                const studentAns = result.answers[qNum];
-                                const correctAns = q.correctAnswer; // Assuming "Option A" or just "A"
-                                // Clean correct answer
-                                const cleanCorrect = correctAns?.replace(/Option /i, '').trim() || '';
-
-                                total += q.marks || 1;
-
-                                if (studentAns === cleanCorrect) {
-                                    score += q.marks || 1;
-                                    details.push({ q: qNum, status: 'correct', mark: q.marks });
-                                } else if (studentAns) {
-                                    // Negative Marking
-                                    const neg = q.negativeMarks || (examSet.exam.mcqNegativeMarking ? (q.marks * examSet.exam.mcqNegativeMarking / 100) : 0);
-                                    score -= neg;
-                                    details.push({ q: qNum, status: 'wrong', got: studentAns, expected: cleanCorrect, penalty: neg });
-                                } else {
-                                    details.push({ q: qNum, status: 'unanswered' });
-                                }
-                            });
-                        }
-
-                        return { score, total, details, examName: examSet.exam.name, setName: examSet.name };
-                    }, "Grade OMR");
-
-                    if (grade) {
-                        result.grading = grade;
-                    }
-                }
-            } catch (e) {
-                console.error("Grading failed during processing:", e);
-                // Don't fail the whole request, just return ungraded OMR data
-            }
-        }
-
-        return createApiResponse(result);
-
-    } catch (error: any) {
-        console.error("OMR API Error:", error);
-        // Handle PDF parsing errors specifically?
-        return createApiResponse(null, `Internal Server Error: ${error.message}`, 500);
+    if (!file) {
+      return NextResponse.json({ success: false, error: 'No image file provided' }, { status: 400 });
     }
+
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+
+    // 1. Read Image
+    const jimpImg = (await Jimp.read(buffer)) as unknown as JimpInstance;
+    const srcW = jimpImg.bitmap.width;
+    const srcH = jimpImg.bitmap.height;
+    const srcData = new Uint8ClampedArray(jimpImg.bitmap.data);
+
+    // 2. Corner Marker Detection
+    const markerResult = detectCornerMarkers(srcData, srcW, srcH);
+    if (!markerResult.isValid || !markerResult.quad) {
+      return NextResponse.json({
+        success: false,
+        error: markerResult.error || 'Failed to detect 4 corner registration markers',
+        markerResult
+      }, { status: 422 });
+    }
+
+    // 3. Perspective Warp into Canonical Coordinates (2480x3508)
+    const dstQuad: CornerQuad = {
+      tl: { x: 145, y: 145 },
+      tr: { x: 2335, y: 145 },
+      bl: { x: 145, y: 3363 },
+      br: { x: 2335, y: 3363 }
+    };
+
+    const warped = warpPerspectiveImage(
+      srcData,
+      srcW,
+      srcH,
+      markerResult.quad,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      dstQuad
+    );
+
+    // 4. Quality Evaluation
+    const quality = evaluateImageQuality(warped.data, CANONICAL_WIDTH, CANONICAL_HEIGHT, markerResult.confidence);
+
+    // 5. QR Code Decoding
+    let qrDataObj: any = null;
+    try {
+      const qrCode = jsQR(warped.data, CANONICAL_WIDTH, CANONICAL_HEIGHT);
+      if (qrCode && qrCode.data) {
+        qrDataObj = JSON.parse(qrCode.data);
+      }
+    } catch (_qrErr) {
+      // QR optional fallback
+    }
+
+    // 6. Template Identification & Geometry Lookup
+    const templateId = qrDataObj?.templateId || 'C_11_12';
+    const version = qrDataObj?.version || 1;
+    const geometry = generateTemplateGeometry(templateId, version);
+
+    // 7. Extract Roll Number (6 columns)
+    const rollResult = DigitBubbleReader.readMatrix(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.roll.columns,
+      geometry.roll.cells
+    );
+
+    // 8. Extract Registration Number (7 columns)
+    const regResult = DigitBubbleReader.readMatrix(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.registration.columns,
+      geometry.registration.cells
+    );
+
+    // 9. Extract Answers (100 Questions)
+    const answerResult = QuestionClassifier.classifyQuestions(
+      warped.data,
+      CANONICAL_WIDTH,
+      CANONICAL_HEIGHT,
+      geometry.answers.questionCount,
+      geometry.answers.cells
+    );
+
+    // 10. Student Lookup by Roll/Registration
+    let matchedStudent: any = null;
+    if (rollResult.value && !rollResult.value.includes('?')) {
+      try {
+        matchedStudent = await prisma.studentProfile.findFirst({
+          where: { roll: rollResult.value },
+          include: { user: { select: { name: true, email: true } } }
+        });
+      } catch (_sErr) {}
+    }
+
+    return NextResponse.json({
+      success: true,
+      scan: {
+        templateId: geometry.templateId,
+        templateVersion: geometry.version,
+        qrData: qrDataObj,
+        rollNumber: rollResult.value,
+        rollConfidence: rollResult.overallConfidence,
+        rollDetails: rollResult.columns,
+        registrationNo: regResult.value,
+        regConfidence: regResult.overallConfidence,
+        answers: answerResult.answers,
+        answerConfidence: answerResult.overallConfidence,
+        answerDetails: answerResult.details,
+        stats: answerResult.stats,
+        quality,
+        student: matchedStudent
+          ? {
+              id: matchedStudent.id,
+              name: matchedStudent.user?.name,
+              roll: matchedStudent.roll,
+              registrationNo: matchedStudent.registrationNo
+            }
+          : null
+      }
+    });
+  } catch (error: any) {
+    return NextResponse.json(
+      { success: false, error: error.message || 'OMR processing failed' },
+      { status: 500 }
+    );
+  }
 }

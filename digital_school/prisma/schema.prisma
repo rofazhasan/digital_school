@@ -344,6 +344,112 @@ model OMRSheet {
   @@map("omr_sheets")
 }
 
+model OMRTemplateDefinition {
+  id              String   @id @default(cuid())
+  templateId      String   @unique
+  version         Int      @default(1)
+  name            String
+  canonicalWidth  Int      @default(2480)
+  canonicalHeight Int      @default(3508)
+  geometry        Json
+  isActive        Boolean  @default(true)
+  isApproved      Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("omr_template_definitions")
+}
+
+model OMRScan {
+  id              String             @id @default(cuid())
+  scanUuid        String             @unique
+  qrCode          String?
+  templateId      String
+  templateVersion Int                @default(1)
+  examId          String
+  examSetId       String?
+  studentId       String?
+  rollNumber      String?
+  registrationNo  String?
+  detectedSet     String?
+  totalScore      Float              @default(0)
+  maxScore        Float              @default(0)
+  rawAnswers      Json?
+  evaluatedAnswers Json?
+  confidenceScore Float              @default(0)
+  qualityScore    Float              @default(0)
+  status          String             @default("PENDING")
+  isAuthoritative Boolean            @default(false)
+  scanSessionId   String?
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  quality         OMRScanQuality?
+  answers         OMRScanAnswer[]
+  corrections     OMRCorrectionLog[]
+
+  @@map("omr_scans")
+}
+
+model OMRScanQuality {
+  id                    String   @id @default(cuid())
+  scanId                String   @unique
+  blurScore             Float
+  brightnessScore        Float
+  contrastScore         Float
+  glareRatio            Float
+  perspectiveDistortion Float
+  markerConfidence      Float
+  qrConfidence          Float
+  scan                  OMRScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@map("omr_scan_qualities")
+}
+
+model OMRScanAnswer {
+  id            String   @id @default(cuid())
+  scanId        String
+  questionNo    Int
+  selectedOption String?
+  correctOption String?
+  isCorrect     Boolean?
+  marksObtained Float    @default(0)
+  confidence    Float    @default(0)
+  status        String   @default("ONE_SELECTED")
+  bubbleScores  Json?
+  scan          OMRScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@index([scanId, questionNo])
+  @@map("omr_scan_answers")
+}
+
+model OMRSyncEvent {
+  id             String    @id @default(cuid())
+  idempotencyKey String    @unique
+  scanUuid       String
+  status         String    @default("PENDING")
+  retryCount     Int       @default(0)
+  lastError      String?
+  syncedAt       DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@map("omr_sync_events")
+}
+
+model OMRCorrectionLog {
+  id            String   @id @default(cuid())
+  scanId        String
+  correctedBy   String
+  questionNo    Int?
+  previousValue String?
+  newValue      String?
+  reason        String?
+  createdAt     DateTime @default(now())
+  scan          OMRScan  @relation(fields: [scanId], references: [id], onDelete: Cascade)
+
+  @@map("omr_correction_logs")
+}
+
 model AdmitCard {
   id           String         @id @default(cuid())
   qrCode       String         @unique
