@@ -163,9 +163,9 @@ export default function PracPerfectSessionPage() {
 
                             const optionsWithIndex = q.options.map((opt: any, idx: number) => {
                                 const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
-                                const isOptCorrect = optObj.isCorrect !== undefined
-                                    ? (optObj.isCorrect === true || String(optObj.isCorrect) === 'true')
-                                    : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : false);
+                                const isOptCorrect = foundIdx !== -1
+                                    ? idx === foundIdx
+                                    : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
                                 return {
                                     ...optObj,
                                     originalIndex: idx,
@@ -1034,7 +1034,7 @@ export default function PracPerfectSessionPage() {
                     boardRef={boardRef}
                     currentIndex={currentIndex}
                     totalQuestions={questions.length}
-                    onPrev={() => timerSetting === "off" && currentIndex > 0 && setCurrentIndex(c => c - 1)}
+                    onPrev={() => currentIndex > 0 && setCurrentIndex(c => c - 1)}
                     onNext={handleNext}
                     bgMode={boardBackground}
                     onNavigateBg={() => {

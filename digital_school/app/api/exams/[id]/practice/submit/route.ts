@@ -78,20 +78,30 @@ export async function POST(
             let questionScore = 0;
 
             if (type === 'MCQ') {
-                const normalize = (s: any) => String(s || '').trim().toLowerCase().normalize();
+                const normalize = (s: any) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
                 if (question.options && Array.isArray(question.options)) {
-                    const correctOption = question.options.find((opt: any) => opt.isCorrect);
-                    if (correctOption) {
-                        const correctOptionText = normalize(correctOption.text || String(correctOption));
-                        isCorrect = userAns === correctOptionText;
+                    const correctIdx = question.options.findIndex((opt: any) => opt.isCorrect);
+                    if (correctIdx !== -1) {
+                        const correctOpt = question.options[correctIdx];
+                        const correctText = normalize(typeof correctOpt === 'string' ? correctOpt : (correctOpt.text || ''));
+                        const letter = String.fromCharCode(97 + correctIdx);
+                        isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
+                    }
+
+                    if (!isCorrect) {
+                        const num = parseInt(userAns, 10);
+                        if (!isNaN(num) && num >= 0 && num < question.options.length) {
+                            isCorrect = Boolean(question.options[num]?.isCorrect);
+                        }
                     }
                 }
 
-                if (!isCorrect && (question.correctAnswer || question.correct)) {
-                    isCorrect = userAns === normalize(String(question.correctAnswer || question.correct));
+                if (!isCorrect && (question.correctAnswer !== undefined || question.correct !== undefined || question.correctOption !== undefined)) {
+                    const cAns = normalize(String(question.correctAnswer ?? question.correct ?? question.correctOption));
+                    isCorrect = userAns === cAns;
                 }
 
                 if (isCorrect) {

@@ -138,6 +138,35 @@ export function normalizeQuestionData(q: any) {
     ].filter(o => Boolean(o.text));
   }
 
+  // Normalize option objects and ensure isCorrect is resolved accurately
+  if (Array.isArray(options) && options.length > 0) {
+    let foundIdx = options.findIndex((o: any) => typeof o === 'object' && (o.isCorrect === true || String(o.isCorrect) === 'true'));
+    let dbCorrectIdx = foundIdx;
+    if (dbCorrectIdx === -1) {
+      if (q.correctOption !== undefined && q.correctOption !== null) {
+        const num = Number(q.correctOption);
+        dbCorrectIdx = num > 0 && num <= options.length ? num - 1 : num;
+      } else if (q.correctAnswer) {
+        const str = String(q.correctAnswer).trim().toUpperCase();
+        const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
+        if (letterMap[str] !== undefined) dbCorrectIdx = letterMap[str];
+        else if (!isNaN(parseInt(str))) dbCorrectIdx = parseInt(str);
+      }
+    }
+
+    options = options.map((opt: any, idx: number) => {
+      const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
+      const isOptCorrect = foundIdx !== -1
+        ? idx === foundIdx
+        : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
+      return {
+        ...optObj,
+        isCorrect: isOptCorrect
+      };
+    });
+  }
+
+
   // 5. Sub-Questions (CQ / Descriptive)
   let subQuestions: any[] = [];
   const rawSub = q.subQuestions || q.sub_questions || q.parts || q.subquestions;

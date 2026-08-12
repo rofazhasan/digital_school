@@ -71,8 +71,17 @@ export function evaluateMTFQuestion(
         normalizedStudentMatches = rawMatches as Record<string, string>;
     }
 
-    const matchesDetails = (question.leftColumn || []).map((item: MTFMatchNode) => {
-        const correctRightId = correctMatches[item.id];
+    const matchesDetails = (question.leftColumn || []).map((item: MTFMatchNode, idx: number) => {
+        let correctRightId = correctMatches[item.id];
+        if (!correctRightId) {
+            const leftOrigIdx = (item as any).originalIndex !== undefined ? (item as any).originalIndex : idx;
+            if (question.rightColumn) {
+                const rMatch = question.rightColumn.find((r: any) => r.originalIndex === leftOrigIdx);
+                if (rMatch) correctRightId = rMatch.id;
+                else if (question.rightColumn[idx]) correctRightId = question.rightColumn[idx].id;
+            }
+        }
+
         const studentRightId = normalizedStudentMatches ? normalizedStudentMatches[item.id] || null : null;
         const isMatchedCorrectly = correctRightId && studentRightId && correctRightId === studentRightId;
 

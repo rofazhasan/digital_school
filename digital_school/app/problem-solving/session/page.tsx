@@ -195,9 +195,9 @@ export default function ProblemSolvingSession() {
 
                         const optionsWithIndex = q.options.map((opt: any, idx: number) => {
                             const optObj = typeof opt === 'string' ? { text: opt } : { ...opt };
-                            const isOptCorrect = optObj.isCorrect !== undefined
-                                ? (optObj.isCorrect === true || String(optObj.isCorrect) === 'true')
-                                : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : false);
+                            const isOptCorrect = foundIdx !== -1
+                                ? idx === foundIdx
+                                : (dbCorrectIdx >= 0 ? idx === dbCorrectIdx : (optObj.isCorrect === true || String(optObj.isCorrect) === 'true'));
                             return {
                                 ...optObj,
                                 originalIndex: idx,

@@ -325,22 +325,30 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             if (type === 'MCQ') {
                 if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') continue;
 
-                // Use a simplified version of MC evaluation for MCQ or just direct check
-                // For MCQ (single choice), it's stored as a string or index
                 const normalize = (s: string | number | undefined | null) => String(s !== undefined && s !== null ? s : '').trim().toLowerCase();
                 const userAns = normalize(studentAnswer);
                 let isCorrect = false;
 
                 if (question.options && Array.isArray(question.options)) {
-                    const correctOption = question.options.find((opt: QuestionOption) => opt.isCorrect);
-                    if (correctOption) {
-                        const correctOptionText = normalize(correctOption.text);
-                        isCorrect = userAns === correctOptionText;
+                    const correctIdx = question.options.findIndex((opt: QuestionOption) => opt.isCorrect);
+                    if (correctIdx !== -1) {
+                        const correctOpt = question.options[correctIdx];
+                        const correctText = normalize(correctOpt.text);
+                        const letter = String.fromCharCode(97 + correctIdx); // 'a', 'b', 'c'...
+                        isCorrect = userAns === correctText || userAns === String(correctIdx) || userAns === letter;
+                    }
+
+                    if (!isCorrect) {
+                        const num = parseInt(userAns, 10);
+                        if (!isNaN(num) && num >= 0 && num < question.options.length) {
+                            isCorrect = Boolean(question.options[num]?.isCorrect);
+                        }
                     }
                 }
 
-                if (!isCorrect && (question.correctAnswer || question.correct)) {
-                    isCorrect = userAns === normalize(String(question.correctAnswer || question.correct));
+                if (!isCorrect && (question.correctAnswer !== undefined || question.correct !== undefined || question.correctOption !== undefined)) {
+                    const cAns = normalize(String(question.correctAnswer ?? question.correct ?? question.correctOption));
+                    isCorrect = userAns === cAns;
                 }
 
                 if (isCorrect) {
