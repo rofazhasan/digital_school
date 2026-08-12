@@ -1520,7 +1520,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             </div>
 
                                             {(() => {
-                                                const subParts = q.subQuestions || q.sub_questions || q.parts || [];
+                                                const subParts = (q as any).subQuestions || (q as any).sub_questions || (q as any).parts || [];
                                                 if (subParts.length === 0) return null;
                                                 return (
                                                     <div className="mt-4 space-y-4">

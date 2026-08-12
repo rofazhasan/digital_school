@@ -4,6 +4,9 @@ import { evaluateMCQuestion, MCQuestion, MCAnswer } from "./evaluation/mcEvaluat
 import { evaluateINTQuestion, INTQuestion, INTAnswer } from "./evaluation/intEvaluation";
 import { evaluateARQuestion, ARQuestion, ARAnswer } from "./evaluation/arEvaluation";
 import { evaluateMTFQuestion, MTFMatchNode, MTFAnswer } from "./evaluation/mtfEvaluation";
+import { evaluateCMAQuestion } from "./evaluation/cmaEvaluation";
+import { evaluateMPCQuestion } from "./evaluation/mpcEvaluation";
+import { evaluateDRQuestion } from "./evaluation/drEvaluation";
 import { sendEmail } from "@/lib/email";
 import { sendSMS } from "@/lib/sms";
 import { ExamResultEmail } from "@/components/emails/ExamResultEmail";
@@ -443,8 +446,21 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
 
                 res = evaluateMTFQuestion(question as unknown as any, studentAnswer as unknown as MTFAnswer);
                 questionScore = res.score;
-                // For MTF, we usually don't apply negative marking if it's partial,
-                // but let's stick to the current logic of the codebase if any
+            } else if (type === 'CMA') {
+                if (studentAnswer === undefined || studentAnswer === null) continue;
+                const cmaRes = evaluateCMAQuestion(question as any, studentAnswer as any);
+                questionScore = cmaRes.score;
+                res = { score: questionScore, type, isCorrect: cmaRes.isCorrect, partResults: cmaRes.partResults };
+            } else if (type === 'MPC') {
+                if (studentAnswer === undefined || studentAnswer === null) continue;
+                const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
+                questionScore = mpcRes.score;
+                res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
+            } else if (type === 'DR') {
+                if (studentAnswer === undefined || studentAnswer === null) continue;
+                const drRes = evaluateDRQuestion(question as any, studentAnswer as any);
+                questionScore = drRes.score;
+                res = { score: questionScore, type, isCorrect: drRes.isCorrect, diagnosticTag: drRes.diagnosticTag };
             }
 
             if (res) {
@@ -776,6 +792,18 @@ export async function releaseExamResults(examId: string) {
                                     } else {
                                         penalty = subPenalty;
                                     }
+                                } else if (type === 'CMA') {
+                                    const res = evaluateCMAQuestion(q as any, studentAnswer as any);
+                                    isCorrect = res.isCorrect;
+                                    if (res.score > 0) isPartial = true;
+                                } else if (type === 'MPC') {
+                                    const res = evaluateMPCQuestion(q as any, studentAnswer as any);
+                                    isCorrect = res.isCorrect;
+                                    if (res.score > 0) isPartial = true;
+                                } else if (type === 'DR') {
+                                    const res = evaluateDRQuestion(q as any, studentAnswer as any);
+                                    isCorrect = res.isCorrect;
+                                    if (res.score > 0) isPartial = true;
                                 }
 
                                 if (isCorrect || isPartial) {

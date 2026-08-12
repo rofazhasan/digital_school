@@ -7,13 +7,13 @@ import { s, n, getValue } from '@/utils/parser-utils';
 
 // Define locally to avoid import issues with agent's linter
 // Define locally to avoid import issues with agent's linter
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'DR';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 async function validateAndMapRow(row: any, classes: any[]) {
     // Initialize best-effort data structure to avoid frontend crashes
     const typeRaw = s(getValue(row, ["Type", "Question Type", "QuestionType"])).toUpperCase();
-    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
+    const type: QuestionType = ['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(typeRaw) ? typeRaw as QuestionType : 'MCQ';
 
     const diffRaw = s(getValue(row, ["Difficulty", "Level", "Diff"])).toUpperCase();
     const difficulty: Difficulty = ['EASY', 'MEDIUM', 'HARD'].includes(diffRaw) ? diffRaw as Difficulty : 'MEDIUM';

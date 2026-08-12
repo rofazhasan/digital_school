@@ -297,6 +297,16 @@ export async function POST(
         processedQuestion.subQuestions = shuffleArray(processedQuestion.subQuestions);
       }
 
+      // 4. Shuffle reason options for DR (Diagnostic Reasoning)
+      if (processedQuestion.type === 'DR' && processedQuestion.reasonOptions && Array.isArray(processedQuestion.reasonOptions)) {
+        processedQuestion.reasonOptions = shuffleArray(processedQuestion.reasonOptions);
+      }
+
+      // 5. Shuffle CMA parts if configured
+      if (processedQuestion.type === 'CMA' && processedQuestion.parts && Array.isArray(processedQuestion.parts) && processedQuestion.shuffleParts) {
+        processedQuestion.parts = shuffleArray(processedQuestion.parts);
+      }
+
       if (processedQuestion.type === 'MCQ' && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
         const negativeMarks = (processedQuestion.marks * exam.mcqNegativeMarking) / 100;
         processedQuestion.negativeMarks = parseFloat(negativeMarks.toFixed(2));

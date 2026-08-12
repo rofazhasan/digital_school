@@ -350,7 +350,7 @@ export default function PracPerfectSessionPage() {
                 isRight = userStr.toLowerCase() === modelStr.toLowerCase();
             }
         } else if (currentQ.type === 'MTF') {
-            const result = evaluateMTFQuestion(currentQ, { matches: currentAns || {} });
+            const result = evaluateMTFQuestion(currentQ as any, { matches: currentAns || {} });
             isRight = result.isCorrect;
         } else {
             // CQ / SQ / DESCRIPTIVE
@@ -696,8 +696,8 @@ export default function PracPerfectSessionPage() {
                                                 const selectedRightId = matchesMap[leftItem.id] || "";
                                                 const correctRightId = currentQ.matches?.[leftItem.id];
                                                 const isMatchCorrect = selectedRightId && correctRightId && selectedRightId === correctRightId;
-                                                const selectedRightItem = currentQ.rightColumn.find((r: any) => r.id === selectedRightId);
-                                                const selectedRightIdx = currentQ.rightColumn.findIndex((r: any) => r.id === selectedRightId);
+                                                const selectedRightItem = (currentQ.rightColumn || []).find((r: any) => r.id === selectedRightId);
+                                                const selectedRightIdx = (currentQ.rightColumn || []).findIndex((r: any) => r.id === selectedRightId);
 
                                                 return (
                                                     <div key={leftItem.id || idx} className={`p-4 rounded-xl border-2 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${isChecked ? (isMatchCorrect ? 'bg-green-500/10 border-green-500' : 'bg-red-500/10 border-red-500') : 'bg-card border-border'}`}>
@@ -732,7 +732,7 @@ export default function PracPerfectSessionPage() {
                                                                     </Button>
                                                                 </PopoverTrigger>
                                                                 <PopoverContent className="w-72 p-1.5 space-y-1 z-[100] font-fancy" align="end">
-                                                                    {currentQ.rightColumn.map((rightItem: any, rIdx: number) => {
+                                                                    {(currentQ.rightColumn || []).map((rightItem: any, rIdx: number) => {
                                                                         const isSelected = selectedRightId === rightItem.id;
                                                                         return (
                                                                             <button
@@ -884,7 +884,7 @@ export default function PracPerfectSessionPage() {
                                                 {currentQ.type === 'INT' && (
                                                     <div className="flex items-center gap-2">
                                                         <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                            Numerical Answer: {String((currentQ as any).integerAnswer ?? currentQ.correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
+                                                            Numerical Answer: {String((currentQ as any).integerAnswer ?? (currentQ as any).correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
                                                         </Badge>
                                                     </div>
                                                 )}
@@ -898,10 +898,10 @@ export default function PracPerfectSessionPage() {
 
                                                             if (currentQ.matches && currentQ.matches[leftItem.id]) {
                                                                 const rId = currentQ.matches[leftItem.id];
-                                                                const rIdx = currentQ.rightColumn?.findIndex((r: any) => r.id === rId);
+                                                                const rIdx = (currentQ.rightColumn || [])?.findIndex((r: any) => r.id === rId);
                                                                 if (rIdx !== undefined && rIdx !== -1) {
                                                                     rightLabel = String.fromCharCode(65 + rIdx);
-                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                    rightText = (currentQ.rightColumn || [])[rIdx]?.text || '';
                                                                 }
                                                             } else if (leftItem.originalIndex !== undefined && currentQ.rightColumn) {
                                                                 const rIdx = currentQ.rightColumn.findIndex((r: any) => r.originalIndex === leftItem.originalIndex);

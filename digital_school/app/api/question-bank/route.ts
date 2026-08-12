@@ -44,6 +44,13 @@ const questionSchema = z.object({
     rightColumn: z.array(z.any()).optional().nullable(),
     matches: z.record(z.string(), z.string()).optional().nullable(),
     explanation: z.string().optional().nullable(),
+    parts: z.array(z.any()).optional().nullable(),
+    cmaParts: z.array(z.any()).optional().nullable(),
+    stages: z.array(z.any()).optional().nullable(),
+    mpcStages: z.array(z.any()).optional().nullable(),
+    scenario: z.string().optional().nullable(),
+    reasonOptions: z.array(z.any()).optional().nullable(),
+    confidenceTracking: z.boolean().optional().nullable(),
     questionBankIds: z.array(z.string().cuid()).optional().nullable(),
     images: z.array(z.string()).optional().nullable(),
 });

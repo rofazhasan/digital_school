@@ -529,6 +529,83 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                       );
                     }
 
+                    if (q.type?.toUpperCase() === 'CMA') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 border border-black/30 p-3 rounded ml-4 bg-gray-50/50">
+                            {(q.parts || q.cmaParts || []).map((part: any, pIdx: number) => (
+                              <div key={pIdx} className="flex items-center gap-2 border-b border-dashed border-gray-300 pb-1">
+                                <span className="font-semibold text-xs">{part.label || `Part ${pIdx+1}`}:</span>
+                                <span className="inline-block min-w-[120px] border border-black/40 bg-white h-6 rounded px-2 text-xs"></span>
+                                {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'MPC') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Multi-Step Problem Chain' : 'বহু-ধাপী সমস্যা শৃঙ্খল'}</span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          {q.scenario && (
+                            <div className="p-2 border-l-2 border-black bg-gray-50 italic text-xs mb-3">
+                              <Text>{q.scenario}</Text>
+                            </div>
+                          )}
+                          <div className="space-y-3 ml-4">
+                            {(q.stages || q.mpcStages || []).map((stage: any, sIdx: number) => (
+                              <div key={sIdx} className="p-2 border border-black/30 rounded text-xs flex items-center justify-between">
+                                <div>
+                                  <span className="font-bold text-indigo-700 mr-2">Stage {sIdx+1}:</span>
+                                  <span>{stage.stageTitle}</span>
+                                </div>
+                                <div className="border border-black/40 bg-white min-w-[140px] h-6 rounded px-2 flex items-center text-[10px] text-gray-400">
+                                  {isEn ? 'Answer space...' : 'উত্তর লিখুন...'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'DR') {
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-4 space-y-2 text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-indigo-800">Part A Answer:</span>
+                              <span className="inline-block min-w-[160px] border border-black/40 bg-white h-6 rounded px-2"></span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-indigo-800">Part B Conceptual Justification:</span>
+                              <div className="space-y-1 mt-1 pl-2">
+                                {(q.reasonOptions || []).map((opt: any, rIdx: number) => (
+                                  <div key={rIdx} className="flex items-center gap-2">
+                                    <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3">{String.fromCharCode(65 + rIdx)}</span>
+                                    <span>{opt.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     return null;
                   });
                 })()}
@@ -700,7 +777,7 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                               </div>
                               {/* Render each sub-part of the descriptive question */}
                               <div className="space-y-4">
-                                {(q.subQuestions || q.sub_questions || q.parts || []).map((part: any, pIdx: number) => (
+                                {((q as any).subQuestions || (q as any).sub_questions || (q as any).parts || []).map((part: any, pIdx: number) => (
                                   <div key={pIdx} className="border border-black/10 rounded-md p-3 bg-gray-50/10 break-inside-avoid shadow-sm">
                                     {part.label && <div className="font-bold text-sm mb-1 underline text-gray-700">{part.label}:</div>}
                                     

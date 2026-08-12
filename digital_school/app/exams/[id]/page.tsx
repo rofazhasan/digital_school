@@ -26,9 +26,11 @@ import { DatePickerWithRange } from "@/components/ui/date-range-picker";
 import { CheckSquare } from "lucide-react";
 import { cleanupMath } from "@/lib/utils";
 
+import { CMARenderer, MPCRenderer, DRRenderer } from '@/components/ui/QuestionRenderers';
+
 // --- Mock Prisma Types (replace with your actual generated types) ---
 // You would typically import these from `import type { Exam, Question, QuestionType, Difficulty } from '@prisma/client'`
-type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ';
+type QuestionType = 'MCQ' | 'CQ' | 'SQ' | 'INT' | 'AR' | 'MTF' | 'MC' | 'DESCRIPTIVE' | 'SMCQ' | 'CMA' | 'MPC' | 'DR';
 type Difficulty = 'EASY' | 'MEDIUM' | 'HARD';
 
 interface Question {
@@ -53,6 +55,9 @@ interface Question {
   matches?: any;
   subQuestions?: any[];
   sub_questions?: any[];
+  parts?: any[];
+  stages?: any[];
+  reasonOptions?: any[];
   images?: string[];
   modelAnswer?: string;
 }
@@ -73,6 +78,7 @@ interface Exam {
   sqTotalQuestions: number;
   sqRequiredQuestions: number;
   mcqNegativeMarking?: number;
+  mcNegativeMarking?: number;
   examSets: ExamSet[];
 }
 

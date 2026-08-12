@@ -251,7 +251,7 @@ export default function ExamEvaluationPage({ params }: { params: Promise<{ id: s
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive'>('all');
+  const [questionTypeFilter, setQuestionTypeFilter] = useState<'all' | 'mcq' | 'smcq' | 'mc' | 'ar' | 'mtf' | 'int' | 'cq' | 'sq' | 'descriptive' | 'cma' | 'mpc' | 'dr'>('all');
   const [showDrawingTool, setShowDrawingTool] = useState(false);
   const [showReference, setShowReference] = useState(true);
   const [currentImage, setCurrentImage] = useState<string | null>(null);

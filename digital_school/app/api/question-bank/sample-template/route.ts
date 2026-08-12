@@ -46,6 +46,9 @@ export async function GET(req: any) {
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B'). Explanation is optional."],
             ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer' (for part answer), and 'Sub X Explanation' (for part rationale)."],
             ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem). Use 'Sub X Text', 'Sub X Marks', 'Sub X Option A-D', and 'Sub X Correct Option' for parts."],
+            ["CMA (Constructed Multi-Answer)", "Fill 'Question Text'. Use 'Sub X Text' for part labels, 'Sub X Marks', and 'Sub X Model Answer' for constructed answers."],
+            ["MPC (Problem Chain)", "Fill 'Question Text' (scenario stem). Use 'Sub X Text' for stage titles, 'Sub X Marks', and 'Sub X Model Answer' for step answers."],
+            ["DR (Diagnostic Reasoning)", "Fill 'Question Text' and 'Model Answer' for Part A. Use 'Sub X Text' for Part B Reason options, and 'Sub X Correct' (A, B, C, D) for key reason."],
         ];
 
         const descriptiveGuide = [
@@ -218,19 +221,19 @@ export async function GET(req: any) {
 
         const subTypeFormula = '"writing,fill_in,comprehension,comprehension_mcq,matching,rearranging,flowchart,interpreting_graph,label_diagram,true_false,error_correction,short_answer"';
         const chartTypeFormula = '"bar,line,pie,scatter,area"';
-        const typeFormula = mode === 'objective' ? '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ"' : mode === 'descriptive' ? '"DESCRIPTIVE"' : '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE"';
+        const typeFormula = mode === 'objective' ? '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,CMA,MPC,DR"' : mode === 'descriptive' ? '"DESCRIPTIVE"' : '"MCQ,MC,INT,AR,MTF,CQ,SQ,SMCQ,DESCRIPTIVE,CMA,MPC,DR"';
 
         // Apply column-level validation + styles
         const typeCol = getColumnByKey('type');
-        if (typeCol) typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
+        if (typeCol) (typeCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
         
         const diffCol = getColumnByKey('difficulty');
-        if (diffCol) diffCol.dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
+        if (diffCol) (diffCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: ['"EASY,MEDIUM,HARD"'] };
         
         if (classNames.length > 0) {
             const classCol = getColumnByKey('className');
             if (classCol) {
-                classCol.dataValidation = {
+                (classCol as any).dataValidation = {
                     type: 'list',
                     allowBlank: false,
                     formulae: [`'Valid Classes Reference'!$A$2:$A$${classNames.length + 1}`],
@@ -250,14 +253,14 @@ export async function GET(req: any) {
             // Descriptive Sub-columns validations & styling
             const descTypeCol = getColumnByKey(`s${i}Type`);
             if (descTypeCol && descTypeCol.number > 0) {
-                descTypeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
+                (descTypeCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
                 const cell = headerRow.getCell(descTypeCol.number);
                 if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
             }
             
             const descChartCol = getColumnByKey(`s${i}ChartType`);
             if (descChartCol && descChartCol.number > 0) {
-                descChartCol.dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
+                (descChartCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: [chartTypeFormula] };
             }
         }
 
@@ -301,6 +304,30 @@ export async function GET(req: any) {
                 objSub1Text: "Which organelle is present only in plants?", objSub1Marks: 1, 
                 objSub1A: "Chloroplast", objSub1B: "Mitochondria", objSub1C: "Ribosome", objSub1D: "Nucleus", 
                 objSub1Correct: "A"
+            });
+            // SAMPLE CMA
+            templateSheet.addRow({
+                type: "CMA", className: sampleClass, subject: "Physics", topic: "Kinematics", difficulty: "HARD", marks: 5,
+                questionText: "A body moves from rest with acceleration 4 m/s² for 5 seconds.",
+                objSub1Text: "Velocity (m/s)", objSub1Marks: 2, objSub1ModelAnswer: "20",
+                objSub2Text: "Displacement (m)", objSub2Marks: 3, objSub2ModelAnswer: "50",
+                explanation: "v = u + at = 0 + 4*5 = 20 m/s; s = ut + 0.5at² = 0 + 0.5*4*25 = 50m"
+            });
+            // SAMPLE MPC
+            templateSheet.addRow({
+                type: "MPC", className: sampleClass, subject: "Physics", topic: "Kinematics", difficulty: "HARD", marks: 10,
+                questionText: "A rocket accelerates upward. Solve the multi-step problem chain below.",
+                objSub1Text: "Stage 1: Calculate acceleration", objSub1Marks: 5, objSub1ModelAnswer: "10",
+                objSub2Text: "Stage 2: Calculate velocity after 5 sec", objSub2Marks: 5, objSub2ModelAnswer: "50",
+                explanation: "Multi-step chain with Error Propagation Protection."
+            });
+            // SAMPLE DR
+            templateSheet.addRow({
+                type: "DR", className: sampleClass, subject: "Physics", topic: "Newton's Laws", difficulty: "MEDIUM", marks: 5,
+                questionText: "A car moves with constant velocity. What is its acceleration?",
+                modelAnswer: "0",
+                objSub1Text: "Velocity is constant, therefore dv/dt = 0", objSub1Marks: 5, objSub1Correct: "A",
+                explanation: "Constant velocity means change in velocity is zero."
             });
         }
 

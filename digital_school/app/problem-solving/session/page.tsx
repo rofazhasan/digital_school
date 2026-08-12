@@ -182,8 +182,8 @@ export default function ProblemSolvingSession() {
                         } else if ((q as any).correctOption !== undefined && (q as any).correctOption !== null) {
                             const num = Number((q as any).correctOption);
                             dbCorrectIdx = num > 0 && num <= q.options.length ? num - 1 : num;
-                        } else if (q.correctAnswer || q.modelAnswer) {
-                            const str = (q.correctAnswer || q.modelAnswer || "").trim().toUpperCase();
+                        } else if ((q as any).correctAnswer || q.modelAnswer) {
+                            const str = ((q as any).correctAnswer || q.modelAnswer || "").trim().toUpperCase();
                             const letterMap: Record<string, number> = { 'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5 };
                             if (letterMap[str] !== undefined) {
                                 dbCorrectIdx = letterMap[str];
@@ -214,7 +214,7 @@ export default function ProblemSolvingSession() {
                             return acc;
                         }, []);
                         if (correctIndices.length > 0) {
-                            updatedQ.correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
+                            (updatedQ as any).correctAnswer = correctIndices.map(idx => String.fromCharCode(65 + idx)).join('');
                         }
                     }
 
@@ -1119,7 +1119,7 @@ export default function ProblemSolvingSession() {
                                             {currentQ.type === 'INT' && (
                                                 <div className="mb-3">
                                                     <Badge className="bg-emerald-600 text-white font-black px-3.5 py-1 text-sm shadow">
-                                                        Correct Numerical Answer: {String((currentQ as any).integerAnswer ?? currentQ.correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
+                                                        Correct Numerical Answer: {String((currentQ as any).integerAnswer ?? (currentQ as any).correctAnswer ?? currentQ.modelAnswer ?? (currentQ as any).correct ?? (currentQ as any).answer ?? (currentQ as any).solution ?? "See explanation")}
                                                     </Badge>
                                                 </div>
                                             )}
@@ -1135,10 +1135,10 @@ export default function ProblemSolvingSession() {
 
                                                             if (currentQ.matches && currentQ.matches[leftItem.id]) {
                                                                 const rId = currentQ.matches[leftItem.id];
-                                                                const rIdx = currentQ.rightColumn?.findIndex((r: any) => r.id === rId);
+                                                                const rIdx = (currentQ.rightColumn || [])?.findIndex((r: any) => r.id === rId);
                                                                 if (rIdx !== undefined && rIdx !== -1) {
                                                                     rightLabel = String.fromCharCode(65 + rIdx);
-                                                                    rightText = currentQ.rightColumn[rIdx]?.text || '';
+                                                                    rightText = (currentQ.rightColumn || [])[rIdx]?.text || '';
                                                                 }
                                                             } else if (leftItem.originalIndex !== undefined && currentQ.rightColumn) {
                                                                 const rIdx = currentQ.rightColumn.findIndex((r: any) => r.originalIndex === leftItem.originalIndex);

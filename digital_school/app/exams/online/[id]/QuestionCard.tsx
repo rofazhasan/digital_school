@@ -24,6 +24,7 @@ import { MTFGrid } from "./question-types/MTFSection";
 import { DebouncedTextarea, DebouncedInput } from "./question-types/SubjectiveSection";
 import { DescriptiveSection } from "./question-types/DescriptiveSection";
 import { IntNumericSection } from "./question-types/IntNumericSection";
+import { CMARenderer, MPCRenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
 
 // Lazy components
 const CameraCapture = lazy(() => import("./CameraCapture"));
@@ -368,6 +369,39 @@ const QuestionCard = memo(({ answer, onAnswerChange, onSubAnswerChange, disabled
                 setIsUploading={setIsUploading}
                 onCaptureClick={(target: any) => setCameraTarget(target)}
                 disabled={!!disabled} submitted={!!submitted} onAnswerChange={onAnswerChange}
+              />
+            )}
+
+            {type === "cma" && (
+              <CMARenderer
+                question={question}
+                value={userAnswer || {}}
+                onChange={onAnswerChange}
+                disabled={!!disabled || !!submitted}
+                showFeedback={showResult}
+                evalResult={result}
+              />
+            )}
+
+            {type === "mpc" && (
+              <MPCRenderer
+                question={question}
+                value={userAnswer || {}}
+                onChange={onAnswerChange}
+                disabled={!!disabled || !!submitted}
+                showFeedback={showResult}
+                evalResult={result}
+              />
+            )}
+
+            {type === "dr" && (
+              <DRRenderer
+                question={question}
+                value={userAnswer || {}}
+                onChange={onAnswerChange}
+                disabled={!!disabled || !!submitted}
+                showFeedback={showResult}
+                evalResult={result}
               />
             )}
           </div>

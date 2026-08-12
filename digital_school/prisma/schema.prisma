@@ -1076,6 +1076,9 @@ enum QuestionType {
   MTF
   DESCRIPTIVE
   SMCQ
+  CMA
+  MPC
+  DR
 }
 
 enum Difficulty {

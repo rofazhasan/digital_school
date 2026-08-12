@@ -47,7 +47,7 @@ import { normalizeQuestionData } from "@/app/components/SingleQuestionPageSheet"
 
 
 // --- Types ---
-type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE';
+type QuestionType = 'MCQ' | 'MC' | 'INT' | 'AR' | 'MTF' | 'CQ' | 'SQ' | 'SMCQ' | 'DESCRIPTIVE' | 'CMA' | 'MPC' | 'DR';
 
 // DESCRIPTIVE sub-type definitions
 type DescSubType = 'writing' | 'fill_in' | 'comprehension' | 'table' | 'matching' | 'rearranging' | 'true_false' | 'label_diagram' | 'short_answer' | 'error_correction' | 'flowchart' | 'interpreting_graph';
@@ -4357,7 +4357,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({ initialData, onSave, onCanc
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-8 gap-y-4">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem></SelectContent></Select></div>
+            <div><Label>Question Type</Label><Select value={type} onValueChange={(v: QuestionType) => setType(v)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="MCQ">MCQ (Single Correct)</SelectItem><SelectItem value="MC">MC (Multiple Correct)</SelectItem><SelectItem value="INT">INT (Integer Type)</SelectItem><SelectItem value="AR">AR (Assertion-Reason)</SelectItem><SelectItem value="MTF">MTF (Match Following)</SelectItem><SelectItem value="CQ">CQ (Creative/Case Study)</SelectItem><SelectItem value="SQ">SQ (Short Question)</SelectItem><SelectItem value="SMCQ">SMCQ (Scenario Based MCQ)</SelectItem><SelectItem value="DESCRIPTIVE">Descriptive (Writing / Grammar)</SelectItem><SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem><SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem><SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem></SelectContent></Select></div>
             <div><Label>Class</Label><Select value={classId} onValueChange={setClassId} required><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map((c: { id: string, name: string }) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select></div>
           </div>
           <div><Label>Question Banks (Optional)</Label><MultiSelect options={questionBanks} selected={questionBankIds} onChange={setQuestionBankIds} openCreateBankDialog={openCreateBankDialog} /></div>

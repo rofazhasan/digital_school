@@ -97,7 +97,7 @@ export async function POST(
     // Use centralized evaluation logic to recalculate total score and marks by type
     const { evaluateSubmission } = await import("@/lib/exam-logic");
     const { totalScore, mcqMarks, cqMarks, sqMarks } = await evaluateSubmission(
-      { ...submission, answers: updatedAnswers },
+      { ...submission, answers: updatedAnswers as any },
       exam,
       exam.examSets
     ) as any;

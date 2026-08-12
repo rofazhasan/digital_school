@@ -35,6 +35,25 @@ function useDebouncedEffect(effect: () => void, deps: any[], delay: number) {
   }, [...deps, delay]);
 }
 
+function seededRandom(seed: number) {
+  const x = Math.sin(seed) * 10000;
+  return x - Math.floor(x);
+}
+
+export function shuffleArrayWithSeed<T>(array: T[], seedStr: string): T[] {
+  let seed = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    seed = (seed << 5) - seed + seedStr.charCodeAt(i);
+    seed |= 0;
+  }
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(seededRandom(seed + i) * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export function ExamContextProvider({
   exam: examProp,
   children
@@ -43,7 +62,18 @@ export function ExamContextProvider({
   children: React.ReactNode;
 }) {
   // Keep exam as state so we can patch timestamps after start API returns
-  const [exam, setExamState] = useState<any>(examProp);
+  const [exam, setExamState] = useState<any>(() => {
+    const origQuestions = examProp.questions || [];
+    const seed = examProp.studentId || examProp.submissionId || examProp.id || 'default_seed';
+    const shuffledQuestions = examProp.shuffleQuestions !== false 
+      ? shuffleArrayWithSeed(origQuestions, seed) 
+      : origQuestions;
+
+    return {
+      ...examProp,
+      questions: shuffledQuestions
+    };
+  });
   const patchExam = useCallback((patch: Partial<any>) => {
     setExamState((prev: any) => ({ ...prev, ...patch }));
   }, []);
@@ -60,7 +90,7 @@ export function ExamContextProvider({
   // --- Section Detection Logic ---
   const { hasObjective, hasCqSq } = useMemo(() => {
     if (!exam.questions) return { hasObjective: false, hasCqSq: false };
-    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq'];
+    const objectiveTypes = ['mcq', 'mc', 'ar', 'mtf', 'int', 'numeric', 'smcq', 'cma', 'mpc', 'dr'];
     const questions = exam.questions || [];
 
     const obj = questions.some((q: any) => {
