@@ -450,16 +450,25 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const cmaRes = evaluateCMAQuestion(question as any, studentAnswer as any);
                 questionScore = cmaRes.score;
+                if (!cmaRes.isCorrect && cmaRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                }
                 res = { score: questionScore, type, isCorrect: cmaRes.isCorrect, partResults: cmaRes.partResults };
             } else if (type === 'MPC') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
                 questionScore = mpcRes.score;
+                if (!mpcRes.isCorrect && mpcRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                }
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
             } else if (type === 'DR') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const drRes = evaluateDRQuestion(question as any, studentAnswer as any);
                 questionScore = drRes.score;
+                if (!drRes.isCorrect && drRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                }
                 res = { score: questionScore, type, isCorrect: drRes.isCorrect, diagnosticTag: drRes.diagnosticTag };
             }
 

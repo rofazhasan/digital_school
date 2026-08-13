@@ -262,6 +262,9 @@ export default function ProblemSolvingSelector() {
                                             <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
                                             <SelectItem value="MTF">MTF (Matching)</SelectItem>
                                             <SelectItem value="INT">INT (Numeric)</SelectItem>
+                                            <SelectItem value="CMA">CMA (Constructed)</SelectItem>
+                                            <SelectItem value="MPC">MPC (Multi-Step)</SelectItem>
+                                            <SelectItem value="DR">DR (Diagnostic)</SelectItem>
                                             <SelectItem value="CQ">CQ (Creative)</SelectItem>
                                             <SelectItem value="SQ">SQ (Short)</SelectItem>
                                             <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>

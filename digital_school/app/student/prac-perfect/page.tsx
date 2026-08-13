@@ -175,16 +175,19 @@ export default function PracPerfectPage() {
                                     <Select value={filterType} onValueChange={setFilterType}>
                                         <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All Types</SelectItem>
-                                            <SelectItem value="MCQ">MCQ (Single)</SelectItem>
-                                            <SelectItem value="MC">MC (Multiple)</SelectItem>
-                                            <SelectItem value="INT">INT (Numeric)</SelectItem>
-                                            <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
-                                            <SelectItem value="MTF">MTF (Matching)</SelectItem>
-                                            <SelectItem value="CQ">CQ (Creative)</SelectItem>
-                                            <SelectItem value="SQ">SQ (Short)</SelectItem>
-                                            <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
-                                            <SelectItem value="SMCQ">SMCQ (Scenario)</SelectItem>
+                                             <SelectItem value="all">All Types</SelectItem>
+                                             <SelectItem value="MCQ">MCQ (Single)</SelectItem>
+                                             <SelectItem value="MC">MC (Multiple)</SelectItem>
+                                             <SelectItem value="INT">INT (Numeric)</SelectItem>
+                                             <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
+                                             <SelectItem value="MTF">MTF (Matching)</SelectItem>
+                                             <SelectItem value="CMA">CMA (Constructed)</SelectItem>
+                                             <SelectItem value="MPC">MPC (Multi-Step)</SelectItem>
+                                             <SelectItem value="DR">DR (Diagnostic)</SelectItem>
+                                             <SelectItem value="CQ">CQ (Creative)</SelectItem>
+                                             <SelectItem value="SQ">SQ (Short)</SelectItem>
+                                             <SelectItem value="DESCRIPTIVE">Descriptive</SelectItem>
+                                             <SelectItem value="SMCQ">SMCQ (Scenario)</SelectItem>
                                         </SelectContent>
                                     </Select>
                                     <Select

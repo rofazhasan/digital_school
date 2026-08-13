@@ -1227,6 +1227,9 @@ export default function QuestionBankPage() {
                               <SelectItem value="INT">INT (Integer)</SelectItem>
                               <SelectItem value="AR">AR (Assertion-Reason)</SelectItem>
                               <SelectItem value="MTF">MTF (Match Following)</SelectItem>
+                              <SelectItem value="CMA">CMA (Constructed Multi-Answer)</SelectItem>
+                              <SelectItem value="MPC">MPC (Multi-Step Problem Chain)</SelectItem>
+                              <SelectItem value="DR">DR (Diagnostic Reasoning)</SelectItem>
                               <SelectItem value="CQ">CQ</SelectItem>
                               <SelectItem value="SMCQ">SMCQ</SelectItem>
                               <SelectItem value="SQ">SQ</SelectItem>

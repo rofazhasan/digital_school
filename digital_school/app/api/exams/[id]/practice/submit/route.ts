@@ -5,6 +5,9 @@ import { evaluateMCQuestion } from '@/lib/evaluation/mcEvaluation';
 import { evaluateINTQuestion } from '@/lib/evaluation/intEvaluation';
 import { evaluateARQuestion } from '@/lib/evaluation/arEvaluation';
 import { evaluateMTFQuestion } from '@/lib/evaluation/mtfEvaluation';
+import { evaluateCMAQuestion } from '@/lib/evaluation/cmaEvaluation';
+import { evaluateMPCQuestion } from '@/lib/evaluation/mpcEvaluation';
+import { evaluateDRQuestion } from '@/lib/evaluation/drEvaluation';
 
 export async function POST(
     request: NextRequest,
@@ -131,6 +134,24 @@ export async function POST(
                 questionScore = Number(result.score) || 0;
                 if (!result.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     questionScore -= (Number(question.marks || 0) * exam.mcqNegativeMarking) / 100;
+                }
+            } else if (type === 'CMA') {
+                const result = evaluateCMAQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
+                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                }
+            } else if (type === 'MPC') {
+                const result = evaluateMPCQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
+                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                }
+            } else if (type === 'DR') {
+                const result = evaluateDRQuestion(question, studentAnswer);
+                questionScore = Number(result.score) || 0;
+                if (!result.isCorrect && result.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
                 }
             }
 

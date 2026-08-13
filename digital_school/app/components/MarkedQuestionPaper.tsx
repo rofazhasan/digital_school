@@ -178,6 +178,9 @@ interface MarkedQuestionPaperProps {
         sq: SQ[];
         smcq?: any[];
         descriptive?: CQ[];
+        cma?: any[];
+        mpc?: any[];
+        dr?: any[];
     };
     submission: StudentSubmission;
     rank?: number;
@@ -205,9 +208,12 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         const ars = questions.ar || [];
         const ints = questions.int || [];
         const mtfs = questions.mtf || [];
+        const cmas = questions.cma || [];
+        const mpcs = questions.mpc || [];
+        const drs = questions.dr || [];
 
         const objectiveTotal = [
-            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs
+            ...mcqs, ...mcs, ...ars, ...ints, ...mtfs, ...cmas, ...mpcs, ...drs
         ].reduce((sum, q) => sum + (q.marks || 1), 0);
 
         const cqs = questions.cq || [];
@@ -881,9 +887,33 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             );
         };
 
+        const getCMAMark = (q: any, userAnswer: any) => {
+            if (!userAnswer) return 0;
+            const evalRes = evaluateCMAQuestion(q, userAnswer);
+            if (evalRes.score > 0) return evalRes.score;
+            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
+            return 0;
+        };
+
+        const getMPCMark = (q: any, userAnswer: any) => {
+            if (!userAnswer) return 0;
+            const evalRes = evaluateMPCQuestion(q, userAnswer);
+            if (evalRes.score > 0) return evalRes.score;
+            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
+            return 0;
+        };
+
+        const getDRMark = (q: any, userAnswer: any) => {
+            if (!userAnswer) return 0;
+            const evalRes = evaluateDRQuestion(q, userAnswer);
+            if (evalRes.score > 0) return evalRes.score;
+            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
+            return 0;
+        };
+
         // Calculate total deducted marks for header display
         let totalDeducted = 0;
-        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || [])].forEach(q => {
+        [...mcqs, ...(questions.mc || []), ...(questions.ar || []), ...(questions.int || []), ...(questions.mtf || []), ...(questions.cma || []), ...(questions.mpc || []), ...(questions.dr || [])].forEach(q => {
             const ans = submission.answers[q.id || ''];
             let m = 0;
             const type = (q as any).type?.toUpperCase();
@@ -892,6 +922,9 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
             else if (type === 'AR') m = getARMark(q as AR, ans);
             else if (type === 'INT') m = getINTMark(q as INT, ans);
             else if (type === 'MTF') m = getMTFMark(q as MTF, ans);
+            else if (type === 'CMA') m = getCMAMark(q, ans);
+            else if (type === 'MPC') m = getMPCMark(q, ans);
+            else if (type === 'DR') m = getDRMark(q, ans);
 
             if (m < 0) totalDeducted += Math.abs(m);
         });
@@ -997,7 +1030,10 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                             ...(questions.mc || []).map(q => ({ ...q, type: 'MC' })),
                             ...(questions.int || []).map(q => ({ ...q, type: 'INT' })),
                             ...(questions.ar || []).map(q => ({ ...q, type: 'AR' })),
-                            ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' }))
+                            ...(questions.mtf || []).map(q => ({ ...q, type: 'MTF' })),
+                            ...(questions.cma || []).map(q => ({ ...q, type: 'CMA' })),
+                            ...(questions.mpc || []).map(q => ({ ...q, type: 'MPC' })),
+                            ...(questions.dr || []).map(q => ({ ...q, type: 'DR' }))
                         ];
 
                         if (allObjective.length === 0) return null;
