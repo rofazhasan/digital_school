@@ -14,63 +14,50 @@ function shuffleArray<T>(array: T[]): T[] {
 }
 
 export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
-  const params = await props.params;
-  const { id: examId } = params;
-  // Fetch exam with sets and questionsJson
-  const exam = await prismadb.exam.findUnique({
-    where: { id: examId },
-    include: {
-      class: {
-        include: {
-          institute: true
-        }
-      },
-      examSets: {
-        include: {
-          questions: {
-            select: {
-              id: true,
-              subject: true,
-              type: true,
-              questionText: true,
-              marks: true,
-              options: true,
-              subQuestions: true,
-              modelAnswer: true,
-              parts: true,
-              cmaParts: true,
-              stages: true,
-              mpcStages: true,
-              scenario: true,
-              reasonOptions: true,
-            }
-          },
+  try {
+    const params = await props.params;
+    const { id: examId } = params;
+    // Fetch exam with sets and questionsJson
+    const exam = await prismadb.exam.findUnique({
+      where: { id: examId },
+      include: {
+        class: {
+          include: {
+            institute: true
+          }
         },
-        orderBy: { createdAt: 'asc' },
+        examSets: {
+          include: {
+            questions: true
+          },
+          orderBy: { createdAt: 'asc' },
+        },
       },
-    },
-  });
-  if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
-
-  // Extract subject from questions - get the most common subject or first available
-  let examSubject = '';
-  const allQuestions = exam.examSets.flatMap((set: any) => set.questions);
-  if (allQuestions.length > 0) {
-    // Get the most common subject from questions
-    const subjectCounts: { [key: string]: number } = {};
-    allQuestions.forEach((q: any) => {
-      if (q.subject) {
-        subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
-      }
     });
+    if (!exam) return NextResponse.json({ error: 'Exam not found' }, { status: 404 });
 
-    // Find the subject with the highest count
-    const mostCommonSubject = Object.entries(subjectCounts).reduce((a, b) =>
-      (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
-    );
+    // Extract subject from questions - get the most common subject or first available
+    let examSubject = '';
+    const allQuestions = exam.examSets.flatMap((set: any) => set.questions);
+    if (allQuestions.length > 0) {
+      // Get the most common subject from questions
+      const subjectCounts: { [key: string]: number } = {};
+      allQuestions.forEach((q: any) => {
+        if (q.subject) {
+          subjectCounts[q.subject] = (subjectCounts[q.subject] || 0) + 1;
+        }
+      });
 
-    examSubject = mostCommonSubject[0] || '';
-  }
+      const subjectEntries = Object.entries(subjectCounts);
+      if (subjectEntries.length > 0) {
+        // Find the subject with the highest count
+        const mostCommonSubject = subjectEntries.reduce((a, b) =>
+          (subjectCounts[a[0]] || 0) > (subjectCounts[b[0]] || 0) ? a : b
+        );
+
+        examSubject = mostCommonSubject[0] || '';
+      }
+    }
 
   // If no subject found from questions relation, try to get from questionsJson
   if (!examSubject) {
@@ -391,4 +378,8 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
   );
 
   return NextResponse.json({ examInfo, sets });
+  } catch (error: any) {
+    console.error("[PrintAPI] Exception error:", error);
+    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+  }
 }
