@@ -450,11 +450,19 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const cmaRes = evaluateCMAQuestion(question as any, studentAnswer as any);
                 let qMark = cmaRes.score;
-                if (!cmaRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const parts = (question as any).parts || (question as any).cmaParts || [];
                     const maxM = cmaRes.maxScore || Number(question.marks) || 1;
-                    const unearned = maxM - cmaRes.score;
-                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
-                    qMark = Math.round((cmaRes.score - negPenalty) * 100) / 100;
+                    const totalPartsWeight = parts.reduce((acc: number, p: any) => acc + (Number(p.marks) || 1), 0) || parts.length || 1;
+                    let wrongPenalty = 0;
+                    for (const part of parts) {
+                        const pRes = cmaRes.partResults?.[part.id];
+                        if (pRes && !pRes.isCorrect) {
+                            const partMax = ((Number(part.marks) || 1) / totalPartsWeight) * maxM;
+                            wrongPenalty += (partMax * exam.mcqNegativeMarking) / 100;
+                        }
+                    }
+                    qMark = Math.round((cmaRes.score - wrongPenalty) * 100) / 100;
                 }
                 questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: cmaRes.isCorrect, partResults: cmaRes.partResults };
@@ -462,11 +470,19 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
                 let qMark = mpcRes.score;
-                if (!mpcRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const stages = (question as any).stages || (question as any).mpcStages || [];
                     const maxM = mpcRes.maxScore || Number(question.marks) || 1;
-                    const unearned = maxM - mpcRes.score;
-                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
-                    qMark = Math.round((mpcRes.score - negPenalty) * 100) / 100;
+                    const totalWeight = stages.reduce((acc: number, s: any) => acc + (Number(s.marks) || 1), 0) || stages.length || 1;
+                    let wrongPenalty = 0;
+                    for (const stage of stages) {
+                        const sRes = mpcRes.stageResults?.[stage.id];
+                        if (sRes && !sRes.isCorrectDirectly && !sRes.isCorrectWithPropagatedError) {
+                            const stageMax = ((Number(stage.marks) || 1) / totalWeight) * maxM;
+                            wrongPenalty += (stageMax * exam.mcqNegativeMarking) / 100;
+                        }
+                    }
+                    qMark = Math.round((mpcRes.score - wrongPenalty) * 100) / 100;
                 }
                 questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
@@ -474,11 +490,13 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const drRes = evaluateDRQuestion(question as any, studentAnswer as any);
                 let qMark = drRes.score;
-                if (!drRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
                     const maxM = drRes.maxScore || Number(question.marks) || 1;
-                    const unearned = maxM - drRes.score;
-                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
-                    qMark = Math.round((drRes.score - negPenalty) * 100) / 100;
+                    const halfMark = maxM / 2;
+                    let wrongPenalty = 0;
+                    if (!drRes.answerCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
+                    if (!drRes.reasonCorrect) wrongPenalty += (halfMark * exam.mcqNegativeMarking) / 100;
+                    qMark = Math.round((drRes.score - wrongPenalty) * 100) / 100;
                 }
                 questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: drRes.isCorrect, diagnosticTag: drRes.diagnosticTag };
