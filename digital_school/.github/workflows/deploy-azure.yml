@@ -1,0 +1,47 @@
+name: Build and Deploy to Azure Web App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: 'digital-school' # Replace with your Azure Web App name if different
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: 1
+
+      # Option 1: Azure Login using Service Principal Credentials (if AZURE_CREDENTIALS secret is set)
+      - name: Azure Login
+        uses: azure/login@v2
+        if: "${{ secrets.AZURE_CREDENTIALS != '' }}"
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Option 2: Deploy to Azure Web App (supports both publish-profile or active Azure Login session)
+      - name: Deploy to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: '.'
