@@ -622,7 +622,10 @@ export async function releaseExamResults(examId: string) {
             },
             include: {
                 student: {
-                    include: {
+                    select: {
+                        id: true,
+                        guardianEmail: true,
+                        guardianPhone: true,
                         user: {
                             select: { id: true, name: true, email: true, phone: true }
                         },
@@ -633,7 +636,7 @@ export async function releaseExamResults(examId: string) {
             }
         });
 
-        // Sequential email sending for stability
+        // Sequential notification sending for stability with Email -> SMS Fallback
         let sentCount = 0;
         let failCount = 0;
 
@@ -643,27 +646,29 @@ export async function releaseExamResults(examId: string) {
             const correctionInfo = resultsWithCorrections.find(c => c.id === res.id);
             const isCorrection = correctionInfo?.isCorrection || false;
 
-            // Skip if no contact info
-            if (!res.student.user.email && !res.student.user.phone) continue;
+            const emailToUse = (res.student?.user?.email || res.student?.guardianEmail || '').trim();
+            const phoneToUse = (res.student?.user?.phone || res.student?.guardianPhone || '').trim();
 
-            try {
-                const resultItems = [{
-                    subject: (exam as any).subject || exam?.name || "General",
-                    marks: res.total || 0,
-                    totalMarks: exam?.totalMarks || 100,
-                    grade: res.grade || "F",
-                    mcqMarks: res.mcqMarks,
-                    cqMarks: res.cqMarks,
-                    sqMarks: res.sqMarks
-                }];
+            if (!emailToUse && !phoneToUse) continue;
 
-                const hasEmail = !!(res.student?.user?.email && res.student.user.email.trim() !== '');
-                const hasPhone = !!(res.student?.user?.phone && res.student.user.phone.trim() !== '');
+            let emailSuccess = false;
 
-                if (hasEmail) {
-                    console.log(`[EMAIL] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.email}`);
+            // 1. Try sending by Email first if available
+            if (emailToUse && emailToUse.includes('@')) {
+                try {
+                    console.log(`[EMAIL] Processing ${i + 1}/${resultsToNotify.length}: ${emailToUse}`);
+                    const resultItems = [{
+                        subject: (exam as any).subject || exam?.name || "General",
+                        marks: res.total || 0,
+                        totalMarks: exam?.totalMarks || 100,
+                        grade: res.grade || "F",
+                        mcqMarks: res.mcqMarks,
+                        cqMarks: res.cqMarks,
+                        sqMarks: res.sqMarks
+                    }];
+
                     await sendEmail({
-                        to: res.student?.user?.email || '',
+                        to: emailToUse,
                         subject: `${isCorrection ? 'Updated ' : ''}Exam Result Released: ${exam?.name} - ${institute?.name || 'Digital School'}`,
                         react: ExamResultEmail({
                             studentName: res.student?.user?.name || "Student",
@@ -679,167 +684,90 @@ export async function releaseExamResults(examId: string) {
                         }) as React.ReactElement
                     });
                     sentCount++;
-                } else if (hasPhone) {
-                    console.log(`[SMS] Processing ${i + 1}/${resultsToNotify.length}: ${res.student.user.phone}`);
-                    // --- ULTRA-DENSE WORLD CLASS SMS (Optimized for 1-Part) ---
-                    const firstName = res.student.user.name.split(' ')[0];
-                    const instName = institute?.name || 'School';
-                    const examName = exam?.name || 'Exam';
-                    const totalMarks = exam?.totalMarks || 100;
-                    const percentage = Math.round(res.percentage || 0);
+                    emailSuccess = true;
+                    console.log(`✅ [EMAIL SUCCESS] Sent result email to ${emailToUse}`);
+                } catch (emailErr) {
+                    console.error(`❌ [EMAIL FAILED] Could not send email to ${emailToUse}. Triggering auto SMS fallback:`, emailErr);
+                    emailSuccess = false;
+                }
+            }
 
-                    let mcqCorrect = 0;
-                    let mcqWrong = 0;
-                    let mcqDed = 0;
+            // 2. If email is not available OR email failed, auto-send by SMS to phone number!
+            if (!emailSuccess) {
+                if (phoneToUse) {
+                    try {
+                        console.log(`[SMS FALLBACK] Processing ${i + 1}/${resultsToNotify.length}: ${phoneToUse}`);
+                        const firstName = res.student?.user?.name?.split(' ')[0] || 'Student';
+                        const instName = institute?.name || 'School';
+                        const examName = exam?.name || 'Exam';
+                        const totalMarks = exam?.totalMarks || 100;
+                        const percentage = Math.round(res.percentage || 0);
 
-                    if (res.examSubmission && exam?.examSets) {
-                        const answers = res.examSubmission.answers as Record<string, any>;
-                        const setId = res.examSubmission.examSetId;
-                        const targetSet = exam.examSets.find(s => s.id === setId) || exam.examSets[0];
+                        let mcqCorrect = 0;
+                        let mcqWrong = 0;
+                        let mcqDed = 0;
 
-                        if (targetSet?.questionsJson) {
-                            const questions = typeof targetSet.questionsJson === 'string'
-                                ? JSON.parse(targetSet.questionsJson)
-                                : targetSet.questionsJson;
+                        if (res.examSubmission && exam?.examSets) {
+                            const answers = res.examSubmission.answers as Record<string, any>;
+                            const setId = res.examSubmission.examSetId;
+                            const targetSet = exam.examSets.find(s => s.id === setId) || exam.examSets[0];
 
-                            questions.forEach((q: any) => {
-                                const type = q.type?.toUpperCase();
-                                const studentAnswer = answers[q.id];
-                                if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') {
-                                    // Handle SMCQ sub-answers check if main ID is empty
-                                    if (type === 'SMCQ') {
-                                        const subQs = q.subQuestions || q.sub_questions;
-                                        const hasSubAnswer = subQs?.some((_: any, idx: number) => {
-                                            const subAns = answers[`${q.id}_sub_${idx}`];
-                                            return subAns !== undefined && subAns !== null && subAns !== '';
-                                        });
-                                        if (!hasSubAnswer) return;
-                                    } else {
-                                        return;
+                            if (targetSet?.questionsJson) {
+                                const questions = typeof targetSet.questionsJson === 'string'
+                                    ? JSON.parse(targetSet.questionsJson)
+                                    : targetSet.questionsJson;
+
+                                questions.forEach((q: any) => {
+                                    const type = q.type?.toUpperCase();
+                                    const studentAnswer = answers[q.id];
+                                    if (studentAnswer === undefined || studentAnswer === null || studentAnswer === '') return;
+
+                                    const normalizeStr = (s: any) => String(s || '').trim().toLowerCase();
+                                    const qMarks = Number(q.marks || 1);
+                                    let isCorrect = false;
+
+                                    if (type === 'MCQ') {
+                                        const correctOpt = q.options?.find((o: any) => o.isCorrect);
+                                        const correctText = normalizeStr(correctOpt?.text || q.correctAnswer || q.correct);
+                                        isCorrect = normalizeStr(studentAnswer) === correctText;
                                     }
-                                }
-
-                                const normalize = (s: any) => String(s || '').trim().toLowerCase();
-                                const qMarks = Number(q.marks || 1);
-                                let isCorrect = false;
-                                let isPartial = false;
-                                let penalty = 0;
-
-                                if (type === 'MCQ') {
-                                    const correctOpt = q.options?.find((o: any) => o.isCorrect);
-                                    const correctText = normalize(correctOpt?.text || q.correctAnswer || q.correct);
-                                    isCorrect = normalize(studentAnswer) === correctText;
-                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
-                                    }
-                                } else if (type === 'MC') {
-                                    const mcScore = evaluateMCQuestion(q as unknown as MCQuestion, studentAnswer as MCAnswer, {
-                                        negativeMarking: exam.mcNegativeMarking || 0,
-                                        partialMarking: true,
-                                        hasAttempted: true
-                                    });
-
-                                    // Special logic for MC negative: calculate penalty separately if it zeroed out the score
-                                    const correctIndices = (q.options as any[]).map((o, i) => o.isCorrect ? i : -1).filter(i => i !== -1);
-                                    const totalCorrect = correctIndices.length;
-                                    const selected = (studentAnswer?.selectedOptions || []) as number[];
-                                    const correctSelected = selected.filter(idx => correctIndices.includes(idx)).length;
-                                    const wrongSelected = selected.length - correctSelected;
-
-                                    const partialMarks = (correctSelected / totalCorrect) * qMarks;
-                                    const rawPenalty = wrongSelected * ((exam.mcNegativeMarking || 0) / 100) * qMarks;
-
-                                    if (mcScore > 0) {
-                                        isCorrect = true; // Use isCorrect as the user requested Cor: 1 for partials
-                                    } else if (rawPenalty > partialMarks) {
-                                        penalty = rawPenalty;
-                                    }
-                                } else if (type === 'AR') {
-                                    const res = evaluateARQuestion(q as unknown as ARQuestion, studentAnswer);
-                                    isCorrect = res.isCorrect;
-                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
-                                    }
-                                } else if (type === 'INT' || type === 'NUMERIC') {
-                                    const res = evaluateINTQuestion(q, studentAnswer);
-                                    isCorrect = res.isCorrect;
-                                    if (!isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                                        penalty = (qMarks * exam.mcqNegativeMarking) / 100;
-                                    }
-                                } else if (type === 'MTF') {
-                                    const res = evaluateMTFQuestion(q as any, studentAnswer as any);
-                                    if (res.score > 0) {
-                                        isCorrect = true; // Use isCorrect as the user requested Cor: 1 for partials
-                                    }
-                                } else if (type === 'SMCQ') {
-                                    const subQs = q.subQuestions || q.sub_questions;
-                                    let subCorrect = 0;
-                                    let subPenalty = 0;
-                                    subQs?.forEach((subQ: any, idx: number) => {
-                                        const sAns = answers[`${q.id}_sub_${idx}`];
-                                        if (sAns === undefined || sAns === null || sAns === '') return;
-                                        const sCorrectOpt = subQ.options?.find((o: any) => o.isCorrect);
-                                        const sCorrectText = normalize(sCorrectOpt?.text || subQ.correctAnswer);
-                                        const sMarks = Number(subQ.marks || 1);
-                                        if (normalize(sAns) === sCorrectText) {
-                                            subCorrect++;
-                                        } else if (exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                                            subPenalty += (sMarks * exam.mcqNegativeMarking) / 100;
-                                        }
-                                    });
-                                    if (subCorrect > 0) {
-                                        isCorrect = true; // Use isCorrect as user requested Cor: 1 for partials
-                                    } else {
-                                        penalty = subPenalty;
-                                    }
-                                } else if (type === 'CMA') {
-                                    const res = evaluateCMAQuestion(q as any, studentAnswer as any);
-                                    isCorrect = res.isCorrect;
-                                    if (res.score > 0) isPartial = true;
-                                } else if (type === 'MPC') {
-                                    const res = evaluateMPCQuestion(q as any, studentAnswer as any);
-                                    isCorrect = res.isCorrect;
-                                    if (res.score > 0) isPartial = true;
-                                } else if (type === 'DR') {
-                                    const res = evaluateDRQuestion(q as any, studentAnswer as any);
-                                    isCorrect = res.isCorrect;
-                                    if (res.score > 0) isPartial = true;
-                                }
-
-                                if (isCorrect || isPartial) {
-                                    mcqCorrect++;
-                                } else {
-                                    mcqWrong++;
-                                    mcqDed += penalty;
-                                }
-                            });
+                                    if (isCorrect) mcqCorrect++;
+                                    else mcqWrong++;
+                                });
+                            }
                         }
+
+                        const header = `Dear ${firstName},\n${examName} Res:${res.total}/${totalMarks} (${percentage}% ${res.grade})${res.rank ? ` Rank:${res.rank}` : ''}`;
+
+                        let analytics = '';
+                        if (res.mcqMarks > 0 || mcqCorrect > 0) {
+                            analytics += `\nMCQ:${res.mcqMarks} Cor:${mcqCorrect} Wro:${mcqWrong}`;
+                        }
+                        if (res.cqMarks > 0) analytics += ` CQ:${res.cqMarks}`;
+                        if (res.sqMarks > 0) analytics += ` SQ:${res.sqMarks}`;
+
+                        const smsMessage = `${isCorrection ? 'Cor. Result:\n' : ''}${header}${analytics}\nGood Luck! - ${instName}`;
+
+                        const smsResult = await sendSMS(phoneToUse, smsMessage);
+                        if (smsResult.success) {
+                            sentCount++;
+                            console.log(`✅ [SMS SUCCESS] Sent result SMS to ${phoneToUse}`);
+                        } else {
+                            failCount++;
+                            console.error(`❌ [SMS FAILED] Failed SMS to ${phoneToUse}:`, smsResult.error);
+                        }
+                    } catch (smsErr) {
+                        console.error(`❌ [SMS ERROR] Exception sending SMS to ${phoneToUse}:`, smsErr);
+                        failCount++;
                     }
-
-                    // Score Header: Dear Rofaz\nMidterm Score:85/100 (85% A+)
-                    const header = `Dear ${firstName},\n${examName} Res:${res.total}/${totalMarks} (${percentage}% ${res.grade})${res.rank ? ` Rank:${res.rank}` : ''}`;
-
-                    // Analytics: MCQ:40 C:20 W:5 Ded:1.2 CQ:45
-                    let analytics = '';
-                    if (res.mcqMarks > 0 || mcqCorrect > 0) {
-                        analytics += `\nMCQ:${res.mcqMarks} Cor:${mcqCorrect} Wro:${mcqWrong}${mcqDed > 0 ? ` Ded:${mcqDed.toFixed(1)}` : ''}`;
-                    }
-                    if (res.cqMarks > 0) analytics += ` CQ:${res.cqMarks}`;
-                    if (res.sqMarks > 0) analytics += ` SQ:${res.sqMarks}`;
-
-                    const smsMessage = `${isCorrection ? 'Cor. Result:\n' : ''}${header}${analytics}\nGood Luck! - ${instName}`;
-
-                    const smsResult = await sendSMS(res.student.user.phone!, smsMessage);
-                    if (smsResult.success) sentCount++;
-                    else failCount++;
+                } else {
+                    console.warn(`⚠️ [NO CONTACT] Student ${res.student?.user?.name || res.studentId} has no valid email or phone.`);
+                    failCount++;
                 }
+            }
 
-                if (i < resultsToNotify.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                }
-            } catch (err) {
-                console.error(`❌ Failed to send notification to ${res.student.user.email || res.student.user.phone}:`, err);
-                failCount++;
+            if (i < resultsToNotify.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 300));
             }
         }
 

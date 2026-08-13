@@ -111,7 +111,7 @@ export async function GET(
         scanId,
         verificationUrl,
         scanDate: new Date(scan.createdAt).toLocaleDateString('en-BD'),
-      })
+      }) as any
     );
 
     return new NextResponse(pdfBuffer, {

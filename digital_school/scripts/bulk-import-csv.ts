@@ -74,7 +74,7 @@ async function main() {
                             options: parsedOptions,
                             subQuestions: parsedSubQuestions,
                             classId,
-                            creatorId,
+                            createdById: creatorId,
                             hasMath: questionText.includes('$') || questionText.includes('\\'),
                         }
                     });

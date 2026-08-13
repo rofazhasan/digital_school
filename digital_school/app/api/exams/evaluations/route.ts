@@ -49,7 +49,14 @@ export async function GET(req: NextRequest) {
       exams = await prisma.exam.findMany({
         where: commonWhere,
         include: {
-          class: { select: { name: true, section: true } },
+          class: {
+            select: {
+              id: true,
+              name: true,
+              section: true,
+              _count: { select: { students: true } }
+            }
+          },
           createdBy: {
             select: { name: true, email: true }
           },
@@ -63,9 +70,13 @@ export async function GET(req: NextRequest) {
               }
             }
           },
+          examStudentMaps: { select: { id: true } },
           examSubmissions: {
             select: {
               id: true,
+              status: true,
+              objectiveStatus: true,
+              cqSqStatus: true,
               evaluatedAt: true,
               evaluatorNotes: true
             }
@@ -96,7 +107,14 @@ export async function GET(req: NextRequest) {
       exams = await prisma.exam.findMany({
         where: evaluatorWhere,
         include: {
-          class: { select: { name: true, section: true } },
+          class: {
+            select: {
+              id: true,
+              name: true,
+              section: true,
+              _count: { select: { students: true } }
+            }
+          },
           createdBy: {
             select: { name: true, email: true }
           },
@@ -111,9 +129,13 @@ export async function GET(req: NextRequest) {
               }
             }
           },
+          examStudentMaps: { select: { id: true } },
           examSubmissions: {
             select: {
               id: true,
+              status: true,
+              objectiveStatus: true,
+              cqSqStatus: true,
               evaluatedAt: true,
               evaluatorNotes: true
             }
@@ -130,10 +152,32 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    // Auto-release trigger check for finished/expired exams
+    try {
+      const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
+      for (const exam of exams) {
+        const isTimeOver = exam.endTime && new Date() > new Date(exam.endTime);
+        const totalClassStudents = exam.class?._count?.students || exam.examStudentMaps?.length || 0;
+        const finishedSubmissions = exam.examSubmissions.filter((s: any) => s.status === 'SUBMITTED' || s.evaluatedAt !== null).length;
+        const allClassFinished = totalClassStudents > 0 && finishedSubmissions >= totalClassStudents;
+        const publishedCount = (exam as any)._count?.results || 0;
+
+        if ((isTimeOver || allClassFinished) && publishedCount < finishedSubmissions) {
+          finalizeAndReleaseExam(exam.id).catch(err => console.error(`[AutoRelease] Background release failed for ${exam.id}:`, err));
+        }
+      }
+    } catch (e) {
+      console.error("[AutoRelease] Failed auto-release sweep:", e);
+    }
+
     console.log('Processing exams:', exams.length, 'Total matching:', totalCount);
     const formattedExams = exams.map((exam: any) => {
       // Calculate evaluation status based on submissions
       let evaluationStatus = "UNASSIGNED";
+      const totalClassStudents = exam.class?._count?.students || exam.examStudentMaps?.length || 0;
+      const submittedSubmissions = exam.examSubmissions.filter((s: any) => s.status === 'SUBMITTED' || s.evaluatedAt !== null);
+      const submittedCount = submittedSubmissions.length;
+      const totalEnrolled = totalClassStudents > 0 ? totalClassStudents : (exam.examStudentMaps?.length || exam.examSubmissions.length);
 
       if (exam.evaluationAssignments.length > 0) {
         const totalSubmissions = exam.examSubmissions.length;
@@ -159,8 +203,8 @@ export async function GET(req: NextRequest) {
         isActive: exam.isActive,
         class: exam.class,
         createdBy: exam.createdBy,
-        totalStudents: exam.examSubmissions.length,
-        submittedStudents: exam.examSubmissions.length,
+        totalStudents: totalEnrolled,
+        submittedStudents: submittedCount,
         publishedResults: (exam as any)._count?.results || 0,
         evaluationAssignments: exam.evaluationAssignments,
         mcqNegativeMarking: exam.mcqNegativeMarking,

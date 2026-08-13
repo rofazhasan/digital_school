@@ -167,20 +167,23 @@ export async function GET(
     }
 
     // -------------------------------------------------------------------------
-    // AUTO-RELEASE TRIGGER (Teacher View Fallback)
+    // AUTO-RELEASE TRIGGER (Teacher View & Evaluation Load Fallback)
     // -------------------------------------------------------------------------
     try {
-      const { isMCQOnlyExam, finalizeAndReleaseExam } = await import("@/lib/exam-logic");
-      const isMCQOnly = isMCQOnlyExam(exam, (exam as any).examSets);
+      const { finalizeAndReleaseExam } = await import("@/lib/exam-logic");
       const isTimeOver = (new Date() > new Date(exam.endTime));
 
-      // Trigger full sweep and release if time is over
-      if (isTimeOver) {
-        // Run in background to avoid blocking initial load, but ensures DB is consistent
+      const totalClassStudents = await prisma.studentProfile.count({
+        where: { classId: exam.classId, user: { isActive: true } }
+      });
+      const submittedCount = await prisma.examSubmission.count({
+        where: { examId: exam.id, status: 'SUBMITTED' }
+      });
+      const allSubmitted = totalClassStudents > 0 && submittedCount >= totalClassStudents;
+
+      // Trigger full sweep and release if time is over OR all class students completed
+      if (isTimeOver || allSubmitted) {
         await finalizeAndReleaseExam(exam.id);
-      } else if (isMCQOnly) {
-        // For MCQ only, we might want to release earlier if all submitted, 
-        // but typically time-over is the safest trigger for auto-release.
       }
     } catch (e) {
       console.error("Auto-release trigger failed in evaluation API:", e);

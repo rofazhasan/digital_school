@@ -47,7 +47,6 @@ export async function POST(request: NextRequest) {
                 data: {
                     passwordResetToken: token,
                     passwordResetExpires: expires,
-                    passwordResetApproved: true, // Email link is self-verifying
                 },
             });
 
@@ -90,7 +89,6 @@ export async function POST(request: NextRequest) {
                 data: {
                     passwordResetToken: token,
                     passwordResetExpires: expires,
-                    passwordResetApproved: true, // SMS OTP is self-verifying
                 },
             });
 
@@ -120,7 +118,6 @@ export async function POST(request: NextRequest) {
             data: {
                 passwordResetToken: token,
                 passwordResetExpires: expires,
-                passwordResetApproved: false, // Requires admin manual intervention
             },
         });
 

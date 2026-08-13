@@ -344,12 +344,12 @@ export default function OnlineExamsPage() {
           {/* Status filter chips */}
           <div className="flex flex-wrap gap-2">
             {(Object.entries(STATUS_CONFIGS) as [StatusFilter, typeof STATUS_CONFIGS[StatusFilter]][]).map(([key, cfg]) => {
-              const Icon = cfg.icon;
+              const Icon = cfg.icon as any;
               const isActive = statusFilter === key;
               return (
                 <button
                   key={key}
-                  onClick={() => setStatusFilter(key)}
+                  onClick={() => setStatusFilter(key as any)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 ${isActive
                     ? `${cfg.bg} ${cfg.color} ring-1 ${cfg.ring} border-transparent shadow-sm`
                     : "bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"

@@ -249,7 +249,7 @@ export function UniversalMathJax({ children, inline, dynamic }: UniversalMathJax
 
         // 2. Render Inline Math $...$ or \(...\)
         // Avoid matching $ inside attributes (e.g. data-hash="...")
-        text = text.replace(/(?:(?<![="])\$(.*?)\$|\\\(([\s\S]*?)\\\))/gs, (_, math1, math2) => {
+        text = text.replace(new RegExp('(?:(?<![="])\\$(.*?)\\$|\\\\\\(([\\s\\S]*?)\\\\\\))', 'gs'), (_, math1, math2) => {
             const math = math1 ?? math2;
             if (!math) return '';
             try {

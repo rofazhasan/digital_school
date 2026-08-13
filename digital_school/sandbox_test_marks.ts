@@ -18,5 +18,5 @@ console.log("INT string zero:", evaluateINTQuestion(intQuestion, "0" as any));
 console.log("AR Empty Obj:", evaluateARQuestion(arQuestion, {} as any));
 console.log("AR Null:", evaluateARQuestion(arQuestion, null as any));
 
-console.log("MTF Empty Obj:", evaluateMTFQuestion(mtfQuestion, {} as any));
-console.log("MTF Null:", evaluateMTFQuestion(mtfQuestion, null as any));
+console.log("MTF Empty Obj:", evaluateMTFQuestion(mtfQuestion as any, {} as any));
+console.log("MTF Null:", evaluateMTFQuestion(mtfQuestion as any, null as any));

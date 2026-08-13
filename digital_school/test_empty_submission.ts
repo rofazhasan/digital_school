@@ -39,7 +39,7 @@ global.prisma = {
 
 async function run() {
   try {
-    const res = await evaluateSubmission(submission, exam, [examSet]);
+    const res = await evaluateSubmission(submission as any, exam as any, [examSet] as any);
     console.log("EVAL RESULT FOR EMPTY ANSWERS:", res);
   } catch(e) {
     console.error(e);

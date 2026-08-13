@@ -64,7 +64,7 @@ async function generateTemplate(mode: string) {
         const typeFormula = '"MCQ,MC"';
 
         const typeCol = templateSheet.getColumn('type');
-        if (typeCol) typeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
+        if (typeCol) (typeCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: [typeFormula] };
 
         // THE LOOP THAT MIGHT FAIL
         for (let i = 1; i <= 10; i++) {
@@ -78,7 +78,7 @@ async function generateTemplate(mode: string) {
             const descTypeCol = templateSheet.getColumn(`s${i}Type`);
             if (descTypeCol && descTypeCol.number > 0) {
                 console.log(`Styling s${i}Type at col ${descTypeCol.number}`);
-                descTypeCol.dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
+                (descTypeCol as any).dataValidation = { type: 'list', allowBlank: true, formulae: [subTypeFormula] };
                 const cell = headerRow.getCell(descTypeCol.number);
                 if (cell) cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0891B2' } };
             }

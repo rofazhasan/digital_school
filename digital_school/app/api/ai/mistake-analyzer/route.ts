@@ -47,11 +47,7 @@ export async function POST(req: NextRequest) {
       where: {
         examSets: {
           some: {
-            exams: {
-              some: {
-                id: submission.examId,
-              },
-            },
+            examId: submission.examId,
           },
         },
       },
@@ -98,7 +94,7 @@ export async function POST(req: NextRequest) {
       .sort((a, b) => b.errorCount - a.errorCount);
 
     const totalMarks = submission.exam?.totalMarks || 100;
-    const obtainedMarks = submission.score || submission.result?.obtainedMarks || 0;
+    const obtainedMarks = submission.score ?? submission.result?.total ?? 0;
     const accuracyPercentage = Math.round((obtainedMarks / totalMarks) * 100);
 
     const context: StudentMistakeContext = {
