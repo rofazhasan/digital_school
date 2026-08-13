@@ -5,6 +5,8 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { UniversalMathJax } from '@/app/components/UniversalMathJax';
+import { cleanupMath } from '@/lib/utils';
 
 // ==========================================
 // 1. CMA (Constructed Multi-Answer) Renderer
@@ -72,7 +74,7 @@ export function CMARenderer({
               >
                 <div className="flex items-center justify-between mb-1.5">
                   <Label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                    {part.label}
+                    <UniversalMathJax inline dynamic>{cleanupMath(part.label || (part as any).prompt || (part as any).text || '')}</UniversalMathJax>
                   </Label>
                   <div className="flex items-center gap-1.5">
                     {part.unit && (
@@ -163,7 +165,7 @@ export function MPCRenderer({
           <p className="font-semibold text-xs uppercase tracking-wider text-indigo-600 dark:text-indigo-400 mb-1">
             Problem Scenario
           </p>
-          <p>{question.scenario}</p>
+          <div><UniversalMathJax inline dynamic>{cleanupMath(question.scenario)}</UniversalMathJax></div>
         </Card>
       )}
 
@@ -191,7 +193,7 @@ export function MPCRenderer({
                     {idx + 1}
                   </span>
                   <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    {stage.stageTitle}
+                    <UniversalMathJax inline dynamic>{cleanupMath(stage.stageTitle || (stage as any).prompt || (stage as any).text || (stage as any).question || '')}</UniversalMathJax>
                   </span>
                 </div>
                 {stage.marks && (
@@ -335,7 +337,7 @@ export function DRRenderer({
                 >
                   {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
                 </div>
-                <span>{opt.text}</span>
+                <span><UniversalMathJax inline dynamic>{cleanupMath(opt.text || '')}</UniversalMathJax></span>
               </button>
             );
           })}

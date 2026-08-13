@@ -1377,7 +1377,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
-                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
                                                             [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
                                                         </span>
@@ -1413,7 +1413,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
-                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.scenario || 'Multi-Step Problem Chain'}</Text></span>
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.scenario || 'Multi-Step Problem Chain'}</UniversalMathJax></span>
                                                         <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
                                                             [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
                                                         </span>
@@ -1446,7 +1446,7 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
-                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
                                                         <div className="flex items-center gap-2">
                                                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 uppercase tracking-wider">
                                                                 {evalRes.diagnosticTag}

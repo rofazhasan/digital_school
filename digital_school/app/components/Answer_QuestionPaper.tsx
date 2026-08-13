@@ -680,7 +680,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-4 space-y-2 border border-emerald-300 bg-emerald-50/50 p-3 rounded">
@@ -688,7 +688,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                               {parts.map((part: any, pIdx: number) => (
                                 <div key={pIdx} className="p-2 border border-emerald-200 bg-white rounded text-xs">
-                                  <span className="font-bold text-emerald-900">{part.label || part.text || `Part ${pIdx+1}`}: </span>
+                                  <span className="font-bold text-emerald-900"><UniversalMathJax inline>{part.label || part.prompt || part.text || `Part ${pIdx+1}`}</UniversalMathJax>: </span>
                                   <span className="font-mono font-bold text-emerald-700">{part.expectedAnswer ?? part.modelAnswer ?? 'N/A'}</span>
                                   {part.unit && <span className="ml-1 text-[10px] text-gray-500">({part.unit})</span>}
                                   {part.tolerance ? <span className="ml-1 text-[10px] text-gray-400">(±{part.tolerance})</span> : null}
@@ -710,7 +710,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.scenario || (isEn ? 'Multi-Step Problem Chain Solution' : 'বহু-ধাপী সমস্যা শৃঙ্খল সমাধান')}</Text></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.scenario || (isEn ? 'Multi-Step Problem Chain Solution' : 'বহু-ধাপী সমস্যা শৃঙ্খল সমাধান')}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-4 space-y-2 border border-indigo-300 bg-indigo-50/40 p-3 rounded">
@@ -719,8 +719,8 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               {stages.map((stage: any, sIdx: number) => (
                                 <div key={sIdx} className="p-2 border border-indigo-200 bg-white rounded text-xs flex justify-between items-center">
                                   <div>
-                                    <span className="font-bold text-indigo-900">Stage {sIdx+1}: {stage.stageTitle || stage.text || ''}</span>
-                                    {stage.formula && <span className="ml-2 font-mono text-[10px] text-indigo-600">(Formula: {stage.formula})</span>}
+                                    <span className="font-bold text-indigo-900">Stage {sIdx+1}: <UniversalMathJax inline>{stage.stageTitle || stage.prompt || stage.text || ''}</UniversalMathJax></span>
+                                    {stage.formula && <span className="ml-2 font-mono text-[10px] text-indigo-600">(Formula: <UniversalMathJax inline>{stage.formula}</UniversalMathJax>)</span>}
                                   </div>
                                   <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{stage.expectedAnswer ?? stage.modelAnswer ?? 'N/A'}</span>
                                 </div>
@@ -742,7 +742,7 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
+                            <span className="font-bold text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-4 space-y-2 border border-purple-300 bg-purple-50/50 p-3 rounded text-xs">
@@ -752,9 +752,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                             </div>
                             <div>
                               <span className="font-bold text-purple-900">Part B Correct Reason Justification:</span>
-                              <p className="mt-1 font-medium text-purple-950 bg-white p-2 border border-purple-200 rounded">
-                                ✓ {correctReason?.text || 'Correct reason key defined'}
-                              </p>
+                              <div className="mt-1 font-medium text-purple-950 bg-white p-2 border border-purple-200 rounded">
+                                ✓ <UniversalMathJax inline>{correctReason?.text || 'Correct reason key defined'}</UniversalMathJax>
+                              </div>
                             </div>
                           </div>
                           {q.explanation && (
