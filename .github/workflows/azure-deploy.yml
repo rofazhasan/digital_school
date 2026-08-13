@@ -35,4 +35,11 @@ jobs:
           file: digital_school/Dockerfile
           push: true
           tags: ${{ secrets.AZURE_CONTAINER_REGISTRY_LOGIN_SERVER }}/digital-school:latest
-          # Removed problematic GHA caching to ensure reliability in nested structure
+
+      - name: Deploy / Restart Azure Web App
+        uses: azure/webapps-deploy@v3
+        continue-on-error: true
+        with:
+          app-name: 'digital-school-app'
+          images: '${{ secrets.AZURE_CONTAINER_REGISTRY_LOGIN_SERVER }}/digital-school:latest'
+
