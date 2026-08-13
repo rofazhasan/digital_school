@@ -890,25 +890,40 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
         const getCMAMark = (q: any, userAnswer: any) => {
             if (!userAnswer) return 0;
             const evalRes = evaluateCMAQuestion(q, userAnswer);
-            if (evalRes.score > 0) return evalRes.score;
-            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
-            return 0;
+            const maxM = evalRes.maxScore || q.marks || 1;
+            if (evalRes.isCorrect) return evalRes.score;
+            if (negativeRate > 0) {
+                const unearned = maxM - evalRes.score;
+                const negPenalty = unearned * negativeRate;
+                return Math.round((evalRes.score - negPenalty) * 100) / 100;
+            }
+            return evalRes.score;
         };
 
         const getMPCMark = (q: any, userAnswer: any) => {
             if (!userAnswer) return 0;
             const evalRes = evaluateMPCQuestion(q, userAnswer);
-            if (evalRes.score > 0) return evalRes.score;
-            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
-            return 0;
+            const maxM = evalRes.maxScore || q.marks || 1;
+            if (evalRes.isCorrect) return evalRes.score;
+            if (negativeRate > 0) {
+                const unearned = maxM - evalRes.score;
+                const negPenalty = unearned * negativeRate;
+                return Math.round((evalRes.score - negPenalty) * 100) / 100;
+            }
+            return evalRes.score;
         };
 
         const getDRMark = (q: any, userAnswer: any) => {
             if (!userAnswer) return 0;
             const evalRes = evaluateDRQuestion(q, userAnswer);
-            if (evalRes.score > 0) return evalRes.score;
-            if (!evalRes.isCorrect && negativeRate > 0) return -((q.marks || 1) * negativeRate);
-            return 0;
+            const maxM = evalRes.maxScore || q.marks || 1;
+            if (evalRes.isCorrect) return evalRes.score;
+            if (negativeRate > 0) {
+                const unearned = maxM - evalRes.score;
+                const negPenalty = unearned * negativeRate;
+                return Math.round((evalRes.score - negPenalty) * 100) / 100;
+            }
+            return evalRes.score;
         };
 
         // Calculate total deducted marks for header display
@@ -1410,12 +1425,20 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         if (q.type === 'CMA') {
                                             const evalRes = evaluateCMAQuestion(q as any, ans || {});
                                             const partsMap = Object.entries(evalRes.partResults || {});
+                                            const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
+                                                ? Number(submission.answers[`${q.id}_marks`])
+                                                : getCMAMark(q, ans);
+                                            const maxM = evalRes.maxScore || q.marks || 1;
+                                            const isFull = earnedMark >= maxM * 0.99;
+                                            const isPartial = earnedMark > 0 && !isFull;
+                                            const isMinus = earnedMark < 0;
+
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
                                                         <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.text || ''}</UniversalMathJax></span>
-                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
-                                                            [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
+                                                            [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 mt-2">
@@ -1446,12 +1469,20 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                         if (q.type === 'MPC') {
                                             const evalRes = evaluateMPCQuestion(q as any, ans || {});
                                             const stagesMap = Object.entries(evalRes.stageResults || {});
+                                            const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
+                                                ? Number(submission.answers[`${q.id}_marks`])
+                                                : getMPCMark(q, ans);
+                                            const maxM = evalRes.maxScore || q.marks || 1;
+                                            const isFull = earnedMark >= maxM * 0.99;
+                                            const isPartial = earnedMark > 0 && !isFull;
+                                            const isMinus = earnedMark < 0;
+
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
                                                         <span className="font-bold text-slate-800 text-sm">{qNum}. <UniversalMathJax inline>{q.questionText || q.scenario || 'Multi-Step Problem Chain'}</UniversalMathJax></span>
-                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
-                                                            [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
+                                                            [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
                                                         </span>
                                                     </div>
                                                     <div className="space-y-2 mt-2">
@@ -1479,6 +1510,14 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
 
                                         if (q.type === 'DR') {
                                             const evalRes = evaluateDRQuestion(q as any, ans || {});
+                                            const earnedMark = submission?.answers?.[`${q.id}_marks`] !== undefined
+                                                ? Number(submission.answers[`${q.id}_marks`])
+                                                : getDRMark(q, ans);
+                                            const maxM = evalRes.maxScore || q.marks || 1;
+                                            const isFull = earnedMark >= maxM * 0.99;
+                                            const isPartial = earnedMark > 0 && !isFull;
+                                            const isMinus = earnedMark < 0;
+
                                             return (
                                                 <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
                                                     <div className="flex justify-between items-start mb-2 border-b pb-2">
@@ -1487,8 +1526,8 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 uppercase tracking-wider">
                                                                 {evalRes.diagnosticTag}
                                                             </span>
-                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
-                                                                [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${isFull ? 'bg-green-100 text-green-800' : (isPartial ? 'bg-amber-100 text-amber-800' : (isMinus ? 'bg-red-100 text-red-800' : 'bg-slate-100 text-slate-700'))}`}>
+                                                                [{earnedMark > 0 ? `+${earnedMark}` : earnedMark} / {maxM} Marks{isPartial ? ' • Partial Credit' : (isMinus ? ' • Minus Deducted' : '')}]
                                                             </span>
                                                         </div>
                                                     </div>

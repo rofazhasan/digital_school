@@ -449,26 +449,38 @@ export async function evaluateSubmission(submission: ExamSubmission, exam: Exam,
             } else if (type === 'CMA') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const cmaRes = evaluateCMAQuestion(question as any, studentAnswer as any);
-                questionScore = cmaRes.score;
-                if (!cmaRes.isCorrect && cmaRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                let qMark = cmaRes.score;
+                if (!cmaRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const maxM = cmaRes.maxScore || Number(question.marks) || 1;
+                    const unearned = maxM - cmaRes.score;
+                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
+                    qMark = Math.round((cmaRes.score - negPenalty) * 100) / 100;
                 }
+                questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: cmaRes.isCorrect, partResults: cmaRes.partResults };
             } else if (type === 'MPC') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const mpcRes = evaluateMPCQuestion(question as any, studentAnswer as any);
-                questionScore = mpcRes.score;
-                if (!mpcRes.isCorrect && mpcRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                let qMark = mpcRes.score;
+                if (!mpcRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const maxM = mpcRes.maxScore || Number(question.marks) || 1;
+                    const unearned = maxM - mpcRes.score;
+                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
+                    qMark = Math.round((mpcRes.score - negPenalty) * 100) / 100;
                 }
+                questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: mpcRes.isCorrect, stageResults: mpcRes.stageResults };
             } else if (type === 'DR') {
                 if (studentAnswer === undefined || studentAnswer === null) continue;
                 const drRes = evaluateDRQuestion(question as any, studentAnswer as any);
-                questionScore = drRes.score;
-                if (!drRes.isCorrect && drRes.score === 0 && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
-                    questionScore = -((Number(question.marks || 0) * exam.mcqNegativeMarking) / 100);
+                let qMark = drRes.score;
+                if (!drRes.isCorrect && exam.mcqNegativeMarking && exam.mcqNegativeMarking > 0) {
+                    const maxM = drRes.maxScore || Number(question.marks) || 1;
+                    const unearned = maxM - drRes.score;
+                    const negPenalty = (unearned * exam.mcqNegativeMarking) / 100;
+                    qMark = Math.round((drRes.score - negPenalty) * 100) / 100;
                 }
+                questionScore = qMark;
                 res = { score: questionScore, type, isCorrect: drRes.isCorrect, diagnosticTag: drRes.diagnosticTag };
             }
 
