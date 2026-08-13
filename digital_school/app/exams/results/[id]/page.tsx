@@ -65,6 +65,10 @@ import MarkedQuestionPaper from '@/app/components/MarkedQuestionPaper';
 import { toBengaliNumerals, toBengaliAlphabets } from '@/utils/numeralConverter';
 import { triggerHaptic, ImpactStyle } from "@/lib/haptics";
 import DrawingCanvas from "@/app/components/DrawingCanvas";
+import { CMARenderer, MPCRenderer, DRRenderer } from "@/components/ui/QuestionRenderers";
+import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
+import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
 
 // import QRCode from "react-qr-code"; // Unused
 
@@ -3044,6 +3048,63 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
                                             </table>
                                           </div>
                                         </div>
+                                      </div>
+                                    ) : type === 'CMA' ? (
+                                      <div className="p-4 bg-card rounded-xl border border-border space-y-3">
+                                        <CMARenderer
+                                          question={{
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            marks: question.marks || 1,
+                                            parts: (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []
+                                          }}
+                                          value={(question.studentAnswer as any) || {}}
+                                          showFeedback={true}
+                                          evalResult={evaluateCMAQuestion({
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            marks: question.marks || 1,
+                                            parts: (question as any).parts || (question as any).cmaParts || (question as any).subQuestions || []
+                                          } as any, (question.studentAnswer as any) || {})}
+                                        />
+                                      </div>
+                                    ) : type === 'MPC' ? (
+                                      <div className="p-4 bg-card rounded-xl border border-border space-y-3">
+                                        <MPCRenderer
+                                          question={{
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            scenario: (question as any).scenario,
+                                            stages: (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []
+                                          }}
+                                          value={(question.studentAnswer as any) || {}}
+                                          showFeedback={true}
+                                          evalResult={evaluateMPCQuestion({
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            scenario: (question as any).scenario,
+                                            stages: (question as any).stages || (question as any).mpcStages || (question as any).subQuestions || []
+                                          } as any, (question.studentAnswer as any) || {})}
+                                        />
+                                      </div>
+                                    ) : type === 'DR' ? (
+                                      <div className="p-4 bg-card rounded-xl border border-border space-y-3">
+                                        <DRRenderer
+                                          question={{
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            expectedAnswer: (question as any).expectedAnswer || (question as any).modelAnswer,
+                                            reasonOptions: (question as any).reasonOptions || (question as any).subQuestions || (question as any).options || []
+                                          }}
+                                          value={(question.studentAnswer as any) || {}}
+                                          showFeedback={true}
+                                          evalResult={evaluateDRQuestion({
+                                            id: question.id,
+                                            text: question.questionText || (question as any).text,
+                                            expectedAnswer: (question as any).expectedAnswer || (question as any).modelAnswer,
+                                            reasonOptions: (question as any).reasonOptions || (question as any).subQuestions || (question as any).options || []
+                                          } as any, (question.studentAnswer as any) || {})}
+                                        />
                                       </div>
                                     ) : null}
 

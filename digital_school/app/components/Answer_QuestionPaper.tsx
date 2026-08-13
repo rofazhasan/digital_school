@@ -100,6 +100,9 @@ interface AnswerQuestionPaperProps {
     sq: SQ[];
     descriptive: DESCRIPTIVE[];
     smcq?: any[];
+    cma?: any[];
+    mpc?: any[];
+    dr?: any[];
     allObjective?: any[];
   };
   qrData: any;
@@ -256,6 +259,9 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
     const sqs = questions.sq || [];
     const descriptives = questions.descriptive || [];
     const mtfs = questions.mtf || [];
+    const cmas = questions.cma || [];
+    const mpcs = questions.mpc || [];
+    const drs = questions.dr || [];
 
     const allObjective = questions.allObjective && questions.allObjective.length > 0
       ? questions.allObjective
@@ -265,7 +271,10 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
         ...(ints.map((q: INT) => ({ ...q, type: (q.type || 'INT').toUpperCase() }))),
         ...(ars.map((q: AR) => ({ ...q, type: (q.type || 'AR').toUpperCase() }))),
         ...(mtfs.map((q: MTF) => ({ ...q, type: (q.type || 'MTF').toUpperCase() }))),
-        ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' }))
+        ...(questions.smcq || []).map((q: any) => ({ ...q, type: 'SMCQ' })),
+        ...(cmas.map((q: any) => ({ ...q, type: 'CMA' }))),
+        ...(mpcs.map((q: any) => ({ ...q, type: 'MPC' }))),
+        ...(drs.map((q: any) => ({ ...q, type: 'DR' })))
       ];
 
     const objectiveTotal = allObjective.reduce((sum, q) => {
@@ -662,6 +671,97 @@ const AnswerQuestionPaper = forwardRef<HTMLDivElement, AnswerQuestionPaperProps>
                               );
                             })}
                           </div>
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'CMA') {
+                      const parts = q.parts || q.cmaParts || q.subQuestions || [];
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-4 space-y-2 border border-emerald-300 bg-emerald-50/50 p-3 rounded">
+                            <p className="font-bold text-xs text-emerald-800 uppercase tracking-wider">{isEn ? 'Constructed Answer Keys:' : 'সঠিক উত্তরসমূহ:'}</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {parts.map((part: any, pIdx: number) => (
+                                <div key={pIdx} className="p-2 border border-emerald-200 bg-white rounded text-xs">
+                                  <span className="font-bold text-emerald-900">{part.label || part.text || `Part ${pIdx+1}`}: </span>
+                                  <span className="font-mono font-bold text-emerald-700">{part.expectedAnswer ?? part.modelAnswer ?? 'N/A'}</span>
+                                  {part.unit && <span className="ml-1 text-[10px] text-gray-500">({part.unit})</span>}
+                                  {part.tolerance ? <span className="ml-1 text-[10px] text-gray-400">(±{part.tolerance})</span> : null}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 ml-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                              <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax inline dynamic>{cleanupMath(q.explanation)}</UniversalMathJax>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'MPC') {
+                      const stages = q.stages || q.mpcStages || q.subQuestions || [];
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.scenario || (isEn ? 'Multi-Step Problem Chain Solution' : 'বহু-ধাপী সমস্যা শৃঙ্খল সমাধান')}</Text></span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-4 space-y-2 border border-indigo-300 bg-indigo-50/40 p-3 rounded">
+                            <p className="font-bold text-xs text-indigo-800 uppercase tracking-wider">{isEn ? 'Sequential Stage Solutions & EPH Formulas:' : 'পর্যায়ক্রমিক ধাপ ও ইপএইচ ফর্মুলা:'}</p>
+                            <div className="space-y-2">
+                              {stages.map((stage: any, sIdx: number) => (
+                                <div key={sIdx} className="p-2 border border-indigo-200 bg-white rounded text-xs flex justify-between items-center">
+                                  <div>
+                                    <span className="font-bold text-indigo-900">Stage {sIdx+1}: {stage.stageTitle || stage.text || ''}</span>
+                                    {stage.formula && <span className="ml-2 font-mono text-[10px] text-indigo-600">(Formula: {stage.formula})</span>}
+                                  </div>
+                                  <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">{stage.expectedAnswer ?? stage.modelAnswer ?? 'N/A'}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 ml-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                              <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax inline dynamic>{cleanupMath(q.explanation)}</UniversalMathJax>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    if (q.type?.toUpperCase() === 'DR') {
+                      const reasonOpts = q.reasonOptions || q.subQuestions || q.options || [];
+                      const correctReason = reasonOpts.find((r: any) => r.isCorrect);
+                      return (
+                        <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
+                          <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
+                            <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
+                          </div>
+                          <div className="ml-4 space-y-2 border border-purple-300 bg-purple-50/50 p-3 rounded text-xs">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-purple-900">Part A Answer Key:</span>
+                              <span className="font-mono font-bold text-purple-700 bg-white border border-purple-300 px-2 py-0.5 rounded">{q.expectedAnswer ?? q.modelAnswer ?? 'N/A'}</span>
+                            </div>
+                            <div>
+                              <span className="font-bold text-purple-900">Part B Correct Reason Justification:</span>
+                              <p className="mt-1 font-medium text-purple-950 bg-white p-2 border border-purple-200 rounded">
+                                ✓ {correctReason?.text || 'Correct reason key defined'}
+                              </p>
+                            </div>
+                          </div>
+                          {q.explanation && (
+                            <div className="mt-2 ml-4 p-2 bg-blue-50 border border-blue-200 rounded text-xs">
+                              <span className="font-bold text-blue-700">ব্যাখ্যা:</span> <UniversalMathJax inline dynamic>{cleanupMath(q.explanation)}</UniversalMathJax>
+                            </div>
+                          )}
                         </div>
                       );
                     }

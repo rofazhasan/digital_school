@@ -39,6 +39,9 @@ import {
 } from 'lucide-react';
 import { cleanupMath, renderDynamicExplanation } from '@/lib/utils';
 import { toBengaliNumerals } from "@/utils/numeralConverter";
+import { evaluateCMAQuestion } from "@/lib/evaluation/cmaEvaluation";
+import { evaluateMPCQuestion } from "@/lib/evaluation/mpcEvaluation";
+import { evaluateDRQuestion } from "@/lib/evaluation/drEvaluation";
 
 // --- TYPES ---
 interface MCQ {
@@ -1364,6 +1367,114 @@ const MarkedQuestionPaper = forwardRef<HTMLDivElement, MarkedQuestionPaperProps>
                                                             </div>
                                                         </div>
                                                     )}
+                                                </div>
+                                            );
+                                        }
+
+                                        if (q.type === 'CMA') {
+                                            const evalRes = evaluateCMAQuestion(q as any, ans || {});
+                                            const partsMap = Object.entries(evalRes.partResults || {});
+                                            return (
+                                                <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
+                                                    <div className="flex justify-between items-start mb-2 border-b pb-2">
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
+                                                            [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2 mt-2">
+                                                        <p className="font-bold text-xs text-cyan-800 uppercase tracking-wider">Constructed Multi-Answer Evaluation:</p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                            {partsMap.map(([pKey, pRes]: [string, any], pIdx: number) => (
+                                                                <div key={pIdx} className={`p-2 border rounded text-xs flex flex-col gap-1 ${pRes.isCorrect ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                                                                    <div className="flex justify-between items-center font-bold">
+                                                                        <span>Part {pIdx + 1} ({pKey}):</span>
+                                                                        <span>{pRes.isCorrect ? '✓ Correct' : '✗ Incorrect'} ({pRes.earned}/{pRes.max}m)</span>
+                                                                    </div>
+                                                                    <div className="text-[11px]">
+                                                                        <span className="text-slate-600">Student: </span>
+                                                                        <span className="font-mono font-bold">{pRes.studentVal !== undefined && pRes.studentVal !== '' ? String(pRes.studentVal) : 'Unanswered'}</span>
+                                                                    </div>
+                                                                    <div className="text-[11px] text-slate-500">
+                                                                        <span>Key: </span>
+                                                                        <span className="font-mono font-bold text-slate-700">{String(pRes.expectedVal)}</span>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (q.type === 'MPC') {
+                                            const evalRes = evaluateMPCQuestion(q as any, ans || {});
+                                            const stagesMap = Object.entries(evalRes.stageResults || {});
+                                            return (
+                                                <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
+                                                    <div className="flex justify-between items-start mb-2 border-b pb-2">
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.scenario || 'Multi-Step Problem Chain'}</Text></span>
+                                                        <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
+                                                            [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-2 mt-2">
+                                                        <p className="font-bold text-xs text-indigo-800 uppercase tracking-wider">Sequential Stage & Error Propagation (EPH) Analysis:</p>
+                                                        <div className="space-y-2">
+                                                            {stagesMap.map(([sKey, sRes]: [string, any], sIdx: number) => (
+                                                                <div key={sIdx} className={`p-2.5 border rounded text-xs space-y-1 ${sRes.isCorrectDirectly ? 'bg-green-50 border-green-300' : (sRes.isCorrectWithPropagatedError ? 'bg-amber-50 border-amber-300' : 'bg-red-50 border-red-300')}`}>
+                                                                    <div className="flex justify-between items-center font-bold">
+                                                                        <span>Stage {sIdx + 1} ({sKey})</span>
+                                                                        <span>
+                                                                            {sRes.isCorrectDirectly ? '✓ Exact Match' : (sRes.isCorrectWithPropagatedError ? '⚡ EPH Method Credit' : '✗ Incorrect')} ({sRes.earned}/{sRes.max}m)
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="flex flex-wrap items-center gap-4 text-[11px]">
+                                                                        <div><span className="text-slate-600">Student: </span><span className="font-mono font-bold">{sRes.studentVal ?? 'Unanswered'}</span></div>
+                                                                        <div><span className="text-slate-600">Expected: </span><span className="font-mono font-bold">{sRes.expectedVal}</span></div>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+
+                                        if (q.type === 'DR') {
+                                            const evalRes = evaluateDRQuestion(q as any, ans || {});
+                                            return (
+                                                <div key={q.id || idx} className="mb-6 p-4 border border-slate-200 rounded-lg bg-white shadow-sm break-inside-avoid text-xs text-left">
+                                                    <div className="flex justify-between items-start mb-2 border-b pb-2">
+                                                        <span className="font-bold text-slate-800 text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-900 border border-purple-300 uppercase tracking-wider">
+                                                                {evalRes.diagnosticTag}
+                                                            </span>
+                                                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${evalRes.isCorrect ? 'bg-green-100 text-green-800' : (evalRes.score > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800')}`}>
+                                                                [{evalRes.score} / {evalRes.maxScore || q.marks || 1} Marks]
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2 mt-2">
+                                                        <div className="p-2.5 bg-purple-50/50 border border-purple-200 rounded space-y-1.5 text-xs">
+                                                            <div className="flex items-center justify-between">
+                                                                <span><strong>Part A Answer:</strong> Student [<span className="font-mono font-bold">{ans?.answer ?? 'None'}</span>] vs Key [<span className="font-mono font-bold">{q.expectedAnswer ?? q.modelAnswer ?? '—'}</span>]</span>
+                                                                <span className={evalRes.answerCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>{evalRes.answerCorrect ? '✓ Correct' : '✗ Incorrect'}</span>
+                                                            </div>
+                                                            <div className="flex items-start justify-between border-t border-purple-200 pt-1.5">
+                                                                <div className="flex-1 pr-2">
+                                                                    <strong>Part B Reason:</strong> Selected Reason [{ans?.reasonId ?? 'None'}]
+                                                                </div>
+                                                                <span className={evalRes.reasonCorrect ? 'text-green-700 font-bold' : 'text-red-700 font-bold'}>{evalRes.reasonCorrect ? '✓ Correct Justification' : '✗ Misconception / Wrong Reason'}</span>
+                                                            </div>
+                                                            {evalRes.confidence && (
+                                                                <div className="border-t border-purple-200 pt-1.5 text-[11px] text-purple-900">
+                                                                    <strong>Part C Confidence:</strong> Student selected [<span className="font-bold">{evalRes.confidence}</span>]
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             );
                                         }

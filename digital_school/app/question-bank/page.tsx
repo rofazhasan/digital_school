@@ -5444,6 +5444,54 @@ const AIGenerator: React.FC<AIGeneratorProps> = ({ onQuestionSaved, classes, que
                         </div>
                       </div>
                     )}
+
+                    {/* CMA Sub-parts preview */}
+                    {q.type === 'CMA' && (
+                      <div className="mt-3 space-y-2 p-3 bg-cyan-50/50 dark:bg-cyan-950/20 border border-cyan-200 dark:border-cyan-800 rounded-lg text-xs">
+                        <p className="font-semibold text-cyan-900 dark:text-cyan-300">Constructed Answer Parts (CMA):</p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(((q as any).parts || (q as any).cmaParts || q.subQuestions) || []).map((part: any, pIdx: number) => (
+                            <div key={pIdx} className="p-2 border rounded bg-background flex flex-col gap-0.5">
+                              <span className="font-bold text-foreground">{part.label || part.text || `Part ${pIdx + 1}`}</span>
+                              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">
+                                Key: {part.expectedAnswer ?? part.modelAnswer ?? '—'} {part.unit ? `(${part.unit})` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* MPC Stages preview */}
+                    {q.type === 'MPC' && (
+                      <div className="mt-3 space-y-2 p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs">
+                        <p className="font-semibold text-indigo-900 dark:text-indigo-300">Problem Chain Stages (MPC):</p>
+                        <div className="space-y-1.5">
+                          {(((q as any).stages || (q as any).mpcStages || q.subQuestions) || []).map((stage: any, sIdx: number) => (
+                            <div key={sIdx} className="p-2 border rounded bg-background flex justify-between items-center">
+                              <span className="font-bold text-foreground">Stage {sIdx + 1}: {stage.stageTitle || stage.text}</span>
+                              <span className="font-mono text-indigo-600 dark:text-indigo-400 font-bold">{stage.expectedAnswer ?? stage.modelAnswer ?? '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* DR Reasoning preview */}
+                    {q.type === 'DR' && (
+                      <div className="mt-3 space-y-2 p-3 bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg text-xs">
+                        <p className="font-semibold text-purple-900 dark:text-purple-300">Diagnostic Reasoning (DR):</p>
+                        <div className="space-y-1 bg-background p-2 border rounded">
+                          <div><span className="font-bold">Part A Key:</span> <span className="font-mono text-purple-600 dark:text-purple-400 font-bold">{(q as any).expectedAnswer || q.modelAnswer || '—'}</span></div>
+                          <div className="font-bold text-muted-foreground mt-1">Part B Justification Options:</div>
+                          {(((q as any).reasonOptions || q.subQuestions || q.options) || []).map((opt: any, rIdx: number) => (
+                            <div key={rIdx} className={`p-1 rounded text-[11px] ${opt.isCorrect ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-900 dark:text-emerald-200 font-bold' : ''}`}>
+                              {String.fromCharCode(65 + rIdx)}. {opt.text || opt.question || ''} {opt.isCorrect ? '✓' : ''}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex gap-2 mt-3 pt-2 border-t border-gray-200 dark:border-gray-700">
                     <Button size="sm" variant="outline" onClick={() => setEditingQuestion(q)}><Edit className="h-3 w-3 mr-1" /> Edit & Refine</Button>

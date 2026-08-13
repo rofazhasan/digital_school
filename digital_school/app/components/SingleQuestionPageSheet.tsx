@@ -672,6 +672,109 @@ export default function SingleQuestionPageSheet({
                           </div>
                         )}
 
+                        {/* CMA Constructed Multi-Answer Fields */}
+                        {qTypeKey === 'CMA' && (
+                          <div className="space-y-2 mt-3 p-3 bg-cyan-50/50 border border-cyan-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
+                            <span className="font-bold text-cyan-900 block mb-1">
+                              {isBn ? 'কনস্ট্রাক্টেড উত্তর ক্ষেত্রসমূহ (CMA):' : 'Constructed Answer Fields (CMA):'}
+                            </span>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              {(rawQuestion.parts || rawQuestion.cmaParts || rawQuestion.subQuestions || []).map((part: any, pIdx: number) => (
+                                <div key={pIdx} className="p-2 border rounded bg-white flex flex-col gap-1 text-xs">
+                                  <div className="flex justify-between items-center font-semibold text-gray-800">
+                                    <span>{part.label || part.text || `Part ${pIdx + 1}`}</span>
+                                    {part.marks && <span className="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded">[{part.marks}m]</span>}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className="font-mono text-xs bg-gray-50 border px-2 py-1 rounded min-w-[80px] font-bold text-slate-800">
+                                      {showAnswers ? (part.expectedAnswer ?? part.modelAnswer ?? '—') : '________'}
+                                    </span>
+                                    {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* MPC Multi-Step Problem Chain Stages */}
+                        {qTypeKey === 'MPC' && (
+                          <div className="space-y-2 mt-3 p-3 bg-indigo-50/50 border border-indigo-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
+                            <span className="font-bold text-indigo-900 block mb-1">
+                              {isBn ? 'বহু-ধাপী সমস্যা শৃঙ্খল ধাপসমূহ (MPC):' : 'Multi-Step Problem Chain Stages (MPC):'}
+                            </span>
+                            {rawQuestion.scenario && (
+                              <div className="p-2 bg-white border border-indigo-200 rounded italic text-xs mb-2">
+                                <MathText>{rawQuestion.scenario}</MathText>
+                              </div>
+                            )}
+                            <div className="space-y-2">
+                              {(rawQuestion.stages || rawQuestion.mpcStages || rawQuestion.subQuestions || []).map((stage: any, sIdx: number) => (
+                                <div key={sIdx} className="p-2.5 border rounded bg-white flex flex-col gap-1 text-xs">
+                                  <div className="flex justify-between items-center font-bold text-indigo-950">
+                                    <span>Stage {sIdx + 1}: {stage.stageTitle || stage.text || ''}</span>
+                                    {stage.marks && <span className="text-[10px] bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">[{stage.marks}m]</span>}
+                                  </div>
+                                  {stage.formula && (
+                                    <span className="text-[10px] text-indigo-600 font-mono">
+                                      EPH Dynamic Formula: {stage.formula}
+                                    </span>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-gray-500 font-medium text-[11px]">{isBn ? 'ধাপ উত্তর: ' : 'Stage Answer: '}</span>
+                                    <span className="font-mono text-xs bg-indigo-50 border border-indigo-300 px-2 py-0.5 rounded font-bold text-indigo-900">
+                                      {showAnswers ? (stage.expectedAnswer ?? stage.modelAnswer ?? '—') : 'Answer Space...'}
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* DR Diagnostic Reasoning Block */}
+                        {qTypeKey === 'DR' && (
+                          <div className="space-y-2 mt-3 p-3 bg-purple-50/50 border border-purple-200 rounded-lg text-xs print:bg-transparent print:border-gray-400">
+                            <span className="font-bold text-purple-900 block mb-1">
+                              {isBn ? 'ডায়াগনস্টিক রিজনিং (DR):' : 'Diagnostic Reasoning (DR):'}
+                            </span>
+                            <div className="p-2 bg-white border border-purple-200 rounded space-y-2 text-xs">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-purple-900">Part A Answer Key:</span>
+                                <span className="font-mono font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded">
+                                  {showAnswers ? (rawQuestion.expectedAnswer || rawQuestion.modelAnswer || '—') : '___________'}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="font-bold text-purple-900 block mb-1">Part B Conceptual Justification Options:</span>
+                                <div className="space-y-1 pl-1">
+                                  {(rawQuestion.reasonOptions || rawQuestion.subQuestions || rawQuestion.options || []).map((opt: any, rIdx: number) => {
+                                    const isReasonCorrect = opt.isCorrect;
+                                    return (
+                                      <div
+                                        key={rIdx}
+                                        className={`p-1.5 rounded border flex items-center gap-2 text-xs ${
+                                          showAnswers && isReasonCorrect
+                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-bold'
+                                            : 'border-gray-200 bg-gray-50/50'
+                                        }`}
+                                      >
+                                        <span className="w-4 h-4 rounded-full bg-purple-200 text-purple-900 flex items-center justify-center font-bold text-[10px] shrink-0">
+                                          {String.fromCharCode(65 + rIdx)}
+                                        </span>
+                                        <span className="flex-1"><MathText>{opt.text || opt.question || ''}</MathText></span>
+                                        {showAnswers && isReasonCorrect && (
+                                          <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded shrink-0">✓ Correct Reason</span>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Question Images */}
                         {question.images && question.images.length > 0 && (
                           <div className="flex flex-wrap gap-2 justify-center my-2">

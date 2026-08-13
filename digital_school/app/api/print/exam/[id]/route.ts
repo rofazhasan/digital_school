@@ -294,9 +294,28 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       subQuestions: Array.isArray(q.subQuestions) ? q.subQuestions : [],
     }));
 
+    const cma = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'CMA').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+      parts: Array.isArray(q.parts) ? q.parts : (Array.isArray(q.cmaParts) ? q.cmaParts : (Array.isArray(q.subQuestions) ? q.subQuestions : [])),
+    }));
+
+    const mpc = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'MPC').map((q: any) => ({
+      ...q,
+      q: q.questionText || q.scenario,
+      scenario: q.scenario || q.questionText,
+      stages: Array.isArray(q.stages) ? q.stages : (Array.isArray(q.mpcStages) ? q.mpcStages : (Array.isArray(q.subQuestions) ? q.subQuestions : [])),
+    }));
+
+    const dr = questionsArr.filter((q: any) => (q.type || "").toUpperCase() === 'DR').map((q: any) => ({
+      ...q,
+      q: q.questionText,
+      reasonOptions: Array.isArray(q.reasonOptions) ? q.reasonOptions : (Array.isArray(q.subQuestions) ? q.subQuestions.map((s: any) => ({ text: s.question || s.text || s.label, isCorrect: Boolean(s.isCorrect) })) : (Array.isArray(q.options) ? q.options : [])),
+    }));
+
     // Create an ordered list of all objective questions to preserve original sequence
     const orderedObjective = questionsArr
-      .filter((q: any) => ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'SMCQ'].includes((q.type || "").toUpperCase()))
+      .filter((q: any) => ['MCQ', 'MC', 'INT', 'NUMERIC', 'AR', 'MTF', 'SMCQ', 'CMA', 'MPC', 'DR'].includes((q.type || "").toUpperCase()))
       .map((q: any) => {
         const type = (q.type || "").toUpperCase();
         if (type === 'MCQ') {
@@ -317,6 +336,15 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         if (type === 'SMCQ') {
           return smcq.find((m: any) => m.id === q.id) || q;
         }
+        if (type === 'CMA') {
+          return cma.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'MPC') {
+          return mpc.find((m: any) => m.id === q.id) || q;
+        }
+        if (type === 'DR') {
+          return dr.find((m: any) => m.id === q.id) || q;
+        }
         return q;
       });
 
@@ -332,6 +360,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
       sq,
       descriptive,
       smcq,
+      cma,
+      mpc,
+      dr,
       orderedObjective,
       qrData: { examId, setId: set.id, classId: exam.classId },
       barcode: `${examId}|${set.id}|${exam.classId}`,
@@ -346,6 +377,9 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
     set.sq?.length ||
     set.descriptive?.length ||
     set.smcq?.length ||
+    set.cma?.length ||
+    set.mpc?.length ||
+    set.dr?.length ||
     set.orderedObjective?.length
   );
 

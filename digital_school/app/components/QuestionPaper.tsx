@@ -91,6 +91,9 @@ interface QuestionPaperProps {
     sq: SQ[];
     descriptive: DESCRIPTIVE[];
     smcq?: any[];
+    cma?: any[];
+    mpc?: any[];
+    dr?: any[];
     allObjective?: any[];
   };
   qrData: any;
@@ -530,16 +533,17 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     }
 
                     if (q.type?.toUpperCase() === 'CMA') {
+                      const parts = q.parts || q.cmaParts || q.subQuestions || [];
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="grid grid-cols-2 gap-3 border border-black/30 p-3 rounded ml-4 bg-gray-50/50">
-                            {(q.parts || q.cmaParts || []).map((part: any, pIdx: number) => (
+                            {parts.map((part: any, pIdx: number) => (
                               <div key={pIdx} className="flex items-center gap-2 border-b border-dashed border-gray-300 pb-1">
-                                <span className="font-semibold text-xs">{part.label || `Part ${pIdx+1}`}:</span>
+                                <span className="font-semibold text-xs">{part.label || part.text || `Part ${pIdx+1}`}:</span>
                                 <span className="inline-block min-w-[120px] border border-black/40 bg-white h-6 rounded px-2 text-xs"></span>
                                 {part.unit && <span className="text-[10px] text-gray-500">({part.unit})</span>}
                               </div>
@@ -550,23 +554,24 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     }
 
                     if (q.type?.toUpperCase() === 'MPC') {
+                      const stages = q.stages || q.mpcStages || q.subQuestions || [];
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. {isEn ? 'Multi-Step Problem Chain' : 'বহু-ধাপী সমস্যা শৃঙ্খল'}</span>
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || (isEn ? 'Multi-Step Problem Chain' : 'বহু-ধাপী সমস্যা শৃঙ্খল')}</Text></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
-                          {q.scenario && (
-                            <div className="p-2 border-l-2 border-black bg-gray-50 italic text-xs mb-3">
+                          {q.scenario && q.scenario !== q.questionText && (
+                            <div className="p-2 border-l-2 border-black bg-gray-50 italic text-xs mb-3 ml-4">
                               <Text>{q.scenario}</Text>
                             </div>
                           )}
                           <div className="space-y-3 ml-4">
-                            {(q.stages || q.mpcStages || []).map((stage: any, sIdx: number) => (
+                            {stages.map((stage: any, sIdx: number) => (
                               <div key={sIdx} className="p-2 border border-black/30 rounded text-xs flex items-center justify-between">
                                 <div>
                                   <span className="font-bold text-indigo-700 mr-2">Stage {sIdx+1}:</span>
-                                  <span>{stage.stageTitle}</span>
+                                  <span>{stage.stageTitle || stage.text || stage.question || ''}</span>
                                 </div>
                                 <div className="border border-black/40 bg-white min-w-[140px] h-6 rounded px-2 flex items-center text-[10px] text-gray-400">
                                   {isEn ? 'Answer space...' : 'উত্তর লিখুন...'}
@@ -579,10 +584,11 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                     }
 
                     if (q.type?.toUpperCase() === 'DR') {
+                      const reasonOpts = q.reasonOptions || q.subQuestions || q.options || [];
                       return (
                         <div key={idx} className="mb-6 text-left question-block break-inside-avoid">
                           <div className="flex justify-between items-end mb-2 border-b border-black/10 pb-0.5">
-                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text}</Text></span>
+                            <span className="font-bold text-sm">{qNum}. <Text>{q.questionText || q.text || ''}</Text></span>
                             <span className="ml-4 font-bold text-xs">[{isEn ? (q.marks || 1) : toBengaliNumerals(q.marks || 1)}]</span>
                           </div>
                           <div className="ml-4 space-y-2 text-xs">
@@ -593,10 +599,10 @@ const QuestionPaper = forwardRef<HTMLDivElement, QuestionPaperProps>(
                             <div>
                               <span className="font-bold text-indigo-800">Part B Conceptual Justification:</span>
                               <div className="space-y-1 mt-1 pl-2">
-                                {(q.reasonOptions || []).map((opt: any, rIdx: number) => (
+                                {reasonOpts.map((opt: any, rIdx: number) => (
                                   <div key={rIdx} className="flex items-center gap-2">
                                     <span className="w-4 h-4 border border-black rounded-full inline-block text-center text-[9px] leading-3">{String.fromCharCode(65 + rIdx)}</span>
-                                    <span>{opt.text}</span>
+                                    <span><Text>{opt.text || opt.question || ''}</Text></span>
                                   </div>
                                 ))}
                               </div>
