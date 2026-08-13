@@ -73,7 +73,7 @@ const MobileNavigator = memo(({
           id={q.id}
           idx={idx}
           isCurrent={idx === currentIndex}
-          isAnswered={!!answers[q.id]}
+          isAnswered={!!answers[q.id] && (typeof answers[q.id] !== 'object' || Object.keys(answers[q.id]).length > 0)}
           isMarked={!!marked[q.id]}
           onNavigate={onNavigate}
         />

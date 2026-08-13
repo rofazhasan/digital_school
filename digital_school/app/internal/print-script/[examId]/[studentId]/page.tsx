@@ -170,6 +170,18 @@ export default function InternalStudentScriptPrintPage({ params, searchParams }:
         sq: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'SQ').map((q: any) => ({
             ...q,
             questionText: q.text
+        })),
+        cma: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'CMA').map((q: any) => ({
+            ...q,
+            questionText: q.text
+        })),
+        mpc: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'MPC').map((q: any) => ({
+            ...q,
+            questionText: q.text
+        })),
+        dr: examData.questions.filter((q: any) => (q.type || "").toUpperCase() === 'DR').map((q: any) => ({
+            ...q,
+            questionText: q.text
         }))
     };
 

@@ -1322,16 +1322,35 @@ export default function ExamResultPage({ params }: { params: Promise<{ id: strin
         questionText: q.questionText,
         marks: q.marks,
         subQuestions: q.subQuestions || []
+      })),
+      cma: result.questions.filter(q => q.type?.toUpperCase() === 'CMA').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks,
+        parts: (q as any).parts || (q as any).cmaParts || []
+      })),
+      mpc: result.questions.filter(q => q.type?.toUpperCase() === 'MPC').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        scenario: (q as any).scenario || q.questionText,
+        marks: q.marks,
+        stages: (q as any).stages || (q as any).mpcStages || []
+      })),
+      dr: result.questions.filter(q => q.type?.toUpperCase() === 'DR').map(q => ({
+        id: q.id,
+        questionText: q.questionText,
+        marks: q.marks,
+        expectedAnswer: (q as any).expectedAnswer || (q as any).correctAnswer,
+        reasonOptions: (q as any).reasonOptions || []
       }))
     };
 
     const answers: Record<string, any> = {};
     result.questions.forEach(q => {
-      if (q.studentAnswer) {
+      if (q.studentAnswer !== undefined && q.studentAnswer !== null) {
         answers[q.id] = q.studentAnswer;
       }
-      const type = q.type?.toUpperCase();
-      if (type === 'CQ' || type === 'SQ' || type === 'DESCRIPTIVE' || type === 'SMCQ') {
+      if (q.awardedMarks !== undefined && q.awardedMarks !== null) {
         answers[`${q.id}_marks`] = q.awardedMarks;
       }
     });

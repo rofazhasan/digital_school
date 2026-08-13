@@ -35,10 +35,14 @@ const NavButton = memo(({
   const isCurrent = currentIdx === globalIdx;
 
   const isAnswered = useMemo(() => {
-    if (answers[questionId]) return true;
+    const val = answers[questionId];
+    if (val !== undefined && val !== null && val !== '') {
+      if (typeof val === 'object') return Object.keys(val).length > 0;
+      return true;
+    }
     const t = (type || "").toLowerCase();
-    if (['smcq', 'cq', 'sq', 'descriptive'].includes(t)) {
-      return Object.keys(answers).some(key => key.startsWith(`${questionId}_sub_`) || key.startsWith(`${questionId}_desc_`));
+    if (['smcq', 'cq', 'sq', 'descriptive', 'cma', 'mpc', 'dr'].includes(t)) {
+      return Object.keys(answers).some(key => key.startsWith(`${questionId}_`));
     }
     return false;
   }, [answers, questionId, type]);
