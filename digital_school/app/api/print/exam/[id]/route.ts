@@ -29,6 +29,7 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
         include: {
           questions: {
             select: {
+              id: true,
               subject: true,
               type: true,
               questionText: true,
@@ -36,6 +37,12 @@ export async function GET(request: NextRequest, props: { params: Promise<{ id: s
               options: true,
               subQuestions: true,
               modelAnswer: true,
+              parts: true,
+              cmaParts: true,
+              stages: true,
+              mpcStages: true,
+              scenario: true,
+              reasonOptions: true,
             }
           },
         },
