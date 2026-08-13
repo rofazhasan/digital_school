@@ -31,14 +31,15 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: 1
 
-      # Option 1: Azure Login using Service Principal Credentials (if AZURE_CREDENTIALS secret is set)
-      - name: Azure Login
-        uses: azure/login@v2
-        if: "${{ secrets.AZURE_CREDENTIALS != '' }}"
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+      - name: Check Secret Availability
+        run: |
+          if [ -z "${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}" ]; then
+            echo "::error::AZURE_WEBAPP_PUBLISH_PROFILE secret is EMPTY or NOT FOUND in Repository Secrets!"
+            exit 1
+          else
+            echo "AZURE_WEBAPP_PUBLISH_PROFILE secret is present and available."
+          fi
 
-      # Option 2: Deploy to Azure Web App (supports both publish-profile or active Azure Login session)
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
