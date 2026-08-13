@@ -39,16 +39,19 @@ export async function GET(req: any) {
         ];
 
         const objectiveGuide = [
-            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ, comma-separated letters for MC like 'A, C'). Explanation is optional."],
+            ["MCQ / MC", "Fill 'Question Text', 'Option A-E', and 'Correct Option' (Single letter for MCQ e.g., 'A', comma-separated letters for MC like 'A, C'). Explanation is optional."],
             ["INT (Integer)", "Fill 'Question Text' and 'Model Answer' (or 'Correct Answer') with the numeric value (e.g., 5 or 42). Use 'Teacher Note / Explanation' ONLY for solution steps."],
             ["SQ (Short Question)", "Fill 'Question Text' and 'Model Answer' with the expected answer text. Use 'Teacher Note / Explanation' ONLY for optional teacher notes."],
-            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-4 or 1-5). Explanation is optional teacher rationale."],
+            ["AR (Assertion-Reason)", "Fill 'Assertion', 'Reason', and 'Correct Option' (1-5). Explanation is optional teacher rationale."],
             ["MTF (Match Following)", "Fill 'Left 1-5', 'Right A-E', and 'Matches' (e.g., '1-A, 2-B'). Explanation is optional."],
             ["CQ (Creative)", "Fill 'Question Text' (stem/passage). Use 'Sub X Text', 'Sub X Marks', 'Sub X Model Answer' (for part answer), and 'Sub X Explanation' (for part rationale)."],
             ["SMCQ (Scenario MCQ)", "Fill 'Question Text' (stem). Use 'Sub X Text', 'Sub X Marks', 'Sub X Option A-D', and 'Sub X Correct Option' for parts."],
-            ["CMA (Constructed Multi-Answer)", "Fill 'Question Text'. Use 'Sub X Text' for part labels, 'Sub X Marks', and 'Sub X Model Answer' for constructed answers."],
-            ["MPC (Problem Chain)", "Fill 'Question Text' (scenario stem). Use 'Sub X Text' for stage titles, 'Sub X Marks', and 'Sub X Model Answer' for step answers."],
-            ["DR (Diagnostic Reasoning)", "Fill 'Question Text' and 'Model Answer' for Part A. Use 'Sub X Text' for Part B Reason options, and 'Sub X Correct' (A, B, C, D) for key reason."],
+            ["", ""],
+            ["ADVANCED OBJECTIVE TYPES INSTRUCTION GUIDE (AI & HUMAN COMPATIBLE)", "CRITICAL SPECIFICATIONS FOR CMA, MPC, AND DR"],
+            ["CMA (Constructed Multi-Answer)", "1. Set Type = 'CMA'. 2. Fill 'Question Text' (problem description). 3. For each sub-part (Sub 1, Sub 2, etc.): Fill 'Sub X Text' (field label/prompt e.g., 'Velocity (m/s)'), 'Sub X Marks' (part marks), and 'Sub X Model Answer' (exact key e.g., '20' or '2*v0*sin(theta)/g'). 4. Optional: 'Sub X Type' (integer, decimal, expression, fraction, text; default is decimal), 'Sub X Tolerance' (e.g., 0.05), 'Sub X Unit' (e.g., 'm/s')."],
+            ["MPC (Multi-Step Problem Chain)", "1. Set Type = 'MPC'. 2. Fill 'Question Text' (scenario stem). 3. For each stage (Sub 1, Sub 2, etc.): Fill 'Sub X Text' (stage title e.g., 'Stage 1: Calculate acceleration'), 'Sub X Marks', and 'Sub X Model Answer' (stage key e.g., '10'). 4. Optional Error Propagation (EPH): 'Sub X Depends On' (e.g., 's1' or '1') and 'Sub X Formula' (dynamic target formula e.g., '0.5 * 1200 * (prev * 8)^2'). If Stage 1 is wrong, Stage 2 evaluates methodology dynamically via this formula so students aren't double-penalized!"],
+            ["DR (Diagnostic Reasoning)", "1. Set Type = 'DR'. 2. Fill 'Question Text' (Part A question stem) and 'Model Answer' (Part A key value). 3. For Part B Reason choices: Fill 'Sub 1 Text', 'Sub 2 Text', 'Sub 3 Text', etc. with justification statements. 4. Specify the correct justification reason via 'Sub X Correct' = 'TRUE' (or set 'Correct Option' = 'A', 'B', 'C', or '1', '2', '3'). The system auto-maps student responses to 7 Cognitive Diagnostic Tags (MASTERY, MISCONCEPTION, EXECUTION_SLIP, etc.)."],
+            ["AI QUESTION GENERATION NOTE", "When generating questions via AI or scripts: Always output Type as 'CMA', 'MPC', or 'DR'. For CMA & MPC, populate 'subQuestions' array with { label/stageTitle, marks, modelAnswer, type, tolerance, unit, dependsOnStageId, formula }. For DR, populate Part A 'modelAnswer' and 'reasonOptions' array with { id, text, isCorrect }."],
         ];
 
         const descriptiveGuide = [

@@ -40,7 +40,7 @@ async function validateAndMapRow(row: any, classes: any[]) {
     };
 
     try {
-        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE'].includes(typeRaw)) {
+        if (!['MCQ', 'MC', 'INT', 'AR', 'MTF', 'CQ', 'SQ', 'SMCQ', 'DESCRIPTIVE', 'CMA', 'MPC', 'DR'].includes(typeRaw)) {
             const isEmpty = Object.values(row).every(v => !v);
             if (isEmpty) throw new Error("Empty Row");
             throw new Error(`Invalid Question Type: ${typeRaw || 'Missing'}`);
@@ -206,6 +206,94 @@ async function validateAndMapRow(row: any, classes: any[]) {
             }
 
             if (data.subQuestions.length === 0) throw new Error("SMCQ requires at least one Sub-Question");
+        } else if (data.type === 'CMA') {
+            data.subQuestions = [];
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const label = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `SQ${i}`, `SQ ${i} Text`, `${prefix} Label`]));
+                if (!label) continue;
+                const m = n(getValue(row, [`${prefix} Marks`, `Sub-Question ${i} Marks`, `SQ${i} Marks`])) || 1;
+                const a = s(getValue(row, [`${prefix} Model Answer`, `Sub-Question ${i} Model Answer`, `SQ${i} Answer`]));
+                const e = s(getValue(row, [`${prefix} Explanation`, `Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
+                const pType = s(getValue(row, [`${prefix} Type`, `Sub-Question ${i} Type`])) || 'decimal';
+                const tol = n(getValue(row, [`${prefix} Tolerance`, `Sub-Question ${i} Tolerance`])) || 0.01;
+                const unit = s(getValue(row, [`${prefix} Unit`, `Sub-Question ${i} Unit`]));
+
+                data.subQuestions.push({
+                    id: `p${i}`,
+                    label,
+                    text: label,
+                    question: label,
+                    marks: m,
+                    modelAnswer: a,
+                    expectedAnswer: a,
+                    type: pType,
+                    tolerance: tol,
+                    unit,
+                    explanation: e
+                });
+            }
+            if (data.subQuestions.length === 0) throw new Error("CMA requires at least one Sub-Question part (Sub 1 Text & Sub 1 Model Answer)");
+        } else if (data.type === 'MPC') {
+            data.subQuestions = [];
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const title = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `SQ${i}`, `SQ ${i} Text`, `${prefix} Title`]));
+                if (!title) continue;
+                const m = n(getValue(row, [`${prefix} Marks`, `Sub-Question ${i} Marks`, `SQ${i} Marks`])) || 1;
+                const a = s(getValue(row, [`${prefix} Model Answer`, `Sub-Question ${i} Model Answer`, `SQ${i} Answer`]));
+                const e = s(getValue(row, [`${prefix} Explanation`, `Sub-Question ${i} Explanation`, `SQ${i} Explanation`]));
+                const tol = n(getValue(row, [`${prefix} Tolerance`, `Sub-Question ${i} Tolerance`])) || 0.01;
+                const dependsOn = s(getValue(row, [`${prefix} Depends On`, `Sub-Question ${i} Depends On`]));
+                const formula = s(getValue(row, [`${prefix} Formula`, `Sub-Question ${i} Formula`]));
+
+                data.subQuestions.push({
+                    id: `s${i}`,
+                    stageTitle: title,
+                    text: title,
+                    question: title,
+                    marks: m,
+                    modelAnswer: a,
+                    expectedAnswer: a,
+                    tolerance: tol,
+                    dependsOnStageId: dependsOn || (i > 1 ? `s${i - 1}` : undefined),
+                    formula,
+                    explanation: e
+                });
+            }
+            if (data.subQuestions.length === 0) throw new Error("MPC requires at least one Stage (Sub 1 Text & Sub 1 Model Answer)");
+        } else if (data.type === 'DR') {
+            const mainAnswer = data.modelAnswer || s(getValue(row, ["Correct Answer", "Answer", "Result"]));
+            if (!mainAnswer) throw new Error("DR question requires a Model Answer for Part A");
+
+            const reasonOpts: Array<{ id: string; text: string; isCorrect: boolean }> = [];
+            const correctReasonOptRaw = s(getValue(row, ["Correct Option", "Correct Answer", "Sub 1 Correct", "Correct Reason"])).toUpperCase();
+
+            for (let i = 1; i <= 10; i++) {
+                const prefix = `Sub ${i}`;
+                const reasonText = s(getValue(row, [`${prefix} Text`, `Sub-Question ${i} Text`, `Reason ${i}`, `${prefix} Option A`, `${prefix} Reason`]));
+                if (!reasonText) continue;
+
+                const isSubCorrect = s(getValue(row, [`${prefix} Correct`, `${prefix} Correct Option`])).toUpperCase();
+                let isCorrect = isSubCorrect === 'TRUE' || isSubCorrect === 'YES' || isSubCorrect === '1';
+
+                const letter = String.fromCharCode(64 + i); // A, B, C...
+                if (correctReasonOptRaw === letter || correctReasonOptRaw === String(i)) {
+                    isCorrect = true;
+                }
+
+                reasonOpts.push({
+                    id: `r${i}`,
+                    text: reasonText,
+                    isCorrect
+                });
+            }
+
+            if (reasonOpts.length < 2) throw new Error("DR question requires at least 2 Reason options in Sub 1 Text & Sub 2 Text");
+            if (!reasonOpts.some(r => r.isCorrect)) throw new Error("DR question requires at least one correct Reason option (Sub X Correct = TRUE or Correct Option = A/B)");
+
+            data.subQuestions = reasonOpts.map(r => ({ question: r.text, isCorrect: r.isCorrect }));
+            data.options = reasonOpts;
         } else if (data.type === 'DESCRIPTIVE') {
             data.subQuestions = [];
             for (let i = 1; i <= 10; i++) {

@@ -5768,6 +5768,47 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
         }
       ],
       "explanation": "This question set covers key grammar points and creative writing for the SSC 2025 syllabus."
+    },
+    {
+      "type": "CMA",
+      "questionText": "A body starts from rest and moves with acceleration 4 m/s² for 5 seconds.",
+      "marks": 5,
+      "difficulty": "HARD",
+      "subject": "Physics",
+      "className": "Class 10",
+      "subQuestions": [
+        { "id": "p1", "label": "Final Velocity (m/s)", "marks": 2, "modelAnswer": "20", "type": "decimal", "tolerance": 0.05, "unit": "m/s" },
+        { "id": "p2", "label": "Displacement (m)", "marks": 3, "modelAnswer": "50", "type": "decimal", "tolerance": 0.1, "unit": "m" }
+      ],
+      "explanation": "v = u + at = 0 + 4*5 = 20 m/s; s = ut + 0.5*a*t^2 = 0 + 0.5*4*25 = 50m"
+    },
+    {
+      "type": "MPC",
+      "questionText": "A rocket accelerates upward from rest. Solve the multi-step problem chain below.",
+      "marks": 10,
+      "difficulty": "HARD",
+      "subject": "Physics",
+      "className": "Class 10",
+      "subQuestions": [
+        { "id": "s1", "stageTitle": "Stage 1: Calculate acceleration", "marks": 5, "modelAnswer": "10", "tolerance": 0.05 },
+        { "id": "s2", "stageTitle": "Stage 2: Calculate velocity after 5 seconds", "marks": 5, "modelAnswer": "50", "dependsOnStageId": "s1", "formula": "prev * 5", "tolerance": 0.1 }
+      ],
+      "explanation": "Stage 1: a = F/m = 10 m/s^2; Stage 2: v = a * t = 10 * 5 = 50 m/s (includes Error Propagation Protection)"
+    },
+    {
+      "type": "DR",
+      "questionText": "A car moves with constant velocity. What is its acceleration?",
+      "modelAnswer": "0",
+      "marks": 5,
+      "difficulty": "MEDIUM",
+      "subject": "Physics",
+      "className": "Class 10",
+      "reasonOptions": [
+        { "id": "r1", "text": "Velocity is constant, therefore dv/dt = 0", "isCorrect": true },
+        { "id": "r2", "text": "Acceleration is directly proportional to constant velocity", "isCorrect": false },
+        { "id": "r3", "text": "Constant velocity requires a non-zero net external force", "isCorrect": false }
+      ],
+      "explanation": "Constant velocity implies dv/dt = 0 according to Newton's First Law."
     }
   ];
 
@@ -5966,13 +6007,15 @@ function BulkUpload({ onQuestionSaved }: { onQuestionSaved: (q: Question) => voi
               <CardDescription className="max-w-md mx-auto">
                 Upload an Excel file (.xlsx) or paste JSON data to add questions in bulk.
               </CardDescription>
-              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3.5 text-left space-y-1 text-xs text-amber-900 dark:text-amber-200 max-w-lg">
+              <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl p-3.5 text-left space-y-1.5 text-xs text-amber-900 dark:text-amber-200 max-w-lg">
                 <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
                   <Info className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Template Field Notice: Model Answer vs Explanation</span>
+                  <span>Objective Template Instructions & Field Rules</span>
                 </div>
-                <p>• <strong>Model Answer:</strong> Official answer key (<strong>Required for INT & SQ</strong>). Rendered as correct answer in exams, evaluation, results & print keys.</p>
-                <p>• <strong>Teacher Note / Explanation:</strong> Optional step-by-step reasoning explaining why the answer is correct.</p>
+                <p>• <strong>Model Answer vs Explanation:</strong> Model Answer is the official answer key (required for INT, SQ, & DR Part A). Explanation is optional teacher notes/rationale.</p>
+                <p>• <strong>CMA (Constructed Multi-Answer):</strong> Set Type = <code>CMA</code>. Fill Sub 1-10 Text (part labels), Sub 1-10 Marks, & Sub 1-10 Model Answer (key values/expressions).</p>
+                <p>• <strong>MPC (Multi-Step Problem Chain):</strong> Set Type = <code>MPC</code>. Fill Sub 1-10 Text (stage titles), Sub 1-10 Marks, & Sub 1-10 Model Answer. Set Sub X Depends On & Sub X Formula for Error Propagation (EPH).</p>
+                <p>• <strong>DR (Diagnostic Reasoning):</strong> Set Type = <code>DR</code>. Fill Question Text & Model Answer (Part A). Fill Sub 1-4 Text (Part B justification reasons) & mark correct reason via Sub X Correct = TRUE (or Correct Option = A/B).</p>
               </div>
             </div>
 
